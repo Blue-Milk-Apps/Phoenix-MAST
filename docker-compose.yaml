@@ -1,0 +1,105 @@
+name: appcritiq-core
+
+services:
+  # MobSF provider for static binary scanning of IPA and APK file types.
+  mobsf-scanner:
+    image: opensecurity/mobile-security-framework-mobsf:latest
+    container_name: mobsf-scanner
+    ports:
+      - "8000:8000"
+    environment:
+      - MOBSF_API_KEY=${MOBSF_API_KEY:-appcritiq-local-mobsf-api-key}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/ -o /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    attach: false
+
+  # NVD database provider
+  nvd-container:
+    image: ghcr.io/blue-milk-apps/nvd-container:latest
+    container_name: nvd-container
+    volumes:
+      - nvd-owasp-data:/data/owasp
+    healthcheck:
+      test: ["CMD", "test", "-f", "/data/owasp/odc.mv.db"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  # Gitleaks secret scanner
+  gitleaks:
+    image: ghcr.io/gitleaks/gitleaks:v8.30.1
+    container_name: gitleaks
+    volumes:
+      - ${PROJECT_MOUNT_PATH:-.}:/workspace:ro
+      - ${OUTPUT_PATH:-./scan-results}:/app/results
+    command: [
+      "dir",
+      "${GITLEAKS_SCAN_PATH:-/workspace}",
+      "--report-format",
+      "json",
+      "--report-path",
+      "/app/results/gitleaks-report.json"
+    ]
+
+  # Primary AppcritIQ Core Service
+  appcritiq:
+    image: appcritiq-core:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: "1001:1001"
+    container_name: appcritiq-core
+    depends_on:
+      mobsf-scanner:
+        condition: service_healthy
+      nvd-container:
+        condition: service_healthy
+    volumes:
+      - ${PROJECT_MOUNT_PATH:-.}:/workspace:ro
+      - ${OUTPUT_PATH:-./scan-results}:/app/results
+      - nvd-owasp-data:/opt/dependency-check/data
+
+    environment:
+      - DEPENDENCY_CHECK_DATA_DIR=/opt/dependency-check/data
+      - DC_NO_UPDATE=1
+      - CI=true
+    command: ["scan", "${SCAN_FLAG:?Set SCAN_FLAG to one AppcritIQ scan target flag}", "${PHOENIX_SCAN_PATH:?Set PHOENIX_SCAN_PATH to the scan path inside the container}", "--output", "/app/results"]
+
+
+  appcritiq-secrets:
+    image: appcritiq-core:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["secrets-only"]
+    volumes:
+      - ${PROJECT_MOUNT_PATH:-./sample-project}:/workspace:ro
+      - ${OUTPUT_PATH:-./scan-results}:/app/results
+    command: ["scan", "${SCAN_FLAG:?Set SCAN_FLAG to one AppcritIQ scan target flag}", "${PHOENIX_SCAN_PATH:?Set PHOENIX_SCAN_PATH to the scan path inside the container}", "--output", "/app/results"]
+
+  appcritiq-deps:
+    image: appcritiq-core:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["deps-only"]
+    depends_on:
+      nvd-container:
+        condition: service_healthy
+    volumes:
+      - ${PROJECT_MOUNT_PATH:-./sample-project}:/workspace:ro
+      - ${OUTPUT_PATH:-./scan-results}:/app/results
+      - nvd-owasp-data:/opt/dependency-check/data
+    command: ["scan", "${SCAN_FLAG:?Set SCAN_FLAG to one AppcritIQ scan target flag}", "${PHOENIX_SCAN_PATH:?Set PHOENIX_SCAN_PATH to the scan path inside the container}", "--output", "/app/results"]
+
+volumes:
+  nvd-owasp-data:
+
+networks:
+  default:
+    name: appcritiq-core

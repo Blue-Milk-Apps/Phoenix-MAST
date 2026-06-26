@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "appcritiq-core"
+version = "0.1.0"
+description = "All-in-one MobSec MAST tool for iOS and Android"
+requires-python = ">=3.12"
+dependencies = [
+    "androguard>=4.1.3",
+    "apkid==3.1.0",
+    "lief",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.15.15",
+]
+
+[project.scripts]
+appcritiq = "entrypoints.cli:main"
+
+[tool.setuptools]
+packages = [
+    "adapters",
+    "adapters.binary_scanners",
+    "adapters.output",
+    "adapters.storage",
+    "adapters.source_code_scanners",
+    "application",
+    "catalogs",
+    "domain",
+    "entrypoints",
+    "ports",
+    "utilities",
+]
+
+[tool.setuptools.package-data]
+catalogs = ["*.json", "*.csv"]
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests",
+]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+extend-select = ["I"]
