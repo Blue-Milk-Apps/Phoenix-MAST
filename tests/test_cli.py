@@ -31,7 +31,12 @@ def _patch_core_scanners(monkeypatch) -> None:
     monkeypatch.setattr(
         cli,
         "OpenGrepScanner",
-        _fake_scanner(ScanType.OPENGREP, "OpenGrep"),
+        _fake_scanner(ScanType.OPENGREP_SOURCE, "OpenGrep"),
+    )
+    monkeypatch.setattr(
+        cli,
+        "BinaryOpenGrepScanner",
+        _fake_scanner(ScanType.OPENGREP_BINARY, "OpenGrep Binary"),
     )
     monkeypatch.setattr(
         cli,
@@ -105,7 +110,7 @@ def _patch_core_scanners(monkeypatch) -> None:
     )
 
 
-def _scan_args(tmp_path: Path, flag_name: str) -> argparse.Namespace:
+def _scan_args(tmp_path: Path, flag_name: str, extra_args: list[str] | None = None) -> argparse.Namespace:
     parser = cli._build_parser()
     return parser.parse_args(
         [
@@ -114,6 +119,7 @@ def _scan_args(tmp_path: Path, flag_name: str) -> argparse.Namespace:
             str(tmp_path),
             "--output",
             str(tmp_path / "results"),
+            *(extra_args or []),
         ]
     )
 
@@ -146,6 +152,31 @@ def test_create_scan_config_for_android_binary(tmp_path: Path, monkeypatch) -> N
             ScanType.STRINGS,
         },
     )
+
+
+def test_create_scan_config_for_android_binary_includes_opengrep_when_rules_path_is_configured(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.delenv("MOBSF_URL", raising=False)
+    rules_path = tmp_path / "android-opengrep-rules"
+    rules_path.mkdir()
+    args = _scan_args(
+        tmp_path,
+        "--android-binary-path",
+        ["--android-binary-opengrep-rules-path", str(rules_path)],
+    )
+
+    config = cli._create_scan_config(args)
+
+    assert {scanner.scan_type for scanner in config.scanners} == {
+        ScanType.ANDROGUARD,
+        ScanType.AAPT2,
+        ScanType.APKTOOL,
+        ScanType.APKSIGNER,
+        ScanType.APKID,
+        ScanType.STRINGS,
+        ScanType.OPENGREP_BINARY,
+    }
 
 
 def test_create_scan_config_for_android_binary_includes_mobsf_when_url_is_configured(
@@ -189,6 +220,29 @@ def test_create_scan_config_for_ios_binary(tmp_path: Path, monkeypatch) -> None:
     )
 
 
+def test_create_scan_config_for_ios_binary_includes_opengrep_when_rules_path_is_configured(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.delenv("MOBSF_URL", raising=False)
+    rules_path = tmp_path / "ios-opengrep-rules"
+    rules_path.mkdir()
+    args = _scan_args(
+        tmp_path,
+        "--ios-binary-path",
+        ["--ios-binary-opengrep-rules-path", str(rules_path)],
+    )
+
+    config = cli._create_scan_config(args)
+
+    assert {scanner.scan_type for scanner in config.scanners} == {
+        ScanType.IPSW,
+        ScanType.LIEF,
+        ScanType.STRINGS,
+        ScanType.PLIST_BINARY,
+        ScanType.OPENGREP_BINARY,
+    }
+
+
 def test_create_scan_config_for_ios_binary_includes_mobsf_when_url_is_configured(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("MOBSF_URL", "http://localhost:8000")
     args = _scan_args(tmp_path, "--ios-binary-path")
@@ -217,7 +271,6 @@ def test_create_scan_config_for_flutter_source(tmp_path: Path) -> None:
     _assert_scanner_types(
         config,
         {
-            ScanType.OPENGREP,
             ScanType.TRUFFLEHOG,
             ScanType.GITLEAKS,
             ScanType.PLIST_SOURCE,
@@ -225,6 +278,29 @@ def test_create_scan_config_for_flutter_source(tmp_path: Path) -> None:
             ScanType.SYFT,
         },
     )
+
+
+def test_create_scan_config_for_flutter_source_includes_opengrep_when_rules_path_is_configured(
+    tmp_path: Path,
+) -> None:
+    rules_path = tmp_path / "flutter-opengrep-rules"
+    rules_path.mkdir()
+    args = _scan_args(
+        tmp_path,
+        "--flutter-source-path",
+        ["--flutter-source-opengrep-rules-path", str(rules_path)],
+    )
+
+    config = cli._create_scan_config(args)
+
+    assert {scanner.scan_type for scanner in config.scanners} == {
+        ScanType.OPENGREP_SOURCE,
+        ScanType.TRUFFLEHOG,
+        ScanType.GITLEAKS,
+        ScanType.PLIST_SOURCE,
+        ScanType.DEPENDENCY_CHECK,
+        ScanType.SYFT,
+    }
 
 
 def test_create_scan_config_for_react_native_source(tmp_path: Path) -> None:
@@ -237,7 +313,6 @@ def test_create_scan_config_for_react_native_source(tmp_path: Path) -> None:
     _assert_scanner_types(
         config,
         {
-            ScanType.OPENGREP,
             ScanType.TRUFFLEHOG,
             ScanType.GITLEAKS,
             ScanType.PLIST_SOURCE,
@@ -245,6 +320,29 @@ def test_create_scan_config_for_react_native_source(tmp_path: Path) -> None:
             ScanType.SYFT,
         },
     )
+
+
+def test_create_scan_config_for_react_native_source_includes_opengrep_when_rules_path_is_configured(
+    tmp_path: Path,
+) -> None:
+    rules_path = tmp_path / "react-native-opengrep-rules"
+    rules_path.mkdir()
+    args = _scan_args(
+        tmp_path,
+        "--react-native-source-path",
+        ["--react-native-source-opengrep-rules-path", str(rules_path)],
+    )
+
+    config = cli._create_scan_config(args)
+
+    assert {scanner.scan_type for scanner in config.scanners} == {
+        ScanType.OPENGREP_SOURCE,
+        ScanType.TRUFFLEHOG,
+        ScanType.GITLEAKS,
+        ScanType.PLIST_SOURCE,
+        ScanType.DEPENDENCY_CHECK,
+        ScanType.SYFT,
+    }
 
 
 def test_create_scan_config_for_native_android_source(tmp_path: Path) -> None:
@@ -257,13 +355,34 @@ def test_create_scan_config_for_native_android_source(tmp_path: Path) -> None:
     _assert_scanner_types(
         config,
         {
-            ScanType.OPENGREP,
             ScanType.TRUFFLEHOG,
             ScanType.GITLEAKS,
             ScanType.DEPENDENCY_CHECK,
             ScanType.SYFT,
         },
     )
+
+
+def test_create_scan_config_for_native_android_source_includes_opengrep_when_rules_path_is_configured(
+    tmp_path: Path,
+) -> None:
+    rules_path = tmp_path / "native-android-opengrep-rules"
+    rules_path.mkdir()
+    args = _scan_args(
+        tmp_path,
+        "--native-android-source-path",
+        ["--native-android-source-opengrep-rules-path", str(rules_path)],
+    )
+
+    config = cli._create_scan_config(args)
+
+    assert {scanner.scan_type for scanner in config.scanners} == {
+        ScanType.OPENGREP_SOURCE,
+        ScanType.TRUFFLEHOG,
+        ScanType.GITLEAKS,
+        ScanType.DEPENDENCY_CHECK,
+        ScanType.SYFT,
+    }
 
 
 def test_create_scan_config_for_native_ios_source(tmp_path: Path) -> None:
@@ -276,13 +395,36 @@ def test_create_scan_config_for_native_ios_source(tmp_path: Path) -> None:
     _assert_scanner_types(
         config,
         {
-            ScanType.OPENGREP,
             ScanType.TRUFFLEHOG,
             ScanType.GITLEAKS,
             ScanType.PLIST_SOURCE,
             ScanType.SYFT,
         },
     )
+
+
+def test_create_scan_config_for_native_ios_source_includes_opengrep_when_rules_path_is_configured(
+    tmp_path: Path,
+) -> None:
+    rules_path = tmp_path / "native-ios-opengrep-rules"
+    rules_path.mkdir()
+    args = _scan_args(
+        tmp_path,
+        "--native-ios-source-path",
+        ["--native-ios-source-opengrep-rules-path", str(rules_path)],
+    )
+
+    config = cli._create_scan_config(args)
+
+    assert {scanner.scan_type for scanner in config.scanners} == {
+        ScanType.OPENGREP_SOURCE,
+        ScanType.TRUFFLEHOG,
+        ScanType.GITLEAKS,
+        ScanType.PLIST_SOURCE,
+        ScanType.SYFT,
+    }
+
+
 
 
 def test_scan_command_prints_selected_scan_details(tmp_path: Path, capsys, monkeypatch) -> None:
@@ -423,6 +565,12 @@ def test_cli_help_mentions_scan_path_flags(capsys) -> None:
     assert "--react-native-source-path" in output
     assert "--native-android-source-path" in output
     assert "--native-ios-source-path" in output
+    assert "--ios-binary-opengrep-rules-path" in output
+    assert "--android-binary-opengrep-rules-path" in output
+    assert "--flutter-source-opengrep-rules-path" in output
+    assert "--react-native-source-opengrep-rules-path" in output
+    assert "--native-android-source-opengrep-rules-path" in output
+    assert "--native-ios-source-opengrep-rules-path" in output
     assert "--sourcecode-path" not in output
     assert "--binary-path" not in output
     assert "--syft-output-format" in output

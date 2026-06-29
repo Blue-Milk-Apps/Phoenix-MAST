@@ -16,6 +16,7 @@ from adapters.binary_scanners import (
     ApkidScanner,
     ApksignerScanner,
     ApktoolScanner,
+    BinaryOpenGrepScanner,
     IpswScanner,
     LIEFScanner,
     MobSFScanner,
@@ -113,6 +114,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_SYFT_OUTPUT_FORMAT,
         help=(f"Syft SBOM output format to capture from stdout (default: {DEFAULT_SYFT_OUTPUT_FORMAT})"),
     )
+    scan_parser.add_argument("--ios-binary-opengrep-rules-path", type=Path, metavar="PATH")
+    scan_parser.add_argument("--android-binary-opengrep-rules-path", type=Path, metavar="PATH")
+    scan_parser.add_argument("--flutter-source-opengrep-rules-path", type=Path, metavar="PATH")
+    scan_parser.add_argument("--react-native-source-opengrep-rules-path", type=Path, metavar="PATH")
+    scan_parser.add_argument("--native-android-source-opengrep-rules-path", type=Path, metavar="PATH")
+    scan_parser.add_argument("--native-ios-source-opengrep-rules-path", type=Path, metavar="PATH")
     scan_parser.set_defaults(func=_scan_command)
 
     return parser
@@ -175,8 +182,6 @@ def _report_context_from_scan_config(scan_config: ScanConfig) -> dict[str, str]:
 
 
 def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
-    default_rules_path = _default_rules_path()
-
     match args:
         case argparse.Namespace(android_binary_path=Path() as project_path):
             scan_mode = "binary"
@@ -190,6 +195,12 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
                 ApkidScanner(),
                 StringsScanner(),
             ]
+            if args.android_binary_opengrep_rules_path:
+                scanners.append(
+                    BinaryOpenGrepScanner(
+                        rules_path=args.android_binary_opengrep_rules_path.resolve()
+                    )
+                )
 
         case argparse.Namespace(ios_binary_path=Path() as project_path):
             scan_mode = "binary"
@@ -201,56 +212,86 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
                 StringsScanner(),
                 PlistBinaryScanner(),
             ]
+            if args.ios_binary_opengrep_rules_path:
+                scanners.append(
+                    BinaryOpenGrepScanner(
+                        rules_path=args.ios_binary_opengrep_rules_path.resolve()
+                    )
+                )
 
         case argparse.Namespace(flutter_source_path=Path() as project_path):
             scan_mode = "source"
             scan_label = "Flutter source"
             scan_slug = "flutter_source"
             scanners = [
-                OpenGrepScanner(default_rules_path=default_rules_path),
                 TrufflehogScanner(),
                 GitleaksScanner(),
                 PlistSourceScanner(),
                 DependencyCheckScanner(),
                 SyftScanner(output_format=args.syft_output_format),
             ]
+            if args.flutter_source_opengrep_rules_path:
+                scanners.insert(
+                    0,
+                    OpenGrepScanner(
+                        rules_path=args.flutter_source_opengrep_rules_path.resolve()
+                    ),
+                )
 
         case argparse.Namespace(react_native_source_path=Path() as project_path):
             scan_mode = "source"
             scan_label = "React Native source"
             scan_slug = "react_native_source"
             scanners = [
-                OpenGrepScanner(default_rules_path=default_rules_path),
                 TrufflehogScanner(),
                 GitleaksScanner(),
                 PlistSourceScanner(),
                 DependencyCheckScanner(),
                 SyftScanner(output_format=args.syft_output_format),
             ]
+            if args.react_native_source_opengrep_rules_path:
+                scanners.insert(
+                    0,
+                    OpenGrepScanner(
+                        rules_path=args.react_native_source_opengrep_rules_path.resolve()
+                    ),
+                )
 
         case argparse.Namespace(native_android_source_path=Path() as project_path):
             scan_mode = "source"
             scan_label = "Native Android source"
             scan_slug = "native_android_source"
             scanners = [
-                OpenGrepScanner(default_rules_path=default_rules_path),
                 TrufflehogScanner(),
                 GitleaksScanner(),
                 DependencyCheckScanner(),
                 SyftScanner(output_format=args.syft_output_format),
             ]
+            if args.native_android_source_opengrep_rules_path:
+                scanners.insert(
+                    0,
+                    OpenGrepScanner(
+                        rules_path=args.native_android_source_opengrep_rules_path.resolve()
+                    ),
+                )
 
         case argparse.Namespace(native_ios_source_path=Path() as project_path):
             scan_mode = "source"
             scan_label = "Native iOS source"
             scan_slug = "native_ios_source"
             scanners = [
-                OpenGrepScanner(default_rules_path=default_rules_path),
                 TrufflehogScanner(),
                 GitleaksScanner(),
                 PlistSourceScanner(),
                 SyftScanner(output_format=args.syft_output_format),
             ]
+            if args.native_ios_source_opengrep_rules_path:
+                scanners.insert(
+                    0,
+                    OpenGrepScanner(
+                        rules_path=args.native_ios_source_opengrep_rules_path.resolve()
+                    ),
+                )
 
         case _:
             raise ValueError("No valid scan type provided")
@@ -264,33 +305,10 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
         output_path=output_path,
         mode=scan_mode,
         scan_label=scan_label,
-        rules_path=default_rules_path,
         scanners=scanners,
         enabled_scans=[scanner.scan_type for scanner in scanners],
     )
     return scan_config
-
-
-def _default_rules_path() -> Path:
-    candidates = []
-
-    env_rules_path_raw = os.environ.get("PHOENIX_RULES_PATH", "").strip()
-    if env_rules_path_raw:
-        candidates.append(Path(env_rules_path_raw).expanduser())
-
-    candidates.extend(
-        [
-            Path(__file__).parent.parent / "rules",
-            Path("/app/rules"),
-            Path.cwd() / "rules",
-        ]
-    )
-
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate.resolve()
-
-    return (Path(__file__).parent.parent / "rules").resolve()
 
 
 def _mobsf_url_configured() -> bool:

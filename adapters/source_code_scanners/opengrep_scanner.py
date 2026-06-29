@@ -21,13 +21,13 @@ class OpenGrepScanner(ScannerPort):
 
     DEFAULT_PROCESS_TIMEOUT_SECONDS = 300
 
-    def __init__(self, default_rules_path: Path | None = None) -> None:
-        self._default_rules_path = default_rules_path
+    def __init__(self, rules_path: Path | None = None) -> None:
+        self._rules_path = rules_path.resolve() if rules_path else None
         self._tool_version: str | None = None
 
     @property
     def scan_type(self) -> ScanType:
-        return ScanType.OPENGREP
+        return ScanType.OPENGREP_SOURCE
 
     @property
     def name(self) -> str:
@@ -88,24 +88,18 @@ class OpenGrepScanner(ScannerPort):
         return self._tool_version
 
     def _get_rules_path(self, config: ScanConfig) -> Path | None:
+        if self._rules_path:
+            return self._rules_path if self._rules_path.exists() else None
+
         if config.rules_path:
             return config.rules_path if config.rules_path.exists() else None
-
-        candidates: list[Path] = []
-        if self._default_rules_path:
-            candidates.append(self._default_rules_path)
-        candidates.extend(
-            [
-                Path(__file__).parent.parent.parent / "rules",
-                Path("/app/rules"),
-                Path.cwd() / "rules",
-            ]
-        )
-
-        for candidate in candidates:
-            if candidate.exists():
-                return candidate.resolve()
         return None
+
+    def _has_rule_files(self, rules_path: Path) -> bool:
+        return any(
+            path.is_file() and path.suffix.lower() in {".yml", ".yaml"}
+            for path in rules_path.rglob("*")
+        )
 
     def _timeout_seconds(self) -> int:
         raw = os.environ.get("APPCRITIQ_OPENGREP_TIMEOUT", "").strip() or os.environ.get(
@@ -134,6 +128,8 @@ class OpenGrepScanner(ScannerPort):
             rules_path = self._get_rules_path(config)
             if not rules_path:
                 return [self._failure("No rules path found. Please configure rules_path in config.")]
+            if not self._has_rule_files(rules_path):
+                return [self._failure(f"No OpenGrep rule files found in: {rules_path}")]
 
             executable = self._opengrep_executable()
             if not executable:
