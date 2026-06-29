@@ -243,6 +243,28 @@ def test_create_scan_config_for_ios_binary_includes_opengrep_when_rules_path_is_
     }
 
 
+def test_create_scan_config_for_ios_binary_uses_default_opengrep_rules_path_when_present(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    captured = {}
+    rules_path = tmp_path / "ios-native-binary"
+    rules_path.mkdir()
+
+    def recording_binary_opengrep_scanner(*args, **kwargs):
+        captured["rules_path"] = kwargs.get("rules_path")
+        return FakeScanner(ScanType.OPENGREP_BINARY, "OpenGrep Binary")
+
+    monkeypatch.setattr(cli, "BinaryOpenGrepScanner", recording_binary_opengrep_scanner)
+    monkeypatch.setattr(cli, "_resolve_opengrep_rules_path", lambda override, slug: rules_path)
+    monkeypatch.delenv("MOBSF_URL", raising=False)
+
+    config = cli._create_scan_config(_scan_args(tmp_path, "--ios-binary-path"))
+
+    assert captured["rules_path"] == rules_path
+    assert ScanType.OPENGREP_BINARY in {scanner.scan_type for scanner in config.scanners}
+
+
 def test_create_scan_config_for_ios_binary_includes_mobsf_when_url_is_configured(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("MOBSF_URL", "http://localhost:8000")
     args = _scan_args(tmp_path, "--ios-binary-path")
@@ -301,6 +323,27 @@ def test_create_scan_config_for_flutter_source_includes_opengrep_when_rules_path
         ScanType.DEPENDENCY_CHECK,
         ScanType.SYFT,
     }
+
+
+def test_create_scan_config_for_flutter_source_uses_default_opengrep_rules_path_when_present(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    captured = {}
+    rules_path = tmp_path / "flutter-source"
+    rules_path.mkdir()
+
+    def recording_opengrep_scanner(*args, **kwargs):
+        captured["rules_path"] = kwargs.get("rules_path")
+        return FakeScanner(ScanType.OPENGREP_SOURCE, "OpenGrep")
+
+    monkeypatch.setattr(cli, "OpenGrepScanner", recording_opengrep_scanner)
+    monkeypatch.setattr(cli, "_resolve_opengrep_rules_path", lambda override, slug: rules_path)
+
+    config = cli._create_scan_config(_scan_args(tmp_path, "--flutter-source-path"))
+
+    assert captured["rules_path"] == rules_path
+    assert ScanType.OPENGREP_SOURCE in {scanner.scan_type for scanner in config.scanners}
 
 
 def test_create_scan_config_for_react_native_source(tmp_path: Path) -> None:

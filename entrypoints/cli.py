@@ -37,6 +37,14 @@ from domain.models import ScanConfig
 from ports.scanner_port import ScannerPort
 
 DEFAULT_SYFT_OUTPUT_FORMAT = "cyclonedx-json"
+DEFAULT_OPENGREP_RULES_DIRS = {
+    "ios_binary": "ios-native-binary",
+    "android_binary": "android-native-binary",
+    "flutter_source": "flutter-source",
+    "react_native_source": "react-native-source",
+    "native_android_source": "android-native-source",
+    "native_ios_source": "ios-native-source",
+}
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -195,10 +203,14 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
                 ApkidScanner(),
                 StringsScanner(),
             ]
-            if args.android_binary_opengrep_rules_path:
+            rules_path = _resolve_opengrep_rules_path(
+                args.android_binary_opengrep_rules_path,
+                "android_binary",
+            )
+            if rules_path:
                 scanners.append(
                     BinaryOpenGrepScanner(
-                        rules_path=args.android_binary_opengrep_rules_path.resolve()
+                        rules_path=rules_path
                     )
                 )
 
@@ -212,10 +224,14 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
                 StringsScanner(),
                 PlistBinaryScanner(),
             ]
-            if args.ios_binary_opengrep_rules_path:
+            rules_path = _resolve_opengrep_rules_path(
+                args.ios_binary_opengrep_rules_path,
+                "ios_binary",
+            )
+            if rules_path:
                 scanners.append(
                     BinaryOpenGrepScanner(
-                        rules_path=args.ios_binary_opengrep_rules_path.resolve()
+                        rules_path=rules_path
                     )
                 )
 
@@ -230,11 +246,15 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
                 DependencyCheckScanner(),
                 SyftScanner(output_format=args.syft_output_format),
             ]
-            if args.flutter_source_opengrep_rules_path:
+            rules_path = _resolve_opengrep_rules_path(
+                args.flutter_source_opengrep_rules_path,
+                "flutter_source",
+            )
+            if rules_path:
                 scanners.insert(
                     0,
                     OpenGrepScanner(
-                        rules_path=args.flutter_source_opengrep_rules_path.resolve()
+                        rules_path=rules_path
                     ),
                 )
 
@@ -249,11 +269,15 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
                 DependencyCheckScanner(),
                 SyftScanner(output_format=args.syft_output_format),
             ]
-            if args.react_native_source_opengrep_rules_path:
+            rules_path = _resolve_opengrep_rules_path(
+                args.react_native_source_opengrep_rules_path,
+                "react_native_source",
+            )
+            if rules_path:
                 scanners.insert(
                     0,
                     OpenGrepScanner(
-                        rules_path=args.react_native_source_opengrep_rules_path.resolve()
+                        rules_path=rules_path
                     ),
                 )
 
@@ -267,11 +291,15 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
                 DependencyCheckScanner(),
                 SyftScanner(output_format=args.syft_output_format),
             ]
-            if args.native_android_source_opengrep_rules_path:
+            rules_path = _resolve_opengrep_rules_path(
+                args.native_android_source_opengrep_rules_path,
+                "native_android_source",
+            )
+            if rules_path:
                 scanners.insert(
                     0,
                     OpenGrepScanner(
-                        rules_path=args.native_android_source_opengrep_rules_path.resolve()
+                        rules_path=rules_path
                     ),
                 )
 
@@ -285,11 +313,15 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
                 PlistSourceScanner(),
                 SyftScanner(output_format=args.syft_output_format),
             ]
-            if args.native_ios_source_opengrep_rules_path:
+            rules_path = _resolve_opengrep_rules_path(
+                args.native_ios_source_opengrep_rules_path,
+                "native_ios_source",
+            )
+            if rules_path:
                 scanners.insert(
                     0,
                     OpenGrepScanner(
-                        rules_path=args.native_ios_source_opengrep_rules_path.resolve()
+                        rules_path=rules_path
                     ),
                 )
 
@@ -313,6 +345,23 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
 
 def _mobsf_url_configured() -> bool:
     return bool(os.environ.get("MOBSF_URL", "").strip())
+
+
+def _resolve_opengrep_rules_path(
+    override_path: Path | None,
+    scan_slug: str,
+) -> Path | None:
+    if override_path is not None:
+        return override_path.resolve()
+
+    default_dir = DEFAULT_OPENGREP_RULES_DIRS.get(scan_slug)
+    if not default_dir:
+        return None
+
+    candidate = (Path(__file__).parent.parent / "rules" / default_dir).resolve()
+    if candidate.exists():
+        return candidate
+    return None
 
 
 if __name__ == "__main__":
