@@ -248,7 +248,7 @@ def test_create_scan_config_for_ios_binary_uses_default_opengrep_rules_path_when
     monkeypatch,
 ) -> None:
     captured = {}
-    rules_path = tmp_path / "ios-native-binary"
+    rules_path = tmp_path / "ios"
     rules_path.mkdir()
 
     def recording_binary_opengrep_scanner(*args, **kwargs):
@@ -330,7 +330,7 @@ def test_create_scan_config_for_flutter_source_uses_default_opengrep_rules_path_
     monkeypatch,
 ) -> None:
     captured = {}
-    rules_path = tmp_path / "flutter-source"
+    rules_path = tmp_path / "flutter"
     rules_path.mkdir()
 
     def recording_opengrep_scanner(*args, **kwargs):

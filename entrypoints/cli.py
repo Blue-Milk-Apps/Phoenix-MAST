@@ -38,12 +38,12 @@ from ports.scanner_port import ScannerPort
 
 DEFAULT_SYFT_OUTPUT_FORMAT = "cyclonedx-json"
 DEFAULT_OPENGREP_RULES_DIRS = {
-    "ios_binary": "ios-native-binary",
-    "android_binary": "android-native-binary",
-    "flutter_source": "flutter-source",
-    "react_native_source": "react-native-source",
-    "native_android_source": "android-native-source",
-    "native_ios_source": "ios-native-source",
+    "ios_binary": "ios",
+    "android_binary": "android",
+    "flutter_source": "flutter",
+    "react_native_source": "react_native",
+    "native_android_source": "android",
+    "native_ios_source": "ios",
 }
 
 
