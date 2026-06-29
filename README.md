@@ -1,93 +1,39 @@
-# appcritiq-core
+# AppCritIQ Core
 
-AppcritIQ Core is the Python foundation for AppcritIQ, an all-in-one Mobile Application Security Testing (MAST) tool for iOS and Android applications.
+AppCritIQ Core is an open source mobile application security testing toolkit for iOS and Android. It packages a practical set of OSS security and analysis tools into a Docker-first workflow, then adds lightweight Python orchestration so teams can run repeatable checks against source projects and mobile binaries.
 
-## What The Project Does
+The project is intentionally modular. Scanner adapters live behind stable ports, so AppCritIQ can be extended, slimmed down, or customized for a specific review process without rewriting the whole pipeline.
 
-AppcritIQ Core is intended to coordinate mobile security scanning workflows from one project:
+## Features
 
-- Static analysis for mobile application security issues
-- Secret detection for accidental credential exposure
-- Dependency vulnerability checks
-- Software Bill of Materials (SBOM) generation
+- Static analysis orchestration for iOS, Android, Flutter, and React Native projects
+- Secret detection with OSS scanners such as Gitleaks and TruffleHog
+- Dependency vulnerability checks with OWASP Dependency-Check
+- SBOM generation with Syft
+- IPA and APK binary analysis with tools such as Strings, LIEF, ipsw, Androguard, Apktool, Apksigner, and APKiD
+- Optional MobSF integration for deeper binary scanning
+- Docker and Docker Compose workflows for repeatable local and CI usage
+- Python port-and-adapter architecture for adding, removing, or swapping scanner implementations
 
-The project is designed to give engineers and security reviewers a consistent place to run and extend mobile application security checks.
+## Quick Start
 
-## Why The Project Is Useful
-
-Mobile application reviews often require several tools, output formats, and setup steps. AppcritIQ Core aims to make that workflow easier to repeat by collecting scanner orchestration, and configuration in one Python project.
-
-Using `uv` keeps Python dependency management fast and reproducible for local development and CI.
-
-## Getting Started
-
-Install `uv`:
+The most convenient way to run AppCritIQ is the released Docker image from GitHub Container Registry.
 
 ```bash
-brew install uv
+mkdir -p scan-results
+
+docker run --rm \
+  -v "$PWD:/workspace:ro" \
+  -v "$PWD/scan-results:/app/results" \
+  ghcr.io/blue-milk-apps/appcritiq-core:<version> \
+  scan --native-ios-source-path /workspace --output /app/results
 ```
 
-Or use the official installer:
+Replace `<version>` with the release tag you want to run, and replace the scan flag with the target type that matches your app.
 
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
+## Scan Targets
 
-Clone the repository:
-
-```bash
-git clone https://github.com/Blue-Milk-Apps/appcritiq-core.git
-cd appcritiq-core
-```
-
-Create a local environment with `uv`:
-
-```bash
-uv venv
-source .venv/bin/activate
-```
-
-When project dependencies are defined, install them with:
-
-```bash
-uv sync
-```
-
-## Local Scanner Setup
-
-AppcritIQ runs several external scanner tools from your local `PATH`. For local scans, install the scanner binaries and prepare any required local data before running `appcritiq scan`.
-
-At minimum:
-
-- Install `trufflehog`, `gitleaks`, `dependency-check`, and `syft`.
-- Install the `lief` Python package for IPA-only binary analysis.
-- Install `ipsw` for IPA-only signing, entitlement, and Mach-O load-command analysis.
-- Install `apktool` for APK semantic reconstruction and evidence extraction.
-- Install `apksigner` for APK signing integrity and signer identity evidence.
-- Make sure `strings` is installed and available on your `PATH` for binary scans.
-- For OWASP Dependency-Check, install Java and prepare the local NVD database under `nvd-owasp-data/`.
-- MobSF is optional for IPA/APK binary scans. Set `MOBSF_URL` when you want AppcritIQ to include MobSF results.
-
-Detailed setup instructions are in [setup/README.md](setup/README.md), with tool-specific notes for:
-
-- [MobSF Scanner and MobSF](setup/mobsf-scanner/README.md)
-- [OWASP Dependency-Check and NVD data](setup/dependency-check/README.md)
-- [Syft](setup/syft/README.md)
-- [TruffleHog](setup/trufflehog/README.md)
-- [Gitleaks](setup/gitleaks/README.md)
-- [Strings](setup/strings/README.md)
-- [LIEF](setup/lief/README.md)
-- [ipsw](setup/ipsw/README.md)
-- [Apktool](setup/apktool/README.md)
-- [Apksigner](setup/apksigner/README.md)
-
-## How to Run
-
-### Scan Target Flags
-
-`appcritiq scan` requires exactly one scan target flag. Any of these flags is valid:
-Run with `appcritiq scan <source_scan_flag> path/to/file|folder
-e.g
+`appcritiq scan` requires exactly one scan target flag.
 
 ```bash
 appcritiq scan --ios-binary-path path/to/app.ipa
@@ -98,19 +44,50 @@ appcritiq scan --native-android-source-path path/to/project
 appcritiq scan --native-ios-source-path path/to/project
 ```
 
-Source scans run Gitleaks, TruffleHog, Dependency-Check, and Syft, with plist extraction included for Flutter, React Native, and native iOS source scans. Binary scans run Strings, with LIEF, ipsw, and plist extraction for iOS binaries and Androguard, Apktool, Apksigner, and APKiD for Android binaries. MobSF runs for binary scans only when `MOBSF_URL` is configured.
+Source scans run Gitleaks, TruffleHog, Dependency-Check, and Syft, with plist extraction included for Flutter, React Native, and native iOS source scans.
 
-## Makefile Usage
+Binary scans run Strings, with LIEF, ipsw, and plist extraction for iOS binaries and Androguard, Apktool, Apksigner, and APKiD for Android binaries. MobSF runs for binary scans only when `MOBSF_URL` is configured.
 
-Use `make run` to run the AppcritIQ Docker image directly against a local target. `PROJECT_PATH` defaults to the current directory, `PHOENIX_SCAN_PATH` defaults to `/workspace`, and `RESULTS_DIR` defaults to `./scan-results`.
+## Running AppCritIQ
+
+### 1. Released Docker Image
+
+Use the pre-built, versioned container when you want the fastest path with the scanner tooling already bundled.
+
+For source projects:
 
 ```bash
-make run PROJECT_PATH=path/to/project SCAN_FLAG=--<scan-target-flag>
+mkdir -p scan-results
+
+docker run --rm \
+  -v "/path/to/project:/workspace:ro" \
+  -v "$PWD/scan-results:/app/results" \
+  ghcr.io/blue-milk-apps/appcritiq-core:<version> \
+  scan --react-native-source-path /workspace --output /app/results
 ```
 
-Use `make compose-run` for the Docker Compose workflow. It builds AppcritIQ, starts required Compose services, mounts the target, and passes the scan target flag into the AppcritIQ container. MobSF is not enabled unless `MOBSF_URL` is provided.
+For mobile binaries, mount the directory that contains the binary and scan the file path inside the container:
 
 ```bash
+mkdir -p scan-results
+
+docker run --rm \
+  -v "/path/to/binaries:/workspace:ro" \
+  -v "$PWD/scan-results:/app/results" \
+  ghcr.io/blue-milk-apps/appcritiq-core:<version> \
+  scan --ios-binary-path /workspace/app.ipa --output /app/results
+```
+
+Use `--android-binary-path /workspace/app.apk` for APK scans.
+
+### 2. Local Docker Compose
+
+Use `make compose-run` when you are working from a clone of this repository and want AppCritIQ to build locally, start its Compose services, mount the target, and write results to `./scan-results`.
+
+```bash
+git clone https://github.com/Blue-Milk-Apps/appcritiq-core.git
+cd appcritiq-core
+
 make compose-run PROJECT_PATH=path/to/project SCAN_FLAG=--native-ios-source-path
 ```
 
@@ -127,13 +104,73 @@ If the binary path contains spaces, quote the entire `PROJECT_PATH` value:
 make compose-run PROJECT_PATH="/Users/name/Desktop/ipas/My Lawn.ipa" SCAN_FLAG=--ios-binary-path
 ```
 
-When using `PROJECT_PATH` as a directory that contains a binary, set `PHOENIX_SCAN_PATH` to the file path inside the container:
+When `PROJECT_PATH` is a directory that contains a binary, set `PHOENIX_SCAN_PATH` to the file path inside the container:
 
 ```bash
 make compose-run PROJECT_PATH=path/to/files SCAN_FLAG=--ios-binary-path PHOENIX_SCAN_PATH=/workspace/app.ipa
 ```
 
-Use `make services-up` only when you want to run AppcritIQ locally while using the MobSF sidecar:
+To include MobSF in a Compose scan, point AppCritIQ at the MobSF sidecar:
+
+```bash
+MOBSF_URL=http://mobsf-scanner:8000 \
+make compose-run PROJECT_PATH=path/to/app.ipa SCAN_FLAG=--ios-binary-path
+```
+
+### 3. Local Developer Install
+
+Use a local install when you are developing AppCritIQ itself, debugging scanner adapters, or intentionally running against tools installed on your host.
+
+Install `uv`:
+
+```bash
+brew install uv
+```
+
+Or use the official installer:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Clone and install the project:
+
+```bash
+git clone https://github.com/Blue-Milk-Apps/appcritiq-core.git
+cd appcritiq-core
+uv venv
+source .venv/bin/activate
+uv sync
+```
+
+Run the CLI locally:
+
+```bash
+uv run appcritiq scan --native-ios-source-path path/to/project
+```
+
+Local scans use scanner binaries from your host `PATH`. Install the tools you plan to run before using this mode.
+
+At minimum, local development scans may require:
+
+- `trufflehog`
+- `gitleaks`
+- `dependency-check`
+- `syft`
+- `strings`
+- `ipsw` for IPA signing, entitlement, and Mach-O load-command analysis
+- `apktool` for APK semantic reconstruction and evidence extraction
+- `apksigner` for APK signing integrity and signer identity evidence
+- Java and local NVD data for OWASP Dependency-Check
+- The Python packages used by binary scanners, including `lief`, `androguard`, and `apkid`
+
+Detailed setup notes are available in [setup/README.md](setup/README.md), including tool-specific instructions for [MobSF](setup/mobsf-scanner/README.md), [Dependency-Check](setup/dependency-check/README.md), [Syft](setup/syft/README.md), [TruffleHog](setup/trufflehog/README.md), [Gitleaks](setup/gitleaks/README.md), [Strings](setup/strings/README.md), [LIEF](setup/lief/README.md), [ipsw](setup/ipsw/README.md), [Apktool](setup/apktool/README.md), and [Apksigner](setup/apksigner/README.md).
+
+## MobSF Sidecar
+
+MobSF is optional and only applies to IPA/APK binary scans.
+
+For local CLI scans with MobSF:
 
 ```bash
 make services-up
@@ -141,36 +178,43 @@ MOBSF_URL=http://localhost:8000 uv run appcritiq scan --ios-binary-path "path/to
 make services-down
 ```
 
-To include MobSF in a Compose scan, point AppcritIQ at the MobSF sidecar:
+For Compose scans with MobSF:
 
 ```bash
 MOBSF_URL=http://mobsf-scanner:8000 \
 make compose-run PROJECT_PATH=path/to/app.ipa SCAN_FLAG=--ios-binary-path
 ```
 
-When using `docker compose` directly, pass `SCAN_FLAG`, `PHOENIX_SCAN_PATH`, and `PROJECT_MOUNT_PATH` so the container receives the matching scan target. Mount the directory that contains the binary, not the binary file itself:
+## Results
 
-```bash
-PROJECT_MOUNT_PATH="/Users/name/Desktop/ipas" \
-PHOENIX_SCAN_PATH="/workspace/My Lawn.ipa" \
-SCAN_FLAG="--ios-binary-path" \
-docker compose up --build --exit-code-from appcritiq appcritiq
-```
+Scan output is written to the configured output directory. Docker and Compose examples in this README write reports to `./scan-results` on the host and `/app/results` inside the container.
 
-To include MobSF when running `docker compose` directly, also pass `MOBSF_URL=http://mobsf-scanner:8000`.
+## Development
 
-## How to Test
-
-See the [scan target flags](#scan-target-flags) list for valid `<scan-target-flag>` values.
+Run the test suite:
 
 ```bash
 make test
+```
+
+Run the CLI from the local environment:
+
+```bash
 uv run appcritiq scan <scan-target-flag> path/to/target
 ```
 
+The codebase follows a port-and-adapter layout:
+
+- `domain/` contains core dataclasses and enums.
+- `ports/` defines scanner and storage interfaces.
+- `application/` contains orchestration such as `ScannerService`.
+- `adapters/` contains scanner, storage, and output implementations.
+- `entrypoints/cli.py` contains the command-line interface.
+- `utilities/` contains helper code for binary extraction and target discovery.
+
 ## Getting Help
 
-Use the GitHub issue tracker for bugs, setup problems, and feature requests:
+Use GitHub issues for bugs, setup problems, and feature requests:
 
 ```text
 https://github.com/Blue-Milk-Apps/appcritiq-core/issues
@@ -178,4 +222,8 @@ https://github.com/Blue-Milk-Apps/appcritiq-core/issues
 
 ## Maintainers And Contributors
 
-AppcritIQ Core is maintained by Blue Milk Apps. Contributions should be made through pull requests against this repository.
+AppCritIQ Core is maintained by Blue Milk Apps. Contributions should be made through pull requests against this repository.
+
+## License
+
+AppCritIQ Core is released under the [Apache License 2.0](LICENSE).
