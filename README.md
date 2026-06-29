@@ -8,6 +8,7 @@ The project is intentionally modular. Scanner adapters live behind stable ports,
 
 - Static analysis orchestration for iOS, Android, Flutter, and React Native projects
 - Secret detection with OSS scanners such as Gitleaks and TruffleHog
+- OpenGrep support for custom source and binary pattern matching
 - Dependency vulnerability checks with OWASP Dependency-Check
 - SBOM generation with Syft
 - IPA and APK binary analysis with tools such as Strings, LIEF, ipsw, Androguard, Apktool, Apksigner, and APKiD
@@ -47,6 +48,26 @@ appcritiq scan --native-ios-source-path path/to/project
 Source scans run Gitleaks, TruffleHog, Dependency-Check, and Syft, with plist extraction included for Flutter, React Native, and native iOS source scans.
 
 Binary scans run Strings, with LIEF, ipsw, and plist extraction for iOS binaries and Androguard, Apktool, Apksigner, and APKiD for Android binaries. MobSF runs for binary scans only when `MOBSF_URL` is configured.
+
+OpenGrep runs only when a rules path is available. For source targets, OpenGrep scans the project directory directly. For binary targets, AppCritIQ first generates `strings` output from the IPA or APK contents and then runs OpenGrep over those generated text artifacts.
+
+By default, AppCritIQ looks for OpenGrep rules in these folders:
+
+- `rules/ios` for `--ios-binary-path` and `--native-ios-source-path`
+- `rules/android` for `--android-binary-path` and `--native-android-source-path`
+- `rules/flutter` for `--flutter-source-path`
+- `rules/react_native` for `--react-native-source-path`
+
+You can override the default rules location per scan target with these flags:
+
+- `--ios-binary-opengrep-rules-path`
+- `--android-binary-opengrep-rules-path`
+- `--flutter-source-opengrep-rules-path`
+- `--react-native-source-opengrep-rules-path`
+- `--native-android-source-opengrep-rules-path`
+- `--native-ios-source-opengrep-rules-path`
+
+These override flags can point to rule directories outside this repository when you run `appcritiq scan` directly. For container runs, the rules directory must be mounted into the container and passed as a container path. The current `make compose-run` wrapper does not provide a dedicated variable for passing extra OpenGrep override flags, so direct `appcritiq scan` or `docker run` is the better path when you want an external rules directory.
 
 Binary scans require the binary to be unsigned. If you have access to source code, you can build an unsigned .ipa easily [using these instructions](docs/UnsignediOSBinaries.md).
 
@@ -151,10 +172,19 @@ Run the CLI locally:
 uv run appcritiq scan --native-ios-source-path path/to/project
 ```
 
+To use a non-default OpenGrep rules directory locally:
+
+```bash
+uv run appcritiq scan \
+  --native-ios-source-path path/to/project \
+  --native-ios-source-opengrep-rules-path path/to/rules
+```
+
 Local scans use scanner binaries from your host `PATH`. Install the tools you plan to run before using this mode.
 
 At minimum, local development scans may require:
 
+- `opengrep`
 - `trufflehog`
 - `gitleaks`
 - `dependency-check`
@@ -189,7 +219,7 @@ make compose-run PROJECT_PATH=path/to/app.ipa SCAN_FLAG=--ios-binary-path
 
 ## Results
 
-Scan output is written to the configured output directory. Docker and Compose examples in this README write reports to `./scan-results` on the host and `/app/results` inside the container.
+Scan output is written to the configured output directory. Docker and Compose examples in this README write reports to `./scan-results` on the host and `/app/results` inside the container. When OpenGrep is enabled, it writes `opengrep_results.json` alongside the other scan artifacts.
 
 ## Development
 
