@@ -71,7 +71,6 @@ RUN python -m venv /opt/appcritiq-venv \
 WORKDIR /app
 COPY README.md pyproject.toml ./
 COPY __init__.py ./
-COPY catalogs ./catalogs
 COPY utilities ./utilities
 COPY adapters ./adapters
 COPY application ./application

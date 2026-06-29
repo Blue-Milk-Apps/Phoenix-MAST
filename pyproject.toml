@@ -30,15 +30,12 @@ packages = [
     "adapters.storage",
     "adapters.source_code_scanners",
     "application",
-    "catalogs",
     "domain",
     "entrypoints",
     "ports",
     "utilities",
 ]
 
-[tool.setuptools.package-data]
-catalogs = ["*.json", "*.csv"]
 
 [tool.pytest.ini_options]
 testpaths = [
