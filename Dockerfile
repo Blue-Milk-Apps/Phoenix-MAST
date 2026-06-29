@@ -9,6 +9,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/appcritiq-venv/bin:/usr/local/bin:$PATH" \
+    OPENGREP_OFFLINE=1 \
+    OPENGREP_DISABLE_METRICS=1 \
+    OPENGREP_SEND_METRICS=off \
     DC_NO_UPDATE=1 \
     TRUFFLEHOG_NO_UPDATE=1
 
@@ -59,11 +62,24 @@ RUN wget -q -L "https://github.com/dependency-check/DependencyCheck/releases/dow
 ARG APKID_VERSION=3.1.0
 ARG ANDROGUARD_VERSION=4.1.3
 ARG LIEF_VERSION=0.17.2
+ARG OPENGREP_VERSION=1.22.0
+ARG TARGETARCH
 RUN python -m venv /opt/appcritiq-venv \
+    && case "${TARGETARCH:-amd64}" in \
+        amd64) OPENGREP_ASSET="opengrep_manylinux_x86" ;; \
+        arm64) OPENGREP_ASSET="opengrep_manylinux_aarch64" ;; \
+        *) echo "Unsupported OpenGrep Docker architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && curl -sSfL \
+        "https://github.com/opengrep/opengrep/releases/download/v${OPENGREP_VERSION}/${OPENGREP_ASSET}" \
+        -o /usr/local/bin/opengrep \
+    && chmod +x /usr/local/bin/opengrep \
+    && ln -sf /usr/local/bin/opengrep /usr/local/bin/opengrep-core \
     && /opt/appcritiq-venv/bin/pip install --no-cache-dir \
         "androguard==${ANDROGUARD_VERSION}" \
         "lief==${LIEF_VERSION}" \
         "apkid==${APKID_VERSION}" \
+    && opengrep --version \
     && /opt/appcritiq-venv/bin/python -c "from importlib.metadata import version; print('apkid ' + version('apkid'))" \
     && /opt/appcritiq-venv/bin/python -c "from androguard.misc import AnalyzeAPK; import lief; print('androguard and lief imports ok')"
 
@@ -77,6 +93,7 @@ COPY application ./application
 COPY domain ./domain
 COPY entrypoints ./entrypoints
 COPY ports ./ports
+COPY rules ./rules
 
 RUN /opt/appcritiq-venv/bin/pip install --no-cache-dir --no-deps .
 
@@ -85,7 +102,7 @@ RUN /opt/appcritiq-venv/bin/pip install --no-cache-dir --no-deps .
 # so it can create the H2 database lock files.
 RUN useradd -m -u 1001 appcritiq \
     && mkdir -p /opt/dependency-check/data \
-    && chown -R appcritiq:appcritiq /app /opt/dependency-check /opt/appcritiq-venv
+    && chown -R appcritiq:appcritiq /app /opt/dependency-check /opt/appcritiq-venv /usr/local/bin/opengrep
 
 USER appcritiq
 WORKDIR /workspace

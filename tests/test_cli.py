@@ -30,6 +30,11 @@ def _patch_core_scanners(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         cli,
+        "OpenGrepScanner",
+        _fake_scanner(ScanType.OPENGREP, "OpenGrep"),
+    )
+    monkeypatch.setattr(
+        cli,
         "TrufflehogScanner",
         _fake_scanner(ScanType.TRUFFLEHOG, "Trufflehog"),
     )
@@ -212,6 +217,7 @@ def test_create_scan_config_for_flutter_source(tmp_path: Path) -> None:
     _assert_scanner_types(
         config,
         {
+            ScanType.OPENGREP,
             ScanType.TRUFFLEHOG,
             ScanType.GITLEAKS,
             ScanType.PLIST_SOURCE,
@@ -231,6 +237,7 @@ def test_create_scan_config_for_react_native_source(tmp_path: Path) -> None:
     _assert_scanner_types(
         config,
         {
+            ScanType.OPENGREP,
             ScanType.TRUFFLEHOG,
             ScanType.GITLEAKS,
             ScanType.PLIST_SOURCE,
@@ -250,6 +257,7 @@ def test_create_scan_config_for_native_android_source(tmp_path: Path) -> None:
     _assert_scanner_types(
         config,
         {
+            ScanType.OPENGREP,
             ScanType.TRUFFLEHOG,
             ScanType.GITLEAKS,
             ScanType.DEPENDENCY_CHECK,
@@ -268,6 +276,7 @@ def test_create_scan_config_for_native_ios_source(tmp_path: Path) -> None:
     _assert_scanner_types(
         config,
         {
+            ScanType.OPENGREP,
             ScanType.TRUFFLEHOG,
             ScanType.GITLEAKS,
             ScanType.PLIST_SOURCE,

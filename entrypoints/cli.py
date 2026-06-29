@@ -25,6 +25,7 @@ from adapters.output import FileScanOutput
 from adapters.source_code_scanners import (
     DependencyCheckScanner,
     GitleaksScanner,
+    OpenGrepScanner,
     PlistSourceScanner,
     StringsScanner,
     SyftScanner,
@@ -174,6 +175,8 @@ def _report_context_from_scan_config(scan_config: ScanConfig) -> dict[str, str]:
 
 
 def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
+    default_rules_path = _default_rules_path()
+
     match args:
         case argparse.Namespace(android_binary_path=Path() as project_path):
             scan_mode = "binary"
@@ -204,6 +207,7 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_label = "Flutter source"
             scan_slug = "flutter_source"
             scanners = [
+                OpenGrepScanner(default_rules_path=default_rules_path),
                 TrufflehogScanner(),
                 GitleaksScanner(),
                 PlistSourceScanner(),
@@ -216,6 +220,7 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_label = "React Native source"
             scan_slug = "react_native_source"
             scanners = [
+                OpenGrepScanner(default_rules_path=default_rules_path),
                 TrufflehogScanner(),
                 GitleaksScanner(),
                 PlistSourceScanner(),
@@ -228,6 +233,7 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_label = "Native Android source"
             scan_slug = "native_android_source"
             scanners = [
+                OpenGrepScanner(default_rules_path=default_rules_path),
                 TrufflehogScanner(),
                 GitleaksScanner(),
                 DependencyCheckScanner(),
@@ -239,6 +245,7 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_label = "Native iOS source"
             scan_slug = "native_ios_source"
             scanners = [
+                OpenGrepScanner(default_rules_path=default_rules_path),
                 TrufflehogScanner(),
                 GitleaksScanner(),
                 PlistSourceScanner(),
@@ -257,10 +264,33 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
         output_path=output_path,
         mode=scan_mode,
         scan_label=scan_label,
+        rules_path=default_rules_path,
         scanners=scanners,
         enabled_scans=[scanner.scan_type for scanner in scanners],
     )
     return scan_config
+
+
+def _default_rules_path() -> Path:
+    candidates = []
+
+    env_rules_path_raw = os.environ.get("PHOENIX_RULES_PATH", "").strip()
+    if env_rules_path_raw:
+        candidates.append(Path(env_rules_path_raw).expanduser())
+
+    candidates.extend(
+        [
+            Path(__file__).parent.parent / "rules",
+            Path("/app/rules"),
+            Path.cwd() / "rules",
+        ]
+    )
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+
+    return (Path(__file__).parent.parent / "rules").resolve()
 
 
 def _mobsf_url_configured() -> bool:

@@ -20,6 +20,7 @@ class ScanType(str, Enum):
     APKSIGNER = "apksigner"
     APKID = "apkid"
     IPSW = "ipsw"
+    OPENGREP = "opengrep"
     TRUFFLEHOG = "trufflehog"
     GITLEAKS = "gitleaks"
     STRINGS = "strings"
