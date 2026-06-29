@@ -46,14 +46,14 @@ services:
       "/app/results/gitleaks-report.json"
     ]
 
-  # Primary AppcritIQ Core Service
-  appcritiq:
+  # AppcritIQ Core Service with MobSF and OWASP Dependency-Check data sidecars.
+  appcritiq-mobsf-owaspdc:
     image: appcritiq-core:latest
     build:
       context: .
       dockerfile: Dockerfile
     user: "1001:1001"
-    container_name: appcritiq-core
+    container_name: appcritiq-core-mobsf-owaspdc
     depends_on:
       mobsf-scanner:
         condition: service_healthy
@@ -68,6 +68,23 @@ services:
       - DEPENDENCY_CHECK_DATA_DIR=/opt/dependency-check/data
       - DC_NO_UPDATE=1
       - CI=true
+    command: ["scan", "${SCAN_FLAG:?Set SCAN_FLAG to one AppcritIQ scan target flag}", "${PHOENIX_SCAN_PATH:?Set PHOENIX_SCAN_PATH to the scan path inside the container}", "--output", "/app/results"]
+
+
+  # Primary AppcritIQ Core Service without MobSF or NVD sidecars.
+  appcritiq:
+    image: appcritiq-core:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: "1001:1001"
+    container_name: appcritiq-core
+    volumes:
+      - ${PROJECT_MOUNT_PATH:-.}:/workspace:ro
+      - ${OUTPUT_PATH:-./scan-results}:/app/results
+    environment:
+      - CI=true
+      - MOBSF_URL=
     command: ["scan", "${SCAN_FLAG:?Set SCAN_FLAG to one AppcritIQ scan target flag}", "${PHOENIX_SCAN_PATH:?Set PHOENIX_SCAN_PATH to the scan path inside the container}", "--output", "/app/results"]
 
 
