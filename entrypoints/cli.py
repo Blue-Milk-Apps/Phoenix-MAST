@@ -293,12 +293,7 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_mode = "source"
             scan_label = "Native iOS source"
             scan_slug = "native_ios_source"
-            rules_path = _resolve_opengrep_rules_path(
-                args.native_ios_source_opengrep_rules_path,
-                "native_ios_source",
-            )
             scanners = [
-                OpenGrepScanner(rules_path=rules_path),
                 TrufflehogScanner(),
                 GitleaksScanner(),
                 PlistSourceScanner(),

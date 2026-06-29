@@ -134,6 +134,13 @@ class OpenGrepScanner(ScannerPort):
             executable = self._opengrep_executable()
             if not executable:
                 return [self._failure("OpenGrep executable was not found on this system.")]
+            if not self._opengrep_core_executable():
+                return [
+                    self._failure(
+                        "OpenGrep core executable was not found on this system. "
+                        "Install a real opengrep-core binary or use the Docker image."
+                    )
+                ]
 
             cmd = [
                 executable,
