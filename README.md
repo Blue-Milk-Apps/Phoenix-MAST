@@ -48,6 +48,8 @@ Source scans run Gitleaks, TruffleHog, Dependency-Check, and Syft, with plist ex
 
 Binary scans run Strings, with LIEF, ipsw, and plist extraction for iOS binaries and Androguard, Apktool, Apksigner, and APKiD for Android binaries. MobSF runs for binary scans only when `MOBSF_URL` is configured.
 
+Binary scans require the binary to be unsigned. If you have access to source code, you can build an unsigned .ipa easily [using these instructions](docs/UnsignediOSBinaries.md).
+
 ## Running AppCritIQ
 
 ### 1. Released Docker Image
