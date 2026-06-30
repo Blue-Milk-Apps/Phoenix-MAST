@@ -342,9 +342,13 @@ def _resolve_opengrep_rules_path(
     if not default_dir:
         return None
 
-    candidate = (Path(__file__).parent.parent / "rules" / default_dir).resolve()
-    if candidate.exists():
-        return candidate
+    candidates = [
+        (Path(__file__).parent.parent / "rules" / default_dir).resolve(),
+        (Path("/app/rules") / default_dir).resolve(),
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
     return None
 
 

@@ -203,6 +203,7 @@ def test_create_scan_config_for_android_binary_includes_mobsf_when_url_is_config
 
 def test_create_scan_config_for_ios_binary(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.delenv("MOBSF_URL", raising=False)
+    monkeypatch.setattr(cli, "_resolve_opengrep_rules_path", lambda override, slug: None)
     args = _scan_args(tmp_path, "--ios-binary-path")
 
     config = cli._create_scan_config(args)
@@ -267,6 +268,7 @@ def test_create_scan_config_for_ios_binary_uses_default_opengrep_rules_path_when
 
 def test_create_scan_config_for_ios_binary_includes_mobsf_when_url_is_configured(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("MOBSF_URL", "http://localhost:8000")
+    monkeypatch.setattr(cli, "_resolve_opengrep_rules_path", lambda override, slug: None)
     args = _scan_args(tmp_path, "--ios-binary-path")
 
     config = cli._create_scan_config(args)
@@ -344,6 +346,20 @@ def test_create_scan_config_for_flutter_source_uses_default_opengrep_rules_path_
 
     assert captured["rules_path"] == rules_path
     assert ScanType.OPENGREP_SOURCE in {scanner.scan_type for scanner in config.scanners}
+
+
+def test_resolve_opengrep_rules_path_uses_app_rules_fallback(monkeypatch) -> None:
+    app_rules_path = Path("/app/rules/ios")
+
+    monkeypatch.setattr(
+        cli.Path,
+        "exists",
+        lambda self: self == app_rules_path,
+    )
+
+    resolved = cli._resolve_opengrep_rules_path(None, "ios_binary")
+
+    assert resolved == app_rules_path
 
 
 def test_create_scan_config_for_react_native_source(tmp_path: Path) -> None:
@@ -428,7 +444,8 @@ def test_create_scan_config_for_native_android_source_includes_opengrep_when_rul
     }
 
 
-def test_create_scan_config_for_native_ios_source(tmp_path: Path) -> None:
+def test_create_scan_config_for_native_ios_source(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(cli, "_resolve_opengrep_rules_path", lambda override, slug: None)
     args = _scan_args(tmp_path, "--native-ios-source-path")
 
     config = cli._create_scan_config(args)
