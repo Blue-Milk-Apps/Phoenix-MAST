@@ -166,6 +166,8 @@ source .venv/bin/activate
 uv sync
 ```
 
+`uv sync` installs the Python package dependencies for AppCritIQ, but that alone is not enough for local OpenGrep scans. The Python `opengrep` package is only a launcher and still requires a real `opengrep-core` binary on your host.
+
 Run the CLI locally:
 
 ```bash
@@ -180,11 +182,13 @@ uv run appcritiq scan \
   --native-ios-source-opengrep-rules-path path/to/rules
 ```
 
+If you want OpenGrep locally, install the standalone OpenGrep binary so that both `opengrep` and `opengrep-core` are available on your `PATH`, or run AppCritIQ through Docker or Docker Compose instead.
+
 Local scans use scanner binaries from your host `PATH`. Install the tools you plan to run before using this mode.
 
 At minimum, local development scans may require:
 
-- `opengrep`
+- the standalone `opengrep` and `opengrep-core` binaries for local OpenGrep scans
 - `trufflehog`
 - `gitleaks`
 - `dependency-check`
