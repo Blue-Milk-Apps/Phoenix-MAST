@@ -1,0 +1,32 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run appcritiq scan (IPA)",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/entrypoints/cli.py",
+      "args": [
+        "scan",
+        "${input:scanFlag}",
+        "${input:file_path}"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    }
+  ],
+  "inputs": [
+    {
+      "id": "scanFlag",
+      "type": "promptString",
+      "description": "Scan flag (e.g. --ios-binary-path)",
+      "default": "--ios-binary-path"
+    },
+    {
+      "id": "file_path",
+      "type": "promptString",
+      "description": "Path to file",
+    }
+  ]
+}
