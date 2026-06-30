@@ -1,0 +1,17 @@
+.env
+.venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+
+owasp-data/
+scan-results/
+appcritiq/
+rules/
+
+sample-project/
+nvd-owasp-data/
+demo-projects/
+
+*.egg-info/
+.DS_Store
