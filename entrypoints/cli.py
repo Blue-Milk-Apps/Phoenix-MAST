@@ -134,7 +134,7 @@ def _build_parser() -> argparse.ArgumentParser:
 def _scan_command(args: argparse.Namespace) -> int:
     scan_config: ScanConfig = _create_scan_config(args)
 
-    MobileAnalysisWorkflowService.run(scan_config)
+    MobileAnalysisWorkflowService().run(scan_config)
     return 0
 
 
@@ -145,37 +145,14 @@ def _package_version() -> str:
         return "0.1.0"
 
 
-def _report_context_from_scan_config(scan_config: ScanConfig) -> dict[str, str]:
-    scan_label = scan_config.scan_label.lower()
-    platform = "ANY"
-    if "ios" in scan_label:
-        platform = "IOS"
-    elif "android" in scan_label:
-        platform = "ANDROID"
-
-    stack = "ANY"
-    if "flutter" in scan_label:
-        stack = "FLUTTER"
-    elif "react native" in scan_label:
-        stack = "REACT_NATIVE"
-    elif "native ios" in scan_label:
-        stack = "NATIVE_IOS"
-    elif "native android" in scan_label:
-        stack = "NATIVE_ANDROID"
-
-    return {
-        "platform": platform,
-        "target_type": scan_config.mode.upper(),
-        "stack": stack,
-    }
-
-
 def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
     match args:
         case argparse.Namespace(android_binary_path=Path() as project_path):
             scan_mode = "binary"
             scan_label = "Android binary"
             scan_slug = "android_binary"
+            platform = "ANDROID"
+            stack = "ANY"
             scanners: list[ScannerPort] = [
                 AndroguardScanner(),
                 Aapt2Scanner(),
@@ -195,6 +172,8 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_mode = "binary"
             scan_label = "iOS binary"
             scan_slug = "ios_binary"
+            platform = "IOS"
+            stack = "ANY"
             scanners = [
                 IpswScanner(),
                 LIEFScanner(),
@@ -212,6 +191,8 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_mode = "source"
             scan_label = "Flutter source"
             scan_slug = "flutter_source"
+            platform = "ANY"
+            stack = "FLUTTER"
             scanners = [
                 TrufflehogScanner(),
                 GitleaksScanner(),
@@ -233,6 +214,8 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_mode = "source"
             scan_label = "React Native source"
             scan_slug = "react_native_source"
+            platform = "ANY"
+            stack = "REACT_NATIVE"
             scanners = [
                 TrufflehogScanner(),
                 GitleaksScanner(),
@@ -254,6 +237,8 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_mode = "source"
             scan_label = "Native Android source"
             scan_slug = "native_android_source"
+            platform = "ANDROID"
+            stack = "NATIVE_ANDROID"
             scanners = [
                 TrufflehogScanner(),
                 GitleaksScanner(),
@@ -274,6 +259,8 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_mode = "source"
             scan_label = "Native iOS source"
             scan_slug = "native_ios_source"
+            platform = "IOS"
+            stack = "NATIVE_IOS"
             scanners = [
                 TrufflehogScanner(),
                 GitleaksScanner(),
@@ -302,6 +289,8 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
         output_path=output_path,
         mode=scan_mode,
         scan_label=scan_label,
+        platform=platform,
+        stack=stack,
         scanners=scanners,
         enabled_scans=[scanner.scan_type for scanner in scanners],
     )

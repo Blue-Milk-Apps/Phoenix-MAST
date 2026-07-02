@@ -61,3 +61,9 @@ class ScanConfig:
     ignore_patterns: list[str] = field(default_factory=list)
     ignore_file: Path | None = None
     display_project_path: str = ""
+    platform: str = "ANY"
+    stack: str = "ANY"
+
+    @property
+    def target_type(self) -> str:
+        return self.mode.upper()

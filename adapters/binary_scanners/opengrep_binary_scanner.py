@@ -83,6 +83,8 @@ class BinaryOpenGrepScanner(OpenGrepScanner):
                 output_path=config.output_path,
                 mode=config.mode,
                 scan_label=config.scan_label,
+                platform=config.platform,
+                stack=config.stack,
                 scanners=config.scanners,
                 enabled_scans=config.enabled_scans,
                 rules_path=rules_path,

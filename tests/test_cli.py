@@ -139,6 +139,9 @@ def test_create_scan_config_for_android_binary(tmp_path: Path, monkeypatch) -> N
 
     assert config.project_path == tmp_path.resolve()
     assert config.mode == "binary"
+    assert config.target_type == "BINARY"
+    assert config.platform == "ANDROID"
+    assert config.stack == "ANY"
     assert config.output_path.parent == (tmp_path / "results").resolve()
     assert config.output_path.name.startswith("SAST_android_binary_")
     _assert_scanner_types(
@@ -209,6 +212,9 @@ def test_create_scan_config_for_ios_binary(tmp_path: Path, monkeypatch) -> None:
     config = cli._create_scan_config(args)
 
     assert config.mode == "binary"
+    assert config.target_type == "BINARY"
+    assert config.platform == "IOS"
+    assert config.stack == "ANY"
     assert config.output_path.name.startswith("SAST_ios_binary_")
     _assert_scanner_types(
         config,
@@ -291,6 +297,9 @@ def test_create_scan_config_for_flutter_source(tmp_path: Path) -> None:
     config = cli._create_scan_config(args)
 
     assert config.mode == "source"
+    assert config.target_type == "SOURCE"
+    assert config.platform == "ANY"
+    assert config.stack == "FLUTTER"
     assert config.output_path.name.startswith("SAST_flutter_source_")
     _assert_scanner_types(
         config,
@@ -368,6 +377,9 @@ def test_create_scan_config_for_react_native_source(tmp_path: Path) -> None:
     config = cli._create_scan_config(args)
 
     assert config.mode == "source"
+    assert config.target_type == "SOURCE"
+    assert config.platform == "ANY"
+    assert config.stack == "REACT_NATIVE"
     assert config.output_path.name.startswith("SAST_react_native_source_")
     _assert_scanner_types(
         config,
@@ -410,6 +422,9 @@ def test_create_scan_config_for_native_android_source(tmp_path: Path) -> None:
     config = cli._create_scan_config(args)
 
     assert config.mode == "source"
+    assert config.target_type == "SOURCE"
+    assert config.platform == "ANDROID"
+    assert config.stack == "NATIVE_ANDROID"
     assert config.output_path.name.startswith("SAST_native_android_source_")
     _assert_scanner_types(
         config,
@@ -451,6 +466,9 @@ def test_create_scan_config_for_native_ios_source(tmp_path: Path, monkeypatch) -
     config = cli._create_scan_config(args)
 
     assert config.mode == "source"
+    assert config.target_type == "SOURCE"
+    assert config.platform == "IOS"
+    assert config.stack == "NATIVE_IOS"
     assert config.output_path.name.startswith("SAST_native_ios_source_")
     _assert_scanner_types(
         config,
@@ -532,7 +550,7 @@ def test_scan_command_writes_scan_metadata(tmp_path: Path, monkeypatch) -> None:
     assert metadata["stack"] == "NATIVE_IOS"
 
 
-def test_scan_command_passes_scanners_to_scanner_service(
+def test_scan_command_passes_scan_config_to_mobile_analysis_workflow_service(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -540,16 +558,16 @@ def test_scan_command_passes_scanners_to_scanner_service(
     monkeypatch.delenv("MOBSF_URL", raising=False)
     captured = {}
 
-    class RecordingScannerService:
-        def __init__(self, scanners, output=None) -> None:
-            captured["scanners"] = scanners
-            captured["output"] = output
-
-        def scan_project(self, config: ScanConfig):
+    class RecordingMobileAnalysisWorkflowService:
+        def run(self, config: ScanConfig):
             captured["config"] = config
             return []
 
-    monkeypatch.setattr(cli, "ScannerService", RecordingScannerService)
+    monkeypatch.setattr(
+        cli,
+        "MobileAnalysisWorkflowService",
+        lambda: RecordingMobileAnalysisWorkflowService(),
+    )
 
     exit_code = cli.main(
         [
@@ -569,10 +587,9 @@ def test_scan_command_passes_scanners_to_scanner_service(
         ScanType.APKID,
         ScanType.STRINGS,
     }
-    scanner_types = {scanner.scan_type for scanner in captured["scanners"]}
+    scanner_types = {scanner.scan_type for scanner in captured["config"].scanners}
     assert exit_code == 0
     assert scanner_types == expected_scan_types
-    assert captured["scanners"] == captured["config"].scanners
     assert set(captured["config"].enabled_scans) == expected_scan_types
 
 
