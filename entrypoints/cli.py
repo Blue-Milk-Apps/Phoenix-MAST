@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import time
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -22,7 +21,6 @@ from adapters.binary_scanners import (
     MobSFScanner,
     PlistBinaryScanner,
 )
-from adapters.output import FileScanOutput
 from adapters.source_code_scanners import (
     DependencyCheckScanner,
     GitleaksScanner,
@@ -32,7 +30,7 @@ from adapters.source_code_scanners import (
     SyftScanner,
     TrufflehogScanner,
 )
-from application.scanner_service import ScannerService
+from application.mobile_analysis_workflow_service import MobileAnalysisWorkflowService
 from domain.models import ScanConfig
 from ports.scanner_port import ScannerPort
 
@@ -136,24 +134,7 @@ def _build_parser() -> argparse.ArgumentParser:
 def _scan_command(args: argparse.Namespace) -> int:
     scan_config: ScanConfig = _create_scan_config(args)
 
-    print("AppcritIQ scan")
-    print(f"Project: {scan_config.project_path}")
-    print(f"Output: {scan_config.output_path}")
-    print(f"Scan type: {scan_config.scan_label}")
-    print(f"Proceeding with {scan_config.scan_label} scan")
-
-    scan_config.output_path.mkdir(parents=True, exist_ok=True)
-    report_context = _report_context_from_scan_config(scan_config)
-    scan_output_method = FileScanOutput(scan_config.output_path)
-    scan_output_method.write_scan_metadata(scan_config, report_context)
-    scanner_service = ScannerService(scan_config.scanners)
-
-    wall_start = time.perf_counter()
-    scan_results = scanner_service.scan_project(scan_config)
-    for result in scan_results:
-        scan_output_method.write_result(result)
-    print(f"Results: {len(scan_results)}")
-    print(f"Duration: {time.perf_counter() - wall_start:.2f} seconds")
+    MobileAnalysisWorkflowService.run(scan_config)
     return 0
 
 
