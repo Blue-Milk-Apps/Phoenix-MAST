@@ -3,10 +3,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from ports.scanner_port import ScannerPort
 
 
 class ScanType(str, Enum):
@@ -55,14 +51,13 @@ class ScanConfig:
     output_path: Path
     mode: str = "source"
     scan_label: str = ""
-    scanners: list["ScannerPort"] = field(default_factory=list)
-    enabled_scans: list[ScanType] = field(default_factory=lambda: list(ScanType))
     rules_path: Path | None = None
     ignore_patterns: list[str] = field(default_factory=list)
     ignore_file: Path | None = None
     display_project_path: str = ""
     platform: str = "ANY"
     stack: str = "ANY"
+    syft_output_format: str = "cyclonedx-json"
 
     @property
     def target_type(self) -> str:

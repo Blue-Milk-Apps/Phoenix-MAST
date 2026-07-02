@@ -27,7 +27,6 @@ def test_strings_scan_returns_raw_output(monkeypatch, tmp_path: Path) -> None:
         project_path=source_file,
         output_path=tmp_path / "scan-results",
         mode="binary",
-        enabled_scans=[ScanType.STRINGS],
     )
 
     monkeypatch.setattr(strings_scanner.shutil, "which", lambda _: "/usr/bin/strings")
@@ -70,7 +69,6 @@ def test_strings_scan_for_apk_returns_raw_output_for_multiple_targets(
         project_path=apk_path,
         output_path=tmp_path / "scan-results",
         mode="binary",
-        enabled_scans=[ScanType.STRINGS],
     )
 
     monkeypatch.setattr(strings_scanner.shutil, "which", lambda _: "/usr/bin/strings")
@@ -140,7 +138,6 @@ def test_strings_scan_for_ipa_paths_are_relative_to_app_bundle(
         project_path=ipa_path,
         output_path=tmp_path / "scan-results",
         mode="binary",
-        enabled_scans=[ScanType.STRINGS],
     )
 
     monkeypatch.setattr(strings_scanner.shutil, "which", lambda _: "/usr/bin/strings")

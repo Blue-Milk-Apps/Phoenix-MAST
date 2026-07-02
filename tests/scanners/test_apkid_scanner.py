@@ -169,5 +169,4 @@ def scan_config(apk_path: Path) -> ScanConfig:
         project_path=apk_path,
         output_path=apk_path.parent / "scan-results",
         mode="binary",
-        enabled_scans=[ScanType.APKID],
     )

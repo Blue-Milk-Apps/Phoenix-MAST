@@ -3,36 +3,13 @@
 from __future__ import annotations
 
 import argparse
-import os
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Sequence
 
-from adapters.binary_scanners import (
-    Aapt2Scanner,
-    AndroguardScanner,
-    ApkidScanner,
-    ApksignerScanner,
-    ApktoolScanner,
-    BinaryOpenGrepScanner,
-    IpswScanner,
-    LIEFScanner,
-    MobSFScanner,
-    PlistBinaryScanner,
-)
-from adapters.source_code_scanners import (
-    DependencyCheckScanner,
-    GitleaksScanner,
-    OpenGrepScanner,
-    PlistSourceScanner,
-    StringsScanner,
-    SyftScanner,
-    TrufflehogScanner,
-)
 from application.mobile_analysis_workflow_service import MobileAnalysisWorkflowService
 from domain.models import ScanConfig
-from ports.scanner_port import ScannerPort
 
 DEFAULT_SYFT_OUTPUT_FORMAT = "cyclonedx-json"
 DEFAULT_OPENGREP_RULES_DIRS = {
@@ -153,20 +130,10 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_slug = "android_binary"
             platform = "ANDROID"
             stack = "ANY"
-            scanners: list[ScannerPort] = [
-                AndroguardScanner(),
-                Aapt2Scanner(),
-                ApktoolScanner(),
-                ApksignerScanner(),
-                ApkidScanner(),
-                StringsScanner(),
-            ]
             rules_path = _resolve_opengrep_rules_path(
                 args.android_binary_opengrep_rules_path,
                 "android_binary",
             )
-            if rules_path:
-                scanners.append(BinaryOpenGrepScanner(rules_path=rules_path))
 
         case argparse.Namespace(ios_binary_path=Path() as project_path):
             scan_mode = "binary"
@@ -174,18 +141,10 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_slug = "ios_binary"
             platform = "IOS"
             stack = "ANY"
-            scanners = [
-                IpswScanner(),
-                LIEFScanner(),
-                StringsScanner(),
-                PlistBinaryScanner(),
-            ]
             rules_path = _resolve_opengrep_rules_path(
                 args.ios_binary_opengrep_rules_path,
                 "ios_binary",
             )
-            if rules_path:
-                scanners.append(BinaryOpenGrepScanner(rules_path=rules_path))
 
         case argparse.Namespace(flutter_source_path=Path() as project_path):
             scan_mode = "source"
@@ -193,22 +152,10 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_slug = "flutter_source"
             platform = "ANY"
             stack = "FLUTTER"
-            scanners = [
-                TrufflehogScanner(),
-                GitleaksScanner(),
-                PlistSourceScanner(),
-                DependencyCheckScanner(),
-                SyftScanner(output_format=args.syft_output_format),
-            ]
             rules_path = _resolve_opengrep_rules_path(
                 args.flutter_source_opengrep_rules_path,
                 "flutter_source",
             )
-            if rules_path:
-                scanners.insert(
-                    0,
-                    OpenGrepScanner(rules_path=rules_path),
-                )
 
         case argparse.Namespace(react_native_source_path=Path() as project_path):
             scan_mode = "source"
@@ -216,22 +163,10 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_slug = "react_native_source"
             platform = "ANY"
             stack = "REACT_NATIVE"
-            scanners = [
-                TrufflehogScanner(),
-                GitleaksScanner(),
-                PlistSourceScanner(),
-                DependencyCheckScanner(),
-                SyftScanner(output_format=args.syft_output_format),
-            ]
             rules_path = _resolve_opengrep_rules_path(
                 args.react_native_source_opengrep_rules_path,
                 "react_native_source",
             )
-            if rules_path:
-                scanners.insert(
-                    0,
-                    OpenGrepScanner(rules_path=rules_path),
-                )
 
         case argparse.Namespace(native_android_source_path=Path() as project_path):
             scan_mode = "source"
@@ -239,21 +174,10 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_slug = "native_android_source"
             platform = "ANDROID"
             stack = "NATIVE_ANDROID"
-            scanners = [
-                TrufflehogScanner(),
-                GitleaksScanner(),
-                DependencyCheckScanner(),
-                SyftScanner(output_format=args.syft_output_format),
-            ]
             rules_path = _resolve_opengrep_rules_path(
                 args.native_android_source_opengrep_rules_path,
                 "native_android_source",
             )
-            if rules_path:
-                scanners.insert(
-                    0,
-                    OpenGrepScanner(rules_path=rules_path),
-                )
 
         case argparse.Namespace(native_ios_source_path=Path() as project_path):
             scan_mode = "source"
@@ -261,26 +185,13 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_slug = "native_ios_source"
             platform = "IOS"
             stack = "NATIVE_IOS"
-            scanners = [
-                TrufflehogScanner(),
-                GitleaksScanner(),
-                PlistSourceScanner(),
-                SyftScanner(output_format=args.syft_output_format),
-            ]
             rules_path = _resolve_opengrep_rules_path(
                 args.native_ios_source_opengrep_rules_path,
                 "native_ios_source",
             )
-            if rules_path:
-                scanners.insert(
-                    0,
-                    OpenGrepScanner(rules_path=rules_path),
-                )
 
         case _:
             raise ValueError("No valid scan type provided")
-    if _mobsf_url_configured():
-        scanners.append(MobSFScanner())
     project_path = project_path.resolve()
     run_timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
     output_path = args.output.resolve() / f"SAST_{scan_slug}_{run_timestamp}"
@@ -291,14 +202,10 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
         scan_label=scan_label,
         platform=platform,
         stack=stack,
-        scanners=scanners,
-        enabled_scans=[scanner.scan_type for scanner in scanners],
+        rules_path=rules_path,
+        syft_output_format=args.syft_output_format,
     )
     return scan_config
-
-
-def _mobsf_url_configured() -> bool:
-    return bool(os.environ.get("MOBSF_URL", "").strip())
 
 
 def _resolve_opengrep_rules_path(

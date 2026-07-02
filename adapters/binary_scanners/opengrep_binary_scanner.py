@@ -85,12 +85,11 @@ class BinaryOpenGrepScanner(OpenGrepScanner):
                 scan_label=config.scan_label,
                 platform=config.platform,
                 stack=config.stack,
-                scanners=config.scanners,
-                enabled_scans=config.enabled_scans,
                 rules_path=rules_path,
                 ignore_patterns=config.ignore_patterns,
                 ignore_file=config.ignore_file,
                 display_project_path=config.display_project_path,
+                syft_output_format=config.syft_output_format,
             )
             results = super().scan(opengrep_config)
             for result in results:
