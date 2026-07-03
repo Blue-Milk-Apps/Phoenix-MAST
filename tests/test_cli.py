@@ -323,7 +323,6 @@ def test_create_scan_config_for_flutter_source_includes_opengrep_when_rules_path
 
     assert config.opengrep_rules_path == rules_path.resolve()
     assert {scanner.scan_type for scanner in _build_scanners(config)} == {
-        ScanType.OPENGREP_SOURCE,
         ScanType.TRUFFLEHOG,
         ScanType.GITLEAKS,
         ScanType.PLIST_SOURCE,
@@ -336,21 +335,13 @@ def test_create_scan_config_for_flutter_source_uses_default_opengrep_rules_path_
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    captured = {}
     rules_path = tmp_path / "flutter"
     rules_path.mkdir()
-
-    def recording_opengrep_scanner(*args, **kwargs):
-        captured["rules_path"] = kwargs.get("rules_path")
-        return FakeScanner(ScanType.OPENGREP_SOURCE, "OpenGrep")
-
-    monkeypatch.setattr(workflow, "OpenGrepScanner", recording_opengrep_scanner)
     monkeypatch.setattr(cli, "_resolve_opengrep_rules_path", lambda override, slug: rules_path)
 
     config = cli._create_scan_config(_scan_args(tmp_path, "--flutter-source-path"))
 
-    _build_scanners(config)
-    assert captured["rules_path"] == rules_path
+    assert config.opengrep_rules_path == rules_path
 
 
 def test_resolve_opengrep_rules_path_uses_app_rules_fallback(monkeypatch) -> None:
@@ -405,7 +396,6 @@ def test_create_scan_config_for_react_native_source_includes_opengrep_when_rules
 
     assert config.opengrep_rules_path == rules_path.resolve()
     assert {scanner.scan_type for scanner in _build_scanners(config)} == {
-        ScanType.OPENGREP_SOURCE,
         ScanType.TRUFFLEHOG,
         ScanType.GITLEAKS,
         ScanType.PLIST_SOURCE,
@@ -451,7 +441,6 @@ def test_create_scan_config_for_native_android_source_includes_opengrep_when_rul
 
     assert config.opengrep_rules_path == rules_path.resolve()
     assert {scanner.scan_type for scanner in _build_scanners(config)} == {
-        ScanType.OPENGREP_SOURCE,
         ScanType.TRUFFLEHOG,
         ScanType.GITLEAKS,
         ScanType.DEPENDENCY_CHECK,
@@ -497,7 +486,6 @@ def test_create_scan_config_for_native_ios_source_includes_opengrep_when_rules_p
 
     assert config.opengrep_rules_path == rules_path.resolve()
     assert {scanner.scan_type for scanner in _build_scanners(config)} == {
-        ScanType.OPENGREP_SOURCE,
         ScanType.TRUFFLEHOG,
         ScanType.GITLEAKS,
         ScanType.PLIST_SOURCE,
@@ -617,7 +605,7 @@ def test_get_opengrep_scan_paths_for_source_returns_project_and_output(tmp_path:
         stack="FLUTTER",
     )
 
-    paths = workflow.MobileAnalysisWorkflowService()._get_opengrep_scan_paths(config)
+    paths = workflow.MobileScannerFactory()._get_opengrep_scan_paths(config)
 
     assert paths == [config.project_path, config.output_path]
 
@@ -631,7 +619,7 @@ def test_get_opengrep_scan_paths_for_binary_returns_output_only(tmp_path: Path) 
         stack="ANY",
     )
 
-    paths = workflow.MobileAnalysisWorkflowService()._get_opengrep_scan_paths(config)
+    paths = workflow.MobileScannerFactory()._get_opengrep_scan_paths(config)
 
     assert paths == [config.output_path]
 

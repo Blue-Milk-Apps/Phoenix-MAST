@@ -21,8 +21,9 @@ class OpenGrepScanner(ScannerPort):
 
     DEFAULT_PROCESS_TIMEOUT_SECONDS = 300
 
-    def __init__(self, rules_path: Path | None = None) -> None:
+    def __init__(self, rules_path: Path | None = None, scan_paths: list[Path] | None = None) -> None:
         self._rules_path = rules_path.resolve() if rules_path else None
+        self._scan_paths = [path.resolve() for path in scan_paths] if scan_paths else None
         self._tool_version: str | None = None
 
     @property
@@ -120,6 +121,11 @@ class OpenGrepScanner(ScannerPort):
         env.setdefault("OPENGREP_SEND_METRICS", "off")
         return env
 
+    def _get_scan_paths(self, config: ScanConfig) -> list[Path]:
+        if self._scan_paths:
+            return self._scan_paths
+        return [config.project_path]
+
     def scan(self, config: ScanConfig) -> list[ScanResult]:
         opengrep_home = Path(tempfile.mkdtemp(prefix="appcritiq_opengrep_"))
         process: subprocess.Popen[str] | None = None
@@ -142,12 +148,13 @@ class OpenGrepScanner(ScannerPort):
                     )
                 ]
 
+            scan_paths = self._get_scan_paths(config)
             cmd = [
                 executable,
                 "scan",
                 "--config",
                 str(rules_path),
-                str(config.project_path),
+                *(str(path) for path in scan_paths),
                 "--json",
                 "--no-rewrite-rule-ids",
                 "--no-git-ignore",
@@ -181,7 +188,7 @@ class OpenGrepScanner(ScannerPort):
                     scanner_name=self.name,
                     scan_type=self.scan_type,
                     success=True,
-                    raw_output=self._report(stdout_data, rules_path, config.project_path),
+                    raw_output=self._report(stdout_data, rules_path, scan_paths),
                     relative_target_path=REPORT_PATH,
                     description=self.description,
                 )
@@ -220,7 +227,7 @@ class OpenGrepScanner(ScannerPort):
                 report["raw_output"] = raw_output
         return json.dumps(report, indent=2, sort_keys=True)
 
-    def _report(self, raw_output: str, rules_path: Path, project_path: Path) -> str:
+    def _report(self, raw_output: str, rules_path: Path, scan_paths: list[Path]) -> str:
         if raw_output.strip():
             try:
                 payload = json.loads(raw_output)
@@ -238,7 +245,8 @@ class OpenGrepScanner(ScannerPort):
                 "tool_version": self._opengrep_version(),
                 "scanner_name": self.name,
                 "scan_type": self.scan_type.value,
-                "project_path": str(project_path),
+                "project_path": str(scan_paths[0]),
+                "scan_paths": [str(path) for path in scan_paths],
                 "rules_path": str(rules_path),
             }
 

@@ -34,9 +34,6 @@ class MobileScannerFactory:
     def build_scanner_list(self, config: ScanConfig) -> list[ScannerPort]:
         scanners = self._base_scanners(config)
 
-        if config.opengrep_rules_path and config.target_type != "BINARY":
-            scanners.insert(0, OpenGrepScanner(rules_path=config.opengrep_rules_path))
-
         if self._mobsf_url_configured():
             scanners.append(MobSFScanner())
 
@@ -92,6 +89,14 @@ class MobileScannerFactory:
     def _mobsf_url_configured() -> bool:
         return bool(os.environ.get("MOBSF_URL", "").strip())
 
+    @staticmethod
+    def _get_opengrep_scan_paths(config: ScanConfig) -> list[Path]:
+        if config.target_type == "SOURCE":
+            return [config.project_path, config.output_path]
+        if config.target_type == "BINARY":
+            return [config.output_path]
+        raise ValueError(f"Unsupported target type for OpenGrep scan paths: {config.target_type}")
+
 
 class MobileAnalysisWorkflowService:
     def run(self, scan_config: ScanConfig) -> None:
@@ -112,11 +117,25 @@ class MobileAnalysisWorkflowService:
         for result in scan_results:
             scan_output_method.write_result(result)
 
-        open_grep_rules_path = self._get_opengrep_rules_path(scan_config)
-        opengrep_scan_paths = self._get_opengrep_scan_paths(scan_config)
-
+        opengrep_results = self._perform_opengrep_scan(scan_config, scan_output_method)
+        scan_results.extend(opengrep_results)
+        for result in opengrep_results:
+            scan_output_method.write_result(result)
         print(f"Results: {len(scan_results)}")
         print(f"Duration: {time.perf_counter() - wall_start:.2f} seconds")
+
+    def _perform_opengrep_scan(self, scan_config: ScanConfig, scan_output_method: FileScanOutput):
+        open_grep_rules_path = self._get_opengrep_rules_path(scan_config)
+        opengrep_scan_paths = self._get_opengrep_scan_paths(scan_config)
+        opengrep_results = []
+        if open_grep_rules_path:
+            opengrep_scanner = OpenGrepScanner(
+                rules_path=Path(open_grep_rules_path),
+                scan_paths=opengrep_scan_paths,
+            )
+            results = opengrep_scanner.scan(scan_config)
+            opengrep_results.extend(results)
+        return opengrep_results
 
     def _get_opengrep_rules_path(self, config: ScanConfig) -> str | None:
         if config.opengrep_rules_path:
@@ -129,9 +148,6 @@ class MobileAnalysisWorkflowService:
             return "opengrep_rules/ios_binary"
         return None
 
-    def _get_opengrep_scan_paths(self, config: ScanConfig) -> list[Path]:
-        if config.target_type == "SOURCE":
-            return [config.project_path, config.output_path]
-        if config.target_type == "BINARY":
-            return [config.output_path]
-        raise ValueError(f"Unsupported target type for OpenGrep scan paths: {config.target_type}")
+    @staticmethod
+    def _get_opengrep_scan_paths(config: ScanConfig) -> list[Path]:
+        return MobileScannerFactory._get_opengrep_scan_paths(config)
