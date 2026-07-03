@@ -1,3 +1,4 @@
+import json
 import os
 import time
 from pathlib import Path
@@ -14,6 +15,10 @@ from adapters.binary_scanners import (
     PlistBinaryScanner,
 )
 from adapters.output.file_output import FileScanOutput
+from adapters.post_scan import (
+    AndroidBinaryScanDetailExtractor,
+    AndroidBinaryScanOutputLoader,
+)
 from adapters.source_code_scanners import (
     DependencyCheckScanner,
     GitleaksScanner,
@@ -23,6 +28,7 @@ from adapters.source_code_scanners import (
     SyftScanner,
     TrufflehogScanner,
 )
+from application.post_scan_processing_service import PostScanProcessingService
 from application.scanner_service import ScannerService
 from domain.models import ScanConfig
 from ports.scanner_port import ScannerPort
@@ -99,6 +105,8 @@ class MobileScannerFactory:
 
 
 class MobileAnalysisWorkflowService:
+    POST_SCAN_OUTPUT_FILE_NAME = "post_scan_processing.json"
+
     def run(self, scan_config: ScanConfig) -> None:
         print("AppcritIQ scan")
         print(f"Project: {scan_config.project_path}")
@@ -121,12 +129,16 @@ class MobileAnalysisWorkflowService:
         scan_results.extend(opengrep_results)
         for result in opengrep_results:
             scan_output_method.write_result(result)
+
+        self._run_post_scan_processing(scan_config.output_path, scan_config)
         print(f"Results: {len(scan_results)}")
         print(f"Duration: {time.perf_counter() - wall_start:.2f} seconds")
 
     def _perform_opengrep_scan(self, scan_config: ScanConfig, scan_output_method: FileScanOutput):
         open_grep_rules_path = self._get_opengrep_rules_path(scan_config)
         opengrep_scan_paths = self._get_opengrep_scan_paths(scan_config)
+        print(f"OpenGrep rules path: {open_grep_rules_path}")
+        print(f"OpenGrep scan paths: {opengrep_scan_paths}")
         opengrep_results = []
         if open_grep_rules_path:
             opengrep_scanner = OpenGrepScanner(
@@ -151,3 +163,28 @@ class MobileAnalysisWorkflowService:
     @staticmethod
     def _get_opengrep_scan_paths(config: ScanConfig) -> list[Path]:
         return MobileScannerFactory._get_opengrep_scan_paths(config)
+
+    def _run_post_scan_processing(self, output_path: Path, scan_config: ScanConfig) -> None:
+        service = self._build_post_scan_processing_service(scan_config)
+        if service is None:
+            return
+
+        post_scan_output = service.process(output_path)
+        target = output_path / self.POST_SCAN_OUTPUT_FILE_NAME
+        target.write_text(
+            json.dumps(post_scan_output, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+
+    @staticmethod
+    def _build_post_scan_processing_service(
+        scan_config: ScanConfig,
+    ) -> PostScanProcessingService | None:
+        match (scan_config.target_type, scan_config.platform, scan_config.stack):
+            case ("BINARY", "ANDROID", _):
+                return PostScanProcessingService(
+                    scan_output_loader=AndroidBinaryScanOutputLoader(),
+                    scan_detail_extractor=AndroidBinaryScanDetailExtractor(),
+                )
+            case _:
+                return None
