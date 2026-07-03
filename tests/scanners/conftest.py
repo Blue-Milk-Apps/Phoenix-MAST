@@ -15,7 +15,7 @@ def scan_config():
             project_path=project_path,
             output_path=output_path,
             mode="source",
-            rules_path=rules_path,
+            opengrep_rules_path=rules_path,
         )
 
     return _build

@@ -126,7 +126,7 @@ def _scan_args(tmp_path: Path, flag_name: str, extra_args: list[str] | None = No
 
 
 def _build_scanners(config: ScanConfig) -> list[FakeScanner]:
-    return workflow.MobileScannerFactory().build_scanners(config)
+    return workflow.MobileScannerFactory().build_scanner_list(config)
 
 
 def _assert_scanner_types(config: ScanConfig, expected_scan_types: set[ScanType]) -> None:
@@ -145,7 +145,7 @@ def test_create_scan_config_for_android_binary(tmp_path: Path, monkeypatch) -> N
     assert config.target_type == "BINARY"
     assert config.platform == "ANDROID"
     assert config.stack == "ANY"
-    assert config.rules_path is None
+    assert config.opengrep_rules_path is None
     assert config.output_path.parent == (tmp_path / "results").resolve()
     assert config.output_path.name.startswith("SAST_android_binary_")
     _assert_scanner_types(
@@ -175,7 +175,7 @@ def test_create_scan_config_for_android_binary_includes_opengrep_when_rules_path
 
     config = cli._create_scan_config(args)
 
-    assert config.rules_path == rules_path.resolve()
+    assert config.opengrep_rules_path == rules_path.resolve()
     assert {scanner.scan_type for scanner in _build_scanners(config)} == {
         ScanType.ANDROGUARD,
         ScanType.AAPT2,
@@ -220,7 +220,7 @@ def test_create_scan_config_for_ios_binary(tmp_path: Path, monkeypatch) -> None:
     assert config.target_type == "BINARY"
     assert config.platform == "IOS"
     assert config.stack == "ANY"
-    assert config.rules_path is None
+    assert config.opengrep_rules_path is None
     assert config.output_path.name.startswith("SAST_ios_binary_")
     _assert_scanner_types(
         config,
@@ -247,7 +247,7 @@ def test_create_scan_config_for_ios_binary_includes_opengrep_when_rules_path_is_
 
     config = cli._create_scan_config(args)
 
-    assert config.rules_path == rules_path.resolve()
+    assert config.opengrep_rules_path == rules_path.resolve()
     assert {scanner.scan_type for scanner in _build_scanners(config)} == {
         ScanType.IPSW,
         ScanType.LIEF,
@@ -307,7 +307,7 @@ def test_create_scan_config_for_flutter_source(tmp_path: Path) -> None:
     assert config.target_type == "SOURCE"
     assert config.platform == "ANY"
     assert config.stack == "FLUTTER"
-    assert config.rules_path is None
+    assert config.opengrep_rules_path is None
     assert config.syft_output_format == "cyclonedx-json"
     assert config.output_path.name.startswith("SAST_flutter_source_")
     _assert_scanner_types(
@@ -335,7 +335,7 @@ def test_create_scan_config_for_flutter_source_includes_opengrep_when_rules_path
 
     config = cli._create_scan_config(args)
 
-    assert config.rules_path == rules_path.resolve()
+    assert config.opengrep_rules_path == rules_path.resolve()
     assert {scanner.scan_type for scanner in _build_scanners(config)} == {
         ScanType.OPENGREP_SOURCE,
         ScanType.TRUFFLEHOG,
@@ -390,7 +390,7 @@ def test_create_scan_config_for_react_native_source(tmp_path: Path) -> None:
     assert config.target_type == "SOURCE"
     assert config.platform == "ANY"
     assert config.stack == "REACT_NATIVE"
-    assert config.rules_path is None
+    assert config.opengrep_rules_path is None
     assert config.output_path.name.startswith("SAST_react_native_source_")
     _assert_scanner_types(
         config,
@@ -417,7 +417,7 @@ def test_create_scan_config_for_react_native_source_includes_opengrep_when_rules
 
     config = cli._create_scan_config(args)
 
-    assert config.rules_path == rules_path.resolve()
+    assert config.opengrep_rules_path == rules_path.resolve()
     assert {scanner.scan_type for scanner in _build_scanners(config)} == {
         ScanType.OPENGREP_SOURCE,
         ScanType.TRUFFLEHOG,
@@ -437,7 +437,7 @@ def test_create_scan_config_for_native_android_source(tmp_path: Path) -> None:
     assert config.target_type == "SOURCE"
     assert config.platform == "ANDROID"
     assert config.stack == "NATIVE_ANDROID"
-    assert config.rules_path is None
+    assert config.opengrep_rules_path is None
     assert config.output_path.name.startswith("SAST_native_android_source_")
     _assert_scanner_types(
         config,
@@ -463,7 +463,7 @@ def test_create_scan_config_for_native_android_source_includes_opengrep_when_rul
 
     config = cli._create_scan_config(args)
 
-    assert config.rules_path == rules_path.resolve()
+    assert config.opengrep_rules_path == rules_path.resolve()
     assert {scanner.scan_type for scanner in _build_scanners(config)} == {
         ScanType.OPENGREP_SOURCE,
         ScanType.TRUFFLEHOG,
@@ -483,7 +483,7 @@ def test_create_scan_config_for_native_ios_source(tmp_path: Path, monkeypatch) -
     assert config.target_type == "SOURCE"
     assert config.platform == "IOS"
     assert config.stack == "NATIVE_IOS"
-    assert config.rules_path is None
+    assert config.opengrep_rules_path is None
     assert config.output_path.name.startswith("SAST_native_ios_source_")
     _assert_scanner_types(
         config,
@@ -509,7 +509,7 @@ def test_create_scan_config_for_native_ios_source_includes_opengrep_when_rules_p
 
     config = cli._create_scan_config(args)
 
-    assert config.rules_path == rules_path.resolve()
+    assert config.opengrep_rules_path == rules_path.resolve()
     assert {scanner.scan_type for scanner in _build_scanners(config)} == {
         ScanType.OPENGREP_SOURCE,
         ScanType.TRUFFLEHOG,
@@ -595,7 +595,7 @@ def test_scan_command_passes_scan_config_to_mobile_analysis_workflow_service(
     assert exit_code == 0
     assert captured["config"].platform == "ANDROID"
     assert captured["config"].stack == "ANY"
-    assert captured["config"].rules_path is None
+    assert captured["config"].opengrep_rules_path is None
     assert not hasattr(captured["config"], "scanners")
     assert not hasattr(captured["config"], "enabled_scans")
 
@@ -620,6 +620,34 @@ def test_scan_command_passes_syft_output_format(tmp_path: Path, monkeypatch) -> 
 
     assert scanners
     assert captured["output_format"] == "spdx-json"
+
+
+def test_get_opengrep_scan_paths_for_source_returns_project_and_output(tmp_path: Path) -> None:
+    config = ScanConfig(
+        project_path=tmp_path / "project",
+        output_path=tmp_path / "scan-results",
+        mode="source",
+        platform="ANY",
+        stack="FLUTTER",
+    )
+
+    paths = workflow.MobileAnalysisWorkflowService()._get_opengrep_scan_paths(config)
+
+    assert paths == [config.project_path, config.output_path]
+
+
+def test_get_opengrep_scan_paths_for_binary_returns_output_only(tmp_path: Path) -> None:
+    config = ScanConfig(
+        project_path=tmp_path / "app.apk",
+        output_path=tmp_path / "scan-results",
+        mode="binary",
+        platform="ANDROID",
+        stack="ANY",
+    )
+
+    paths = workflow.MobileAnalysisWorkflowService()._get_opengrep_scan_paths(config)
+
+    assert paths == [config.output_path]
 
 
 def test_cli_version_exits_successfully(capsys) -> None:

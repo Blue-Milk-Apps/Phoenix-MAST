@@ -85,7 +85,7 @@ class BinaryOpenGrepScanner(OpenGrepScanner):
                 scan_label=config.scan_label,
                 platform=config.platform,
                 stack=config.stack,
-                rules_path=rules_path,
+                opengrep_rules_path=rules_path,
                 ignore_patterns=config.ignore_patterns,
                 ignore_file=config.ignore_file,
                 display_project_path=config.display_project_path,

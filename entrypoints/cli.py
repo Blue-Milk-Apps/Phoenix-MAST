@@ -202,7 +202,7 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
         scan_label=scan_label,
         platform=platform,
         stack=stack,
-        rules_path=rules_path,
+        opengrep_rules_path=rules_path,
         syft_output_format=args.syft_output_format,
     )
     return scan_config

@@ -91,8 +91,8 @@ class OpenGrepScanner(ScannerPort):
         if self._rules_path:
             return self._rules_path if self._rules_path.exists() else None
 
-        if config.rules_path:
-            return config.rules_path if config.rules_path.exists() else None
+        if config.opengrep_rules_path:
+            return config.opengrep_rules_path if config.opengrep_rules_path.exists() else None
         return None
 
     def _has_rule_files(self, rules_path: Path) -> bool:
