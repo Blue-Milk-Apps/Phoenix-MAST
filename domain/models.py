@@ -17,7 +17,6 @@ class ScanType(str, Enum):
     APKID = "apkid"
     IPSW = "ipsw"
     OPENGREP_SOURCE = "opengrep_source"
-    OPENGREP_BINARY = "opengrep_binary"
     TRUFFLEHOG = "trufflehog"
     GITLEAKS = "gitleaks"
     STRINGS = "strings"

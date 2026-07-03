@@ -8,7 +8,6 @@ from adapters.binary_scanners import (
     ApkidScanner,
     ApksignerScanner,
     ApktoolScanner,
-    BinaryOpenGrepScanner,
     IpswScanner,
     LIEFScanner,
     MobSFScanner,
@@ -35,11 +34,8 @@ class MobileScannerFactory:
     def build_scanner_list(self, config: ScanConfig) -> list[ScannerPort]:
         scanners = self._base_scanners(config)
 
-        if config.opengrep_rules_path:
-            if config.target_type == "BINARY":
-                scanners.append(BinaryOpenGrepScanner(rules_path=config.opengrep_rules_path))
-            else:
-                scanners.insert(0, OpenGrepScanner(rules_path=config.opengrep_rules_path))
+        if config.opengrep_rules_path and config.target_type != "BINARY":
+            scanners.insert(0, OpenGrepScanner(rules_path=config.opengrep_rules_path))
 
         if self._mobsf_url_configured():
             scanners.append(MobSFScanner())

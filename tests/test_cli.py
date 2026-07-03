@@ -36,11 +36,6 @@ def _patch_core_scanners(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         workflow,
-        "BinaryOpenGrepScanner",
-        _fake_scanner(ScanType.OPENGREP_BINARY, "OpenGrep Binary"),
-    )
-    monkeypatch.setattr(
-        workflow,
         "TrufflehogScanner",
         _fake_scanner(ScanType.TRUFFLEHOG, "Trufflehog"),
     )
@@ -183,7 +178,6 @@ def test_create_scan_config_for_android_binary_includes_opengrep_when_rules_path
         ScanType.APKSIGNER,
         ScanType.APKID,
         ScanType.STRINGS,
-        ScanType.OPENGREP_BINARY,
     }
 
 
@@ -253,7 +247,6 @@ def test_create_scan_config_for_ios_binary_includes_opengrep_when_rules_path_is_
         ScanType.LIEF,
         ScanType.STRINGS,
         ScanType.PLIST_BINARY,
-        ScanType.OPENGREP_BINARY,
     }
 
 
@@ -261,22 +254,15 @@ def test_create_scan_config_for_ios_binary_uses_default_opengrep_rules_path_when
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    captured = {}
     rules_path = tmp_path / "ios"
     rules_path.mkdir()
 
-    def recording_binary_opengrep_scanner(*args, **kwargs):
-        captured["rules_path"] = kwargs.get("rules_path")
-        return FakeScanner(ScanType.OPENGREP_BINARY, "OpenGrep Binary")
-
-    monkeypatch.setattr(workflow, "BinaryOpenGrepScanner", recording_binary_opengrep_scanner)
     monkeypatch.setattr(cli, "_resolve_opengrep_rules_path", lambda override, slug: rules_path)
     monkeypatch.delenv("MOBSF_URL", raising=False)
 
     config = cli._create_scan_config(_scan_args(tmp_path, "--ios-binary-path"))
 
-    _build_scanners(config)
-    assert captured["rules_path"] == rules_path
+    assert config.opengrep_rules_path == rules_path
 
 
 def test_create_scan_config_for_ios_binary_includes_mobsf_when_url_is_configured(tmp_path: Path, monkeypatch) -> None:
