@@ -36,9 +36,15 @@ def test_android_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Pa
 
 
 def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() -> None:
+    apk_path = Path("/tmp/APKPure.apk")
     loaded_outputs = {
+        "scan_metadata": {
+            "project_path": str(apk_path),
+        },
         "androguard_metadata": {
+            "apk_path": str(apk_path),
             "app_name": "APKPure",
+            "file_name": "APKPure.apk",
             "package": "com.apkpure.aegon",
             "target_sdk": "34",
             "min_sdk": "19",
@@ -73,6 +79,11 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
             ]
         },
         "apksigner_signing_evidence": {
+            "apk": {
+                "file_name": "APKPure.apk",
+                "sha256": "9614118b4e75e72e4fb65909fe95649efd89d00fb8435e99e5bebbec75bb1a31",
+                "size_bytes": 25760048,
+            },
             "signature_schemes": {
                 "v1": {"state": "VERIFIED"},
                 "v2": {"state": "VERIFIED"},
@@ -122,20 +133,29 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
         "22311a95d67057b82318e23b3efd7cc878e190b8dcd55ac2e7bb745343957474"
     )
     assert sections["certificate"]["unique_certs"] == "1"
+    assert sections["file_info"] == {
+        "filename": "APKPure.apk",
+        "size": "25760048",
+        "md5": "",
+        "sha1": "",
+        "sha256": "9614118b4e75e72e4fb65909fe95649efd89d00fb8435e99e5bebbec75bb1a31",
+    }
 
 
 def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_path: Path) -> None:
     scan_dir = tmp_path / "SAST_android_binary_2026-07-03_23-34-29"
+    apk_path = tmp_path / "APKPure.apk"
     (scan_dir / "opengrep_source").mkdir(parents=True)
     (scan_dir / "androguard").mkdir()
     (scan_dir / "aapt2").mkdir()
     (scan_dir / "apksigner").mkdir()
+    apk_path.write_bytes(b"fake apk bytes")
 
     _write_json(
         scan_dir / "scan_metadata.json",
         {
             "platform": "ANDROID",
-            "project_path": "/tmp/APKPure.apk",
+            "project_path": str(apk_path),
         },
     )
     _write_json(scan_dir / "opengrep_source" / "opengrep_results.json", {"results": []})
@@ -143,6 +163,7 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
         scan_dir / "androguard" / "metadata.json",
         {
             "app_name": "APKPure",
+            "apk_path": str(apk_path),
             "file_name": "APKPure.apk",
             "package": "com.apkpure.aegon",
             "version_name": "3.20.70",
@@ -189,6 +210,11 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
     _write_json(
         scan_dir / "apksigner" / "signing_evidence.json",
         {
+            "apk": {
+                "file_name": "APKPure.apk",
+                "sha256": "9614118b4e75e72e4fb65909fe95649efd89d00fb8435e99e5bebbec75bb1a31",
+                "size_bytes": apk_path.stat().st_size,
+            },
             "signature_schemes": {
                 "v1": {"state": "VERIFIED"},
                 "v2": {"state": "VERIFIED"},
@@ -225,6 +251,13 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
     }
     assert result["app_info"]["main_activity"] == "com.apkpure.aegon.main.activity.FirstSeemPageActivity"
     assert result["certificate"]["signature_versions"]["v2"] is True
+    assert result["file_info"] == {
+        "filename": "APKPure.apk",
+        "size": str(apk_path.stat().st_size),
+        "md5": "d8db041096e5576650d5c1b0ac38bcca",
+        "sha1": "dadc430a84587e51b2231daa1024ee0506806f96",
+        "sha256": "cb4870807289f0ebb14bbfc941421b08f5766fa0346c1828bd5f09a955ccd560",
+    }
 
 
 def _write_json(path: Path, payload: dict) -> None:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+from pathlib import Path
 from typing import Any
 
 from ports.scan_detail_extractor_port import ScanDetailExtractorPort
@@ -14,6 +16,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         return {
             "app_info": self._build_app_info(loaded_outputs),
             "certificate": self._build_certificate(loaded_outputs),
+            "file_info": self._build_file_info(loaded_outputs),
         }
 
     def _build_app_info(self, loaded_outputs: dict[str, Any]) -> dict[str, str]:
@@ -109,6 +112,36 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "unique_certs": str(len(androguard_certificates.get("all") or [])),
         }
 
+    def _build_file_info(self, loaded_outputs: dict[str, Any]) -> dict[str, str]:
+        scan_metadata = loaded_outputs.get("scan_metadata") or {}
+        androguard_metadata = loaded_outputs.get("androguard_metadata") or {}
+        apksigner_signing_evidence = loaded_outputs.get("apksigner_signing_evidence") or {}
+        apk_details = apksigner_signing_evidence.get("apk") or {}
+
+        file_path = self._existing_file_path(
+            scan_metadata.get("project_path"),
+            androguard_metadata.get("apk_path"),
+        )
+        file_hashes = self._hash_file(file_path) if file_path else {}
+        size_bytes = apk_details.get("size_bytes")
+        if size_bytes in (None, "") and file_path is not None:
+            size_bytes = file_path.stat().st_size
+
+        return {
+            "filename": self._first_non_empty(
+                apk_details.get("file_name"),
+                androguard_metadata.get("file_name"),
+                Path(str(scan_metadata.get("project_path", ""))).name,
+            ),
+            "size": self._first_non_empty(size_bytes),
+            "md5": self._first_non_empty(file_hashes.get("md5")),
+            "sha1": self._first_non_empty(file_hashes.get("sha1")),
+            "sha256": self._first_non_empty(
+                file_hashes.get("sha256"),
+                apk_details.get("sha256"),
+            ),
+        }
+
     @staticmethod
     def _primary_certificate(
         androguard_certificates: dict[str, Any],
@@ -183,6 +216,35 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             if cleaned.startswith(prefix):
                 return cleaned[len(prefix) :].strip()
         return ""
+
+    @staticmethod
+    def _existing_file_path(*candidates: object) -> Path | None:
+        for candidate in candidates:
+            text = str(candidate or "").strip()
+            if not text:
+                continue
+            path = Path(text)
+            if path.is_file():
+                return path
+        return None
+
+    @staticmethod
+    def _hash_file(path: Path) -> dict[str, str]:
+        md5 = hashlib.md5()  # noqa: S324 - used for report metadata, not security decisions
+        sha1 = hashlib.sha1()  # noqa: S324 - used for report metadata, not security decisions
+        sha256 = hashlib.sha256()
+
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(8192), b""):
+                md5.update(chunk)
+                sha1.update(chunk)
+                sha256.update(chunk)
+
+        return {
+            "md5": md5.hexdigest(),
+            "sha1": sha1.hexdigest(),
+            "sha256": sha256.hexdigest(),
+        }
 
     @staticmethod
     def _first_non_empty(*values: object) -> str:
