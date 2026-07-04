@@ -20,11 +20,14 @@ class AndroidBinaryScanOutputLoader(ScanOutputLoaderPort):
             "opengrep": self._load_json(root / "opengrep_source" / "opengrep_results.json"),
             "androguard_components": self._load_json(root / "androguard" / "components.json"),
             "androguard_metadata": self._load_json(root / "androguard" / "metadata.json"),
+            "androguard_permissions": self._load_json(root / "androguard" / "permissions.json"),
             "androguard_certificates": self._load_json(root / "androguard" / "certificates.json"),
             "aapt2_components": self._load_json(root / "aapt2" / "components.json"),
             "aapt2_identity": self._load_json(root / "aapt2" / "identity.json"),
             "aapt2_application": self._load_json(root / "aapt2" / "application.json"),
+            "aapt2_permissions": self._load_json(root / "aapt2" / "permissions.json"),
             "apksigner_signing_evidence": self._load_json(root / "apksigner" / "signing_evidence.json"),
+            "apktool_permissions": self._load_json(root / "apktool" / "permissions.json"),
         }
 
     @staticmethod

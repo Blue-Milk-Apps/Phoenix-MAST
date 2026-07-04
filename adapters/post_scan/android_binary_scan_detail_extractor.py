@@ -18,6 +18,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "app_components": self._build_app_components(loaded_outputs),
             "certificate": self._build_certificate(loaded_outputs),
             "file_info": self._build_file_info(loaded_outputs),
+            "permissions": self._build_permissions(loaded_outputs),
         }
 
     def _build_app_info(self, loaded_outputs: dict[str, Any]) -> dict[str, str]:
@@ -162,6 +163,31 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             ),
         }
 
+    def _build_permissions(self, loaded_outputs: dict[str, Any]) -> list[dict[str, str]]:
+        aapt2_permissions = loaded_outputs.get("aapt2_permissions") or {}
+        apktool_permissions = loaded_outputs.get("apktool_permissions") or {}
+
+        declared_permissions = self._declared_permission_map(apktool_permissions)
+        permissions: list[dict[str, str]] = []
+
+        for permission in aapt2_permissions.get("permissions") or []:
+            name = self._first_non_empty(permission.get("name"))
+            if not name:
+                continue
+
+            protection_level = self._first_non_empty(permission.get("protection_level_hint"))
+            permissions.append(
+                {
+                    "permission": name,
+                    "status": self._normalize_permission_status(protection_level),
+                    "info": self._permission_info(protection_level),
+                    "usage_description": "",
+                    "general_description": declared_permissions.get(name, ""),
+                }
+            )
+
+        return permissions
+
     @staticmethod
     def _primary_certificate(
         androguard_certificates: dict[str, Any],
@@ -269,6 +295,38 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     @staticmethod
     def _count_exported(components: list[dict[str, Any]]) -> int:
         return sum(1 for component in components if component.get("exported") is True)
+
+    @staticmethod
+    def _declared_permission_map(apktool_permissions: dict[str, Any]) -> dict[str, str]:
+        result: dict[str, str] = {}
+        for permission in apktool_permissions.get("declared") or []:
+            name = str(permission.get("value", "")).strip()
+            if not name:
+                continue
+            protection_level = str((permission.get("context") or {}).get("protection_level", "")).strip()
+            if protection_level:
+                result[name] = f"Declared permission ({protection_level})"
+            else:
+                result[name] = "Declared permission"
+        return result
+
+    @staticmethod
+    def _normalize_permission_status(protection_level: str) -> str:
+        normalized = protection_level.strip().lower()
+        if normalized == "dangerous":
+            return "dangerous"
+        return "normal"
+
+    @staticmethod
+    def _permission_info(protection_level: str) -> str:
+        normalized = protection_level.strip().lower()
+        if normalized == "dangerous":
+            return "dangerous"
+        if normalized == "signature":
+            return "signature"
+        if normalized:
+            return normalized.replace("_", " ")
+        return ""
 
     @staticmethod
     def _first_non_empty(*values: object) -> str:

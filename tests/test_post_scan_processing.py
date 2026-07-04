@@ -14,16 +14,20 @@ def test_android_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Pa
     (scan_dir / "androguard").mkdir()
     (scan_dir / "aapt2").mkdir()
     (scan_dir / "apksigner").mkdir()
+    (scan_dir / "apktool").mkdir()
 
     _write_json(scan_dir / "scan_metadata.json", {"platform": "ANDROID"})
     _write_json(scan_dir / "opengrep_source" / "opengrep_results.json", {"results": []})
     _write_json(scan_dir / "androguard" / "components.json", {"activities": []})
     _write_json(scan_dir / "androguard" / "metadata.json", {"app_name": "APKPure"})
+    _write_json(scan_dir / "androguard" / "permissions.json", {"items": []})
     _write_json(scan_dir / "androguard" / "certificates.json", {"all": []})
     _write_json(scan_dir / "aapt2" / "components.json", {"activities": []})
     _write_json(scan_dir / "aapt2" / "identity.json", {"application_label": "APKPure"})
     _write_json(scan_dir / "aapt2" / "application.json", {"id": "app"})
+    _write_json(scan_dir / "aapt2" / "permissions.json", {"permissions": []})
     _write_json(scan_dir / "apksigner" / "signing_evidence.json", {"verification": {}})
+    _write_json(scan_dir / "apktool" / "permissions.json", {"declared": []})
 
     loaded = AndroidBinaryScanOutputLoader().load(scan_dir)
 
@@ -32,11 +36,14 @@ def test_android_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Pa
     assert loaded["opengrep"] == {"results": []}
     assert loaded["androguard_components"] == {"activities": []}
     assert loaded["androguard_metadata"] == {"app_name": "APKPure"}
+    assert loaded["androguard_permissions"] == {"items": []}
     assert loaded["androguard_certificates"] == {"all": []}
     assert loaded["aapt2_components"] == {"activities": []}
     assert loaded["aapt2_identity"] == {"application_label": "APKPure"}
     assert loaded["aapt2_application"] == {"id": "app"}
+    assert loaded["aapt2_permissions"] == {"permissions": []}
     assert loaded["apksigner_signing_evidence"] == {"verification": {}}
+    assert loaded["apktool_permissions"] == {"declared": []}
 
 
 def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() -> None:
@@ -78,6 +85,22 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
             "launchable_activity": "com.apkpure.aegon.main.activity.FirstSeemPageActivity",
             "target_sdk_version": "34",
             "version_name": "3.20.70",
+        },
+        "aapt2_permissions": {
+            "permissions": [
+                {
+                    "name": "android.permission.ACCESS_FINE_LOCATION",
+                    "protection_level_hint": "dangerous",
+                },
+                {
+                    "name": "android.permission.INTERNET",
+                    "protection_level_hint": "unknown_or_normal",
+                },
+                {
+                    "name": "com.apkpure.aegon.permission.PROCESS_PUSH_MSG",
+                    "protection_level_hint": "unknown_or_normal",
+                },
+            ]
         },
         "androguard_certificates": {
             "all": [
@@ -122,6 +145,14 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
                     }
                 }
             ],
+        },
+        "apktool_permissions": {
+            "declared": [
+                {
+                    "context": {"protection_level": "signature"},
+                    "value": "com.apkpure.aegon.permission.PROCESS_PUSH_MSG",
+                }
+            ]
         },
     }
 
@@ -172,6 +203,29 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
         "sha1": "",
         "sha256": "9614118b4e75e72e4fb65909fe95649efd89d00fb8435e99e5bebbec75bb1a31",
     }
+    assert sections["permissions"] == [
+        {
+            "permission": "android.permission.ACCESS_FINE_LOCATION",
+            "status": "dangerous",
+            "info": "dangerous",
+            "usage_description": "",
+            "general_description": "",
+        },
+        {
+            "permission": "android.permission.INTERNET",
+            "status": "normal",
+            "info": "unknown or normal",
+            "usage_description": "",
+            "general_description": "",
+        },
+        {
+            "permission": "com.apkpure.aegon.permission.PROCESS_PUSH_MSG",
+            "status": "normal",
+            "info": "unknown or normal",
+            "usage_description": "",
+            "general_description": "Declared permission (signature)",
+        },
+    ]
 
 
 def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_path: Path) -> None:
@@ -181,6 +235,7 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
     (scan_dir / "androguard").mkdir()
     (scan_dir / "aapt2").mkdir()
     (scan_dir / "apksigner").mkdir()
+    (scan_dir / "apktool").mkdir()
     apk_path.write_bytes(b"fake apk bytes")
 
     _write_json(
@@ -191,6 +246,7 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
         },
     )
     _write_json(scan_dir / "opengrep_source" / "opengrep_results.json", {"results": []})
+    _write_json(scan_dir / "androguard" / "permissions.json", {"items": []})
     _write_json(
         scan_dir / "androguard" / "components.json",
         {
@@ -269,6 +325,21 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
     )
     _write_json(scan_dir / "aapt2" / "application.json", {"id": "app"})
     _write_json(
+        scan_dir / "aapt2" / "permissions.json",
+        {
+            "permissions": [
+                {
+                    "name": "android.permission.ACCESS_FINE_LOCATION",
+                    "protection_level_hint": "dangerous",
+                },
+                {
+                    "name": "android.permission.INTERNET",
+                    "protection_level_hint": "unknown_or_normal",
+                },
+            ]
+        },
+    )
+    _write_json(
         scan_dir / "apksigner" / "signing_evidence.json",
         {
             "apk": {
@@ -294,6 +365,7 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
             ],
         },
     )
+    _write_json(scan_dir / "apktool" / "permissions.json", {"declared": []})
 
     result = PostScanProcessingService(
         scan_output_loader=AndroidBinaryScanOutputLoader(),
@@ -329,6 +401,22 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
         "sha1": "dadc430a84587e51b2231daa1024ee0506806f96",
         "sha256": "cb4870807289f0ebb14bbfc941421b08f5766fa0346c1828bd5f09a955ccd560",
     }
+    assert result["permissions"] == [
+        {
+            "permission": "android.permission.ACCESS_FINE_LOCATION",
+            "status": "dangerous",
+            "info": "dangerous",
+            "usage_description": "",
+            "general_description": "",
+        },
+        {
+            "permission": "android.permission.INTERNET",
+            "status": "normal",
+            "info": "unknown or normal",
+            "usage_description": "",
+            "general_description": "",
+        },
+    ]
 
 
 def _write_json(path: Path, payload: dict) -> None:
