@@ -15,6 +15,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     def extract_sections(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
         return {
             "app_info": self._build_app_info(loaded_outputs),
+            "app_components": self._build_app_components(loaded_outputs),
             "certificate": self._build_certificate(loaded_outputs),
             "file_info": self._build_file_info(loaded_outputs),
         }
@@ -51,6 +52,25 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "developer": "",
             "categories": "",
             "trackers_detected": "",
+        }
+
+    def _build_app_components(self, loaded_outputs: dict[str, Any]) -> dict[str, int]:
+        androguard_components = loaded_outputs.get("androguard_components") or {}
+
+        activities = androguard_components.get("activities") or []
+        services = androguard_components.get("services") or []
+        receivers = androguard_components.get("receivers") or []
+        providers = androguard_components.get("providers") or []
+
+        return {
+            "activities": len(activities),
+            "services": len(services),
+            "receivers": len(receivers),
+            "providers": len(providers),
+            "exported_activities": self._count_exported(activities),
+            "exported_services": self._count_exported(services),
+            "exported_receivers": self._count_exported(receivers),
+            "exported_providers": self._count_exported(providers),
         }
 
     def _build_certificate(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
@@ -245,6 +265,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "sha1": sha1.hexdigest(),
             "sha256": sha256.hexdigest(),
         }
+
+    @staticmethod
+    def _count_exported(components: list[dict[str, Any]]) -> int:
+        return sum(1 for component in components if component.get("exported") is True)
 
     @staticmethod
     def _first_non_empty(*values: object) -> str:

@@ -17,8 +17,10 @@ def test_android_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Pa
 
     _write_json(scan_dir / "scan_metadata.json", {"platform": "ANDROID"})
     _write_json(scan_dir / "opengrep_source" / "opengrep_results.json", {"results": []})
+    _write_json(scan_dir / "androguard" / "components.json", {"activities": []})
     _write_json(scan_dir / "androguard" / "metadata.json", {"app_name": "APKPure"})
     _write_json(scan_dir / "androguard" / "certificates.json", {"all": []})
+    _write_json(scan_dir / "aapt2" / "components.json", {"activities": []})
     _write_json(scan_dir / "aapt2" / "identity.json", {"application_label": "APKPure"})
     _write_json(scan_dir / "aapt2" / "application.json", {"id": "app"})
     _write_json(scan_dir / "apksigner" / "signing_evidence.json", {"verification": {}})
@@ -28,8 +30,10 @@ def test_android_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Pa
     assert loaded["scan_output_path"] == str(scan_dir)
     assert loaded["scan_metadata"] == {"platform": "ANDROID"}
     assert loaded["opengrep"] == {"results": []}
+    assert loaded["androguard_components"] == {"activities": []}
     assert loaded["androguard_metadata"] == {"app_name": "APKPure"}
     assert loaded["androguard_certificates"] == {"all": []}
+    assert loaded["aapt2_components"] == {"activities": []}
     assert loaded["aapt2_identity"] == {"application_label": "APKPure"}
     assert loaded["aapt2_application"] == {"id": "app"}
     assert loaded["apksigner_signing_evidence"] == {"verification": {}}
@@ -49,6 +53,24 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
             "target_sdk": "34",
             "min_sdk": "19",
             "version_name": "3.20.70",
+        },
+        "androguard_components": {
+            "activities": [
+                {"exported": True},
+                {"exported": False},
+                {"exported": None},
+            ],
+            "services": [
+                {"exported": True},
+                {"exported": False},
+            ],
+            "receivers": [
+                {"exported": True},
+                {"exported": True},
+            ],
+            "providers": [
+                {"exported": False},
+            ],
         },
         "aapt2_identity": {
             "application_label": "APKPure",
@@ -119,6 +141,16 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
         "categories": "",
         "trackers_detected": "",
     }
+    assert sections["app_components"] == {
+        "activities": 3,
+        "services": 2,
+        "receivers": 2,
+        "providers": 1,
+        "exported_activities": 1,
+        "exported_services": 1,
+        "exported_receivers": 2,
+        "exported_providers": 0,
+    }
     assert sections["certificate"]["owner_name"] == "apkpure"
     assert sections["certificate"]["organization"] == "apkpure"
     assert sections["certificate"]["organizational_unit"] == "apkpure"
@@ -160,6 +192,26 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
     )
     _write_json(scan_dir / "opengrep_source" / "opengrep_results.json", {"results": []})
     _write_json(
+        scan_dir / "androguard" / "components.json",
+        {
+            "activities": [
+                {"exported": True},
+                {"exported": False},
+            ],
+            "services": [
+                {"exported": True},
+            ],
+            "receivers": [
+                {"exported": False},
+                {"exported": True},
+            ],
+            "providers": [
+                {"exported": False},
+                {"exported": False},
+            ],
+        },
+    )
+    _write_json(
         scan_dir / "androguard" / "metadata.json",
         {
             "app_name": "APKPure",
@@ -194,6 +246,15 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
                     },
                 }
             ]
+        },
+    )
+    _write_json(
+        scan_dir / "aapt2" / "components.json",
+        {
+            "activities": [],
+            "services": [],
+            "receivers": [],
+            "providers": [],
         },
     )
     _write_json(
@@ -250,6 +311,16 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
         "reviewer_org": "AppCritique Security Report",
     }
     assert result["app_info"]["main_activity"] == "com.apkpure.aegon.main.activity.FirstSeemPageActivity"
+    assert result["app_components"] == {
+        "activities": 2,
+        "services": 1,
+        "receivers": 2,
+        "providers": 2,
+        "exported_activities": 1,
+        "exported_services": 1,
+        "exported_receivers": 1,
+        "exported_providers": 0,
+    }
     assert result["certificate"]["signature_versions"]["v2"] is True
     assert result["file_info"] == {
         "filename": "APKPure.apk",
