@@ -13,6 +13,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     def extract_sections(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
         return {
             "app_info": self._build_app_info(loaded_outputs),
+            "certificate": self._build_certificate(loaded_outputs),
         }
 
     def _build_app_info(self, loaded_outputs: dict[str, Any]) -> dict[str, str]:
@@ -48,6 +49,140 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "categories": "",
             "trackers_detected": "",
         }
+
+    def _build_certificate(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
+        androguard_certificates = loaded_outputs.get("androguard_certificates") or {}
+        apksigner_signing_evidence = loaded_outputs.get("apksigner_signing_evidence") or {}
+
+        primary_certificate = self._primary_certificate(androguard_certificates, apksigner_signing_evidence)
+        subject = primary_certificate.get("subject") or {}
+        issuer = primary_certificate.get("issuer") or {}
+        signature_schemes = apksigner_signing_evidence.get("signature_schemes") or {}
+
+        return {
+            "owner_name": self._first_non_empty(
+                subject.get("common_name"),
+                self._extract_dn_value(
+                    (((apksigner_signing_evidence.get("signers") or [{}])[0]).get("certificate") or {}).get(
+                        "subject_dn"
+                    ),
+                    "CN",
+                ),
+            ),
+            "organization": self._first_non_empty(
+                subject.get("organization_name"),
+                self._extract_dn_value(
+                    (((apksigner_signing_evidence.get("signers") or [{}])[0]).get("certificate") or {}).get(
+                        "subject_dn"
+                    ),
+                    "O",
+                ),
+            ),
+            "organizational_unit": self._first_non_empty(
+                subject.get("organizational_unit_name"),
+                self._extract_dn_value(
+                    (((apksigner_signing_evidence.get("signers") or [{}])[0]).get("certificate") or {}).get(
+                        "subject_dn"
+                    ),
+                    "OU",
+                ),
+            ),
+            "location": "",
+            "validity": self._format_validity(
+                primary_certificate.get("not_valid_before"),
+                primary_certificate.get("not_valid_after"),
+            ),
+            "issuer": self._format_identity(issuer),
+            "serial_number": self._first_non_empty(primary_certificate.get("serial_number")),
+            "signature_versions": {
+                "v1": self._signature_scheme_verified(signature_schemes.get("v1")),
+                "v2": self._signature_scheme_verified(signature_schemes.get("v2")),
+                "v3": self._signature_scheme_verified(signature_schemes.get("v3")),
+                "v4": self._signature_scheme_verified(signature_schemes.get("v4")),
+            },
+            "hash_algorithms": self._format_hash_algorithms(primary_certificate, apksigner_signing_evidence),
+            "fingerprint": self._first_non_empty(
+                primary_certificate.get("sha256"),
+                (((apksigner_signing_evidence.get("signers") or [{}])[0]).get("certificate") or {}).get("sha256"),
+                primary_certificate.get("sha1"),
+            ),
+            "unique_certs": str(len(androguard_certificates.get("all") or [])),
+        }
+
+    @staticmethod
+    def _primary_certificate(
+        androguard_certificates: dict[str, Any],
+        apksigner_signing_evidence: dict[str, Any],
+    ) -> dict[str, Any]:
+        all_certs = androguard_certificates.get("all") or []
+        if all_certs:
+            return all_certs[0]
+
+        signer_certs = apksigner_signing_evidence.get("signers") or []
+        if signer_certs:
+            return signer_certs[0].get("certificate") or {}
+
+        return {}
+
+    @staticmethod
+    def _signature_scheme_verified(signature_scheme: dict[str, Any] | None) -> bool:
+        if not signature_scheme:
+            return False
+        return str(signature_scheme.get("state", "")).upper() == "VERIFIED"
+
+    @staticmethod
+    def _format_validity(not_before: object, not_after: object) -> str:
+        start = str(not_before or "").strip()
+        end = str(not_after or "").strip()
+        if start and end:
+            return f"{start} to {end}"
+        return start or end
+
+    @staticmethod
+    def _format_identity(identity: dict[str, Any]) -> str:
+        parts = [
+            str(identity.get("common_name", "")).strip(),
+            str(identity.get("organization_name", "")).strip(),
+            str(identity.get("organizational_unit_name", "")).strip(),
+        ]
+        return ", ".join(part for part in parts if part)
+
+    @staticmethod
+    def _format_hash_algorithms(primary_certificate: dict[str, Any], apksigner_signing_evidence: dict[str, Any]) -> str:
+        values: list[str] = []
+
+        if primary_certificate.get("sha1"):
+            values.append("SHA1")
+        if primary_certificate.get("sha256"):
+            values.append("SHA256")
+
+        signer_cert = (((apksigner_signing_evidence.get("signers") or [{}])[0]).get("certificate") or {})
+        signature_algorithm = str(signer_cert.get("signature_algorithm", "")).strip()
+        if signature_algorithm and signature_algorithm.upper() != "UNKNOWN":
+            values.append(signature_algorithm)
+
+        public_key_algorithm = str(signer_cert.get("public_key_algorithm", "")).strip()
+        if public_key_algorithm:
+            values.append(public_key_algorithm)
+
+        deduped: list[str] = []
+        for value in values:
+            if value not in deduped:
+                deduped.append(value)
+        return ", ".join(deduped)
+
+    @staticmethod
+    def _extract_dn_value(distinguished_name: object, key: str) -> str:
+        text = str(distinguished_name or "").strip()
+        if not text:
+            return ""
+
+        for part in text.split(","):
+            cleaned = part.strip()
+            prefix = f"{key}="
+            if cleaned.startswith(prefix):
+                return cleaned[len(prefix) :].strip()
+        return ""
 
     @staticmethod
     def _first_non_empty(*values: object) -> str:

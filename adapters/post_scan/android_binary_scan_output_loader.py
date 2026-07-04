@@ -19,8 +19,10 @@ class AndroidBinaryScanOutputLoader(ScanOutputLoaderPort):
             "scan_metadata": self._load_json(root / "scan_metadata.json"),
             "opengrep": self._load_json(root / "opengrep_source" / "opengrep_results.json"),
             "androguard_metadata": self._load_json(root / "androguard" / "metadata.json"),
+            "androguard_certificates": self._load_json(root / "androguard" / "certificates.json"),
             "aapt2_identity": self._load_json(root / "aapt2" / "identity.json"),
             "aapt2_application": self._load_json(root / "aapt2" / "application.json"),
+            "apksigner_signing_evidence": self._load_json(root / "apksigner" / "signing_evidence.json"),
         }
 
     @staticmethod
