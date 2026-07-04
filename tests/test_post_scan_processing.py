@@ -174,6 +174,30 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
                     "context": {"category": "email"},
                     "value": "support@apkpure.com",
                 },
+                {
+                    "context": {"category": "secret_keyword"},
+                    "provenance": {"path": "res/values/strings.xml", "line": 12},
+                    "value": "API_KEY=super-secret",
+                },
+            ]
+        },
+        "opengrep": {
+            "results": [
+                {
+                    "extra": {
+                        "message": "App declares or uses Android location services.",
+                        "metadata": {
+                            "appcritiq": {
+                                "check_id": 55,
+                                "description": (
+                                    "Detect whether the app declares Android location permissions "
+                                    "or uses Android location-related APIs."
+                                ),
+                                "title": "Location services declaration present",
+                            }
+                        },
+                    }
+                }
             ]
         },
     }
@@ -248,6 +272,29 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
             "general_description": "Declared permission (signature)",
         },
     ]
+    assert sections["functionality"]["Location"] == {
+        "present": True,
+        "explanation": "Detect whether the app declares Android location permissions or uses Android location-related APIs.",
+    }
+    assert sections["functionality"]["Audio"] == {
+        "present": False,
+        "explanation": "",
+    }
+    assert sections["hardcoded_values"] == {
+        "urls": [
+            {
+                "url": "https://api.apkpure.com/v1/apps",
+                "country": "",
+            }
+        ],
+        "emails": ["support@apkpure.com"],
+        "secrets": [
+            {
+                "value": "API_KEY=super-secret",
+                "location": "res/values/strings.xml:12",
+            }
+        ],
+    }
     assert sections["endpoints"] == [
         {
             "endpoint": "apkpure.com",
@@ -282,6 +329,23 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
         },
     )
     _write_json(scan_dir / "opengrep_source" / "opengrep_results.json", {"results": []})
+    _write_json(
+        scan_dir / "opengrep_source" / "opengrep_results.json",
+        {
+            "results": [
+                {
+                    "extra": {
+                        "metadata": {
+                            "appcritiq": {
+                                "check_id": 55,
+                                "description": "Detect whether the app declares Android location permissions or uses Android location-related APIs.",
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+    )
     _write_json(scan_dir / "androguard" / "permissions.json", {"items": []})
     _write_json(
         scan_dir / "androguard" / "components.json",
@@ -407,8 +471,17 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
         {
             "items": [
                 {
+                    "context": {"category": "url"},
+                    "value": "https://api.apkpure.com/v1/apps",
+                },
+                {
                     "context": {"category": "domain"},
                     "value": "apkpure.com",
+                },
+                {
+                    "context": {"category": "secret_keyword"},
+                    "provenance": {"path": "AndroidManifest.xml", "line": 88},
+                    "value": "token=abc123",
                 }
             ]
         },
@@ -464,7 +537,29 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
             "general_description": "",
         },
     ]
+    assert result["functionality"]["Location"]["present"] is True
+    assert result["hardcoded_values"] == {
+        "urls": [
+            {
+                "url": "https://api.apkpure.com/v1/apps",
+                "country": "",
+            }
+        ],
+        "emails": [],
+        "secrets": [
+            {
+                "value": "token=abc123",
+                "location": "AndroidManifest.xml:88",
+            }
+        ],
+    }
     assert result["endpoints"] == [
+        {
+            "endpoint": "https://api.apkpure.com/v1/apps",
+            "tags": "url",
+            "ip_address": "",
+            "country": "",
+        },
         {
             "endpoint": "apkpure.com",
             "tags": "domain",

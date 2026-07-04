@@ -12,6 +12,39 @@ from ports.scan_detail_extractor_port import ScanDetailExtractorPort
 class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     """Extract Android-binary-specific sections from loaded scan outputs."""
 
+    FUNCTIONALITY_KEYS = [
+        "Audio",
+        "Location",
+        "Contacts",
+        "Geofencing",
+        "Health Data",
+        "Maps",
+        "Networking",
+        "Payment Services",
+        "SMS",
+        "Secure RNG",
+        "Bluetooth",
+        "Camera",
+        "Camera Delegation",
+        "Calendar",
+        "Device Administrator",
+        "Fingerprint",
+        "Google Cloud Messaging",
+        "Infrared LED",
+        "In-App Purchases",
+        "Keychain",
+        "Microphone",
+        "NFC",
+        "Photos",
+        "Sensors",
+        "Telephony",
+        "USB Devices",
+    ]
+
+    FUNCTIONALITY_CHECK_ID_MAP = {
+        55: "Location",
+    }
+
     def extract_sections(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
         return {
             "app_info": self._build_app_info(loaded_outputs),
@@ -19,6 +52,8 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "certificate": self._build_certificate(loaded_outputs),
             "file_info": self._build_file_info(loaded_outputs),
             "permissions": self._build_permissions(loaded_outputs),
+            "functionality": self._build_functionality(loaded_outputs),
+            "hardcoded_values": self._build_hardcoded_values(loaded_outputs),
             "endpoints": self._build_endpoints(loaded_outputs),
         }
 
@@ -221,6 +256,72 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
 
         return endpoints
 
+    def _build_hardcoded_values(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
+        apktool_secrets_endpoints = loaded_outputs.get("apktool_secrets_endpoints") or {}
+
+        urls: list[dict[str, str]] = []
+        emails: list[str] = []
+        secrets: list[dict[str, str]] = []
+        seen_urls: set[str] = set()
+        seen_emails: set[str] = set()
+        seen_secrets: set[tuple[str, str]] = set()
+
+        for item in apktool_secrets_endpoints.get("items") or []:
+            context = item.get("context") or {}
+            category = str(context.get("category", "")).strip().lower()
+            value = self._first_non_empty(item.get("value"))
+            if not value:
+                continue
+
+            if category == "url":
+                if value in seen_urls:
+                    continue
+                seen_urls.add(value)
+                urls.append({"url": value, "country": ""})
+                continue
+
+            if self._looks_like_email(value):
+                if value in seen_emails:
+                    continue
+                seen_emails.add(value)
+                emails.append(value)
+                continue
+
+            if category == "secret_keyword":
+                location = self._format_provenance_location(item.get("provenance") or {})
+                dedupe_key = (value, location)
+                if dedupe_key in seen_secrets:
+                    continue
+                seen_secrets.add(dedupe_key)
+                secrets.append({"value": value, "location": location})
+
+        return {
+            "urls": urls,
+            "emails": emails,
+            "secrets": secrets,
+        }
+
+    def _build_functionality(self, loaded_outputs: dict[str, Any]) -> dict[str, dict[str, Any]]:
+        opengrep = loaded_outputs.get("opengrep") or {}
+        functionality = {
+            key: {
+                "present": False,
+                "explanation": "",
+            }
+            for key in self.FUNCTIONALITY_KEYS
+        }
+
+        for result in opengrep.get("results") or []:
+            capability = self._functionality_name_for_result(result)
+            if not capability or capability not in functionality:
+                continue
+
+            functionality[capability]["present"] = True
+            if not functionality[capability]["explanation"]:
+                functionality[capability]["explanation"] = self._functionality_explanation_for_result(result)
+
+        return functionality
+
     @staticmethod
     def _primary_certificate(
         androguard_certificates: dict[str, Any],
@@ -370,3 +471,41 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             if text:
                 return text
         return ""
+
+    def _functionality_name_for_result(self, result: dict[str, Any]) -> str:
+        metadata = ((result.get("extra") or {}).get("metadata") or {}).get("appcritiq") or {}
+
+        check_id = metadata.get("check_id")
+        if isinstance(check_id, int) and check_id in self.FUNCTIONALITY_CHECK_ID_MAP:
+            return self.FUNCTIONALITY_CHECK_ID_MAP[check_id]
+
+        title = str(metadata.get("title", "")).strip().lower()
+        if "location" in title:
+            return "Location"
+
+        return ""
+
+    @staticmethod
+    def _functionality_explanation_for_result(result: dict[str, Any]) -> str:
+        extra = result.get("extra") or {}
+        metadata = (extra.get("metadata") or {}).get("appcritiq") or {}
+        return (
+            str(metadata.get("description", "")).strip()
+            or str(metadata.get("title", "")).strip()
+            or str(extra.get("message", "")).strip()
+        )
+
+    @staticmethod
+    def _looks_like_email(value: str) -> bool:
+        if "@" not in value:
+            return False
+        local_part, _, domain_part = value.partition("@")
+        return bool(local_part and "." in domain_part)
+
+    @staticmethod
+    def _format_provenance_location(provenance: dict[str, Any]) -> str:
+        path = str(provenance.get("path", "")).strip()
+        line = provenance.get("line")
+        if path and line not in (None, ""):
+            return f"{path}:{line}"
+        return path
