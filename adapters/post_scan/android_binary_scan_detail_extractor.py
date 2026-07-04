@@ -19,6 +19,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "certificate": self._build_certificate(loaded_outputs),
             "file_info": self._build_file_info(loaded_outputs),
             "permissions": self._build_permissions(loaded_outputs),
+            "endpoints": self._build_endpoints(loaded_outputs),
         }
 
     def _build_app_info(self, loaded_outputs: dict[str, Any]) -> dict[str, str]:
@@ -187,6 +188,38 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             )
 
         return permissions
+
+    def _build_endpoints(self, loaded_outputs: dict[str, Any]) -> list[dict[str, str]]:
+        apktool_secrets_endpoints = loaded_outputs.get("apktool_secrets_endpoints") or {}
+
+        endpoints: list[dict[str, str]] = []
+        seen: set[str] = set()
+
+        for item in apktool_secrets_endpoints.get("items") or []:
+            context = item.get("context") or {}
+            category = str(context.get("category", "")).strip().lower()
+            value = self._first_non_empty(item.get("value"))
+            if not value:
+                continue
+
+            if category not in {"url", "domain"}:
+                continue
+
+            dedupe_key = f"{category}:{value}"
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+
+            endpoints.append(
+                {
+                    "endpoint": value,
+                    "tags": category,
+                    "ip_address": "",
+                    "country": "",
+                }
+            )
+
+        return endpoints
 
     @staticmethod
     def _primary_certificate(

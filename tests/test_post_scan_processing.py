@@ -28,6 +28,7 @@ def test_android_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Pa
     _write_json(scan_dir / "aapt2" / "permissions.json", {"permissions": []})
     _write_json(scan_dir / "apksigner" / "signing_evidence.json", {"verification": {}})
     _write_json(scan_dir / "apktool" / "permissions.json", {"declared": []})
+    _write_json(scan_dir / "apktool" / "secrets_endpoints.json", {"items": []})
 
     loaded = AndroidBinaryScanOutputLoader().load(scan_dir)
 
@@ -44,6 +45,7 @@ def test_android_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Pa
     assert loaded["aapt2_permissions"] == {"permissions": []}
     assert loaded["apksigner_signing_evidence"] == {"verification": {}}
     assert loaded["apktool_permissions"] == {"declared": []}
+    assert loaded["apktool_secrets_endpoints"] == {"items": []}
 
 
 def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() -> None:
@@ -154,6 +156,26 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
                 }
             ]
         },
+        "apktool_secrets_endpoints": {
+            "items": [
+                {
+                    "context": {"category": "domain"},
+                    "value": "apkpure.com",
+                },
+                {
+                    "context": {"category": "url"},
+                    "value": "https://api.apkpure.com/v1/apps",
+                },
+                {
+                    "context": {"category": "domain"},
+                    "value": "apkpure.com",
+                },
+                {
+                    "context": {"category": "email"},
+                    "value": "support@apkpure.com",
+                },
+            ]
+        },
     }
 
     sections = AndroidBinaryScanDetailExtractor().extract_sections(loaded_outputs)
@@ -224,6 +246,20 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
             "info": "unknown or normal",
             "usage_description": "",
             "general_description": "Declared permission (signature)",
+        },
+    ]
+    assert sections["endpoints"] == [
+        {
+            "endpoint": "apkpure.com",
+            "tags": "domain",
+            "ip_address": "",
+            "country": "",
+        },
+        {
+            "endpoint": "https://api.apkpure.com/v1/apps",
+            "tags": "url",
+            "ip_address": "",
+            "country": "",
         },
     ]
 
@@ -366,6 +402,17 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
         },
     )
     _write_json(scan_dir / "apktool" / "permissions.json", {"declared": []})
+    _write_json(
+        scan_dir / "apktool" / "secrets_endpoints.json",
+        {
+            "items": [
+                {
+                    "context": {"category": "domain"},
+                    "value": "apkpure.com",
+                }
+            ]
+        },
+    )
 
     result = PostScanProcessingService(
         scan_output_loader=AndroidBinaryScanOutputLoader(),
@@ -416,6 +463,14 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
             "usage_description": "",
             "general_description": "",
         },
+    ]
+    assert result["endpoints"] == [
+        {
+            "endpoint": "apkpure.com",
+            "tags": "domain",
+            "ip_address": "",
+            "country": "",
+        }
     ]
 
 

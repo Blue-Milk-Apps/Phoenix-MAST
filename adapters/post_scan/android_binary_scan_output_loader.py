@@ -28,6 +28,7 @@ class AndroidBinaryScanOutputLoader(ScanOutputLoaderPort):
             "aapt2_permissions": self._load_json(root / "aapt2" / "permissions.json"),
             "apksigner_signing_evidence": self._load_json(root / "apksigner" / "signing_evidence.json"),
             "apktool_permissions": self._load_json(root / "apktool" / "permissions.json"),
+            "apktool_secrets_endpoints": self._load_json(root / "apktool" / "secrets_endpoints.json"),
         }
 
     @staticmethod
