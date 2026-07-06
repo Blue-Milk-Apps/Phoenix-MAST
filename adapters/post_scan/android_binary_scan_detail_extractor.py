@@ -60,6 +60,14 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         67: "Device Administrator",
         68: "Camera Delegation",
         69: "Sensors",
+        70: "USB Devices",
+        71: "Geofencing",
+        72: "Health Data",
+        73: "Infrared LED",
+        74: "Audio",
+        75: "Payment Services",
+        76: "Secure RNG",
+        77: "Keychain",
     }
 
     FUNCTIONALITY_RULE_ID_MAP = {
@@ -77,6 +85,14 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         "android.device.administrator.usage.present": "Device Administrator",
         "android.camera.delegation.usage.present": "Camera Delegation",
         "android.sensors.usage.present": "Sensors",
+        "android.usb.devices.usage.present": "USB Devices",
+        "android.geofencing.usage.present": "Geofencing",
+        "android.health.data.usage.present": "Health Data",
+        "android.infrared.led.usage.present": "Infrared LED",
+        "android.audio.usage.present": "Audio",
+        "android.payment.services.usage.present": "Payment Services",
+        "android.secure.rng.usage.present": "Secure RNG",
+        "android.keychain.usage.present": "Keychain",
         "android.telephony.usage.present": "Telephony",
         "android.contacts.usage.present": "Contacts",
         "android.calendar.usage.present": "Calendar",
@@ -415,8 +431,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         }
 
         declared_permissions = {
-            self._first_non_empty(permission.get("name"))
-            for permission in aapt2_permissions.get("permissions") or []
+            self._first_non_empty(permission.get("name")) for permission in aapt2_permissions.get("permissions") or []
         }
         declared_permissions.discard("")
 
@@ -500,7 +515,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         if primary_certificate.get("sha256"):
             values.append("SHA256")
 
-        signer_cert = (((apksigner_signing_evidence.get("signers") or [{}])[0]).get("certificate") or {})
+        signer_cert = ((apksigner_signing_evidence.get("signers") or [{}])[0]).get("certificate") or {}
         signature_algorithm = str(signer_cert.get("signature_algorithm", "")).strip()
         if signature_algorithm and signature_algorithm.upper() != "UNKNOWN":
             values.append(signature_algorithm)
