@@ -17,6 +17,9 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         r"(?<![A-Za-z0-9+/=])[A-Za-z0-9+/]{40,}={0,2}(?![A-Za-z0-9+/=])"
     )
     JVM_DESCRIPTOR_PATTERN = re.compile(r"^\+?L(?:[A-Za-z0-9_$]+/)+[A-Za-z0-9_$]+$")
+    SECRET_LABEL_PATTERN = re.compile(
+        r"(?i)^(?:api[_-]?key|client[_-]?secret|secret[_-]?key|access[_-]?token|secretkey)$"
+    )
 
     FUNCTIONALITY_KEYS = [
         "Audio",
@@ -443,6 +446,8 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
                 continue
 
             if category == "secret_keyword":
+                if self._looks_like_secret_label(value):
+                    continue
                 location = self._format_provenance_location(item.get("provenance") or {})
                 dedupe_key = (value, location)
                 if dedupe_key in seen_secrets:
@@ -479,6 +484,9 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         if not any(char in value for char in "+="):
             return False
         return len(set(value)) >= 10
+
+    def _looks_like_secret_label(self, value: str) -> bool:
+        return self.SECRET_LABEL_PATTERN.fullmatch(value.strip()) is not None
 
     def _build_functionality(self, loaded_outputs: dict[str, Any]) -> dict[str, dict[str, Any]]:
         opengrep = loaded_outputs.get("opengrep") or {}

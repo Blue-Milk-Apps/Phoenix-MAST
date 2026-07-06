@@ -244,16 +244,16 @@
   <p class="small">No hard-coded email addresses were found.</p>
   {% endif %}
 
-  <h3>Hardcoded Secrets / Possible Secrets</h3>
+  <h3>Hardcoded Secrets</h3>
   {% if data.hardcoded_values.secrets %}
   <table class="compact">
-    <tr><th>Value</th><th>Location</th></tr>
+    <tr><th>Secret</th></tr>
     {% for s in data.hardcoded_values.secrets %}
-    <tr><td class="mono">{{ s.value if s.value is defined else s }}</td><td>{{ s.location if s.location is defined else '' }}</td></tr>
+    <tr><td class="mono">{{ s.value if s.value is defined else s }}</td></tr>
     {% endfor %}
   </table>
   {% else %}
-  <p class="small">No hardcoded secrets or likely secrets were found.</p>
+  <p class="small">No hardcoded secrets were found.</p>
   {% endif %}
 </div>
 
