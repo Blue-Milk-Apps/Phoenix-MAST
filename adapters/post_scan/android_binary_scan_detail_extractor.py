@@ -49,6 +49,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         55: "Location",
         56: "NFC",
         58: "Bluetooth",
+        59: "SMS",
         61: "Google Cloud Messaging",
     }
 
@@ -59,6 +60,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         "android.location.services.present": "Location",
         "android.nfc.usage.present": "NFC",
         "android.bluetooth.usage.present": "Bluetooth",
+        "android.sms.usage.present": "SMS",
         "android.contacts.usage.present": "Contacts",
         "android.calendar.usage.present": "Calendar",
         "android.push.messaging.present": "Google Cloud Messaging",
@@ -85,6 +87,13 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "android.permission.BLUETOOTH_ADVERTISE",
             "android.permission.BLUETOOTH_CONNECT",
             "android.permission.BLUETOOTH_SCAN",
+        },
+        "SMS": {
+            "android.permission.SEND_SMS",
+            "android.permission.READ_SMS",
+            "android.permission.RECEIVE_SMS",
+            "android.permission.RECEIVE_MMS",
+            "android.permission.RECEIVE_WAP_PUSH",
         },
         "Contacts": {
             "android.permission.READ_CONTACTS",

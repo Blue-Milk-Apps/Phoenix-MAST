@@ -447,6 +447,18 @@ def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks
                     }
                 },
                 {
+                    "check_id": "android.sms.usage.present",
+                    "extra": {
+                        "metadata": {
+                            "appcritiq": {
+                                "check_id": 59,
+                                "title": "SMS usage declaration present",
+                                "description": "SMS usage detected.",
+                            }
+                        }
+                    },
+                },
+                {
                     "extra": {
                         "metadata": {
                             "appcritiq": {
@@ -505,6 +517,10 @@ def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks
         "present": True,
         "explanation": "Bluetooth usage detected.",
     }
+    assert sections["functionality"]["SMS"] == {
+        "present": True,
+        "explanation": "SMS usage detected.",
+    }
     assert sections["functionality"]["Contacts"] == {
         "present": True,
         "explanation": "Contacts usage detected.",
@@ -529,6 +545,10 @@ def test_android_binary_scan_detail_extractor_combines_permission_and_opengrep_f
                 },
                 {
                     "name": "android.permission.READ_CALENDAR",
+                    "protection_level_hint": "dangerous",
+                },
+                {
+                    "name": "android.permission.SEND_SMS",
                     "protection_level_hint": "dangerous",
                 },
             ]
@@ -559,6 +579,18 @@ def test_android_binary_scan_detail_extractor_combines_permission_and_opengrep_f
                         }
                     },
                 },
+                {
+                    "check_id": "android.sms.usage.present",
+                    "extra": {
+                        "metadata": {
+                            "appcritiq": {
+                                "check_id": 59,
+                                "title": "SMS usage declaration present",
+                                "description": "SMS usage detected.",
+                            }
+                        }
+                    },
+                },
             ]
         },
     }
@@ -580,6 +612,35 @@ def test_android_binary_scan_detail_extractor_combines_permission_and_opengrep_f
             "The app also declares permission android.permission.READ_CALENDAR, "
             "which may indicate calendar functionality."
         ),
+    }
+    assert sections["functionality"]["SMS"] == {
+        "present": True,
+        "explanation": (
+            "SMS usage detected. "
+            "The app also declares permission android.permission.SEND_SMS, "
+            "which may indicate sms functionality."
+        ),
+    }
+
+
+def test_android_binary_scan_detail_extractor_maps_sms_permission_only_functionality_evidence() -> None:
+    loaded_outputs = {
+        "aapt2_permissions": {
+            "permissions": [
+                {
+                    "name": "android.permission.RECEIVE_SMS",
+                    "protection_level_hint": "dangerous",
+                }
+            ]
+        },
+        "opengrep": {"results": []},
+    }
+
+    sections = AndroidBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert sections["functionality"]["SMS"] == {
+        "present": True,
+        "explanation": "permission android.permission.RECEIVE_SMS, which may indicate sms functionality.",
     }
 
 
