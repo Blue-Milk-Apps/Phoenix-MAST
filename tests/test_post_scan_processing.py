@@ -436,6 +436,18 @@ def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks
                     }
                 },
                 {
+                    "check_id": "android.fingerprint.usage.present",
+                    "extra": {
+                        "metadata": {
+                            "appcritiq": {
+                                "check_id": 57,
+                                "title": "Fingerprint usage declaration present",
+                                "description": "Fingerprint usage detected.",
+                            }
+                        }
+                    },
+                },
+                {
                     "extra": {
                         "metadata": {
                             "appcritiq": {
@@ -513,6 +525,10 @@ def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks
         "present": True,
         "explanation": "NFC usage detected.",
     }
+    assert sections["functionality"]["Fingerprint"] == {
+        "present": True,
+        "explanation": "Fingerprint usage detected.",
+    }
     assert sections["functionality"]["Bluetooth"] == {
         "present": True,
         "explanation": "Bluetooth usage detected.",
@@ -550,6 +566,10 @@ def test_android_binary_scan_detail_extractor_combines_permission_and_opengrep_f
                 {
                     "name": "android.permission.SEND_SMS",
                     "protection_level_hint": "dangerous",
+                },
+                {
+                    "name": "android.permission.USE_BIOMETRIC",
+                    "protection_level_hint": "unknown_or_normal",
                 },
             ]
         },
@@ -591,6 +611,18 @@ def test_android_binary_scan_detail_extractor_combines_permission_and_opengrep_f
                         }
                     },
                 },
+                {
+                    "check_id": "android.fingerprint.usage.present",
+                    "extra": {
+                        "metadata": {
+                            "appcritiq": {
+                                "check_id": 57,
+                                "title": "Fingerprint usage declaration present",
+                                "description": "Fingerprint usage detected.",
+                            }
+                        }
+                    },
+                },
             ]
         },
     }
@@ -621,6 +653,14 @@ def test_android_binary_scan_detail_extractor_combines_permission_and_opengrep_f
             "which may indicate sms functionality."
         ),
     }
+    assert sections["functionality"]["Fingerprint"] == {
+        "present": True,
+        "explanation": (
+            "Fingerprint usage detected. "
+            "The app also declares permission android.permission.USE_BIOMETRIC, "
+            "which may indicate fingerprint functionality."
+        ),
+    }
 
 
 def test_android_binary_scan_detail_extractor_maps_sms_permission_only_functionality_evidence() -> None:
@@ -641,6 +681,27 @@ def test_android_binary_scan_detail_extractor_maps_sms_permission_only_functiona
     assert sections["functionality"]["SMS"] == {
         "present": True,
         "explanation": "permission android.permission.RECEIVE_SMS, which may indicate sms functionality.",
+    }
+
+
+def test_android_binary_scan_detail_extractor_maps_fingerprint_permission_only_functionality_evidence() -> None:
+    loaded_outputs = {
+        "aapt2_permissions": {
+            "permissions": [
+                {
+                    "name": "android.permission.USE_FINGERPRINT",
+                    "protection_level_hint": "unknown_or_normal",
+                }
+            ]
+        },
+        "opengrep": {"results": []},
+    }
+
+    sections = AndroidBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert sections["functionality"]["Fingerprint"] == {
+        "present": True,
+        "explanation": "permission android.permission.USE_FINGERPRINT, which may indicate fingerprint functionality.",
     }
 
 

@@ -48,6 +48,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         54: "Microphone",
         55: "Location",
         56: "NFC",
+        57: "Fingerprint",
         58: "Bluetooth",
         59: "SMS",
         61: "Google Cloud Messaging",
@@ -59,6 +60,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         "android.microphone.usage.present": "Microphone",
         "android.location.services.present": "Location",
         "android.nfc.usage.present": "NFC",
+        "android.fingerprint.usage.present": "Fingerprint",
         "android.bluetooth.usage.present": "Bluetooth",
         "android.sms.usage.present": "SMS",
         "android.contacts.usage.present": "Contacts",
@@ -80,6 +82,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         },
         "NFC": {
             "android.permission.NFC",
+        },
+        "Fingerprint": {
+            "android.permission.USE_BIOMETRIC",
+            "android.permission.USE_FINGERPRINT",
         },
         "Bluetooth": {
             "android.permission.BLUETOOTH",
