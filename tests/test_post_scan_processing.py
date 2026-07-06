@@ -333,23 +333,23 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
     }
     assert sections["functionality"]["Camera"] == {
         "present": True,
-        "explanation": "Declared permission android.permission.CAMERA.",
+        "explanation": "permission android.permission.CAMERA, which may indicate camera functionality.",
     }
     assert sections["functionality"]["Microphone"] == {
         "present": True,
-        "explanation": "Declared permission android.permission.RECORD_AUDIO.",
+        "explanation": "permission android.permission.RECORD_AUDIO, which may indicate microphone functionality.",
     }
     assert sections["functionality"]["Contacts"] == {
         "present": True,
-        "explanation": "Declared permission android.permission.READ_CONTACTS.",
+        "explanation": "permission android.permission.READ_CONTACTS, which may indicate contacts functionality.",
     }
     assert sections["functionality"]["Calendar"] == {
         "present": True,
-        "explanation": "Declared permission android.permission.READ_CALENDAR.",
+        "explanation": "permission android.permission.READ_CALENDAR, which may indicate calendar functionality.",
     }
     assert sections["functionality"]["Bluetooth"] == {
         "present": True,
-        "explanation": "Declared permission android.permission.BLUETOOTH_CONNECT.",
+        "explanation": "permission android.permission.BLUETOOTH_CONNECT, which may indicate bluetooth functionality.",
     }
     assert sections["functionality"]["Audio"] == {
         "present": False,
@@ -516,6 +516,115 @@ def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks
     assert sections["functionality"]["Google Cloud Messaging"] == {
         "present": True,
         "explanation": "Push messaging usage detected.",
+    }
+
+
+def test_android_binary_scan_detail_extractor_combines_permission_and_opengrep_functionality_evidence() -> None:
+    loaded_outputs = {
+        "aapt2_permissions": {
+            "permissions": [
+                {
+                    "name": "android.permission.RECEIVE_BOOT_COMPLETED",
+                    "protection_level_hint": "unknown_or_normal",
+                },
+                {
+                    "name": "android.permission.READ_CALENDAR",
+                    "protection_level_hint": "dangerous",
+                },
+            ]
+        },
+        "opengrep": {
+            "results": [
+                {
+                    "check_id": "android.background.execution.present",
+                    "extra": {
+                        "metadata": {
+                            "appcritiq": {
+                                "check_id": 9,
+                                "title": "Background execution modes declared by the app",
+                                "description": "Background execution detected.",
+                            }
+                        }
+                    },
+                },
+                {
+                    "check_id": "android.calendar.usage.present",
+                    "extra": {
+                        "metadata": {
+                            "appcritiq": {
+                                "check_id": 60,
+                                "title": "Calendar usage declaration present",
+                                "description": "Calendar usage detected.",
+                            }
+                        }
+                    },
+                },
+            ]
+        },
+    }
+
+    sections = AndroidBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert sections["functionality"]["Background Execution"] == {
+        "present": True,
+        "explanation": (
+            "Background execution detected. "
+            "The app also declares permission android.permission.RECEIVE_BOOT_COMPLETED, "
+            "which may indicate background execution functionality."
+        ),
+    }
+    assert sections["functionality"]["Calendar"] == {
+        "present": True,
+        "explanation": (
+            "Calendar usage detected. "
+            "The app also declares permission android.permission.READ_CALENDAR, "
+            "which may indicate calendar functionality."
+        ),
+    }
+
+
+def test_android_binary_scan_detail_extractor_maps_shared_check_id_60_with_rule_ids() -> None:
+    loaded_outputs = {
+        "aapt2_permissions": {"permissions": []},
+        "opengrep": {
+            "results": [
+                {
+                    "check_id": "android.contacts.usage.present",
+                    "extra": {
+                        "metadata": {
+                            "appcritiq": {
+                                "check_id": 60,
+                                "title": "Contacts usage declaration present",
+                                "description": "Contacts usage detected.",
+                            }
+                        }
+                    },
+                },
+                {
+                    "check_id": "android.calendar.usage.present",
+                    "extra": {
+                        "metadata": {
+                            "appcritiq": {
+                                "check_id": 60,
+                                "title": "Calendar usage declaration present",
+                                "description": "Calendar usage detected.",
+                            }
+                        }
+                    },
+                },
+            ]
+        },
+    }
+
+    sections = AndroidBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert sections["functionality"]["Contacts"] == {
+        "present": True,
+        "explanation": "Contacts usage detected.",
+    }
+    assert sections["functionality"]["Calendar"] == {
+        "present": True,
+        "explanation": "Calendar usage detected.",
     }
 
 
@@ -759,7 +868,7 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
     assert result["functionality"]["Location"]["present"] is True
     assert result["functionality"]["Camera"] == {
         "present": True,
-        "explanation": "Declared permission android.permission.CAMERA.",
+        "explanation": "permission android.permission.CAMERA, which may indicate camera functionality.",
     }
     assert result["hardcoded_values"] == {
         "urls": [

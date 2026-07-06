@@ -52,7 +52,24 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         61: "Google Cloud Messaging",
     }
 
+    FUNCTIONALITY_RULE_ID_MAP = {
+        "android.background.execution.present": "Background Execution",
+        "android.camera.usage.present": "Camera",
+        "android.microphone.usage.present": "Microphone",
+        "android.location.services.present": "Location",
+        "android.nfc.usage.present": "NFC",
+        "android.bluetooth.usage.present": "Bluetooth",
+        "android.contacts.usage.present": "Contacts",
+        "android.calendar.usage.present": "Calendar",
+        "android.push.messaging.present": "Google Cloud Messaging",
+    }
+
     FUNCTIONALITY_PERMISSION_MAP = {
+        "Background Execution": {
+            "android.permission.FOREGROUND_SERVICE",
+            "android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE",
+            "android.permission.RECEIVE_BOOT_COMPLETED",
+        },
         "Camera": {
             "android.permission.CAMERA",
         },
@@ -353,24 +370,36 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         }
         declared_permissions.discard("")
 
+        permission_evidence: dict[str, list[str]] = {}
+        opengrep_evidence: dict[str, str] = {}
+
         for capability, permission_names in self.FUNCTIONALITY_PERMISSION_MAP.items():
             matched_permissions = sorted(permission_names.intersection(declared_permissions))
             if not matched_permissions:
                 continue
 
-            functionality[capability]["present"] = True
-            functionality[capability]["explanation"] = self._permission_based_functionality_explanation(
-                matched_permissions
-            )
+            permission_evidence[capability] = matched_permissions
 
         for result in opengrep.get("results") or []:
             capability = self._functionality_name_for_result(result)
             if not capability or capability not in functionality:
                 continue
 
+            opengrep_evidence.setdefault(capability, self._functionality_explanation_for_result(result))
+
+        for capability in self.FUNCTIONALITY_KEYS:
+            matched_permissions = permission_evidence.get(capability, [])
+            opengrep_explanation = opengrep_evidence.get(capability, "")
+
+            if not matched_permissions and not opengrep_explanation:
+                continue
+
             functionality[capability]["present"] = True
-            if not functionality[capability]["explanation"]:
-                functionality[capability]["explanation"] = self._functionality_explanation_for_result(result)
+            functionality[capability]["explanation"] = self._build_functionality_explanation(
+                capability=capability,
+                matched_permissions=matched_permissions,
+                opengrep_explanation=opengrep_explanation,
+            )
 
         return functionality
 
@@ -525,6 +554,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         return ""
 
     def _functionality_name_for_result(self, result: dict[str, Any]) -> str:
+        rule_id = str(result.get("check_id", "")).strip()
+        if rule_id in self.FUNCTIONALITY_RULE_ID_MAP:
+            return self.FUNCTIONALITY_RULE_ID_MAP[rule_id]
+
         metadata = ((result.get("extra") or {}).get("metadata") or {}).get("appcritiq") or {}
 
         check_id = metadata.get("check_id")
@@ -570,12 +603,29 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         )
 
     @staticmethod
-    def _permission_based_functionality_explanation(permission_names: list[str]) -> str:
+    def _build_functionality_explanation(
+        capability: str,
+        matched_permissions: list[str],
+        opengrep_explanation: str,
+    ) -> str:
+        permission_explanation = AndroidBinaryScanDetailExtractor._permission_based_functionality_explanation(
+            capability=capability,
+            permission_names=matched_permissions,
+        )
+
+        if opengrep_explanation and permission_explanation:
+            return f"{opengrep_explanation} The app also declares {permission_explanation}"
+        if opengrep_explanation:
+            return opengrep_explanation
+        return permission_explanation
+
+    @staticmethod
+    def _permission_based_functionality_explanation(capability: str, permission_names: list[str]) -> str:
         if not permission_names:
             return ""
         if len(permission_names) == 1:
-            return f"Declared permission {permission_names[0]}."
-        return f"Declared permissions {', '.join(permission_names)}."
+            return f"permission {permission_names[0]}, which may indicate {capability.lower()} functionality."
+        return f"permissions {', '.join(permission_names)}, which may indicate {capability.lower()} functionality."
 
     @staticmethod
     def _looks_like_email(value: str) -> bool:
