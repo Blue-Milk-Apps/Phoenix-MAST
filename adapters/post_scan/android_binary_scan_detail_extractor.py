@@ -52,6 +52,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         58: "Bluetooth",
         59: "SMS",
         61: "Google Cloud Messaging",
+        62: "Maps",
+        63: "Networking",
+        64: "Telephony",
+        65: "Photos",
     }
 
     FUNCTIONALITY_RULE_ID_MAP = {
@@ -59,12 +63,16 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         "android.camera.usage.present": "Camera",
         "android.microphone.usage.present": "Microphone",
         "android.location.services.present": "Location",
+        "android.maps.usage.present": "Maps",
+        "android.networking.usage.present": "Networking",
         "android.nfc.usage.present": "NFC",
         "android.fingerprint.usage.present": "Fingerprint",
         "android.bluetooth.usage.present": "Bluetooth",
         "android.sms.usage.present": "SMS",
+        "android.telephony.usage.present": "Telephony",
         "android.contacts.usage.present": "Contacts",
         "android.calendar.usage.present": "Calendar",
+        "android.photos.usage.present": "Photos",
         "android.push.messaging.present": "Google Cloud Messaging",
     }
 
@@ -101,6 +109,15 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "android.permission.RECEIVE_MMS",
             "android.permission.RECEIVE_WAP_PUSH",
         },
+        "Telephony": {
+            "android.permission.ANSWER_PHONE_CALLS",
+            "android.permission.CALL_PHONE",
+            "android.permission.PROCESS_OUTGOING_CALLS",
+            "android.permission.READ_CALL_LOG",
+            "android.permission.READ_PHONE_NUMBERS",
+            "android.permission.READ_PHONE_STATE",
+            "android.permission.WRITE_CALL_LOG",
+        },
         "Contacts": {
             "android.permission.READ_CONTACTS",
             "android.permission.WRITE_CONTACTS",
@@ -109,6 +126,12 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         "Calendar": {
             "android.permission.READ_CALENDAR",
             "android.permission.WRITE_CALENDAR",
+        },
+        "Photos": {
+            "android.permission.READ_EXTERNAL_STORAGE",
+            "android.permission.READ_MEDIA_IMAGES",
+            "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+            "android.permission.WRITE_EXTERNAL_STORAGE",
         },
     }
 
