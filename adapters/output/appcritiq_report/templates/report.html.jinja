@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>{{ css }}</style>
+</head>
+<body>
+
+<!-- ===================== COVER ===================== -->
+<div class="cover">
+  <div class="brand">{{ data.meta.reviewer_org }}</div>
+  <div class="cover-heading">
+    <img class="cover-icon" src="{{ app_icon_uri }}">
+    <div class="cover-heading-text">
+      <div class="title">{{ data.meta.app_display_name }}</div>
+      <div class="subtitle">Application Vulnerability Assessment</div>
+    </div>
+  </div>
+  <table class="meta-table">
+    <tr><td class="label">File Name</td><td class="value">{{ data.meta.file_name }}</td></tr>
+    <tr><td class="label">Package Name</td><td class="value">{{ data.meta.package_name }}</td></tr>
+    <tr><td class="label">Scan Date</td><td class="value">{{ data.meta.scan_date }}</td></tr>
+    <tr><td class="label">Platform</td><td class="value">{{ data.meta.platform }}</td></tr>
+    <tr><td class="label">Version</td><td class="value">{{ data.meta.version_name }} ({{ data.meta.version_code }})</td></tr>
+    <tr><td class="label">App Store</td><td class="value">{{ data.app_info.app_store_id }}</td></tr>
+    <tr><td class="label">Developer</td><td class="value">{{ data.app_info.developer }}</td></tr>
+    <tr><td class="label">Categories</td><td class="value">{{ data.app_info.categories }}</td></tr>
+    <tr><td class="label">Trackers Detected</td><td class="value">{{ data.app_info.trackers_detected }}</td></tr>
+  </table>
+</div>
+
+<!-- ===================== FINDINGS BY SEVERITY ===================== -->
+<div class="section">
+  <h2>Findings by Severity</h2>
+  <div class="section-sub">Number of individual checks that returned each severity level</div>
+  {% for level, color, key in [('High','#c0392b','high'), ('Medium','#e08e0b','medium'), ('Info','#2980b9','info'), ('Secure','#27ae60','secure'), ('Hotspot','#555','hotspot')] %}
+  {% set count = data.findings_severity.get(key, 0) %}
+  {% set max_count = [data.findings_severity.values() | max, 1] | max %}
+  <div class="bar-block">
+    <div class="bar-label-row">
+      <span class="bar-label">{{ level }}</span>
+      <span class="bar-count-chip" style="background:{{ color }};">{{ count }}</span>
+    </div>
+    <div class="bar-track"><div class="bar-fill" style="width:{{ (count / max_count * 100) | round(1) }}%; background:{{ color }};"></div></div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ===================== OVERALL RISK ===================== -->
+<div class="section">
+  <h2>Overall Security</h2>
+  <div class="risk-graph-wrap no-break">
+    <img class="polar-chart" src="data:image/png;base64,{{ charts.overall_risk_polar }}">
+  </div>
+
+  <h2>Overall Evaluation Results</h2>
+  <table>
+    <tr><th class="col-check">Area of Concern</th><th class="col-result">Risk Rating</th><th>Summary of Findings</th></tr>
+    {% for row in data.overall_evaluation %}
+    <tr>
+      <td>{{ row.area_of_concern }}</td>
+      <td>{{ risk_badge(row.risk_rating) }}</td>
+      <td class="eval-findings"><ul>{% for f in row.summary_findings %}<li>{{ f }}</li>{% endfor %}</ul></td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<!-- ===================== CERTIFICATE / FILE / APP INFO ===================== -->
+<div class="section">
+  <h2>Certificate Information</h2>
+  <table class="kv-table">
+    <tr><td class="k">Owner Name</td><td class="v">{{ data.certificate.owner_name }}</td></tr>
+    <tr><td class="k">Organization</td><td class="v">{{ data.certificate.organization }}</td></tr>
+    <tr><td class="k">Organizational Unit</td><td class="v">{{ data.certificate.organizational_unit }}</td></tr>
+    <tr><td class="k">Location</td><td class="v">{{ data.certificate.location }}</td></tr>
+    <tr><td class="k">Validity</td><td class="v">{{ data.certificate.validity }}</td></tr>
+    <tr><td class="k">Issuer</td><td class="v">{{ data.certificate.issuer }}</td></tr>
+    <tr><td class="k">Serial Number</td><td class="v mono">{{ data.certificate.serial_number }}</td></tr>
+    <tr><td class="k">Signature Versions</td><td class="v">
+      v1: {{ "Yes" if data.certificate.signature_versions.v1 else "No" }} &nbsp;|&nbsp;
+      v2: {{ "Yes" if data.certificate.signature_versions.v2 else "No" }} &nbsp;|&nbsp;
+      v3: {{ "Yes" if data.certificate.signature_versions.v3 else "No" }} &nbsp;|&nbsp;
+      v4: {{ "Yes" if data.certificate.signature_versions.v4 else "No" }}
+    </td></tr>
+    <tr><td class="k">Hash Algorithms</td><td class="v">{{ data.certificate.hash_algorithms }}</td></tr>
+    <tr><td class="k">Fingerprint</td><td class="v mono">{{ data.certificate.fingerprint }}</td></tr>
+    <tr><td class="k">Unique Certs</td><td class="v">{{ data.certificate.unique_certs }}</td></tr>
+  </table>
+
+  <h2>File Information</h2>
+  <table class="kv-table">
+    <tr><td class="k">File Name</td><td class="v">{{ data.file_info.filename }}</td></tr>
+    <tr><td class="k">Size</td><td class="v">{{ data.file_info.size }}</td></tr>
+    <tr><td class="k">MD5</td><td class="v mono">{{ data.file_info.md5 }}</td></tr>
+    <tr><td class="k">SHA-1</td><td class="v mono">{{ data.file_info.sha1 }}</td></tr>
+    <tr><td class="k">SHA-256</td><td class="v mono">{{ data.file_info.sha256 }}</td></tr>
+  </table>
+
+  <h2>App Information</h2>
+  <table class="kv-table">
+    <tr><td class="k">Name</td><td class="v">{{ data.app_info.name }}</td></tr>
+    <tr><td class="k">Package Name</td><td class="v">{{ data.app_info.package_name }}</td></tr>
+    <tr><td class="k">Main Activity</td><td class="v">{{ data.app_info.main_activity }}</td></tr>
+    <tr><td class="k">Target SDK</td><td class="v">{{ data.app_info.target_sdk }}</td></tr>
+    <tr><td class="k">Min SDK</td><td class="v">{{ data.app_info.min_sdk }}</td></tr>
+    <tr><td class="k">Max SDK</td><td class="v">{{ data.app_info.max_sdk }}</td></tr>
+    <tr><td class="k">Version Name</td><td class="v">{{ data.app_info.version_name }}</td></tr>
+  </table>
+
+  <h2>App Components</h2>
+  <div class="components-bars">
+    {% set component_rows = [
+      ('Activities', data.app_components.activities, data.app_components.exported_activities),
+      ('Services', data.app_components.services, data.app_components.exported_services),
+      ('Receivers', data.app_components.receivers, data.app_components.exported_receivers),
+      ('Providers', data.app_components.providers, data.app_components.exported_providers)
+    ] %}
+    {% set max_total = (component_rows | map(attribute=1) | list | max) or 1 %}
+    {% for label, total, exported in component_rows %}
+    {% set width_pct = (total / max_total * 100) if max_total else 0 %}
+    {% set exported_pct = (exported / total * 100) if total else 0 %}
+    <div class="component-bar-row">
+      <div class="component-bar-label-row">
+        <span class="component-bar-label">{{ label }}</span>
+        <span class="component-bar-count">{{ total }} total &middot; <span class="component-bar-exported">{{ exported }} exported</span></span>
+      </div>
+      <div class="component-bar-track" style="width: {{ width_pct | round(1) }}%;">
+        <div class="component-bar-exported-fill" style="width: {{ exported_pct | round(1) }}%;"></div>
+        <div class="component-bar-safe-fill" style="width: {{ (100 - exported_pct) | round(1) }}%;"></div>
+      </div>
+    </div>
+    {% endfor %}
+    <div class="component-bar-legend">
+      <span class="legend-swatch legend-exported"></span> Exported
+      <span class="legend-swatch legend-safe"></span> Not Exported
+    </div>
+  </div>
+</div>
+
+<!-- ===================== FUNCTIONALITY ===================== -->
+<div class="section">
+  <h2>Functionality</h2>
+  <table>
+    <tr><th class="col-check">Functionality</th><th class="col-result">Status</th><th>Details</th></tr>
+    {% for name, f in data.functionality.items() %}
+    <tr>
+      <td>{{ name }}</td>
+      <td>{{ risk_badge('Info' if f.present else 'N/A', label=('Present' if f.present else 'Not Present')) }}</td>
+      <td>{{ f.explanation if f.present else '' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<!-- ===================== THIRD PARTY SDKS ===================== -->
+<div class="section">
+  <h2>Third-Party SDKs</h2>
+  {% for category, sdks in data.third_party_sdks.items() %}
+  <div class="sdk-category">
+    <h4>{{ category }}</h4>
+    <div class="sdk-grid">
+      {% for name, present in sdks.items() %}
+      <div class="sdk-item">
+        <span class="{{ 'sdk-yes' if present else 'sdk-no' }}">{{ '✔' if present else '✗' }} {{ name }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ===================== PERMISSIONS ===================== -->
+<div class="section">
+  <h2>Permissions Requested</h2>
+  <table>
+    <tr><th>Permission</th><th>Status</th><th>Description</th></tr>
+    {% for p in data.permissions %}
+    <tr>
+      <td class="mono">{{ p.permission }}</td>
+      <td>{{ risk_badge('High' if p.status == 'dangerous' else 'Info', label=p.status) }}</td>
+      <td>{{ p.general_description }}{% if p.usage_description %}<br><span class="small">{{ p.usage_description }}</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<!-- ===================== VULNERABILITY SECTIONS ===================== -->
+{% for section in data.vulnerability_sections %}
+<div class="section">
+  <h2>{{ section.section_name }}</h2>
+  {% if section.findings_text %}
+  <h3>Findings</h3>
+  <div class="vuln-findings">{{ section.findings_text }}</div>
+  {% endif %}
+  {% if section.checks %}
+  <h3>Checks Conducted</h3>
+  <table>
+    <tr>
+      <th class="col-check">Check</th>
+      <th class="col-result">Result</th>
+      <th class="col-severity">Severity</th>
+      <th class="col-explain">Explanation</th>
+      <th class="col-compliance">Compliance</th>
+      <th class="col-evidence">Evidence</th>
+    </tr>
+    {% for c in section.checks %}
+    <tr>
+      <td>{{ c.check }}</td>
+      <td>{{ result_badge(c.result) }}</td>
+      <td>{{ risk_badge(c.severity) }}</td>
+      <td>{{ c.explanation }}{% if c.remediation_link %}<br><span class="small">Remediation: {{ c.remediation_link }}</span>{% endif %}</td>
+      <td class="small">{{ c.compliance }}</td>
+      <td class="small">{{ c.evidence }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="small">No individual checks were logged for this section in the current scan.</p>
+  {% endif %}
+</div>
+{% endfor %}
+
+<!-- ===================== HARDCODED VALUES ===================== -->
+<div class="section">
+  <h2>Hard-Coded Values Found</h2>
+  <h3>URLs</h3>
+  <table class="compact">
+    <tr><th>URL</th><th>Country</th></tr>
+    {% for u in data.hardcoded_values.urls %}
+    <tr><td class="mono">{{ u.url }}</td><td>{{ u.country }}</td></tr>
+    {% endfor %}
+  </table>
+
+  <h3>Emails</h3>
+  {% if data.hardcoded_values.emails %}
+  <table class="compact">
+    <tr><th>Email</th></tr>
+    {% for e in data.hardcoded_values.emails %}
+    <tr><td class="mono">{{ e }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="small">No hard-coded email addresses were found.</p>
+  {% endif %}
+
+  <h3>Hardcoded Secrets / Possible Secrets</h3>
+  {% if data.hardcoded_values.secrets %}
+  <table class="compact">
+    <tr><th>Value</th><th>Location</th></tr>
+    {% for s in data.hardcoded_values.secrets %}
+    <tr><td class="mono">{{ s.value if s.value is defined else s }}</td><td>{{ s.location if s.location is defined else '' }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="small">No hardcoded secrets or likely secrets were found.</p>
+  {% endif %}
+</div>
+
+<!-- ===================== ENDPOINTS ===================== -->
+<div class="section">
+  <h2>Endpoint Connections</h2>
+  <p class="small">The following network connections were established during analysis of the application.</p>
+  <table class="compact">
+    <tr><th>Endpoint</th><th>Tags</th><th>IP Address</th><th>Country</th></tr>
+    {% for e in data.endpoints %}
+    <tr><td class="mono">{{ e.endpoint }}</td><td>{{ e.tags }}</td><td class="mono">{{ e.ip_address }}</td><td>{{ e.country }}</td></tr>
+    {% endfor %}
+  </table>
+  <p class="small">* If country code is not provided it could not be determined.</p>
+</div>
+
+</body>
+</html>

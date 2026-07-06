@@ -1,0 +1,791 @@
+{
+  "meta": {
+    "app_display_name": "InsecureBankv2",
+    "file_name": "InsecureBankv2.apk",
+    "package_name": "com.android.insecurebankv2",
+    "scan_date": "2020-01-14",
+    "platform": "Android",
+    "version_name": "1.0",
+    "version_code": "1",
+    "reviewer_org": "AppCritique Security Report"
+  },
+  "findings_severity": {
+    "high": 13,
+    "medium": 0,
+    "info": 0,
+    "secure": 0,
+    "hotspot": 0
+  },
+  "risk_summary": {
+    "code_vulnerability": "High",
+    "data_storage": "High",
+    "networking": "High",
+    "resilience": "Low"
+  },
+  "overall_evaluation": [
+    {
+      "area_of_concern": "Code Vulnerability",
+      "risk_rating": "High",
+      "summary_findings": [
+        "App is Debuggable",
+        "Uses SHA1 Hashing Algorithm",
+        "Remember Me Enabled by Default"
+      ]
+    },
+    {
+      "area_of_concern": "Data Storage",
+      "risk_rating": "High",
+      "summary_findings": [
+        "Sensitive Information Stored in External Storage",
+        "Authentication Credentials Not Protected with Android Keystore",
+        "Does not Prevent Screen Capture of Sensitive Information"
+      ]
+    },
+    {
+      "area_of_concern": "Networking",
+      "risk_rating": "High",
+      "summary_findings": [
+        "Does not Perform Certificate Pinning",
+        "Weak Certificate Validation Enables MitM Attacks",
+        "Sensitive Information is Unencrypted in Transit",
+        "Password is not Hashed in Transit"
+      ]
+    },
+    {
+      "area_of_concern": "Resilience",
+      "risk_rating": "Low",
+      "summary_findings": [
+        "Not separately assessed in this scan"
+      ]
+    }
+  ],
+  "certificate": {
+    "owner_name": "Dinesh Shetty",
+    "organization": "SI",
+    "organizational_unit": "Services",
+    "location": "Boston, MA, Unlisted Country",
+    "validity": "July 24, 2015 through July 17, 2040",
+    "issuer": "Not Provided",
+    "serial_number": "Not Provided",
+    "signature_versions": {
+      "v1": true,
+      "v2": false,
+      "v3": false,
+      "v4": false
+    },
+    "hash_algorithms": "Not Provided",
+    "fingerprint": "Not Provided",
+    "unique_certs": "Not Provided"
+  },
+  "file_info": {
+    "filename": "InsecureBankv2.apk",
+    "size": "Not Provided",
+    "md5": "Not Provided",
+    "sha1": "Not Provided",
+    "sha256": "b18af2a0e44d7634bbcdf93664d9c78a2695e050393fcfbb5e8b91f902d194a4"
+  },
+  "app_info": {
+    "icon_path": "",
+    "name": "InsecureBankv2",
+    "package_name": "com.android.insecurebankv2",
+    "main_activity": "Not Provided",
+    "target_sdk": "Not Provided",
+    "min_sdk": "Not Provided",
+    "max_sdk": "Not Provided",
+    "version_name": "1.0",
+    "app_store_id": "N/A (training/test app, not store-distributed)",
+    "developer": "OWASP (deliberately vulnerable test app)",
+    "categories": "Security Training",
+    "trackers_detected": "Not Provided"
+  },
+  "app_components": {
+    "activities": 0,
+    "services": 0,
+    "receivers": 0,
+    "providers": 0,
+    "exported_activities": 0,
+    "exported_services": 0,
+    "exported_receivers": 0,
+    "exported_providers": 0
+  },
+  "functionality": {
+    "Audio": {
+      "present": true,
+      "explanation": "This app plays audio."
+    },
+    "Contacts": {
+      "present": true,
+      "explanation": "This app accesses contacts because it requests the following permission(s): android.permission.GET_ACCOUNTS and android.permission.READ_CONTACTS."
+    },
+    "Geofencing": {
+      "present": true,
+      "explanation": "This app uses Geofencing to monitor the user's entry and exit from specific locations."
+    },
+    "Health Data": {
+      "present": true,
+      "explanation": "This app uses the Google Fit API."
+    },
+    "Location": {
+      "present": true,
+      "explanation": "This app uses device location because it requests the following permission(s): android.permission.ACCESS_COARSE_LOCATION."
+    },
+    "Maps": {
+      "present": true,
+      "explanation": "This app uses Google Maps."
+    },
+    "Networking": {
+      "present": true,
+      "explanation": "This app connects to the internet and requests the following network related permission(s): android.permission.ACCESS_NETWORK_STATE and android.permission.INTERNET."
+    },
+    "Payment Services": {
+      "present": true,
+      "explanation": "This app uses Android Pay services to process payments."
+    },
+    "SMS": {
+      "present": true,
+      "explanation": "This app uses SMS because it requests the following permission(s): android.permission.SEND_SMS."
+    },
+    "Secure RNG": {
+      "present": true,
+      "explanation": "This app uses the secure platform random number generator SecureRandom."
+    },
+    "Bluetooth": {
+      "present": false,
+      "explanation": ""
+    },
+    "Camera": {
+      "present": false,
+      "explanation": ""
+    },
+    "Camera Delegation": {
+      "present": false,
+      "explanation": ""
+    },
+    "Calendar": {
+      "present": false,
+      "explanation": ""
+    },
+    "Device Administrator": {
+      "present": false,
+      "explanation": ""
+    },
+    "Fingerprint": {
+      "present": false,
+      "explanation": ""
+    },
+    "Google Cloud Messaging": {
+      "present": false,
+      "explanation": ""
+    },
+    "Infrared LED": {
+      "present": false,
+      "explanation": ""
+    },
+    "In-App Purchases": {
+      "present": false,
+      "explanation": ""
+    },
+    "Keychain": {
+      "present": false,
+      "explanation": ""
+    },
+    "Microphone": {
+      "present": false,
+      "explanation": ""
+    },
+    "NFC": {
+      "present": false,
+      "explanation": ""
+    },
+    "Photos": {
+      "present": false,
+      "explanation": ""
+    },
+    "Sensors": {
+      "present": false,
+      "explanation": ""
+    },
+    "Telephony": {
+      "present": false,
+      "explanation": ""
+    },
+    "USB Devices": {
+      "present": false,
+      "explanation": ""
+    }
+  },
+  "third_party_sdks": {
+    "Analytics": {
+      "GoogleAnalytics": true,
+      "Flurry": false,
+      "Amplitude": false,
+      "Mixpanel": false,
+      "NewRelic": false
+    },
+    "Advertising": {
+      "Admob": true,
+      "DoubleClick": true,
+      "Chartboost": false,
+      "AppLovin": false
+    },
+    "Cloud Storage": {
+      "GoogleDrive": true,
+      "Dropbox": false,
+      "OneDrive": false,
+      "Box": false
+    },
+    "Developer Tools": {
+      "Stripe": true,
+      "Paypal": false,
+      "Retrofit": false,
+      "Fabric": false
+    }
+  },
+  "permissions": [
+    {
+      "permission": "ACCESS_COARSE_LOCATION",
+      "status": "dangerous",
+      "info": "",
+      "usage_description": "",
+      "general_description": "Allows an app to access approximate location."
+    },
+    {
+      "permission": "ACCESS_NETWORK_STATE",
+      "status": "normal",
+      "info": "",
+      "usage_description": "",
+      "general_description": "Allows applications to access information about networks."
+    },
+    {
+      "permission": "ACCESS_WIFI_STATE",
+      "status": "normal",
+      "info": "",
+      "usage_description": "",
+      "general_description": "Allows applications to access information about Wi-Fi networks."
+    },
+    {
+      "permission": "CHANGE_NETWORK_STATE",
+      "status": "normal",
+      "info": "",
+      "usage_description": "",
+      "general_description": "Allows applications to change network connectivity state."
+    },
+    {
+      "permission": "GET_ACCOUNTS",
+      "status": "normal",
+      "info": "",
+      "usage_description": "",
+      "general_description": "Allows access to the list of accounts in the Accounts Service."
+    },
+    {
+      "permission": "INTERNET",
+      "status": "normal",
+      "info": "",
+      "usage_description": "",
+      "general_description": "Allows applications to open network sockets."
+    },
+    {
+      "permission": "READ_CONTACTS",
+      "status": "dangerous",
+      "info": "",
+      "usage_description": "",
+      "general_description": "Allows an application to read the user's contacts data."
+    },
+    {
+      "permission": "READ_EXTERNAL_STORAGE",
+      "status": "dangerous",
+      "info": "",
+      "usage_description": "",
+      "general_description": "Allows an application to read from external storage."
+    },
+    {
+      "permission": "SEND_SMS",
+      "status": "dangerous",
+      "info": "",
+      "usage_description": "",
+      "general_description": "Allows an application to send SMS messages."
+    },
+    {
+      "permission": "USE_CREDENTIALS",
+      "status": "normal",
+      "info": "",
+      "usage_description": "",
+      "general_description": "Allows an application to request authtokens from the AccountManager."
+    },
+    {
+      "permission": "WRITE_EXTERNAL_STORAGE",
+      "status": "dangerous",
+      "info": "",
+      "usage_description": "",
+      "general_description": "Allows an application to write to external storage."
+    }
+  ],
+  "vulnerability_sections": [
+    {
+      "section_name": "Code",
+      "findings_text": "Analysis of InsecureBankv2 suggests a high level of risk associated with code vulnerabilities. A high level of risk indicates the app could be manipulated by attackers. InsecureBankv2 is configured to allow debugging, which adds risk since a malicious actor with physical access could attach a debugger, exposing sensitive information and allowing execution of arbitrary code. The app also uses the SHA1 hashing algorithm, which is vulnerable to collision attacks, though not in a way that currently compromises sensitive information. The app also remembers login credentials by default, which is a convenience feature that carries security risk; best practice is to make this opt-in rather than the default. The high risk rating for code vulnerabilities is justified based on these findings.",
+      "checks": [
+        {
+          "check": "Accesses Unique Identifiers",
+          "result": "Not Present",
+          "explanation": "The app does not access any unique identifiers.",
+          "compliance": "NIAP: FDP_DEC_EXT.1.1; FDP_DEC_EXT.1.2",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Low"
+        },
+        {
+          "check": "Activities Accessible to Other Apps",
+          "result": "Not Present",
+          "explanation": "No activities are exported, or access to all activities is restricted by use of permissions.",
+          "compliance": "OWASP: 2016-M1-Improper Platform Usage",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "App is Debuggable",
+          "result": "Present",
+          "explanation": "The app is debuggable. A malicious actor with physical access to a device that has USB debugging enabled can attach a debugger to the app's process during execution, exposing sensitive information, enabling reverse engineering, and allowing execution of arbitrary code.",
+          "compliance": "OWASP: 2016-M10-Extraneous Functionality",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Contains Hard-coded Cryptographic Key",
+          "result": "Not Present",
+          "explanation": "No hard-coded cryptographic keys were found in the app.",
+          "compliance": "OWASP: 2016-M5-Insufficient Cryptography; 2016-M9-Reverse Engineering",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Contains Native Code",
+          "result": "Not Present",
+          "explanation": "The app does not load native code libraries.",
+          "compliance": "OWASP: 2016-M7-Client Code Quality",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Info"
+        },
+        {
+          "check": "Contains Potential Hard-coded Password",
+          "result": "Not Present",
+          "explanation": "No hard-coded passwords were found in the app.",
+          "compliance": "OWASP: 2016-M9-Reverse Engineering",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Contains Potential SQL Injection",
+          "result": "Not Present",
+          "explanation": "No potential SQL injection vulnerabilities were found.",
+          "compliance": "OWASP: 2016-M7-Client Code Quality; NIAP: FPT_API_EXT.2.1",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Contains Reflection Code",
+          "result": "Not Present",
+          "explanation": "The app does not contain Java reflection code.",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Low"
+        },
+        {
+          "check": "Creates Blowfish Key with Weak Length",
+          "result": "Not Present",
+          "explanation": "The app does not create a Blowfish key with less than 128 bits in length.",
+          "compliance": "OWASP: 2016-M5-Insufficient Cryptography; NIAP: FCS_COP.1.1(1)",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Creates RSA Keys with Weak Modulus Length",
+          "result": "Not Present",
+          "explanation": "The app does not create an RSA key with modulus length less than 1024 bits.",
+          "compliance": "OWASP: 2016-M5-Insufficient Cryptography; NIAP: FCS_CKM.1.1(1)",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Does not Update Security Provider",
+          "result": "Not Present",
+          "explanation": "The app uses the dynamic GmsCore_OpenSSL Provider to ensure that the device's security provider is always updated.",
+          "compliance": "OWASP: 2016-M1-Improper Platform Usage; 2016-M5-Insufficient Cryptography",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Receivers Accessible to Other Apps",
+          "result": "Not Present",
+          "explanation": "The app does not contain receivers, no receivers are exported, or access to all exported receivers is restricted by use of permissions.",
+          "compliance": "OWASP: 2016-M1-Improper Platform Usage; NIAP: FMT_CFG_EXT.1.2",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Requests Root Access",
+          "result": "Present",
+          "explanation": "The app requests root access or superuser privileges, allowing execution of more advanced or potentially dangerous operations on the device. Called from: com.android.insecurebankv2.PostLogin.",
+          "compliance": "OWASP: 2016-M8-Code Tampering",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Services Accessible to Other Apps",
+          "result": "Not Present",
+          "explanation": "The app does not contain services, no services are exported, or access to all services is restricted by use of permissions.",
+          "compliance": "OWASP: 2016-M1-Improper Platform Usage; NIAP: FMT_CFG_EXT.1.2",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "SMS CVE-2014-8610",
+          "result": "Not Present",
+          "explanation": "The app does not send text messages or has the required SMS permission; it is not vulnerable to CVE-2014-8610.",
+          "compliance": "OWASP: 2016-M1-Improper Platform Usage",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Source Code is not Obfuscated",
+          "result": "Present",
+          "explanation": "This app does not obfuscate its code by renaming classes, fields, and methods, making it possible for an adversary to reverse-engineer the application.",
+          "compliance": "OWASP: 2016-M9-Reverse Engineering",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Low"
+        },
+        {
+          "check": "Uses SHA1 Hashing Algorithm",
+          "result": "Present",
+          "explanation": "The app uses the SHA1 hashing algorithm, which is vulnerable to collision attacks.",
+          "compliance": "OWASP: 2016-M5-Insufficient Cryptography; NIAP: FCS_TUD_EXT.1.6",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Weakly Configured XML Parser",
+          "result": "Not Present",
+          "explanation": "No potential weakly configured XML parsing is found.",
+          "compliance": "OWASP: 2016-M7-Client Code Quality; NIAP: FPT_API_EXT.2.1",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Writes Sensitive Information to System Log",
+          "result": "Not Present",
+          "explanation": "This app was not observed to write sensitive information to the system log.",
+          "compliance": "OWASP: 2016-M2-Insecure Data Storage; NIAP: FDP_DEC_EXT.1.2; HIPAA: 164.312(a)(2)(iv); GDPR: Articles 5, 25, 32",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Uses Spoofable Values for Authentication",
+          "result": "Not Present",
+          "explanation": "This app does not authenticate using values that can be spoofed.",
+          "compliance": "OWASP: 2016-M4-Insecure Authentication",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Copies Sensitive Information into the Clipboard Without User Consent",
+          "result": "Not Present",
+          "explanation": "This app does not copy sensitive information into the clipboard without the user's consent.",
+          "compliance": "OWASP: 2016-M2-Insecure Data Storage; HIPAA: 164.312(a)(2)(iv)",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        }
+      ]
+    },
+    {
+      "section_name": "Storage",
+      "findings_text": "Analysis of InsecureBankv2 suggests a high level of risk associated with data storage. A high level of risk indicates the app could be manipulated by attackers. The app stores sensitive information in Android's shared external storage space, where files are world-readable and may be analyzed or modified by other applications. InsecureBankv2 also stores the user's account password without hardware-backed encryption; this file can only be accessed by the app itself, reducing risk, but it would benefit from encryption backed by the Android KeyStore. Finally, the app does not prevent screen capture of bank account numbers, meaning sensitive information can be duplicated to other locations on the file system through routine OS screen-capture behavior. The high risk rating for data storage is justified based on these findings.",
+      "checks": [
+        {
+          "check": "Accesses External Storage",
+          "result": "Present",
+          "explanation": "The app accesses the external storage directory (SDCard), which can be accessed by any app on the device with the READ/WRITE_EXTERNAL_STORAGE permission. Found in: com.android.insecurebankv2.DoTransfer$RequestDoTransferTask$1.run(), com.android.insecurebankv2.ViewStatement.onCreate(Bundle).",
+          "compliance": "OWASP: 2016-M2-Insecure Data Storage; NIAP: FDP_DAR_EXT.1.1; HIPAA: 164.312(a)(2)(iv); GDPR: Articles 5, 25, 32",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Authentication Credentials Not Protected with Android Keystore",
+          "result": "Present",
+          "explanation": "The app stores user authentication credentials (e.g. passwords, tokens) without using the Android Keystore system for hardware-backed protection.",
+          "compliance": "OWASP: 2016-M2-Insecure Data Storage; NIAP: FDP_DAR_EXT.1.1; HIPAA: 164.312(a)(2)(iv); GDPR: Articles 5, 25, 32",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Sensitive Information Stored in World Readable or Writable File in Internal Storage",
+          "result": "Not Present",
+          "explanation": "This app does not create world readable or writable files with sensitive information in its internal storage.",
+          "compliance": "OWASP: 2016-M2-Insecure Data Storage; NIAP: FDP_DAR_EXT.1.1; FMT_CFG_EXT.1.2; FMT_MEC_EXT.1.1; HIPAA: 164.312(a)(2)(iv); GDPR: Articles 5, 25, 32",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Sensitive Information Stored in External Storage",
+          "result": "Present",
+          "explanation": "The app stores sensitive information on the device in external storage, accessible from any app on the device with the READ_EXTERNAL_STORAGE permission.",
+          "compliance": "OWASP: 2016-M2-Insecure Data Storage; NIAP: FDP_DAR_EXT.1.1; FMT_CFG_EXT.1.2; FMT_MEC_EXT.1.1; HIPAA: 164.312(a)(2)(iv); GDPR: Articles 5, 25, 32",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Does not Prevent Screen Capture of Sensitive Information",
+          "result": "Present",
+          "explanation": "The app does not prevent sensitive information on screen from being captured via screenshot or video by setting the FLAG_SECURE window layout parameter.",
+          "compliance": "OWASP: 2016-M2-Insecure Data Storage",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        }
+      ]
+    },
+    {
+      "section_name": "Network",
+      "findings_text": "Analysis of InsecureBankv2 suggests a high level of risk associated with networking. A high level of risk indicates the app could be manipulated by attackers. InsecureBankv2 uses HTTPS and verifies certificates for most traffic, which generally keeps networking risk low, but it does not implement certificate pinning, which would otherwise ensure the app only accepts connections to its intended endpoint. Without pinning, an attacker in control of any other trusted certificate authority on the device could compromise TLS communications. The app also does not sufficiently validate certificates in some cases, enabling man-in-the-middle attacks, downloads sensitive information over plain HTTP, and does not hash the user's password before sending it over the network. The high risk rating for networking is justified based on these findings.",
+      "checks": [
+        {
+          "check": "Allows Cleartext Traffic for All Domains",
+          "result": "Present",
+          "explanation": "The app allows cleartext traffic for all domains by omitting a network security configuration file or explicitly allowing all cleartext traffic.",
+          "compliance": "OWASP: 2016-M3-Insecure Communication; NIAP: FTP_DIT_EXT.1.1; HIPAA: 164.312(e)(2)(ii); GDPR: Articles 5, 25, 32",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Contains HostnameVerifier That Accepts All Hostnames",
+          "result": "Not Present",
+          "explanation": "No weak HostnameVerifiers are found.",
+          "compliance": "OWASP: 2016-M3-Insecure Communication; NIAP: FIA_X509_EXT.1.1",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Contains X509TrustManager that Accepts All Certificates",
+          "result": "Not Present",
+          "explanation": "No weak X509TrustManagers are found.",
+          "compliance": "OWASP: 2016-M3-Insecure Communication; NIAP: FIA_X509_EXT.1.1",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Does not Perform Certificate Pinning",
+          "result": "Present",
+          "explanation": "The app does not implement certificate pinning. Without it, an attacker may be able to compromise the security of the app's TLS network communication using a rogue certificate.",
+          "compliance": "OWASP: 2016-M3-Insecure Communication; NIAP: FTP_DIT_EXT.1.1",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Opens a Listening Port",
+          "result": "Not Present",
+          "explanation": "This app does not open a listening port on the device.",
+          "compliance": "NIAP: FDP_NET_EXT.1.1",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Sensitive Cookies Lack Security Attributes",
+          "result": "Not Present",
+          "explanation": "This app does not receive sensitive cookies without security attributes, or does not receive any sensitive cookies.",
+          "compliance": "OWASP: 2016-M4-Insecure Authentication",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Sensitive Information Pushed to Online Storage Service without User Consent",
+          "result": "Not Present",
+          "explanation": "No sensitive information is sent to an online storage service without user consent.",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Unnecessary Information Transmitted",
+          "result": "Not Present",
+          "explanation": "This app does not send any unnecessary user or device information.",
+          "compliance": "GDPR: Article 23; NIAP: FDP_NET_EXT.1.1; FPR_ANO_EXT.1.1",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Low"
+        },
+        {
+          "check": "Sensitive Information is Unencrypted in Transit",
+          "result": "Present",
+          "explanation": "This app sends sensitive information over the network without encryption. An adversary on the local network or on-path could easily capture this information.",
+          "compliance": "OWASP: 2016-M3-Insecure Communication; NIAP: FTP_DIT_EXT.1.1; HIPAA: 164.312(e)(2)(ii); GDPR: Articles 5, 25, 32",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Password is not Hashed in Transit",
+          "result": "Present",
+          "explanation": "This app does not hash the user's password before sending it over the network, exposing the plaintext password to the recipient or an on-path adversary.",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Weak Certificate Validation Enables MitM Attacks",
+          "result": "Present",
+          "explanation": "The app is vulnerable to man-in-the-middle attacks that could compromise the confidentiality of some or all encrypted network communications due to flawed certificate validation.",
+          "compliance": "OWASP: 2016-M3-Insecure Communication; NIAP: FIA_X509_EXT.1.1; HIPAA: 164.312(e)(2)(ii); GDPR: Articles 5, 25, 32",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        }
+      ]
+    },
+    {
+      "section_name": "Resilience",
+      "findings_text": "Not separately assessed in this scan.",
+      "checks": []
+    }
+  ],
+  "hardcoded_values": {
+    "urls": [
+      {
+        "url": "http://schema.org/ActivateAction",
+        "country": "US"
+      },
+      {
+        "url": "http://schema.org/ActiveActionStatus",
+        "country": "US"
+      },
+      {
+        "url": "http://schema.org/AddAction",
+        "country": "US"
+      },
+      {
+        "url": "https://www.googleapis.com/auth/datastoremobile",
+        "country": "US"
+      },
+      {
+        "url": "https://www.googleapis.com/auth/drive",
+        "country": "US"
+      },
+      {
+        "url": "https://www.googleapis.com/auth/drive.appdata",
+        "country": "US"
+      },
+      {
+        "url": "https://www.googleapis.com/auth/drive.apps",
+        "country": "US"
+      },
+      {
+        "url": "https://www.googleapis.com/auth/drive.file",
+        "country": "US"
+      },
+      {
+        "url": "https://www.googleapis.com/auth/fitness.activity.read",
+        "country": "US"
+      },
+      {
+        "url": "https://www.googleapis.com/auth/fitness.activity.write",
+        "country": "US"
+      },
+      {
+        "url": "https://www.googleapis.com/auth/fitness.body.read",
+        "country": "US"
+      },
+      {
+        "url": "https://www.googleapis.com/auth/fitness.body.write",
+        "country": "US"
+      },
+      {
+        "url": "https://www.googleapis.com/auth/fitness.location.read",
+        "country": "US"
+      },
+      {
+        "url": "https://www.googleapis.com/auth/fitness.location.write",
+        "country": "US"
+      },
+      {
+        "url": "https://www.googleapis.com/auth/fitness.nutrition.read",
+        "country": "US"
+      },
+      {
+        "url": "https://www.googleapis.com/auth/fitness.nutrition.write",
+        "country": "US"
+      },
+      {
+        "url": "https://www.googleapis.com/auth/games",
+        "country": "US"
+      },
+      {
+        "url": "https://www.googleapis.com/auth/games.firstparty",
+        "country": "US"
+      },
+      {
+        "url": "https://www.googleapis.com/auth/plus.login",
+        "country": "US"
+      },
+      {
+        "url": "https://www.googleapis.com/auth/plus.me",
+        "country": "US"
+      },
+      {
+        "url": "https://www.googleapis.com/auth/plus.moments.write",
+        "country": "US"
+      },
+      {
+        "url": "https://www.googletagmanager.com",
+        "country": "US"
+      },
+      {
+        "url": "https://www.linkedin.com",
+        "country": "US"
+      },
+      {
+        "url": "https://www.paypal.com",
+        "country": "NL"
+      }
+    ],
+    "emails": [],
+    "secrets": []
+  },
+  "endpoints": [
+    {
+      "endpoint": "172.217.13.74",
+      "tags": "",
+      "ip_address": "172.217.13.74",
+      "country": "US"
+    }
+  ]
+}

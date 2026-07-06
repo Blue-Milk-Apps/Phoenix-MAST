@@ -1,0 +1,40 @@
+{
+  "check_id": "insecure-crypto-algorithms",
+  "title": "Insecure or outdated cryptographic algorithms / implementations",
+  "category": "Cryptography",
+  "platform": "Android",
+  "capability_type": ["Binary", "Source"],
+
+  "description": "Detect weak, deprecated, or misused cryptographic algorithms and APIs such as MD5, SHA-1, DES, RC2/RC4, custom crypto, or improper encoding used as protection.",
+
+  "status": "Present",
+  "severity": "Medium",
+
+  "impact": "The app uses the MD5 and SHA-1 hashing algorithms, both of which are vulnerable to collision attacks and should not be relied on for integrity or security-sensitive purposes.",
+
+  "remediation": {
+    "guidance": "Replace MD5/SHA-1 with a modern hash such as SHA-256 or SHA-3 for any security-relevant use (integrity checks, signatures, password-adjacent hashing).",
+    "resources": [
+      { "title": "OWASP MASTG-TEST-0012: Testing Cryptographic Key Management", "url": "https://mas.owasp.org/MASTG/tests/android/MASVS-CRYPTO/MASTG-TEST-0012/" }
+    ]
+  },
+
+  "compliance": {
+    "niap": ["FCS_COP.1"],
+    "owasp_masvs": ["MASVS-CRYPTO-1"],
+    "owasp_maswe": ["MASWE-0019", "MASWE-0021", "MASWE-0020"],
+    "owasp_mastg_mstg": ["CRYPTO/MASTG-TEST-0012", "MSTG-CRYPTO-4"],
+    "owasp_top10_mobile_2016": "M5: Insufficient Cryptography",
+    "cwe": ["CWE-327"],
+    "cve": ["CVE-2004-2761", "CVE-2005-4900"],
+    "hipaa": [],
+    "gdpr": []
+  },
+
+  "evidence": [
+    { "file_path": "l4/d.java", "tool": "strings", "output_location": "strings/Runner.txt:rg -n -i \"MD5|SHA1|SHA-1|DES|RC4|ECB|Cipher\\.getInstance|MessageDigest\"" },
+    { "file_path": "u6/l.java", "tool": "mobsf", "output_location": "mobsf_scanner/mobsf_report.json:binary_analysis.findings" }
+  ],
+
+  "report_section": "Code"
+}

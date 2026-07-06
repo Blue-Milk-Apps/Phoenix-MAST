@@ -1,0 +1,431 @@
+{
+  "meta": {
+    "app_display_name": "",
+    "file_name": "",
+    "package_name": "",
+    "scan_date": "",
+    "platform": "Android",
+    "version_name": "",
+    "version_code": "",
+    "reviewer_org": "AppCritique Security Report"
+  },
+  "findings_severity": {
+    "high": 0,
+    "medium": 0,
+    "info": 0,
+    "secure": 0,
+    "hotspot": 0
+  },
+  "risk_summary": {
+    "code_vulnerability": "High",
+    "data_storage": "High",
+    "networking": "High",
+    "resilience": "Low"
+  },
+  "overall_evaluation": [
+    {
+      "area_of_concern": "Code Vulnerability",
+      "risk_rating": "High",
+      "summary_findings": [
+        "App is Debuggable",
+        "Uses SHA1 Hashing Algorithm"
+      ]
+    },
+    {
+      "area_of_concern": "Data Storage",
+      "risk_rating": "High",
+      "summary_findings": [
+        "Sensitive Information Stored in External Storage"
+      ]
+    },
+    {
+      "area_of_concern": "Networking",
+      "risk_rating": "High",
+      "summary_findings": [
+        "Does not Perform Certificate Pinning"
+      ]
+    },
+    {
+      "area_of_concern": "Cryptography",
+      "risk_rating": "Medium",
+      "summary_findings": [
+        "Uses SHA-1"
+      ]
+    },
+    {
+      "area_of_concern": "Resilience",
+      "risk_rating": "Low",
+      "summary_findings": [
+        "Root/Jailbreak Detection Missing"
+      ]
+    },
+    {
+      "area_of_concern": "Platform",
+      "risk_rating": "Info",
+      "summary_findings": [
+        "Unprotected Exported Activity"
+      ]
+    }
+  ],
+  "certificate": {
+    "owner_name": "",
+    "organization": "",
+    "organizational_unit": "",
+    "location": "",
+    "validity": "",
+    "issuer": "",
+    "serial_number": "",
+    "signature_versions": {
+      "v1": false,
+      "v2": false,
+      "v3": false,
+      "v4": false
+    },
+    "hash_algorithms": "",
+    "fingerprint": "",
+    "unique_certs": ""
+  },
+  "file_info": {
+    "filename": "",
+    "size": "",
+    "md5": "",
+    "sha1": "",
+    "sha256": ""
+  },
+  "app_info": {
+    "icon_path": "",
+    "name": "",
+    "package_name": "",
+    "main_activity": "",
+    "target_sdk": "",
+    "min_sdk": "",
+    "max_sdk": "",
+    "version_name": "",
+    "app_store_id": "",
+    "developer": "",
+    "categories": "",
+    "trackers_detected": ""
+  },
+  "app_components": {
+    "activities": 0,
+    "services": 0,
+    "receivers": 0,
+    "providers": 0,
+    "exported_activities": 0,
+    "exported_services": 0,
+    "exported_receivers": 0,
+    "exported_providers": 0
+  },
+  "functionality": {
+    "Audio": {
+      "present": false,
+      "explanation": ""
+    },
+    "Contacts": {
+      "present": false,
+      "explanation": ""
+    },
+    "Geofencing": {
+      "present": false,
+      "explanation": ""
+    },
+    "Health Data": {
+      "present": false,
+      "explanation": ""
+    },
+    "Location": {
+      "present": false,
+      "explanation": ""
+    },
+    "Maps": {
+      "present": false,
+      "explanation": ""
+    },
+    "Networking": {
+      "present": false,
+      "explanation": ""
+    },
+    "Payment Services": {
+      "present": false,
+      "explanation": ""
+    },
+    "SMS": {
+      "present": false,
+      "explanation": ""
+    },
+    "Secure RNG": {
+      "present": false,
+      "explanation": ""
+    },
+    "Bluetooth": {
+      "present": false,
+      "explanation": ""
+    },
+    "Camera": {
+      "present": false,
+      "explanation": ""
+    },
+    "Camera Delegation": {
+      "present": false,
+      "explanation": ""
+    },
+    "Calendar": {
+      "present": false,
+      "explanation": ""
+    },
+    "Device Administrator": {
+      "present": false,
+      "explanation": ""
+    },
+    "Fingerprint": {
+      "present": false,
+      "explanation": ""
+    },
+    "Google Cloud Messaging": {
+      "present": false,
+      "explanation": ""
+    },
+    "Infrared LED": {
+      "present": false,
+      "explanation": ""
+    },
+    "In-App Purchases": {
+      "present": false,
+      "explanation": ""
+    },
+    "Keychain": {
+      "present": false,
+      "explanation": ""
+    },
+    "Microphone": {
+      "present": false,
+      "explanation": ""
+    },
+    "NFC": {
+      "present": false,
+      "explanation": ""
+    },
+    "Photos": {
+      "present": false,
+      "explanation": ""
+    },
+    "Sensors": {
+      "present": false,
+      "explanation": ""
+    },
+    "Telephony": {
+      "present": false,
+      "explanation": ""
+    },
+    "USB Devices": {
+      "present": false,
+      "explanation": ""
+    }
+  },
+  "third_party_sdks": {
+    "Analytics": {
+      "GoogleAnalytics": false,
+      "Flurry": false,
+      "Amplitude": false,
+      "Mixpanel": false,
+      "NewRelic": false
+    },
+    "Advertising": {
+      "Admob": false,
+      "DoubleClick": false,
+      "Chartboost": false,
+      "AppLovin": false
+    },
+    "Cloud Storage": {
+      "GoogleDrive": false,
+      "Dropbox": false,
+      "OneDrive": false,
+      "Box": false
+    },
+    "Developer Tools": {
+      "Stripe": false,
+      "Paypal": false,
+      "Retrofit": false,
+      "Fabric": false
+    }
+  },
+  "permissions": [
+    {
+      "permission": "",
+      "status": "dangerous",
+      "info": "",
+      "usage_description": "",
+      "general_description": ""
+    }
+  ],
+  "vulnerability_sections": [
+    {
+      "section_name": "Code",
+      "findings_text": "",
+      "checks": [
+        {
+          "check": "Unprotected Exported Activity",
+          "result": "Not Present",
+          "explanation": "",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Application Data can be Backed Up",
+          "result": "Not Present",
+          "explanation": "",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "App can be Installed on a Vulnerable/Unpatched Minimum SDK Version",
+          "result": "Not Present",
+          "explanation": "",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Application Uses Custom URL Schemes / Deep Links",
+          "result": "Not Present",
+          "explanation": "",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Components with Known Vulnerabilities",
+          "result": "Not Present",
+          "explanation": "",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Variable"
+        },
+        {
+          "check": "Application Utilizes Insecure Random Number Generator",
+          "result": "Not Present",
+          "explanation": "",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Weak PBKDF2 or Key-Derivation Parameters",
+          "result": "Not Present",
+          "explanation": "",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Cryptographic Key Generation Not Using Approved Platform APIs (Android Keystore)",
+          "result": "Not Present",
+          "explanation": "",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        }
+      ]
+    },
+    {
+      "section_name": "Network",
+      "findings_text": "",
+      "checks": [
+        {
+          "check": "API Authentication Weakness (weak token handling / API key used as authentication)",
+          "result": "Not Present",
+          "explanation": "",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        }
+      ]
+    },
+    {
+      "section_name": "Resilience",
+      "findings_text": "",
+      "checks": [
+        {
+          "check": "Root Detection Missing",
+          "result": "Not Present",
+          "explanation": "",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Biometric / Local Authentication Bypass Possible",
+          "result": "Not Present",
+          "explanation": "",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        }
+      ]
+    },
+    {
+      "section_name": "Storage",
+      "findings_text": "",
+      "checks": [
+        {
+          "check": "Sensitive Values Stored Insecurely in SharedPreferences",
+          "result": "Not Present",
+          "explanation": "",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Sensitive Data in HTTP Cache Databases",
+          "result": "Not Present",
+          "explanation": "",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Sensitive Data Exposed Through Deep Link / URL Handler",
+          "result": "Not Present",
+          "explanation": "",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        }
+      ]
+    }
+  ],
+  "hardcoded_values": {
+    "urls": [
+      {
+        "url": "",
+        "country": ""
+      }
+    ],
+    "emails": [],
+    "secrets": []
+  },
+  "endpoints": [
+    {
+      "endpoint": "",
+      "tags": "",
+      "ip_address": "",
+      "country": ""
+    }
+  ]
+}

@@ -1,0 +1,133 @@
+@page {
+  size: letter;
+  margin: 2.1cm 1.6cm 2.3cm 1.6cm;
+  @bottom-center {
+    content: "AppCritique Security Report — Page " counter(page);
+    font-family: "DejaVu Sans", sans-serif;
+    font-size: 8pt;
+    color: #7a7a7a;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: "DejaVu Sans", sans-serif;
+  font-size: 9.5pt;
+  color: #222;
+  line-height: 1.45;
+}
+
+h1, h2, h3, h4 { font-family: "DejaVu Sans", sans-serif; color: #16233c; margin: 0 0 8px 0; }
+h1 { font-size: 22pt; }
+h2 { font-size: 14pt; border-bottom: 2px solid #16233c; padding-bottom: 4px; margin-top: 0; }
+h3 { font-size: 11.5pt; color: #16233c; margin-top: 18px; }
+p { margin: 0 0 8px 0; }
+
+.section { page-break-before: always; padding-top: 4px; }
+.section:first-of-type { page-break-before: avoid; }
+.no-break { page-break-inside: avoid; }
+
+/* ---------- Cover page ---------- */
+.cover {
+  page-break-after: always;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 23cm;
+}
+.cover .brand { font-size: 11pt; letter-spacing: 2px; color: #7a7a7a; text-transform: uppercase; margin-bottom: 40px; }
+.cover .title { font-size: 30pt; font-weight: bold; color: #16233c; margin-bottom: 6px; }
+.cover .subtitle { font-size: 15pt; color: #444; margin-bottom: 30px; }
+.cover .meta-table { width: 60%; border-collapse: collapse; margin-top: 30px; }
+.cover .meta-table td { padding: 5px 0; font-size: 10pt; border-bottom: 1px solid #ddd; }
+.cover .meta-table td.label { color: #7a7a7a; width: 40%; }
+.cover .meta-table td.value { font-weight: bold; color: #16233c; }
+
+/* ---------- Risk badges ---------- */
+.badge { display: inline-block; padding: 2px 10px; border-radius: 3px; font-size: 8.5pt; font-weight: bold; color: #fff; }
+.badge-high, .badge-present { background: #c0392b; }
+.badge-critical { background: #7b1113; }
+.badge-medium { background: #e08e0b; }
+.badge-low, .badge-info { background: #2980b9; }
+.badge-secure, .badge-notpresent { background: #27ae60; }
+.badge-hotspot { background: #444444; }
+.badge-variable { background: #6c5ce7; }
+.badge-na { background: #999999; }
+
+/* ---------- Tables ---------- */
+table { width: 100%; border-collapse: collapse; margin: 10px 0 16px 0; }
+th { background: #16233c; color: #fff; text-align: left; padding: 6px 8px; font-size: 8.5pt; }
+td { padding: 6px 8px; border-bottom: 1px solid #e2e2e2; vertical-align: top; font-size: 8.5pt; }
+tr:nth-child(even) td { background: #f7f8fa; }
+table.compact th, table.compact td { font-size: 8pt; padding: 4px 6px; }
+
+.col-check { width: 18%; }
+.col-severity { width: 9%; }
+.col-result { width: 9%; }
+.col-explain { width: 36%; }
+.col-compliance { width: 16%; }
+.col-evidence { width: 12%; }
+
+/* ---------- App Components segmented bars ---------- */
+.components-bars { margin-top: 12px; }
+.component-bar-row { margin: 14px 0; }
+.component-bar-label-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; font-size: 9.5pt; }
+.component-bar-label { font-weight: bold; color: #16233c; }
+.component-bar-count { color: #555; font-size: 8.5pt; }
+.component-bar-exported { color: #c0392b; font-weight: bold; }
+.component-bar-track { height: 13px; border-radius: 4px; overflow: hidden; display: flex; min-width: 8%; }
+.component-bar-exported-fill { height: 100%; background: #c0392b; }
+.component-bar-safe-fill { height: 100%; background: #2980b9; }
+.component-bar-legend { margin-top: 10px; font-size: 8pt; color: #666; }
+.legend-swatch { display: inline-block; width: 9px; height: 9px; margin-right: 4px; border-radius: 2px; }
+.legend-exported { background: #c0392b; }
+.legend-safe { background: #2980b9; margin-left: 14px; }
+
+/* ---------- Bar meters (findings by severity) ---------- */
+.section-sub { font-size: 8.5pt; color: #888; margin-bottom: 16px; margin-top: -6px; }
+.bar-block { margin: 14px 0; }
+.bar-label-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.bar-label { font-weight: bold; font-size: 10pt; color: #16233c; }
+.bar-count-chip { display: inline-block; border-radius: 3px; padding: 1px 8px; color: #fff; font-size: 8pt; font-weight: bold; }
+.bar-track { height: 7px; background: #eaeaea; border-radius: 4px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 4px; }
+
+/* ---------- Risk polar chart ---------- */
+.risk-graph-wrap { display: flex; justify-content: center; margin: 14px 0 20px 0; }
+.polar-chart { width: 65%; max-width: 380px; }
+
+/* ---------- Cover heading (icon + title) ---------- */
+.cover-heading { display: flex; align-items: center; margin-bottom: 6px; }
+.cover-icon { width: 54px; height: 54px; border-radius: 12px; margin-right: 18px; flex-shrink: 0; }
+.cover-heading-text .title { margin-bottom: 2px; }
+.cover-heading-text .subtitle { margin-bottom: 0; }
+
+/* ---------- Evaluation summary ---------- */
+.eval-findings ul { margin: 4px 0 4px 16px; padding: 0; }
+.eval-findings li { margin-bottom: 2px; }
+
+/* ---------- Functionality grid ---------- */
+.func-grid { display: flex; flex-wrap: wrap; }
+.func-item { width: 50%; padding: 4px 8px 4px 0; font-size: 8.5pt; }
+.func-item .fname { font-weight: bold; }
+.func-item .fexp { color: #555; }
+.func-notfound { font-size: 8.5pt; color: #555; background: #f7f8fa; padding: 8px; border-radius: 3px; }
+
+/* ---------- SDK grid ---------- */
+.sdk-category { margin-bottom: 10px; }
+.sdk-category h4 { margin: 8px 0 4px 0; font-size: 9.5pt; color: #16233c; }
+.sdk-grid { display: flex; flex-wrap: wrap; }
+.sdk-item { width: 33%; font-size: 8.5pt; padding: 2px 0; }
+.sdk-yes { color: #1e7e34; font-weight: bold; }
+.sdk-no { color: #999; }
+
+/* ---------- Vulnerability section ---------- */
+.vuln-findings { background: #f7f8fa; border-left: 3px solid #16233c; padding: 10px 12px; margin-bottom: 12px; font-size: 9pt; }
+
+/* ---------- Certificate & file info ---------- */
+.kv-table td.k { width: 34%; color: #555; }
+.kv-table td.v { font-weight: bold; }
+
+.small { font-size: 8pt; color: #666; }
+.mono { font-family: "DejaVu Sans Mono", monospace; font-size: 8pt; word-break: break-all; }

@@ -14,6 +14,7 @@ from adapters.binary_scanners import (
     MobSFScanner,
     PlistBinaryScanner,
 )
+from adapters.output.appcritiq_report.generate_report import generate_report
 from adapters.output.file_output import FileScanOutput
 from adapters.post_scan import (
     AndroidBinaryScanDetailExtractor,
@@ -106,6 +107,7 @@ class MobileScannerFactory:
 
 class MobileAnalysisWorkflowService:
     POST_SCAN_OUTPUT_FILE_NAME = "post_scan_processing.json"
+    GENERATED_REPORT_FILE_NAME = "AppCritique_Report.pdf"
 
     def run(self, scan_config: ScanConfig) -> None:
         print("AppcritIQ scan")
@@ -130,7 +132,14 @@ class MobileAnalysisWorkflowService:
         for result in opengrep_results:
             scan_output_method.write_result(result)
 
-        self._run_post_scan_processing(scan_config.output_path, scan_config)
+        post_scan_output = self._run_post_scan_processing(scan_config.output_path, scan_config)
+        target = scan_config.output_path / self.POST_SCAN_OUTPUT_FILE_NAME
+        target.write_text(
+            json.dumps(post_scan_output, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+        if post_scan_output:
+            generate_report(post_scan_output, self._report_output_path(scan_config.output_path, post_scan_output))
         print(f"Results: {len(scan_results)}")
         print(f"Duration: {time.perf_counter() - wall_start:.2f} seconds")
 
@@ -164,17 +173,33 @@ class MobileAnalysisWorkflowService:
     def _get_opengrep_scan_paths(config: ScanConfig) -> list[Path]:
         return MobileScannerFactory._get_opengrep_scan_paths(config)
 
-    def _run_post_scan_processing(self, output_path: Path, scan_config: ScanConfig) -> None:
+    def _run_post_scan_processing(self, output_path: Path, scan_config: ScanConfig) -> dict:
         service = self._build_post_scan_processing_service(scan_config)
         if service is None:
-            return
+            return {}
 
         post_scan_output = service.process(output_path)
-        target = output_path / self.POST_SCAN_OUTPUT_FILE_NAME
-        target.write_text(
-            json.dumps(post_scan_output, indent=2, sort_keys=True),
-            encoding="utf-8",
+        return post_scan_output
+
+    def _report_output_path(self, output_path: Path, post_scan_output: dict) -> Path:
+        file_stem = self._report_file_stem(post_scan_output)
+        return output_path / f"{file_stem}_{self.GENERATED_REPORT_FILE_NAME}"
+
+    @staticmethod
+    def _report_file_stem(post_scan_output: dict) -> str:
+        candidates = (
+            (post_scan_output.get("meta") or {}).get("app_display_name"),
+            (post_scan_output.get("file_info") or {}).get("filename"),
+            (post_scan_output.get("meta") or {}).get("file_name"),
         )
+        for candidate in candidates:
+            text = str(candidate or "").strip()
+            if not text:
+                continue
+            sanitized = "".join(char if char.isalnum() else "_" for char in Path(text).stem).strip("_")
+            if sanitized:
+                return sanitized
+        return "scan"
 
     @staticmethod
     def _build_post_scan_processing_service(

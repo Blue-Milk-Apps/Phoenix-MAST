@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://appcritique.local/schemas/check.schema.json",
+  "title": "AppCritique Security Check",
+  "description": "Schema for a single security check record, built from two sources only: (1) capabilities.csv's own columns (ID, Platform, CapabilityType, Category, Title, Description, Default Severity, NIAP, OWASP MASVS, OWASP MASWE, OWASP MASTG/MSTG, CVE, Phoenix Output Location), and (2) the field set AppCritique's own checks-conducted table already uses (Check, Result, Explanation, Compliance, Remediation, Evidence). No NowSecure-specific concepts and no cross-reference ID fields tied to an external source system. Not every field here is rendered in the PDF today -- this is meant as a complete data record a report template can choose to draw from.",
+  "type": "object",
+  "required": ["check_id", "title", "category", "platform", "description", "status", "severity"],
+  "properties": {
+
+    "check_id": {
+      "type": "string",
+      "description": "Identifier for this check within your own catalog (e.g. a slug you assign). Not a cross-reference to any external system's row number."
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable check name, matching capabilities.csv's Title column, e.g. 'Insecure or outdated cryptographic algorithms / implementations'."
+    },
+    "category": {
+      "type": "string",
+      "description": "Top-level grouping, matching capabilities.csv's Category column.",
+      "examples": [
+        "Artifact / inventory",
+        "Authentication",
+        "Cryptography",
+        "Network / transport",
+        "Storage / privacy",
+        "Code quality / dependencies",
+        "Binary hardening",
+        "Build / platform currency",
+        "Platform interaction",
+        "Resilience"
+      ]
+    },
+    "platform": {
+      "type": "string",
+      "enum": ["iOS", "Android", "Cross-platform"],
+      "description": "Matches capabilities.csv's Platform column. Use 'Cross-platform' only in your own catalog if you've deliberately merged an iOS row and an Android row that describe the same underlying check."
+    },
+    "capability_type": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["Binary", "Source", "Dynamic"] },
+      "description": "Which analysis input(s) the check runs against, matching capabilities.csv's CapabilityType column. A capability often has separate Binary and Source rows in the CSV -- list every type that applies to this check."
+    },
+
+    "description": {
+      "type": "string",
+      "description": "What the check looks for, in the abstract -- matches capabilities.csv's Description column, e.g. 'Detect weak, deprecated, or misused cryptographic algorithms and APIs such as MD5, SHA-1, DES, RC2/RC4, custom crypto, or improper encoding used as protection.'"
+    },
+
+    "status": {
+      "type": "string",
+      "enum": ["Present", "Not Present", "Not Evaluated"],
+      "description": "Outcome of this check on a specific scan. Matches the 'Result' column in AppCritique's checks-conducted table. Use 'Not Evaluated' rather than guessing when the check didn't run or the tool didn't cover it, instead of defaulting to 'Not Present'."
+    },
+
+    "severity": {
+      "type": "string",
+      "enum": ["Critical", "High", "Medium", "Low", "Info", "Secure", "Hotspot", "Variable", "N/A"],
+      "description": "Matches capabilities.csv's Default Severity column. 'Variable' is used in the CSV itself for a few checks (e.g. 'Components with known vulnerabilities') where actual severity depends on the specific CVE found. 'N/A' is used for pure inventory/artifact checks that don't carry a risk rating of their own."
+    },
+
+    "impact": {
+      "type": "string",
+      "description": "Plain-language explanation of what happens if this check's status is 'Present' (i.e. the issue exists) -- matches the 'Explanation' column in AppCritique's checks-conducted table. Distinct from description: description explains what the check looks for in general; impact explains the consequence for this specific finding."
+    },
+
+    "remediation": {
+      "type": "object",
+      "description": "Matches the remediation-link field in AppCritique's checks-conducted table.",
+      "properties": {
+        "guidance": {
+          "type": ["string", "null"],
+          "description": "Short recommended-fix text."
+        },
+        "resources": {
+          "type": "array",
+          "description": "Links to remediation guides, standards pages, or vendor documentation.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "url": { "type": "string" }
+            },
+            "required": ["title", "url"]
+          }
+        }
+      }
+    },
+
+    "compliance": {
+      "type": "object",
+      "description": "Every standards mapping capabilities.csv carries for a check, plus the additional tags (HIPAA/GDPR/legacy OWASP Mobile Top 10) that show up in the 'Compliance' column of AppCritique's own checks-conducted table. Populate whichever apply; leave the rest as empty arrays.",
+      "properties": {
+        "niap": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "NIAP Protection Profile requirement IDs, e.g. 'FDP_DEC_EXT.1.1'. Matches capabilities.csv's NIAP column (semicolon-separated in the source file -- split into array elements here)."
+        },
+        "owasp_masvs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "OWASP MASVS control IDs, e.g. 'MASVS-CRYPTO-1'. Matches capabilities.csv's OWASP MASVS column."
+        },
+        "owasp_maswe": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "OWASP MASWE weakness IDs, e.g. 'MASWE-0019'. Matches capabilities.csv's OWASP MASWE column."
+        },
+        "owasp_mastg_mstg": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Test IDs from capabilities.csv's combined 'OWASP MASTG / MSTG' column, e.g. 'CRYPTO/MASTG-TEST-0061' or the legacy 'MSTG-CRYPTO-4' -- the source column mixes both numbering schemes, so both live here as given."
+        },
+        "owasp_top10_mobile_2016": {
+          "type": ["string", "null"],
+          "description": "Legacy OWASP Mobile Top 10 (2016) category, e.g. 'M5: Insufficient Cryptography'. Not a capabilities.csv column, but appears in AppCritique's own Compliance field for many checks and is worth carrying alongside MASVS."
+        },
+        "cwe": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "CWE IDs, e.g. 'CWE-327'. Not a dedicated capabilities.csv column on its own, but shows up bundled into it for a handful of checks and consistently appears in AppCritique's Compliance field."
+        },
+        "cve": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Specific CVE IDs this check flags for, e.g. 'CVE-2014-0160'. Matches capabilities.csv's CVE column -- populated only for the small number of checks that target a named vulnerability (vulnerable OpenSSL/Nanopb versions)."
+        },
+        "hipaa": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "HIPAA citations, e.g. '164.312(a)(2)(iv)'. Not a capabilities.csv column, but appears in AppCritique's Compliance field for storage/transport-related checks."
+        },
+        "gdpr": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "GDPR article references, e.g. 'Articles 5, 25, 32'. Same source as hipaa -- AppCritique's own Compliance field, not capabilities.csv."
+        }
+      }
+    },
+
+    "evidence": {
+      "type": "array",
+      "description": "Where the finding was (or would be) observed. Matches the 'Evidence' column in AppCritique's checks-conducted table, extended with capabilities.csv's Phoenix Output Location column (which tool produced the data and where in its raw output).",
+      "items": {
+        "type": "object",
+        "properties": {
+          "file_path": {
+            "type": ["string", "null"],
+            "description": "File or manifest location where the finding shows up, e.g. 'AndroidManifest.xml' or a specific source file path."
+          },
+          "tool": {
+            "type": ["string", "null"],
+            "description": "Which scanning tool produced this evidence, per capabilities.csv's Phoenix Output Location column, e.g. 'mobsf', 'androguard', 'apktool', 'lief', 'strings', 'gitleaks', 'trufflehog', 'opengrep', 'syft', 'apksigner', or 'dynamic' for runtime-only checks."
+          },
+          "output_location": {
+            "type": ["string", "null"],
+            "description": "Path/key within that tool's raw output, e.g. 'mobsf_scanner/mobsf_report.json:binary_analysis.findings'. Kept close to the raw capabilities.csv string for traceability rather than over-parsed."
+          }
+        }
+      }
+    },
+
+    "report_section": {
+      "type": ["string", "null"],
+      "enum": ["Code", "Network", "Resilience", "Storage", "Permissions", "Certificate Info", "App Info", "Hardcoded Values", "Endpoint Connections", null],
+      "description": "Which AppCritique report section this check's result would render under, if displayed. Presentation-only -- everything above this field is source-of-truth data independent of any one report layout."
+    }
+  }
+}

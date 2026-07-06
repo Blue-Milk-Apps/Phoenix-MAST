@@ -1,0 +1,682 @@
+{
+  "meta": {
+    "app_display_name": "MirrCast",
+    "file_name": "Mirrcast_TV_Receiver-Joyetv_3.1.2_APKPure.xapk",
+    "package_name": "com.tv.casttv",
+    "scan_date": "June 25, 2026",
+    "platform": "Android",
+    "version_name": "3.1.2",
+    "version_code": "312",
+    "reviewer_org": "AppCritique Security Report"
+  },
+  "findings_severity": {
+    "high": 5,
+    "medium": 27,
+    "info": 1,
+    "secure": 1,
+    "hotspot": 1
+  },
+  "risk_summary": {
+    "code_vulnerability": "High",
+    "data_storage": "Medium",
+    "networking": "High",
+    "resilience": "Medium"
+  },
+  "overall_evaluation": [
+    {
+      "area_of_concern": "Code Vulnerability",
+      "risk_rating": "High",
+      "summary_findings": [
+        "Unprotected Exported Activities (10)",
+        "Application Data can be Backed Up",
+        "App Installable on a Vulnerable/Unpatched Minimum SDK Version (23)",
+        "Uses MD5 and SHA-1 Weak Hashing Algorithms",
+        "Contains Hard-coded Cryptographic Keys and Credentials"
+      ]
+    },
+    {
+      "area_of_concern": "Data Storage",
+      "risk_rating": "Medium",
+      "summary_findings": [
+        "App can Read/Write to External Storage",
+        "IP Address Disclosure in Code",
+        "Application Logs Information to Device Logs"
+      ]
+    },
+    {
+      "area_of_concern": "Networking",
+      "risk_rating": "High",
+      "summary_findings": [
+        "Network Security Config Allows Cleartext Traffic for All Domains",
+        "Network Security Config Trusts User-Installed CAs",
+        "Application Contains Insecure HTTP Traffic"
+      ]
+    },
+    {
+      "area_of_concern": "Resilience",
+      "risk_rating": "Medium",
+      "summary_findings": [
+        "Root Detection Not Independently Confirmed",
+        "Anti-VM / Anti-Debug Checks Present (Positive Control)"
+      ]
+    }
+  ],
+  "certificate": {
+    "owner_name": "Android",
+    "organization": "Google Inc.",
+    "organizational_unit": "Android",
+    "location": "Mountain View, California, US",
+    "validity": "March 25, 2022 through March 25, 2052",
+    "issuer": "C=US, ST=California, L=Mountain View, O=Google Inc., OU=Android, CN=Android",
+    "serial_number": "0x22681acd18a02adda8fed7077fbe2db0944843be",
+    "signature_versions": {
+      "v1": true,
+      "v2": true,
+      "v3": true,
+      "v4": false
+    },
+    "hash_algorithms": "sha256",
+    "fingerprint": "f0537d133c333a562996127b59a04ebb69c68844604ad98fe1bacbf46a3f4616",
+    "unique_certs": "1"
+  },
+  "file_info": {
+    "filename": "Mirrcast_TV_Receiver-Joyetv_3.1.2_APKPure.xapk",
+    "size": "28.59 MB",
+    "md5": "2168971a5ed32d8a0e826e9fbe702310",
+    "sha1": "619ea547fda2bab88688182165aaac738ead8960",
+    "sha256": "978775d50d71e49add565da9b2ae240becc1e5745257c4353cc503bad31a7b24"
+  },
+  "app_info": {
+    "icon_path": "",
+    "name": "MirrCast",
+    "package_name": "com.tv.casttv",
+    "main_activity": "com.tv.casttv.ui.activity.SplashActivity",
+    "target_sdk": "36",
+    "min_sdk": "23",
+    "max_sdk": "Not Set",
+    "version_name": "3.1.2",
+    "app_store_id": "com.tv.casttv",
+    "developer": "Joyetv",
+    "categories": "Video Players & Editors",
+    "trackers_detected": "3"
+  },
+  "app_components": {
+    "activities": 38,
+    "services": 17,
+    "receivers": 13,
+    "providers": 4,
+    "exported_activities": 10,
+    "exported_services": 1,
+    "exported_receivers": 3,
+    "exported_providers": 0
+  },
+  "functionality": {
+    "Audio": {
+      "present": true,
+      "explanation": "The app declares FOREGROUND_SERVICE_MEDIA_PLAYBACK and reads media files for casting audio content."
+    },
+    "Contacts": {
+      "present": false,
+      "explanation": ""
+    },
+    "Geofencing": {
+      "present": false,
+      "explanation": ""
+    },
+    "Health Data": {
+      "present": false,
+      "explanation": ""
+    },
+    "Location": {
+      "present": true,
+      "explanation": "This app uses device location because it requests android.permission.ACCESS_COARSE_LOCATION and android.permission.ACCESS_FINE_LOCATION."
+    },
+    "Maps": {
+      "present": false,
+      "explanation": ""
+    },
+    "Networking": {
+      "present": true,
+      "explanation": "This app connects to the internet and requests android.permission.ACCESS_NETWORK_STATE and android.permission.INTERNET."
+    },
+    "Payment Services": {
+      "present": false,
+      "explanation": ""
+    },
+    "SMS": {
+      "present": false,
+      "explanation": ""
+    },
+    "Secure RNG": {
+      "present": false,
+      "explanation": "Not confirmed to use the platform SecureRandom API in this scan."
+    },
+    "Bluetooth": {
+      "present": false,
+      "explanation": ""
+    },
+    "Camera": {
+      "present": false,
+      "explanation": ""
+    },
+    "Camera Delegation": {
+      "present": false,
+      "explanation": ""
+    },
+    "Calendar": {
+      "present": false,
+      "explanation": ""
+    },
+    "Device Administrator": {
+      "present": false,
+      "explanation": ""
+    },
+    "Fingerprint": {
+      "present": false,
+      "explanation": ""
+    },
+    "Google Cloud Messaging": {
+      "present": true,
+      "explanation": "The app integrates Firebase (Remote Config, Crashlytics, Analytics) for messaging and configuration delivery."
+    },
+    "Infrared LED": {
+      "present": false,
+      "explanation": ""
+    },
+    "In-App Purchases": {
+      "present": true,
+      "explanation": "This app uses Google Play Billing, requesting the com.android.vending.BILLING permission."
+    },
+    "Keychain": {
+      "present": false,
+      "explanation": ""
+    },
+    "Microphone": {
+      "present": false,
+      "explanation": ""
+    },
+    "NFC": {
+      "present": false,
+      "explanation": ""
+    },
+    "Photos": {
+      "present": true,
+      "explanation": "This app accesses photos because it requests android.permission.READ_MEDIA_IMAGES."
+    },
+    "Sensors": {
+      "present": false,
+      "explanation": ""
+    },
+    "Telephony": {
+      "present": false,
+      "explanation": ""
+    },
+    "USB Devices": {
+      "present": false,
+      "explanation": ""
+    }
+  },
+  "third_party_sdks": {
+    "Analytics": {
+      "GoogleAnalytics": true,
+      "FirebaseAnalytics": true,
+      "FirebaseCrashlytics": true,
+      "Flurry": false,
+      "Amplitude": false,
+      "Mixpanel": false,
+      "NewRelic": false
+    },
+    "Advertising": {
+      "GoogleAdMob": true,
+      "DoubleClick": true,
+      "Chartboost": false,
+      "AppLovin": false
+    },
+    "Cloud Storage": {
+      "GoogleDrive": true,
+      "Dropbox": false,
+      "OneDrive": false,
+      "Box": false
+    },
+    "Developer Tools": {
+      "Stripe": false,
+      "Paypal": false,
+      "Retrofit": false,
+      "Fabric": false
+    }
+  },
+  "permissions": [
+    {
+      "permission": "ACCESS_COARSE_LOCATION",
+      "status": "dangerous",
+      "info": "coarse (network-based) location",
+      "usage_description": "",
+      "general_description": "Access coarse location sources, such as the mobile network database, to determine an approximate phone location, where available."
+    },
+    {
+      "permission": "ACCESS_FINE_LOCATION",
+      "status": "dangerous",
+      "info": "fine (GPS) location",
+      "usage_description": "",
+      "general_description": "Access fine location sources, such as the Global Positioning System on the phone, where available."
+    },
+    {
+      "permission": "ACCESS_NETWORK_STATE",
+      "status": "normal",
+      "info": "view network status",
+      "usage_description": "",
+      "general_description": "Allows an application to view the status of all networks."
+    },
+    {
+      "permission": "INTERNET",
+      "status": "normal",
+      "info": "full Internet access",
+      "usage_description": "",
+      "general_description": "Allows an application to create network sockets."
+    },
+    {
+      "permission": "AD_ID",
+      "status": "normal",
+      "info": "application shows advertisements",
+      "usage_description": "",
+      "general_description": "This app uses a Google advertising ID and can possibly serve advertisements."
+    },
+    {
+      "permission": "WRITE_EXTERNAL_STORAGE",
+      "status": "dangerous",
+      "info": "read/modify/delete external storage contents",
+      "usage_description": "",
+      "general_description": "Allows an application to write to external storage."
+    },
+    {
+      "permission": "READ_MEDIA_VIDEO",
+      "status": "dangerous",
+      "info": "allows reading video files from external storage",
+      "usage_description": "",
+      "general_description": "Allows an application to read video files from external storage."
+    },
+    {
+      "permission": "READ_MEDIA_IMAGES",
+      "status": "dangerous",
+      "info": "allows reading image files from external storage",
+      "usage_description": "",
+      "general_description": "Allows an application to read image files from external storage."
+    },
+    {
+      "permission": "READ_EXTERNAL_STORAGE",
+      "status": "dangerous",
+      "info": "read external storage contents",
+      "usage_description": "",
+      "general_description": "Allows an application to read from external storage."
+    },
+    {
+      "permission": "ACCESS_WIFI_STATE",
+      "status": "normal",
+      "info": "view Wi-Fi status",
+      "usage_description": "",
+      "general_description": "Allows an application to view information about the status of Wi-Fi."
+    },
+    {
+      "permission": "WAKE_LOCK",
+      "status": "normal",
+      "info": "prevent phone from sleeping",
+      "usage_description": "",
+      "general_description": "Allows an application to prevent the phone from going to sleep."
+    }
+  ],
+  "vulnerability_sections": [
+    {
+      "section_name": "Code",
+      "findings_text": "Analysis of MirrCast suggests a high level of risk associated with code vulnerabilities. Ten activities (including MainActivity, BrowserActivity, and WebActivity) are exported without protection, making them accessible to any other app on the device. The app allows its data to be backed up via adb, and it can be installed on Android 6.0-6.0.1, a range with multiple unpatched platform vulnerabilities that Google no longer supports with reasonable security updates. The app uses the MD5 and SHA-1 hashing algorithms, both vulnerable to collision attacks, and multiple hardcoded API keys and credentials were recovered from the app bundle. The app also declares custom URL schemes and a deep-link host, which need review for hijacking or spoofing risk.",
+      "checks": [
+        {
+          "check": "Unprotected Exported Activity",
+          "result": "Present",
+          "explanation": "10 activities are exported without protection, including MainActivity, VideoPlayActivity, BrowserActivity, WebActivity, TranslucentActivity, PlayFeedbackActivity, ImaAdActivity, AdPlayActivity, AdDefaultActivity, and GdprBreakActivity. Any other app on the device can launch these activities.",
+          "compliance": "OWASP: 2016-M1-Improper Platform Usage",
+          "remediation_link": "",
+          "evidence": "AndroidManifest.xml",
+          "severity": "High"
+        },
+        {
+          "check": "Application Data can be Backed Up",
+          "result": "Present",
+          "explanation": "The manifest sets android:allowBackup=true. This allows anyone with USB debugging access to copy application data off the device via adb.",
+          "compliance": "OWASP: 2016-M2-Insecure Data Storage",
+          "remediation_link": "",
+          "evidence": "AndroidManifest.xml",
+          "severity": "Medium"
+        },
+        {
+          "check": "App can be Installed on a Vulnerable/Unpatched Minimum SDK Version",
+          "result": "Present",
+          "explanation": "minSdk=23 allows installation on Android 6.0-6.0.1, which has multiple unfixed vulnerabilities and no longer receives reasonable security updates from Google.",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "AndroidManifest.xml",
+          "severity": "Medium"
+        },
+        {
+          "check": "Application Uses Custom URL Schemes / Deep Links",
+          "result": "Present",
+          "explanation": "BrowserActivity registers http:// and https:// schemes, and WebActivity registers a custom tv:// scheme with host com.tv.casttv. These handlers need review for hijacking or unsafe parameter handling.",
+          "compliance": "OWASP: 2016-M1-Improper Platform Usage",
+          "remediation_link": "",
+          "evidence": "AndroidManifest.xml",
+          "severity": "Medium"
+        },
+        {
+          "check": "Uses SHA-1 Hashing Algorithm",
+          "result": "Present",
+          "explanation": "SHA-1 is a weak hash known to have hash collisions.",
+          "compliance": "CWE-327; OWASP Top 10: M5-Insufficient Cryptography; MASVS-CRYPTO-4",
+          "remediation_link": "",
+          "evidence": "u6/l.java",
+          "severity": "Medium"
+        },
+        {
+          "check": "Uses MD5 Hashing Algorithm",
+          "result": "Present",
+          "explanation": "MD5 is a weak hash known to have hash collisions.",
+          "compliance": "CWE-327; OWASP Top 10: M5-Insufficient Cryptography; MASVS-CRYPTO-4",
+          "remediation_link": "",
+          "evidence": "l4/d.java",
+          "severity": "Medium"
+        },
+        {
+          "check": "Contains Hard-coded Cryptographic Key / Credentials",
+          "result": "Present",
+          "explanation": "Multiple hardcoded values were recovered from the app bundle, including a Google API key, a Firebase Crashlytics mapping ID, and default settings/AirPlay credentials.",
+          "compliance": "CWE-312; OWASP Top 10: M9-Reverse Engineering",
+          "remediation_link": "",
+          "evidence": "res/values/strings.xml",
+          "severity": "High"
+        },
+        {
+          "check": "Insecure Encryption Mode (CBC with PKCS5/PKCS7 Padding)",
+          "result": "Present",
+          "explanation": "The app uses the CBC encryption mode with PKCS5/PKCS7 padding, which is vulnerable to padding oracle attacks.",
+          "compliance": "CWE-649; OWASP Top 10: M5-Insufficient Cryptography; MASVS-CRYPTO-3",
+          "remediation_link": "",
+          "evidence": "d0/a.java",
+          "severity": "High"
+        },
+        {
+          "check": "Components with Known Vulnerabilities",
+          "result": "Not Present",
+          "explanation": "No known-vulnerable dependency versions were flagged in this scan.",
+          "compliance": "OWASP: 2016-M9-Reverse Engineering",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Variable"
+        },
+        {
+          "check": "Application Utilizes Insecure Random Number Generator",
+          "result": "Not Present",
+          "explanation": "No use of a weak/predictable random number source (e.g. java.util.Random for security decisions) was identified in this scan.",
+          "compliance": "OWASP Top 10: M5-Insufficient Cryptography",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Weak PBKDF2 or Key-Derivation Parameters",
+          "result": "Not Present",
+          "explanation": "No PBKDF2 or other key-derivation calls with insufficient iteration counts were identified in this scan.",
+          "compliance": "OWASP: 2016-M5-Insufficient Cryptography",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Cryptographic Key Generation Not Using Approved Platform APIs (Android Keystore)",
+          "result": "Not Present",
+          "explanation": "No ad hoc key-generation calls bypassing Android Keystore were identified in this scan.",
+          "compliance": "OWASP: 2016-M5-Insufficient Cryptography",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        }
+      ]
+    },
+    {
+      "section_name": "Network",
+      "findings_text": "Analysis of MirrCast suggests a high level of risk associated with networking. The app's network security configuration permits cleartext traffic to all domains and trusts user-installed certificate authorities, meaning a device with a malicious CA installed could intercept and modify the app's TLS traffic without detection. Cleartext traffic is also enabled at the manifest level. No API authentication weaknesses were identified in the strings or traffic captured during this scan.",
+      "checks": [
+        {
+          "check": "Network Security Configuration Allows Cleartext Traffic",
+          "result": "Present",
+          "explanation": "The base network security configuration is insecurely configured to permit cleartext traffic to all domains.",
+          "compliance": "OWASP: 2016-M3-Insecure Communication; NIAP: FTP_DIT_EXT.1.1; HIPAA: 164.312(e)(2)(ii)",
+          "remediation_link": "",
+          "evidence": "res/xml/network_security_config.xml",
+          "severity": "High"
+        },
+        {
+          "check": "Network Security Configuration Allows User-installed CAs",
+          "result": "Present",
+          "explanation": "The base configuration is set to trust user-installed certificates, which enables man-in-the-middle attacks if a malicious CA is present on the device.",
+          "compliance": "OWASP: 2016-M3-Insecure Communication",
+          "remediation_link": "",
+          "evidence": "res/xml/network_security_config.xml",
+          "severity": "High"
+        },
+        {
+          "check": "Clear Text Traffic is Enabled for App",
+          "result": "Present",
+          "explanation": "android:usesCleartextTraffic=true is set at the application level.",
+          "compliance": "OWASP: 2016-M3-Insecure Communication",
+          "remediation_link": "",
+          "evidence": "AndroidManifest.xml",
+          "severity": "High"
+        },
+        {
+          "check": "Application Vulnerable to Janus Vulnerability",
+          "result": "Present",
+          "explanation": "The app is signed with the v1 signature scheme (in addition to v2/v3), which makes it vulnerable to the Janus vulnerability on Android 5.0-8.0 devices.",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "APK signature",
+          "severity": "Medium"
+        },
+        {
+          "check": "API Authentication Weakness (weak token handling / API key used as authentication)",
+          "result": "Not Present",
+          "explanation": "No weak API-authentication patterns (e.g. API keys used as sole user authentication) were identified in this scan.",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        }
+      ]
+    },
+    {
+      "section_name": "Resilience",
+      "findings_text": "Anti-VM and anti-debug checks (Build.FINGERPRINT, Build.MODEL, Build.MANUFACTURER, and related device-property checks, plus a Debug.isDebuggerConnected() check) were identified across the app's classes.dex files, indicating some environment-tampering awareness. No explicit root-detection or biometric-bypass-resistance logic was identified in this scan.",
+      "checks": [
+        {
+          "check": "Anti-VM / Anti-Emulator Checks Present",
+          "result": "Present",
+          "explanation": "classes.dex, classes2.dex, and classes3.dex each contain Build.FINGERPRINT/MODEL/MANUFACTURER/PRODUCT/HARDWARE/BOARD/TAGS and SIM/network-operator checks consistent with anti-VM logic.",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "APKiD analysis",
+          "severity": "Info"
+        },
+        {
+          "check": "Anti-Debug Code Present",
+          "result": "Present",
+          "explanation": "classes3.dex contains a Debug.isDebuggerConnected() check.",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "APKiD analysis",
+          "severity": "Info"
+        },
+        {
+          "check": "Components Contain Debug Symbols",
+          "result": "Not Present",
+          "explanation": "No stripped-symbol gaps were flagged for the app's native libraries in this scan.",
+          "compliance": "RESILIENCE/MASTG-TEST-0083; MSTG-CODE-3",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Low"
+        },
+        {
+          "check": "Root Detection Missing",
+          "result": "Not Present",
+          "explanation": "Root-detection presence or absence was not independently confirmed in this scan; recommend dynamic verification.",
+          "compliance": "MASVS-RESILIENCE-1; MSTG-RESILIENCE-1",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Biometric / Local Authentication Bypass Possible",
+          "result": "Not Present",
+          "explanation": "The app was not observed to implement local biometric authentication gates in this scan.",
+          "compliance": "MASVS-AUTH-2",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        }
+      ]
+    },
+    {
+      "section_name": "Storage",
+      "findings_text": "Analysis of MirrCast suggests a medium level of risk associated with data storage. The app can read from and write to external storage, which is world-readable and may be analyzed or modified by other applications. Source files disclose a hardcoded IP address, and the app logs information to the device log, which should never include sensitive values in production builds. No sensitive values were identified specifically in SharedPreferences or HTTP cache databases during this scan.",
+      "checks": [
+        {
+          "check": "App can Read/Write to External Storage",
+          "result": "Present",
+          "explanation": "Any app on the device can read data written to external storage by this app.",
+          "compliance": "CWE-276; OWASP Top 10: M2-Insecure Data Storage; MSTG-STORAGE-2",
+          "remediation_link": "",
+          "evidence": "a0/b.java, a0/i.java, j1/b.java, l1/e.java, l1/i.java",
+          "severity": "Medium"
+        },
+        {
+          "check": "IP Address Disclosure",
+          "result": "Present",
+          "explanation": "Hardcoded IP address references were found in the app's code.",
+          "compliance": "CWE-200; OWASP MASVS: MSTG-CODE-2",
+          "remediation_link": "",
+          "evidence": "com/softmedia/vplayer/widget/VideoViewEx.java, g0/b.java",
+          "severity": "Low"
+        },
+        {
+          "check": "The App Logs Information to Device Logs",
+          "result": "Present",
+          "explanation": "Sensitive information should never be logged in production builds.",
+          "compliance": "CWE-532; OWASP MASVS: MSTG-STORAGE-3",
+          "remediation_link": "",
+          "evidence": "com/tv/casttv/ui/fragment/SettingsFragment2.java",
+          "severity": "Low"
+        },
+        {
+          "check": "Sensitive Values Stored Insecurely in SharedPreferences",
+          "result": "Not Present",
+          "explanation": "No sensitive values (credentials, tokens, PII) were identified in SharedPreferences during this scan.",
+          "compliance": "MASVS-STORAGE-1",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Sensitive Data in HTTP Cache Databases",
+          "result": "Not Present",
+          "explanation": "No sensitive values were identified in WebView/HTTP cache databases during this scan.",
+          "compliance": "MASVS-STORAGE-1",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Sensitive Data Exposed Through Deep Link / URL Handler",
+          "result": "Not Present",
+          "explanation": "The registered tv:// and http(s):// handlers were not observed passing sensitive data in this scan.",
+          "compliance": "MASVS-STORAGE-2; MSTG-PLATFORM-3",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        }
+      ]
+    }
+  ],
+  "hardcoded_values": {
+    "urls": [
+      {
+        "url": "https://www.googleapis.com/auth/drive",
+        "country": "US"
+      },
+      {
+        "url": "https://www.googletagmanager.com",
+        "country": "US"
+      },
+      {
+        "url": "https://www.linkedin.com",
+        "country": "US"
+      },
+      {
+        "url": "https://www.paypal.com",
+        "country": "NL"
+      }
+    ],
+    "emails": [
+      "support@mirrcast.com"
+    ],
+    "secrets": [
+      {
+        "value": "airplay_security_password : \"Password\"",
+        "location": "Android String Resource"
+      },
+      {
+        "value": "google_api_key : AIzaSyBOoa4QvnaV4lHde_Rlvc_ayakiEb7thsc",
+        "location": "Android String Resource"
+      },
+      {
+        "value": "google_crash_reporting_api_key : AIzaSyBOoa4QvnaV4lHde_Rlvc_ayakiEb7thsc",
+        "location": "Android String Resource"
+      },
+      {
+        "value": "settings_username / settings_password : \"Username\" / \"Password\"",
+        "location": "Android String Resource"
+      },
+      {
+        "value": "com.google.firebase.crashlytics.mapping_file_id : 01dd123546384c1fbb53147108768540",
+        "location": "Android String Resource"
+      }
+    ]
+  },
+  "endpoints": [
+    {
+      "endpoint": "mirrcast.com",
+      "tags": "",
+      "ip_address": "8.219.53.54",
+      "country": "Singapore"
+    },
+    {
+      "endpoint": "api.cleanonego.com",
+      "tags": "",
+      "ip_address": "8.219.53.54",
+      "country": "Singapore"
+    },
+    {
+      "endpoint": "tvapi.mirrcast.me",
+      "tags": "",
+      "ip_address": "8.219.53.54",
+      "country": "Singapore"
+    },
+    {
+      "endpoint": "pubads.g.doubleclick.net",
+      "tags": "Advertising",
+      "ip_address": "216.58.201.2",
+      "country": "United States"
+    },
+    {
+      "endpoint": "deeprd.com",
+      "tags": "",
+      "ip_address": "107.172.44.195",
+      "country": "United States"
+    }
+  ]
+}
