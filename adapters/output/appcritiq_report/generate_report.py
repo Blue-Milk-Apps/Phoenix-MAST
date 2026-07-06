@@ -55,6 +55,166 @@ DERIVED_CHECK_ALIAS_TO_COMPONENT_KEY = {
 }
 SHARED_PREFS_HINTS = ("shared_prefs/", "/shared_prefs/", "shared_prefs\\")
 CACHE_HINTS = ("cache/", "/cache/", "cache\\", "webviewcache", "httpcache")
+DEPRECATED_NETWORK_CHECK_NAMES = {
+    "api authentication weakness (weak token handling / api key used as authentication)",
+}
+NETWORK_CHECK_SPECS = (
+    {
+        "check": "Allows Cleartext Traffic for All Domains",
+        "severity": "High",
+        "compliance": (
+            "OWASP: 2016-M3-Insecure Communication; NIAP: FTP_DIT_EXT.1.1; "
+            "HIPAA: 164.312(e)(2)(ii); GDPR: Articles 5, Article 25, Article 32"
+        ),
+        "present_explanation": (
+            "The app allows cleartext traffic for all domains by omitting a "
+            "network security configuration file or explicitly allowing all "
+            "cleartext traffic."
+        ),
+        "not_present_explanation": (
+            "The app does not appear to allow cleartext traffic for all domains "
+            "based on the available network configuration evidence."
+        ),
+        "aliases": (
+            "network security configuration allows cleartext traffic",
+            "network security config allows cleartext traffic for all domains",
+            "clear text traffic is enabled for app",
+        ),
+    },
+    {
+        "check": "Contains HostnameVerifier That Accepts All Hostnames",
+        "severity": "High",
+        "compliance": "OWASP: 2016-M3-Insecure Communication; NIAP: FIA_X509_EXT.1.1",
+        "present_explanation": (
+            "A weak HostnameVerifier was found that accepts all hostnames, which "
+            "can allow the app to trust unexpected TLS endpoints."
+        ),
+        "not_present_explanation": "No weak HostnameVerifiers are found.",
+        "aliases": (),
+    },
+    {
+        "check": "Contains X509TrustManager that Accepts All Certificates",
+        "severity": "High",
+        "compliance": "OWASP: 2016-M3-Insecure Communication; NIAP: FIA_X509_EXT.1.1",
+        "present_explanation": (
+            "A weak X509TrustManager was found that accepts all certificates, "
+            "which can allow interception of TLS traffic."
+        ),
+        "not_present_explanation": "No weak X509TrustManagers are found.",
+        "aliases": (),
+    },
+    {
+        "check": "Does not Perform Certificate Pinning",
+        "severity": "Medium",
+        "compliance": "OWASP: 2016-M3-Insecure Communication; NIAP: FTP_DIT_EXT.1.1",
+        "present_explanation": (
+            "The app does not implement certificate pinning. Without certificate "
+            "pinning, an attacker may be able to compromise the security of the "
+            "app's TLS network communication using a rogue certificate."
+        ),
+        "not_present_explanation": (
+            "The app implements certificate pinning or no lack of certificate "
+            "pinning was identified in this scan."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "Opens a Listening Port",
+        "severity": "Medium",
+        "compliance": "NIAP: FDP_NET_EXT.1.1",
+        "present_explanation": (
+            "The app opens a listening port on the device, which can increase "
+            "the attack surface for local network or inter-app attacks."
+        ),
+        "not_present_explanation": "This app does not open a listening port on the device.",
+        "aliases": (),
+    },
+    {
+        "check": "Sensitive Cookies Lack Security Attributes",
+        "severity": "Medium",
+        "compliance": "OWASP: 2016-M4-Insecure Authentication",
+        "present_explanation": (
+            "The app receives sensitive cookies without required security "
+            "attributes, which can weaken session protection."
+        ),
+        "not_present_explanation": (
+            "This app does not receive sensitive cookies, such as authentication "
+            "cookies, without security attributes, or does not receive any "
+            "sensitive cookies."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "Unnecessary Information Transmitted",
+        "severity": "Low",
+        "compliance": "GDPR: Article 23; NIAP: FDP_NET_EXT.1.1; FPR_ANO_EXT.1.1",
+        "present_explanation": (
+            "The app transmits unnecessary user or device information over the "
+            "network."
+        ),
+        "not_present_explanation": "This app does not send any unnecessary user or device information.",
+        "aliases": (),
+    },
+    {
+        "check": "Sensitive Information is Unencrypted in Transit",
+        "severity": "High",
+        "compliance": (
+            "OWASP: 2016-M3-Insecure Communication; NIAP: FTP_DIT_EXT.1.1; "
+            "HIPAA: 164.312(e)(2)(ii); GDPR: Articles 5, Article 25, Article 32"
+        ),
+        "present_explanation": (
+            "This app sends sensitive information over the network without "
+            "encryption. An adversary on the local network or on-path could "
+            "easily capture this sensitive information."
+        ),
+        "not_present_explanation": (
+            "No unencrypted transmission of sensitive information was identified "
+            "in this scan."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "Password is not Hashed in Transit",
+        "severity": "High",
+        "compliance": "",
+        "present_explanation": (
+            "This app does not hash the user's password before sending it over "
+            "the network. This could expose the user's plaintext password to the "
+            "recipient or to an adversary if the security of the connection is "
+            "compromised. When sending a password over the network it is best "
+            "practice to hash the password before sending it off the client "
+            "device, and then to hash the result again once it reaches the server."
+        ),
+        "not_present_explanation": (
+            "No evidence was found that the app sends unhashed passwords over "
+            "the network."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "Weak Certificate Validation Enables MitM Attacks",
+        "severity": "High",
+        "compliance": (
+            "OWASP: 2016-M3-Insecure Communication; NIAP: FIA_X509_EXT.1.1; "
+            "HIPAA: 164.312(e)(2)(ii); GDPR: Articles 5, Article 25, Article 32"
+        ),
+        "present_explanation": (
+            "The app is vulnerable to man-in-the-middle attacks that could "
+            "compromise the confidentiality of some or all encrypted network "
+            "communications due to flawed certificate validation. An attacker "
+            "could exploit this flaw locally, using techniques such as ARP "
+            "spoofing and evil twin Wi-Fi hotspots, or remotely using BGP "
+            "hijacking or DNS cache poisoning."
+        ),
+        "not_present_explanation": (
+            "No weak certificate-validation behavior leading to man-in-the-middle "
+            "exposure was identified in this scan."
+        ),
+        "aliases": (
+            "network security configuration allows user-installed cas",
+        ),
+    },
+)
 
 # Vulnerability categories excluded from the report entirely (per request:
 # Authentication, Cryptography, and Platform are dropped from the output
@@ -245,6 +405,7 @@ def _configure_weasyprint_library_path() -> None:
 def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     report_data = _merge_nested(_blank_template(), data)
 
+    _canonicalize_network_section(report_data)
     _apply_derived_vulnerability_checks(report_data)
     report_data["vulnerability_sections"] = [
         s for s in report_data.get("vulnerability_sections", [])
@@ -255,6 +416,87 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     report_data["findings_severity"] = _build_findings_severity(report_data)
 
     return _prune_placeholder_rows(report_data)
+
+
+def _canonicalize_network_section(report_data: dict[str, Any]) -> None:
+    sections = report_data.get("vulnerability_sections")
+    if not isinstance(sections, list):
+        return
+
+    network_section = None
+    for section in sections:
+        if str(section.get("section_name", "")).strip().lower() == "network":
+            network_section = section
+            break
+    if network_section is None:
+        return
+
+    incoming_checks = list(network_section.get("checks") or [])
+    lookup = {
+        _normalized_check_name(check.get("check")): check
+        for check in incoming_checks
+        if isinstance(check, dict) and str(check.get("check", "")).strip()
+    }
+
+    canonical_checks = [
+        _canonical_network_check(report_data, spec, lookup)
+        for spec in NETWORK_CHECK_SPECS
+    ]
+    network_section["checks"] = canonical_checks
+
+
+def _canonical_network_check(
+    report_data: dict[str, Any],
+    spec: dict[str, Any],
+    lookup: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    result = "Not Present"
+    explanation = spec["not_present_explanation"]
+    compliance = spec["compliance"]
+    evidence = ""
+    remediation_link = ""
+
+    canonical_name = _normalized_check_name(spec["check"])
+    source = lookup.get(canonical_name)
+
+    if source is not None:
+        result = _present_not_present(source.get("result")) or result
+        explanation = _non_empty_string(source.get("explanation")) or _network_explanation(spec, result)
+        compliance = _non_empty_string(source.get("compliance")) or compliance
+        evidence = _non_empty_string(source.get("evidence"))
+        remediation_link = _non_empty_string(source.get("remediation_link"))
+    else:
+        alias_source = _first_matching_network_alias(spec, lookup)
+        if alias_source is not None:
+            result = _present_not_present(alias_source.get("result")) or result
+            explanation = _network_explanation(spec, result)
+            evidence = _non_empty_string(alias_source.get("evidence"))
+
+    if source is None and canonical_name == "allows cleartext traffic for all domains":
+        cleartext_result, cleartext_evidence = _derive_cleartext_check(report_data, lookup)
+        if cleartext_result is not None:
+            result = cleartext_result
+            explanation = _network_explanation(spec, result)
+            if cleartext_evidence:
+                evidence = cleartext_evidence
+
+    if source is None and canonical_name == "weak certificate validation enables mitm attacks":
+        mitm_result, mitm_evidence = _derive_mitm_check(lookup)
+        if mitm_result is not None:
+            result = mitm_result
+            explanation = _network_explanation(spec, result)
+            if mitm_evidence:
+                evidence = mitm_evidence
+
+    return {
+        "check": spec["check"],
+        "result": result,
+        "explanation": explanation,
+        "compliance": compliance,
+        "remediation_link": remediation_link,
+        "evidence": evidence,
+        "severity": spec["severity"],
+    }
 
 
 def _apply_derived_vulnerability_checks(report_data: dict[str, Any]) -> None:
@@ -271,8 +513,6 @@ def _apply_derived_check(
     section_name = str(section.get("section_name", "")).strip().lower()
     if section_name == "code":
         _apply_derived_code_check(report_data, check)
-    elif section_name == "network":
-        _apply_derived_network_check(report_data, check)
     elif section_name == "storage":
         _apply_derived_storage_check(report_data, check)
 
@@ -329,26 +569,6 @@ def _apply_derived_code_check(report_data: dict[str, Any], check: dict[str, Any]
 
     if check_name == "application uses custom url schemes / deep links":
         _apply_deep_link_check(report_data, check)
-
-
-def _apply_derived_network_check(report_data: dict[str, Any], check: dict[str, Any]) -> None:
-    check_name = _normalized_check_name(check.get("check"))
-    if check_name != "api authentication weakness (weak token handling / api key used as authentication)":
-        return
-
-    secrets = _secret_entries(report_data)
-    if not secrets:
-        return
-
-    count = len(secrets)
-    check["result"] = "Present"
-    noun = "value" if count == 1 else "values"
-    check["explanation"] = (
-        f"{count} hardcoded secret-like {noun} detected in the application package. "
-        "These may represent static API keys, tokens, or authentication material "
-        "that weakens API authentication controls."
-    )
-    check["evidence"] = f"hardcoded_secrets={count}"
 
 
 def _apply_derived_storage_check(report_data: dict[str, Any], check: dict[str, Any]) -> None:
@@ -498,6 +718,76 @@ def _secret_entries(report_data: dict[str, Any]) -> list[dict[str, Any]]:
     return [secret for secret in secrets if isinstance(secret, dict)]
 
 
+def _first_matching_network_alias(
+    spec: dict[str, Any],
+    lookup: dict[str, dict[str, Any]],
+) -> dict[str, Any] | None:
+    for alias in spec.get("aliases", ()):
+        source = lookup.get(alias)
+        if source is not None:
+            return source
+    return None
+
+
+def _derive_cleartext_check(
+    report_data: dict[str, Any],
+    lookup: dict[str, dict[str, Any]],
+) -> tuple[str | None, str]:
+    evidence: list[str] = []
+    for alias in (
+        "network security configuration allows cleartext traffic",
+        "network security config allows cleartext traffic for all domains",
+        "clear text traffic is enabled for app",
+    ):
+        source = lookup.get(alias)
+        if source is None:
+            continue
+        if _present_not_present(source.get("result")) == "Present":
+            if _non_empty_string(source.get("evidence")):
+                evidence.append(_non_empty_string(source.get("evidence")))
+            return "Present", ", ".join(_dedupe_preserve_order(evidence))
+
+    for section_key, field_key, label in (
+        ("application", "uses_cleartext_traffic", "uses_cleartext_traffic=true"),
+        ("manifest", "uses_cleartext_traffic", "uses_cleartext_traffic=true"),
+        ("network_security", "allows_cleartext_traffic", "network_security_allows_cleartext=true"),
+    ):
+        section = report_data.get(section_key)
+        if not isinstance(section, dict):
+            continue
+        flag = _coerce_bool(section.get(field_key))
+        if flag is True:
+            return "Present", label
+
+    return None, ""
+
+
+def _derive_mitm_check(
+    lookup: dict[str, dict[str, Any]],
+) -> tuple[str | None, str]:
+    evidence: list[str] = []
+    for name in (
+        "weak certificate validation enables mitm attacks",
+        "contains hostnameverifier that accepts all hostnames",
+        "contains x509trustmanager that accepts all certificates",
+        "network security configuration allows user-installed cas",
+    ):
+        source = lookup.get(name)
+        if source is None:
+            continue
+        if _present_not_present(source.get("result")) == "Present":
+            if _non_empty_string(source.get("evidence")):
+                evidence.append(_non_empty_string(source.get("evidence")))
+            return "Present", ", ".join(_dedupe_preserve_order(evidence))
+    return None, ""
+
+
+def _network_explanation(spec: dict[str, Any], result: str) -> str:
+    if _normalized_check_name(result) == "present":
+        return spec["present_explanation"]
+    return spec["not_present_explanation"]
+
+
 def _blank_template() -> dict[str, Any]:
     return json.loads(BLANK_TEMPLATE_PATH.read_text(encoding="utf-8"))
 
@@ -604,6 +894,31 @@ def _normalize_risk_level(value: object) -> str:
 
 def _normalized_check_name(value: object) -> str:
     return str(value or "").strip().lower()
+
+
+def _non_empty_string(value: object) -> str:
+    text = str(value or "").strip()
+    return text
+
+
+def _present_not_present(value: object) -> str:
+    text = str(value or "").strip().lower()
+    if text == "present":
+        return "Present"
+    if text == "not present":
+        return "Not Present"
+    return ""
+
+
+def _dedupe_preserve_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for value in values:
+        if value in seen or not value:
+            continue
+        seen.add(value)
+        deduped.append(value)
+    return deduped
 
 
 def _coerce_int(value: object) -> int | None:

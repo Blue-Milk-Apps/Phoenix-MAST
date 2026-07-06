@@ -343,13 +343,94 @@
       "findings_text": "",
       "checks": [
         {
-          "check": "API Authentication Weakness (weak token handling / API key used as authentication)",
+          "check": "Allows Cleartext Traffic for All Domains",
           "result": "Not Present",
-          "explanation": "",
-          "compliance": "",
+          "explanation": "The app allows cleartext traffic for all domains by omitting a network security configuration file or explicitly allowing all cleartext traffic.",
+          "compliance": "OWASP: 2016-M3-Insecure Communication; NIAP: FTP_DIT_EXT.1.1; HIPAA: 164.312(e)(2)(ii); GDPR: Articles 5, Article 25, Article 32",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Contains HostnameVerifier That Accepts All Hostnames",
+          "result": "Not Present",
+          "explanation": "No weak HostnameVerifiers are found.",
+          "compliance": "OWASP: 2016-M3-Insecure Communication; NIAP: FIA_X509_EXT.1.1",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Contains X509TrustManager that Accepts All Certificates",
+          "result": "Not Present",
+          "explanation": "No weak X509TrustManagers are found.",
+          "compliance": "OWASP: 2016-M3-Insecure Communication; NIAP: FIA_X509_EXT.1.1",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Does not Perform Certificate Pinning",
+          "result": "Not Present",
+          "explanation": "The app does not implement certificate pinning. Without certificate pinning, an attacker may be able to compromise the security of the app's TLS network communication using a rogue certificate.",
+          "compliance": "OWASP: 2016-M3-Insecure Communication; NIAP: FTP_DIT_EXT.1.1",
           "remediation_link": "",
           "evidence": "",
           "severity": "Medium"
+        },
+        {
+          "check": "Opens a Listening Port",
+          "result": "Not Present",
+          "explanation": "This app does not open a listening port on the device.",
+          "compliance": "NIAP: FDP_NET_EXT.1.1",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Sensitive Cookies Lack Security Attributes",
+          "result": "Not Present",
+          "explanation": "This app does not receive sensitive cookies, such as authentication cookies, without security attributes, or does not receive any sensitive cookies.",
+          "compliance": "OWASP: 2016-M4-Insecure Authentication",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Medium"
+        },
+        {
+          "check": "Unnecessary Information Transmitted",
+          "result": "Not Present",
+          "explanation": "This app does not send any unnecessary user or device information.",
+          "compliance": "GDPR: Article 23; NIAP: FDP_NET_EXT.1.1; FPR_ANO_EXT.1.1",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "Low"
+        },
+        {
+          "check": "Sensitive Information is Unencrypted in Transit",
+          "result": "Not Present",
+          "explanation": "This app sends sensitive information over the network without encryption. An adversary on the local network or on-path could easily capture this sensitive information.",
+          "compliance": "OWASP: 2016-M3-Insecure Communication; NIAP: FTP_DIT_EXT.1.1; HIPAA: 164.312(e)(2)(ii); GDPR: Articles 5, Article 25, Article 32",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Password is not Hashed in Transit",
+          "result": "Not Present",
+          "explanation": "This app does not hash the user's password before sending it over the network. This could expose the user's plaintext password to the recipient or to an adversary if the security of the connection is compromised. When sending a password over the network it is best practice to hash the password before sending it off the client device, and then to hash the result again once it reaches the server.",
+          "compliance": "",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Weak Certificate Validation Enables MitM Attacks",
+          "result": "Not Present",
+          "explanation": "The app is vulnerable to man-in-the-middle attacks that could compromise the confidentiality of some or all encrypted network communications due to flawed certificate validation. An attacker could exploit this flaw locally, using techniques such as ARP spoofing and evil twin Wi-Fi hotspots, or remotely using BGP hijacking or DNS cache poisoning.",
+          "compliance": "OWASP: 2016-M3-Insecure Communication; NIAP: FIA_X509_EXT.1.1; HIPAA: 164.312(e)(2)(ii); GDPR: Articles 5, Article 25, Article 32",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
         }
       ]
     },
