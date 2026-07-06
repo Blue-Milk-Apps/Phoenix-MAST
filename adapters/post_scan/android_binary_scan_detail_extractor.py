@@ -604,7 +604,15 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
 
     @staticmethod
     def _count_exported(components: list[dict[str, Any]]) -> int:
-        return sum(1 for component in components if component.get("exported") is True)
+        return sum(
+            1
+            for component in components
+            if component.get("exported") is True
+            or (
+                component.get("exported") is None
+                and bool(component.get("has_intent_filters"))
+            )
+        )
 
     @staticmethod
     def _declared_permission_map(apktool_permissions: dict[str, Any]) -> dict[str, str]:
