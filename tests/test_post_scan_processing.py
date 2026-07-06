@@ -349,7 +349,7 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
     }
     assert sections["functionality"]["Bluetooth"] == {
         "present": True,
-        "explanation": "permission android.permission.BLUETOOTH_CONNECT, which may indicate bluetooth functionality.",
+        "explanation": "permission android.permission.BLUETOOTH_CONNECT, which may indicate Bluetooth functionality.",
     }
     assert sections["functionality"]["Audio"] == {
         "present": False,
@@ -551,6 +551,127 @@ def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks
     }
 
 
+def test_android_binary_scan_detail_extractor_maps_recent_opengrep_functionality_checks() -> None:
+    loaded_outputs = {
+        "aapt2_permissions": {"permissions": []},
+        "opengrep": {
+            "results": [
+                {
+                    "check_id": "android.maps.usage.present",
+                    "extra": {"metadata": {"appcritiq": {"check_id": 62, "description": "Maps usage detected."}}},
+                },
+                {
+                    "check_id": "android.networking.usage.present",
+                    "extra": {"metadata": {"appcritiq": {"check_id": 63, "description": "Networking usage detected."}}},
+                },
+                {
+                    "check_id": "android.telephony.usage.present",
+                    "extra": {"metadata": {"appcritiq": {"check_id": 64, "description": "Telephony usage detected."}}},
+                },
+                {
+                    "check_id": "android.photos.usage.present",
+                    "extra": {"metadata": {"appcritiq": {"check_id": 65, "description": "Photos usage detected."}}},
+                },
+                {
+                    "check_id": "android.in_app_purchases.usage.present",
+                    "extra": {
+                        "metadata": {"appcritiq": {"check_id": 66, "description": "In-app purchases usage detected."}}
+                    },
+                },
+                {
+                    "check_id": "android.device.administrator.usage.present",
+                    "extra": {
+                        "metadata": {
+                            "appcritiq": {"check_id": 67, "description": "Device administrator usage detected."}
+                        }
+                    },
+                },
+                {
+                    "check_id": "android.camera.delegation.usage.present",
+                    "extra": {
+                        "metadata": {"appcritiq": {"check_id": 68, "description": "Camera delegation usage detected."}}
+                    },
+                },
+                {
+                    "check_id": "android.sensors.usage.present",
+                    "extra": {"metadata": {"appcritiq": {"check_id": 69, "description": "Sensors usage detected."}}},
+                },
+                {
+                    "check_id": "android.usb.devices.usage.present",
+                    "extra": {"metadata": {"appcritiq": {"check_id": 70, "description": "USB devices usage detected."}}},
+                },
+                {
+                    "check_id": "android.geofencing.usage.present",
+                    "extra": {"metadata": {"appcritiq": {"check_id": 71, "description": "Geofencing usage detected."}}},
+                },
+                {
+                    "check_id": "android.health.data.usage.present",
+                    "extra": {"metadata": {"appcritiq": {"check_id": 72, "description": "Health data usage detected."}}},
+                },
+                {
+                    "check_id": "android.infrared.led.usage.present",
+                    "extra": {"metadata": {"appcritiq": {"check_id": 73, "description": "Infrared LED usage detected."}}},
+                },
+                {
+                    "check_id": "android.audio.usage.present",
+                    "extra": {"metadata": {"appcritiq": {"check_id": 74, "description": "Audio usage detected."}}},
+                },
+                {
+                    "check_id": "android.payment.services.usage.present",
+                    "extra": {
+                        "metadata": {"appcritiq": {"check_id": 75, "description": "Payment services usage detected."}}
+                    },
+                },
+                {
+                    "check_id": "android.secure.rng.usage.present",
+                    "extra": {"metadata": {"appcritiq": {"check_id": 76, "description": "Secure RNG usage detected."}}},
+                },
+                {
+                    "check_id": "android.keystore.usage.present",
+                    "extra": {"metadata": {"appcritiq": {"check_id": 77, "description": "Keystore usage detected."}}},
+                },
+            ]
+        },
+    }
+
+    sections = AndroidBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert sections["functionality"]["Maps"] == {"present": True, "explanation": "Maps usage detected."}
+    assert sections["functionality"]["Networking"] == {"present": True, "explanation": "Networking usage detected."}
+    assert sections["functionality"]["Telephony"] == {"present": True, "explanation": "Telephony usage detected."}
+    assert sections["functionality"]["Photos"] == {"present": True, "explanation": "Photos usage detected."}
+    assert sections["functionality"]["In-App Purchases"] == {
+        "present": True,
+        "explanation": "In-app purchases usage detected.",
+    }
+    assert sections["functionality"]["Device Administrator"] == {
+        "present": True,
+        "explanation": "Device administrator usage detected.",
+    }
+    assert sections["functionality"]["Camera Delegation"] == {
+        "present": True,
+        "explanation": "Camera delegation usage detected.",
+    }
+    assert sections["functionality"]["Sensors"] == {"present": True, "explanation": "Sensors usage detected."}
+    assert sections["functionality"]["USB Devices"] == {"present": True, "explanation": "USB devices usage detected."}
+    assert sections["functionality"]["Geofencing"] == {"present": True, "explanation": "Geofencing usage detected."}
+    assert sections["functionality"]["Health Data"] == {"present": True, "explanation": "Health data usage detected."}
+    assert sections["functionality"]["Infrared LED"] == {
+        "present": True,
+        "explanation": "Infrared LED usage detected.",
+    }
+    assert sections["functionality"]["Audio"] == {"present": True, "explanation": "Audio usage detected."}
+    assert sections["functionality"]["Payment Services"] == {
+        "present": True,
+        "explanation": "Payment services usage detected.",
+    }
+    assert sections["functionality"]["Secure RNG"] == {
+        "present": True,
+        "explanation": "Secure RNG usage detected.",
+    }
+    assert sections["functionality"]["Keystore"] == {"present": True, "explanation": "Keystore usage detected."}
+
+
 def test_android_binary_scan_detail_extractor_combines_permission_and_opengrep_functionality_evidence() -> None:
     loaded_outputs = {
         "aapt2_permissions": {
@@ -650,7 +771,7 @@ def test_android_binary_scan_detail_extractor_combines_permission_and_opengrep_f
         "explanation": (
             "SMS usage detected. "
             "The app also declares permission android.permission.SEND_SMS, "
-            "which may indicate sms functionality."
+            "which may indicate SMS functionality."
         ),
     }
     assert sections["functionality"]["Fingerprint"] == {
@@ -680,7 +801,7 @@ def test_android_binary_scan_detail_extractor_maps_sms_permission_only_functiona
 
     assert sections["functionality"]["SMS"] == {
         "present": True,
-        "explanation": "permission android.permission.RECEIVE_SMS, which may indicate sms functionality.",
+        "explanation": "permission android.permission.RECEIVE_SMS, which may indicate SMS functionality.",
     }
 
 
@@ -702,6 +823,34 @@ def test_android_binary_scan_detail_extractor_maps_fingerprint_permission_only_f
     assert sections["functionality"]["Fingerprint"] == {
         "present": True,
         "explanation": "permission android.permission.USE_FINGERPRINT, which may indicate fingerprint functionality.",
+    }
+
+
+def test_android_binary_scan_detail_extractor_maps_recent_permission_only_functionality_evidence() -> None:
+    loaded_outputs = {
+        "aapt2_permissions": {
+            "permissions": [
+                {"name": "android.permission.READ_PHONE_STATE", "protection_level_hint": "dangerous"},
+                {"name": "android.permission.READ_MEDIA_IMAGES", "protection_level_hint": "dangerous"},
+                {"name": "android.permission.BODY_SENSORS", "protection_level_hint": "dangerous"},
+            ]
+        },
+        "opengrep": {"results": []},
+    }
+
+    sections = AndroidBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert sections["functionality"]["Telephony"] == {
+        "present": True,
+        "explanation": "permission android.permission.READ_PHONE_STATE, which may indicate telephony functionality.",
+    }
+    assert sections["functionality"]["Photos"] == {
+        "present": True,
+        "explanation": "permission android.permission.READ_MEDIA_IMAGES, which may indicate photo functionality.",
+    }
+    assert sections["functionality"]["Sensors"] == {
+        "present": True,
+        "explanation": "permission android.permission.BODY_SENSORS, which may indicate sensor functionality.",
     }
 
 

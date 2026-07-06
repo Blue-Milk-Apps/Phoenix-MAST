@@ -163,6 +163,36 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         },
     }
 
+    FUNCTIONALITY_EXPLANATION_LABELS = {
+        "Audio": "audio",
+        "Background Execution": "background execution",
+        "Location": "location",
+        "Contacts": "contacts",
+        "Geofencing": "geofencing",
+        "Health Data": "health data",
+        "Maps": "maps",
+        "Networking": "networking",
+        "Payment Services": "payment services",
+        "SMS": "SMS",
+        "Secure RNG": "secure RNG",
+        "Bluetooth": "Bluetooth",
+        "Camera": "camera",
+        "Camera Delegation": "camera delegation",
+        "Calendar": "calendar",
+        "Device Administrator": "device administrator",
+        "Fingerprint": "fingerprint",
+        "Google Cloud Messaging": "Google Cloud Messaging",
+        "Infrared LED": "infrared LED",
+        "In-App Purchases": "in-app purchases",
+        "Keystore": "keystore",
+        "Microphone": "microphone",
+        "NFC": "NFC",
+        "Photos": "photo",
+        "Sensors": "sensor",
+        "Telephony": "telephony",
+        "USB Devices": "USB device",
+    }
+
     def extract_sections(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
         return {
             "app_info": self._build_app_info(loaded_outputs),
@@ -688,9 +718,13 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     def _permission_based_functionality_explanation(capability: str, permission_names: list[str]) -> str:
         if not permission_names:
             return ""
+        capability_label = AndroidBinaryScanDetailExtractor.FUNCTIONALITY_EXPLANATION_LABELS.get(
+            capability,
+            capability.lower(),
+        )
         if len(permission_names) == 1:
-            return f"permission {permission_names[0]}, which may indicate {capability.lower()} functionality."
-        return f"permissions {', '.join(permission_names)}, which may indicate {capability.lower()} functionality."
+            return f"permission {permission_names[0]}, which may indicate {capability_label} functionality."
+        return f"permissions {', '.join(permission_names)}, which may indicate {capability_label} functionality."
 
     @staticmethod
     def _looks_like_email(value: str) -> bool:
