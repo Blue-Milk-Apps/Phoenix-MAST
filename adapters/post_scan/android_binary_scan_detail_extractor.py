@@ -56,6 +56,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         63: "Networking",
         64: "Telephony",
         65: "Photos",
+        66: "In-App Purchases",
+        67: "Device Administrator",
+        68: "Camera Delegation",
+        69: "Sensors",
     }
 
     FUNCTIONALITY_RULE_ID_MAP = {
@@ -69,6 +73,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         "android.fingerprint.usage.present": "Fingerprint",
         "android.bluetooth.usage.present": "Bluetooth",
         "android.sms.usage.present": "SMS",
+        "android.in_app_purchases.usage.present": "In-App Purchases",
+        "android.device.administrator.usage.present": "Device Administrator",
+        "android.camera.delegation.usage.present": "Camera Delegation",
+        "android.sensors.usage.present": "Sensors",
         "android.telephony.usage.present": "Telephony",
         "android.contacts.usage.present": "Contacts",
         "android.calendar.usage.present": "Calendar",
@@ -132,6 +140,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "android.permission.READ_MEDIA_IMAGES",
             "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
             "android.permission.WRITE_EXTERNAL_STORAGE",
+        },
+        "Sensors": {
+            "android.permission.BODY_SENSORS",
+            "android.permission.BODY_SENSORS_BACKGROUND",
         },
     }
 
