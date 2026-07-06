@@ -45,6 +45,34 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         55: "Location",
     }
 
+    FUNCTIONALITY_PERMISSION_MAP = {
+        "Camera": {
+            "android.permission.CAMERA",
+        },
+        "Microphone": {
+            "android.permission.RECORD_AUDIO",
+        },
+        "NFC": {
+            "android.permission.NFC",
+        },
+        "Bluetooth": {
+            "android.permission.BLUETOOTH",
+            "android.permission.BLUETOOTH_ADMIN",
+            "android.permission.BLUETOOTH_ADVERTISE",
+            "android.permission.BLUETOOTH_CONNECT",
+            "android.permission.BLUETOOTH_SCAN",
+        },
+        "Contacts": {
+            "android.permission.READ_CONTACTS",
+            "android.permission.WRITE_CONTACTS",
+            "android.permission.GET_ACCOUNTS",
+        },
+        "Calendar": {
+            "android.permission.READ_CALENDAR",
+            "android.permission.WRITE_CALENDAR",
+        },
+    }
+
     def extract_sections(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
         return {
             "app_info": self._build_app_info(loaded_outputs),
@@ -303,6 +331,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
 
     def _build_functionality(self, loaded_outputs: dict[str, Any]) -> dict[str, dict[str, Any]]:
         opengrep = loaded_outputs.get("opengrep") or {}
+        aapt2_permissions = loaded_outputs.get("aapt2_permissions") or {}
         functionality = {
             key: {
                 "present": False,
@@ -310,6 +339,22 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             }
             for key in self.FUNCTIONALITY_KEYS
         }
+
+        declared_permissions = {
+            self._first_non_empty(permission.get("name"))
+            for permission in aapt2_permissions.get("permissions") or []
+        }
+        declared_permissions.discard("")
+
+        for capability, permission_names in self.FUNCTIONALITY_PERMISSION_MAP.items():
+            matched_permissions = sorted(permission_names.intersection(declared_permissions))
+            if not matched_permissions:
+                continue
+
+            functionality[capability]["present"] = True
+            functionality[capability]["explanation"] = self._permission_based_functionality_explanation(
+                matched_permissions
+            )
 
         for result in opengrep.get("results") or []:
             capability = self._functionality_name_for_result(result)
@@ -494,6 +539,14 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             or str(metadata.get("title", "")).strip()
             or str(extra.get("message", "")).strip()
         )
+
+    @staticmethod
+    def _permission_based_functionality_explanation(permission_names: list[str]) -> str:
+        if not permission_names:
+            return ""
+        if len(permission_names) == 1:
+            return f"Declared permission {permission_names[0]}."
+        return f"Declared permissions {', '.join(permission_names)}."
 
     @staticmethod
     def _looks_like_email(value: str) -> bool:

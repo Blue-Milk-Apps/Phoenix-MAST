@@ -95,6 +95,26 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
                     "protection_level_hint": "dangerous",
                 },
                 {
+                    "name": "android.permission.CAMERA",
+                    "protection_level_hint": "dangerous",
+                },
+                {
+                    "name": "android.permission.RECORD_AUDIO",
+                    "protection_level_hint": "dangerous",
+                },
+                {
+                    "name": "android.permission.READ_CONTACTS",
+                    "protection_level_hint": "dangerous",
+                },
+                {
+                    "name": "android.permission.READ_CALENDAR",
+                    "protection_level_hint": "dangerous",
+                },
+                {
+                    "name": "android.permission.BLUETOOTH_CONNECT",
+                    "protection_level_hint": "unknown_or_normal",
+                },
+                {
                     "name": "android.permission.INTERNET",
                     "protection_level_hint": "unknown_or_normal",
                 },
@@ -258,6 +278,41 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
             "general_description": "",
         },
         {
+            "permission": "android.permission.CAMERA",
+            "status": "dangerous",
+            "info": "dangerous",
+            "usage_description": "",
+            "general_description": "",
+        },
+        {
+            "permission": "android.permission.RECORD_AUDIO",
+            "status": "dangerous",
+            "info": "dangerous",
+            "usage_description": "",
+            "general_description": "",
+        },
+        {
+            "permission": "android.permission.READ_CONTACTS",
+            "status": "dangerous",
+            "info": "dangerous",
+            "usage_description": "",
+            "general_description": "",
+        },
+        {
+            "permission": "android.permission.READ_CALENDAR",
+            "status": "dangerous",
+            "info": "dangerous",
+            "usage_description": "",
+            "general_description": "",
+        },
+        {
+            "permission": "android.permission.BLUETOOTH_CONNECT",
+            "status": "normal",
+            "info": "unknown or normal",
+            "usage_description": "",
+            "general_description": "",
+        },
+        {
             "permission": "android.permission.INTERNET",
             "status": "normal",
             "info": "unknown or normal",
@@ -275,6 +330,26 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
     assert sections["functionality"]["Location"] == {
         "present": True,
         "explanation": "Detect whether the app declares Android location permissions or uses Android location-related APIs.",
+    }
+    assert sections["functionality"]["Camera"] == {
+        "present": True,
+        "explanation": "Declared permission android.permission.CAMERA.",
+    }
+    assert sections["functionality"]["Microphone"] == {
+        "present": True,
+        "explanation": "Declared permission android.permission.RECORD_AUDIO.",
+    }
+    assert sections["functionality"]["Contacts"] == {
+        "present": True,
+        "explanation": "Declared permission android.permission.READ_CONTACTS.",
+    }
+    assert sections["functionality"]["Calendar"] == {
+        "present": True,
+        "explanation": "Declared permission android.permission.READ_CALENDAR.",
+    }
+    assert sections["functionality"]["Bluetooth"] == {
+        "present": True,
+        "explanation": "Declared permission android.permission.BLUETOOTH_CONNECT.",
     }
     assert sections["functionality"]["Audio"] == {
         "present": False,
@@ -433,6 +508,10 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
                     "protection_level_hint": "dangerous",
                 },
                 {
+                    "name": "android.permission.CAMERA",
+                    "protection_level_hint": "dangerous",
+                },
+                {
                     "name": "android.permission.INTERNET",
                     "protection_level_hint": "unknown_or_normal",
                 },
@@ -530,6 +609,13 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
             "general_description": "",
         },
         {
+            "permission": "android.permission.CAMERA",
+            "status": "dangerous",
+            "info": "dangerous",
+            "usage_description": "",
+            "general_description": "",
+        },
+        {
             "permission": "android.permission.INTERNET",
             "status": "normal",
             "info": "unknown or normal",
@@ -538,6 +624,10 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
         },
     ]
     assert result["functionality"]["Location"]["present"] is True
+    assert result["functionality"]["Camera"] == {
+        "present": True,
+        "explanation": "Declared permission android.permission.CAMERA.",
+    }
     assert result["hardcoded_values"] == {
         "urls": [
             {
