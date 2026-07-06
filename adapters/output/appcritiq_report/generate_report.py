@@ -28,6 +28,20 @@ BLANK_TEMPLATE_PATH = BASE_DIR / "data" / "blank_template.json"
 RISK_LEVEL_ORDER = {"low": 1, "medium": 2, "high": 3}
 RISK_LEVEL_COLOR = {"low": "#2980b9", "medium": "#e08e0b", "high": "#c0392b"}
 FINDINGS_SEVERITY_KEYS = ("critical", "high", "medium", "low", "info", "secure")
+SECTION_TO_AREA = {
+    "code": ("Code Vulnerability", "code_vulnerability"),
+    "storage": ("Data Storage", "data_storage"),
+    "network": ("Networking", "networking"),
+    "resilience": ("Resilience", "resilience"),
+}
+SECTION_SEVERITY_ORDER = {
+    "critical": 5,
+    "high": 4,
+    "medium": 3,
+    "low": 2,
+    "info": 1,
+    "secure": 0,
+}
 
 # Vulnerability categories excluded from the report entirely (per request:
 # Authentication, Cryptography, and Platform are dropped from the output
@@ -222,6 +236,8 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
         s for s in report_data.get("vulnerability_sections", [])
         if (s.get("section_name") or "").strip().lower() not in EXCLUDED_VULN_SECTIONS
     ]
+    report_data["overall_evaluation"] = _build_overall_evaluation(report_data)
+    report_data["risk_summary"] = _build_risk_summary(report_data)
     report_data["findings_severity"] = _build_findings_severity(report_data)
 
     return _prune_placeholder_rows(report_data)
@@ -259,6 +275,76 @@ def _build_findings_severity(report_data: dict[str, Any]) -> dict[str, int]:
                 counts[severity] += 1
 
     return counts
+
+
+def _build_overall_evaluation(report_data: dict[str, Any]) -> list[dict[str, Any]]:
+    rows_by_area: dict[str, dict[str, Any]] = {}
+
+    for section in report_data.get("vulnerability_sections") or []:
+        section_name = str(section.get("section_name", "")).strip().lower()
+        area_details = SECTION_TO_AREA.get(section_name)
+        if area_details is None:
+            continue
+
+        area_label, _risk_key = area_details
+        present_checks = [
+            check for check in (section.get("checks") or [])
+            if str(check.get("result", "")).strip().lower() == "present"
+        ]
+        summary_findings = [str(check.get("check", "")).strip() for check in present_checks if str(check.get("check", "")).strip()]
+        risk_rating = _highest_present_severity(present_checks)
+
+        rows_by_area[area_label] = {
+            "area_of_concern": area_label,
+            "risk_rating": risk_rating,
+            "summary_findings": summary_findings or ["No present findings identified in this scan"],
+        }
+
+    ordered_rows: list[dict[str, Any]] = []
+    for area_label, _risk_key in SECTION_TO_AREA.values():
+        row = rows_by_area.get(area_label)
+        if row is not None:
+            ordered_rows.append(row)
+
+    return ordered_rows
+
+
+def _build_risk_summary(report_data: dict[str, Any]) -> dict[str, str]:
+    summary = {risk_key: "Low" for _area_label, risk_key in SECTION_TO_AREA.values()}
+
+    for row in report_data.get("overall_evaluation") or []:
+        area_name = str(row.get("area_of_concern", "")).strip().lower()
+        for section_name, (area_label, risk_key) in SECTION_TO_AREA.items():
+            if area_label.lower() == area_name:
+                summary[risk_key] = _normalize_risk_level(row.get("risk_rating"))
+                break
+
+    return summary
+
+
+def _highest_present_severity(present_checks: list[dict[str, Any]]) -> str:
+    highest = "info"
+    highest_rank = SECTION_SEVERITY_ORDER[highest]
+
+    for check in present_checks:
+        severity = str(check.get("severity", "")).strip().lower()
+        if severity not in SECTION_SEVERITY_ORDER:
+            continue
+        rank = SECTION_SEVERITY_ORDER[severity]
+        if rank > highest_rank:
+            highest = severity
+            highest_rank = rank
+
+    return highest.title()
+
+
+def _normalize_risk_level(value: object) -> str:
+    text = str(value or "").strip().lower()
+    if text in {"critical", "high"}:
+        return "High"
+    if text == "medium":
+        return "Medium"
+    return "Low"
 
 
 def _prune_placeholder_rows(data: dict[str, Any]) -> dict[str, Any]:
