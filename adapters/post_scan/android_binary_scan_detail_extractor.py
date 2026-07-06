@@ -14,6 +14,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
 
     FUNCTIONALITY_KEYS = [
         "Audio",
+        "Background Execution",
         "Location",
         "Contacts",
         "Geofencing",
@@ -42,7 +43,13 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     ]
 
     FUNCTIONALITY_CHECK_ID_MAP = {
+        9: "Background Execution",
+        53: "Camera",
+        54: "Microphone",
         55: "Location",
+        56: "NFC",
+        58: "Bluetooth",
+        61: "Google Cloud Messaging",
     }
 
     FUNCTIONALITY_PERMISSION_MAP = {
@@ -521,10 +528,32 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         metadata = ((result.get("extra") or {}).get("metadata") or {}).get("appcritiq") or {}
 
         check_id = metadata.get("check_id")
-        if isinstance(check_id, int) and check_id in self.FUNCTIONALITY_CHECK_ID_MAP:
-            return self.FUNCTIONALITY_CHECK_ID_MAP[check_id]
-
         title = str(metadata.get("title", "")).strip().lower()
+        if isinstance(check_id, int):
+            if check_id == 60:
+                if "contact" in title:
+                    return "Contacts"
+                if "calendar" in title:
+                    return "Calendar"
+            if check_id in self.FUNCTIONALITY_CHECK_ID_MAP:
+                return self.FUNCTIONALITY_CHECK_ID_MAP[check_id]
+
+        if "background execution" in title:
+            return "Background Execution"
+        if "camera" in title:
+            return "Camera"
+        if "microphone" in title:
+            return "Microphone"
+        if "nfc" in title:
+            return "NFC"
+        if "bluetooth" in title:
+            return "Bluetooth"
+        if "contact" in title:
+            return "Contacts"
+        if "calendar" in title:
+            return "Calendar"
+        if "push notification" in title or "google cloud messaging" in title:
+            return "Google Cloud Messaging"
         if "location" in title:
             return "Location"
 

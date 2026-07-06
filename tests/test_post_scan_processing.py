@@ -386,6 +386,139 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
     ]
 
 
+def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks() -> None:
+    loaded_outputs = {
+        "aapt2_permissions": {"permissions": []},
+        "opengrep": {
+            "results": [
+                {
+                    "extra": {
+                        "metadata": {
+                            "appcritiq": {
+                                "check_id": 9,
+                                "title": "Background execution modes declared by the app",
+                                "description": "Background execution detected.",
+                            }
+                        }
+                    }
+                },
+                {
+                    "extra": {
+                        "metadata": {
+                            "appcritiq": {
+                                "check_id": 53,
+                                "title": "Camera usage declaration present",
+                                "description": "Camera usage detected.",
+                            }
+                        }
+                    }
+                },
+                {
+                    "extra": {
+                        "metadata": {
+                            "appcritiq": {
+                                "check_id": 54,
+                                "title": "Microphone usage declaration present",
+                                "description": "Microphone usage detected.",
+                            }
+                        }
+                    }
+                },
+                {
+                    "extra": {
+                        "metadata": {
+                            "appcritiq": {
+                                "check_id": 56,
+                                "title": "NFC usage declaration present",
+                                "description": "NFC usage detected.",
+                            }
+                        }
+                    }
+                },
+                {
+                    "extra": {
+                        "metadata": {
+                            "appcritiq": {
+                                "check_id": 58,
+                                "title": "Bluetooth usage declaration present",
+                                "description": "Bluetooth usage detected.",
+                            }
+                        }
+                    }
+                },
+                {
+                    "extra": {
+                        "metadata": {
+                            "appcritiq": {
+                                "check_id": 60,
+                                "title": "Contacts usage declaration present",
+                                "description": "Contacts usage detected.",
+                            }
+                        }
+                    }
+                },
+                {
+                    "extra": {
+                        "metadata": {
+                            "appcritiq": {
+                                "check_id": 60,
+                                "title": "Calendar usage declaration present",
+                                "description": "Calendar usage detected.",
+                            }
+                        }
+                    }
+                },
+                {
+                    "extra": {
+                        "metadata": {
+                            "appcritiq": {
+                                "check_id": 61,
+                                "title": "Push notification registration and background push behavior present",
+                                "description": "Push messaging usage detected.",
+                            }
+                        }
+                    }
+                },
+            ]
+        },
+    }
+
+    sections = AndroidBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert sections["functionality"]["Background Execution"] == {
+        "present": True,
+        "explanation": "Background execution detected.",
+    }
+    assert sections["functionality"]["Camera"] == {
+        "present": True,
+        "explanation": "Camera usage detected.",
+    }
+    assert sections["functionality"]["Microphone"] == {
+        "present": True,
+        "explanation": "Microphone usage detected.",
+    }
+    assert sections["functionality"]["NFC"] == {
+        "present": True,
+        "explanation": "NFC usage detected.",
+    }
+    assert sections["functionality"]["Bluetooth"] == {
+        "present": True,
+        "explanation": "Bluetooth usage detected.",
+    }
+    assert sections["functionality"]["Contacts"] == {
+        "present": True,
+        "explanation": "Contacts usage detected.",
+    }
+    assert sections["functionality"]["Calendar"] == {
+        "present": True,
+        "explanation": "Calendar usage detected.",
+    }
+    assert sections["functionality"]["Google Cloud Messaging"] == {
+        "present": True,
+        "explanation": "Push messaging usage detected.",
+    }
+
+
 def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_path: Path) -> None:
     scan_dir = tmp_path / "SAST_android_binary_2026-07-03_23-34-29"
     apk_path = tmp_path / "APKPure.apk"
