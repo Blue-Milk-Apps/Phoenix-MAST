@@ -10,11 +10,12 @@
     "reviewer_org": "AppCritique Security Report"
   },
   "findings_severity": {
+    "critical": 0,
     "high": 0,
     "medium": 0,
+    "low": 0,
     "info": 0,
-    "secure": 0,
-    "hotspot": 0
+    "secure": 0
   },
   "risk_summary": {
     "code_vulnerability": "High",

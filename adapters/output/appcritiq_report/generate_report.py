@@ -27,6 +27,7 @@ BLANK_TEMPLATE_PATH = BASE_DIR / "data" / "blank_template.json"
 
 RISK_LEVEL_ORDER = {"low": 1, "medium": 2, "high": 3}
 RISK_LEVEL_COLOR = {"low": "#2980b9", "medium": "#e08e0b", "high": "#c0392b"}
+FINDINGS_SEVERITY_KEYS = ("critical", "high", "medium", "low", "info", "secure")
 
 # Vulnerability categories excluded from the report entirely (per request:
 # Authentication, Cryptography, and Platform are dropped from the output
@@ -221,6 +222,7 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
         s for s in report_data.get("vulnerability_sections", [])
         if (s.get("section_name") or "").strip().lower() not in EXCLUDED_VULN_SECTIONS
     ]
+    report_data["findings_severity"] = _build_findings_severity(report_data)
 
     return _prune_placeholder_rows(report_data)
 
@@ -245,6 +247,18 @@ def _merge_nested(base: Any, override: Any) -> Any:
         return copy.deepcopy(base)
 
     return copy.deepcopy(override)
+
+
+def _build_findings_severity(report_data: dict[str, Any]) -> dict[str, int]:
+    counts = {key: 0 for key in FINDINGS_SEVERITY_KEYS}
+
+    for section in report_data.get("vulnerability_sections") or []:
+        for check in section.get("checks") or []:
+            severity = str(check.get("severity", "")).strip().lower()
+            if severity in counts:
+                counts[severity] += 1
+
+    return counts
 
 
 def _prune_placeholder_rows(data: dict[str, Any]) -> dict[str, Any]:

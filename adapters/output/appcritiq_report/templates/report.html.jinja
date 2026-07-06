@@ -33,7 +33,7 @@
 <div class="section">
   <h2>Findings by Severity</h2>
   <div class="section-sub">Number of individual checks that returned each severity level</div>
-  {% for level, color, key in [('High','#c0392b','high'), ('Medium','#e08e0b','medium'), ('Info','#2980b9','info'), ('Secure','#27ae60','secure'), ('Hotspot','#555','hotspot')] %}
+  {% for level, color, key in [('Critical','#8e1b1b','critical'), ('High','#c0392b','high'), ('Medium','#e08e0b','medium'), ('Low','#5499c7','low'), ('Info','#2980b9','info'), ('Secure','#27ae60','secure')] %}
   {% set count = data.findings_severity.get(key, 0) %}
   {% set max_count = [data.findings_severity.values() | max, 1] | max %}
   <div class="bar-block">
