@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,11 @@ from ports.scan_detail_extractor_port import ScanDetailExtractorPort
 
 class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     """Extract Android-binary-specific sections from loaded scan outputs."""
+
+    ENCODED_SECRET_PATTERN = re.compile(
+        r"(?<![A-Za-z0-9+/=])[A-Za-z0-9+/]{40,}={0,2}(?![A-Za-z0-9+/=])"
+    )
+    JVM_DESCRIPTOR_PATTERN = re.compile(r"^\+?L(?:[A-Za-z0-9_$]+/)+[A-Za-z0-9_$]+$")
 
     FUNCTIONALITY_KEYS = [
         "Audio",
@@ -406,6 +412,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
 
     def _build_hardcoded_values(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
         apktool_secrets_endpoints = loaded_outputs.get("apktool_secrets_endpoints") or {}
+        strings_outputs = loaded_outputs.get("strings_outputs") or {}
 
         urls: list[dict[str, str]] = []
         emails: list[str] = []
@@ -443,11 +450,35 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
                 seen_secrets.add(dedupe_key)
                 secrets.append({"value": value, "location": location})
 
+        for source_name, content in strings_outputs.items():
+            for line_number, line in enumerate(content.splitlines(), start=1):
+                for match in self.ENCODED_SECRET_PATTERN.finditer(line):
+                    value = match.group(0)
+                    if not self._looks_like_encoded_secret(value):
+                        continue
+                    location = f"strings/{source_name}:{line_number}"
+                    dedupe_key = (value, location)
+                    if dedupe_key in seen_secrets:
+                        continue
+                    seen_secrets.add(dedupe_key)
+                    secrets.append({"value": value, "location": location})
+
         return {
             "urls": urls,
             "emails": emails,
             "secrets": secrets,
         }
+
+    def _looks_like_encoded_secret(self, value: str) -> bool:
+        if len(value) < 40:
+            return False
+        if len(value) % 4 not in {0, 2, 3}:
+            return False
+        if self.JVM_DESCRIPTOR_PATTERN.fullmatch(value):
+            return False
+        if not any(char in value for char in "+="):
+            return False
+        return len(set(value)) >= 10
 
     def _build_functionality(self, loaded_outputs: dict[str, Any]) -> dict[str, dict[str, Any]]:
         opengrep = loaded_outputs.get("opengrep") or {}

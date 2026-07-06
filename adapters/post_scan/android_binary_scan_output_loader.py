@@ -29,6 +29,7 @@ class AndroidBinaryScanOutputLoader(ScanOutputLoaderPort):
             "apksigner_signing_evidence": self._load_json(root / "apksigner" / "signing_evidence.json"),
             "apktool_permissions": self._load_json(root / "apktool" / "permissions.json"),
             "apktool_secrets_endpoints": self._load_json(root / "apktool" / "secrets_endpoints.json"),
+            "strings_outputs": self._load_strings_outputs(root / "strings"),
         }
 
     @staticmethod
@@ -40,3 +41,13 @@ class AndroidBinaryScanOutputLoader(ScanOutputLoaderPort):
             return json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             return None
+
+    @staticmethod
+    def _load_strings_outputs(strings_root: Path) -> dict[str, str]:
+        if not strings_root.is_dir():
+            return {}
+
+        outputs: dict[str, str] = {}
+        for path in sorted(strings_root.glob("*.txt")):
+            outputs[path.name] = path.read_text(encoding="utf-8", errors="ignore")
+        return outputs
