@@ -43,6 +43,19 @@ SECTION_SEVERITY_ORDER = {
     "secure": 0,
 }
 
+DERIVED_CHECK_ALIAS_TO_COMPONENT_KEY = {
+    "unprotected exported activity": "exported_activities",
+    "activities accessible to other apps": "exported_activities",
+    "unprotected exported service": "exported_services",
+    "services accessible to other apps": "exported_services",
+    "unprotected exported receiver": "exported_receivers",
+    "receivers accessible to other apps": "exported_receivers",
+    "unprotected exported provider": "exported_providers",
+    "providers accessible to other apps": "exported_providers",
+}
+SHARED_PREFS_HINTS = ("shared_prefs/", "/shared_prefs/", "shared_prefs\\")
+CACHE_HINTS = ("cache/", "/cache/", "cache\\", "webviewcache", "httpcache")
+
 # Vulnerability categories excluded from the report entirely (per request:
 # Authentication, Cryptography, and Platform are dropped from the output
 # regardless of what's present in the source data file).
@@ -232,6 +245,7 @@ def _configure_weasyprint_library_path() -> None:
 def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     report_data = _merge_nested(_blank_template(), data)
 
+    _apply_derived_vulnerability_checks(report_data)
     report_data["vulnerability_sections"] = [
         s for s in report_data.get("vulnerability_sections", [])
         if (s.get("section_name") or "").strip().lower() not in EXCLUDED_VULN_SECTIONS
@@ -241,6 +255,247 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     report_data["findings_severity"] = _build_findings_severity(report_data)
 
     return _prune_placeholder_rows(report_data)
+
+
+def _apply_derived_vulnerability_checks(report_data: dict[str, Any]) -> None:
+    for section in report_data.get("vulnerability_sections") or []:
+        for check in section.get("checks") or []:
+            _apply_derived_check(report_data, section, check)
+
+
+def _apply_derived_check(
+    report_data: dict[str, Any],
+    section: dict[str, Any],
+    check: dict[str, Any],
+) -> None:
+    section_name = str(section.get("section_name", "")).strip().lower()
+    if section_name == "code":
+        _apply_derived_code_check(report_data, check)
+    elif section_name == "network":
+        _apply_derived_network_check(report_data, check)
+    elif section_name == "storage":
+        _apply_derived_storage_check(report_data, check)
+
+
+def _apply_derived_code_check(report_data: dict[str, Any], check: dict[str, Any]) -> None:
+    check_name = _normalized_check_name(check.get("check"))
+
+    component_key = DERIVED_CHECK_ALIAS_TO_COMPONENT_KEY.get(check_name)
+    if component_key is not None:
+        _apply_exported_component_check(report_data, check, component_key)
+        return
+
+    if check_name == "application data can be backed up":
+        _apply_boolean_check(
+            report_data,
+            check,
+            paths=[
+                ("application", "allow_backup"),
+                ("app_info", "allow_backup"),
+                ("manifest", "allow_backup"),
+            ],
+            present_explanation=(
+                "The manifest allows application data backup, which can expose "
+                "app data through device backup mechanisms."
+            ),
+            not_present_explanation=(
+                "Application data backup is not enabled based on the available "
+                "report data."
+            ),
+            evidence_label="allow_backup",
+        )
+        return
+
+    if check_name == "app is debuggable":
+        _apply_boolean_check(
+            report_data,
+            check,
+            paths=[
+                ("application", "debuggable"),
+                ("app_info", "debuggable"),
+                ("manifest", "debuggable"),
+            ],
+            present_explanation=(
+                "The app is marked as debuggable, which can expose runtime "
+                "state and make reverse engineering easier."
+            ),
+            not_present_explanation=(
+                "The app is not marked as debuggable based on the available "
+                "report data."
+            ),
+            evidence_label="debuggable",
+        )
+        return
+
+    if check_name == "application uses custom url schemes / deep links":
+        _apply_deep_link_check(report_data, check)
+
+
+def _apply_derived_network_check(report_data: dict[str, Any], check: dict[str, Any]) -> None:
+    check_name = _normalized_check_name(check.get("check"))
+    if check_name != "api authentication weakness (weak token handling / api key used as authentication)":
+        return
+
+    secrets = _secret_entries(report_data)
+    if not secrets:
+        return
+
+    count = len(secrets)
+    check["result"] = "Present"
+    noun = "value" if count == 1 else "values"
+    check["explanation"] = (
+        f"{count} hardcoded secret-like {noun} detected in the application package. "
+        "These may represent static API keys, tokens, or authentication material "
+        "that weakens API authentication controls."
+    )
+    check["evidence"] = f"hardcoded_secrets={count}"
+
+
+def _apply_derived_storage_check(report_data: dict[str, Any], check: dict[str, Any]) -> None:
+    check_name = _normalized_check_name(check.get("check"))
+    if check_name == "sensitive values stored insecurely in sharedpreferences":
+        _apply_location_based_secret_check(
+            report_data,
+            check,
+            hints=SHARED_PREFS_HINTS,
+            present_explanation=(
+                "Secret-like values were found in SharedPreferences-related paths, "
+                "indicating sensitive data may be stored insecurely in local preferences."
+            ),
+            not_present_explanation=(
+                "No secret-like values were found in SharedPreferences-related paths."
+            ),
+            evidence_label="shared_prefs_secret_hits",
+        )
+        return
+
+    if check_name == "sensitive data in http cache databases":
+        _apply_location_based_secret_check(
+            report_data,
+            check,
+            hints=CACHE_HINTS,
+            present_explanation=(
+                "Secret-like values were found in cache-related paths, indicating "
+                "sensitive data may be present in application cache storage."
+            ),
+            not_present_explanation=(
+                "No secret-like values were found in cache-related paths."
+            ),
+            evidence_label="cache_secret_hits",
+        )
+
+
+def _apply_exported_component_check(
+    report_data: dict[str, Any],
+    check: dict[str, Any],
+    component_key: str,
+) -> None:
+    app_components = report_data.get("app_components") or {}
+    if component_key not in app_components:
+        return
+
+    exported_count = _coerce_int(app_components.get(component_key))
+    if exported_count is None:
+        return
+
+    component_label = component_key.removeprefix("exported_").replace("_", " ")
+    singular = component_label[:-1] if component_label.endswith("s") else component_label
+    plural = component_label if component_label.endswith("s") else f"{component_label}s"
+
+    if exported_count > 0:
+        check["result"] = "Present"
+        noun = singular if exported_count == 1 else plural
+        check["explanation"] = (
+            f"{exported_count} exported {noun} detected in the manifest."
+        )
+        check["evidence"] = f"{component_key}={exported_count}"
+        return
+
+    check["result"] = "Not Present"
+    check["explanation"] = f"No exported {plural} were detected in the manifest."
+    check["evidence"] = f"{component_key}=0"
+
+
+def _apply_boolean_check(
+    report_data: dict[str, Any],
+    check: dict[str, Any],
+    *,
+    paths: list[tuple[str, str]],
+    present_explanation: str,
+    not_present_explanation: str,
+    evidence_label: str,
+) -> None:
+    for section_key, field_key in paths:
+        section = report_data.get(section_key)
+        if not isinstance(section, dict) or field_key not in section:
+            continue
+        flag = _coerce_bool(section.get(field_key))
+        if flag is None:
+            continue
+        check["result"] = "Present" if flag else "Not Present"
+        check["explanation"] = present_explanation if flag else not_present_explanation
+        check["evidence"] = f"{evidence_label}={str(flag).lower()}"
+        return
+
+
+def _apply_deep_link_check(report_data: dict[str, Any], check: dict[str, Any]) -> None:
+    deep_links = report_data.get("deep_links")
+    if not isinstance(deep_links, dict):
+        return
+
+    entries = deep_links.get("deep_links")
+    if not isinstance(entries, list):
+        return
+
+    count = len(entries)
+    if count > 0:
+        check["result"] = "Present"
+        noun = "handler" if count == 1 else "handlers"
+        check["explanation"] = (
+            f"{count} custom URL scheme or deep link {noun} detected in the app."
+        )
+        check["evidence"] = f"deep_links={count}"
+        return
+
+    check["result"] = "Not Present"
+    check["explanation"] = "No custom URL schemes or deep links were detected."
+    check["evidence"] = "deep_links=0"
+
+
+def _apply_location_based_secret_check(
+    report_data: dict[str, Any],
+    check: dict[str, Any],
+    *,
+    hints: tuple[str, ...],
+    present_explanation: str,
+    not_present_explanation: str,
+    evidence_label: str,
+) -> None:
+    secrets = _secret_entries(report_data)
+    matched = [
+        secret for secret in secrets
+        if any(hint in str(secret.get("location", "")).lower() for hint in hints)
+    ]
+    if matched:
+        check["result"] = "Present"
+        check["explanation"] = present_explanation
+        check["evidence"] = f"{evidence_label}={len(matched)}"
+        return
+
+    if secrets:
+        check["result"] = "Not Present"
+        check["explanation"] = not_present_explanation
+        check["evidence"] = f"{evidence_label}=0"
+
+
+def _secret_entries(report_data: dict[str, Any]) -> list[dict[str, Any]]:
+    hardcoded_values = report_data.get("hardcoded_values")
+    if not isinstance(hardcoded_values, dict):
+        return []
+    secrets = hardcoded_values.get("secrets")
+    if not isinstance(secrets, list):
+        return []
+    return [secret for secret in secrets if isinstance(secret, dict)]
 
 
 def _blank_template() -> dict[str, Any]:
@@ -345,6 +600,28 @@ def _normalize_risk_level(value: object) -> str:
     if text == "medium":
         return "Medium"
     return "Low"
+
+
+def _normalized_check_name(value: object) -> str:
+    return str(value or "").strip().lower()
+
+
+def _coerce_int(value: object) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_bool(value: object) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    text = str(value or "").strip().lower()
+    if text in {"true", "1", "yes"}:
+        return True
+    if text in {"false", "0", "no"}:
+        return False
+    return None
 
 
 def _prune_placeholder_rows(data: dict[str, Any]) -> dict[str, Any]:
