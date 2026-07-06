@@ -33,7 +33,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         "Google Cloud Messaging",
         "Infrared LED",
         "In-App Purchases",
-        "Keychain",
+        "Keystore",
         "Microphone",
         "NFC",
         "Photos",
@@ -67,7 +67,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         74: "Audio",
         75: "Payment Services",
         76: "Secure RNG",
-        77: "Keychain",
+        77: "Keystore",
     }
 
     FUNCTIONALITY_RULE_ID_MAP = {
@@ -92,7 +92,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         "android.audio.usage.present": "Audio",
         "android.payment.services.usage.present": "Payment Services",
         "android.secure.rng.usage.present": "Secure RNG",
-        "android.keychain.usage.present": "Keychain",
+        "android.keystore.usage.present": "Keystore",
         "android.telephony.usage.present": "Telephony",
         "android.contacts.usage.present": "Contacts",
         "android.calendar.usage.present": "Calendar",
