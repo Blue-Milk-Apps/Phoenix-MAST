@@ -286,6 +286,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "application": self._build_application(loaded_outputs),
             "app_components": self._build_app_components(loaded_outputs),
             "certificate": self._build_certificate(loaded_outputs),
+            "code_evidence": self._build_code_evidence(loaded_outputs),
             "file_info": self._build_file_info(loaded_outputs),
             "permissions": self._build_permissions(loaded_outputs),
             "functionality": self._build_functionality(loaded_outputs),
@@ -733,6 +734,475 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "urls": urls,
             "emails": emails,
             "secrets": secrets,
+        }
+
+    def _build_code_evidence(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
+        app_components = self._build_app_components(loaded_outputs)
+        application = self._build_application(loaded_outputs)
+        app_info = self._build_app_info(loaded_outputs)
+        hardcoded_values = self._build_hardcoded_values(loaded_outputs)
+
+        aapt2_identity = loaded_outputs.get("aapt2_identity") or {}
+        aapt2_permissions = loaded_outputs.get("aapt2_permissions") or {}
+        aapt2_posture = loaded_outputs.get("aapt2_manifest_security_posture") or {}
+        androguard_api_calls = loaded_outputs.get("androguard_api_calls") or {}
+        androguard_findings = loaded_outputs.get("androguard_findings") or {}
+        androguard_report_summary = loaded_outputs.get("androguard_report_summary") or {}
+        apktool_code_indicators = loaded_outputs.get("apktool_code_indicators") or {}
+
+        api_calls = list(androguard_api_calls.get("items") or [])
+        finding_items = list(androguard_findings.get("items") or [])
+        code_indicator_items = list(apktool_code_indicators.get("items") or [])
+        declared_permissions = {
+            self._first_non_empty(permission.get("name"))
+            for permission in aapt2_permissions.get("permissions") or []
+            if self._first_non_empty(permission.get("name"))
+        }
+
+        reflection_callers = self._matching_api_call_sites(
+            api_calls,
+            lambda item: "reflect" in self._api_call_signature(item).lower(),
+        )
+        runtime_exec_callers = self._matching_api_call_sites(
+            api_calls,
+            lambda item: "runtime; exec" in self._api_call_signature(item).lower(),
+        )
+        provider_update_callers = self._matching_api_call_sites(
+            api_calls,
+            lambda item: "providerinstaller" in self._api_call_caller_signature(item).lower()
+            or "providerinstaller" in self._api_call_signature(item).lower(),
+        )
+
+        identifier_callers = self._matching_api_call_sites(
+            api_calls,
+            lambda item: any(
+                token in self._api_call_signature(item).lower()
+                for token in (
+                    "advertisingid",
+                    "settings$secure",
+                    "android_id",
+                    "telephonymanager",
+                    "getdeviceid",
+                    "getsubscriberid",
+                    "getsimserialnumber",
+                )
+            ),
+        )
+
+        sql_callers = self._matching_api_call_sites(
+            api_calls,
+            lambda item: any(
+                token in self._api_call_signature(item).lower()
+                for token in (
+                    "rawquery",
+                    "execsql",
+                    "sqlitequerybuilder",
+                )
+            ),
+        )
+
+        sha1_callers = self._matching_api_call_sites(
+            api_calls,
+            lambda item: "sha1" in self._api_call_signature(item).lower()
+            or "sha-1" in self._api_call_signature(item).lower(),
+        )
+
+        xml_parser_callers = self._matching_api_call_sites(
+            api_calls,
+            lambda item: any(
+                token in self._api_call_signature(item).lower()
+                for token in (
+                    "xmlpullparser",
+                    "saxparserfactory",
+                    "documentbuilderfactory",
+                )
+            ),
+        )
+
+        clipboard_callers = self._matching_api_call_sites(
+            api_calls,
+            lambda item: "clipboard" in self._api_call_signature(item).lower()
+            or "setprimaryclip" in self._api_call_signature(item).lower(),
+        )
+
+        code_indicator_values = [self._first_non_empty(item.get("value")) for item in code_indicator_items]
+        code_indicator_locations = [
+            self._format_provenance_location(item.get("provenance") or {})
+            for item in code_indicator_items
+        ]
+        report_api_counts = dict(androguard_report_summary.get("api_category_counts") or {})
+        report_string_counts = dict(androguard_report_summary.get("string_category_counts") or {})
+
+        password_secret_hits = [
+            secret for secret in hardcoded_values.get("secrets") or []
+            if self.PASSWORD_HINT_PATTERN.search(
+                f"{secret.get('value', '')} {secret.get('location', '')}"
+            )
+        ]
+
+        crypto_secret_hits = [
+            secret for secret in hardcoded_values.get("secrets") or []
+            if any(
+                token in f"{secret.get('value', '')} {secret.get('location', '')}".lower()
+                for token in ("key", "crypto", "cipher", "aes", "rsa", "des", "blowfish")
+            )
+        ]
+
+        source_package = self._first_non_empty(
+            app_info.get("package_name"),
+            aapt2_identity.get("package_name"),
+        )
+        readable_app_classes = self._readable_app_class_names(
+            source_package,
+            loaded_outputs,
+            runtime_exec_callers,
+        )
+
+        native_abis = list(aapt2_identity.get("native_abis") or [])
+        native_abi_presence = self._coerce_bool_like(aapt2_posture.get("native_abi_presence"))
+
+        reflection_present = bool(reflection_callers) or any(
+            "reflection" in str(finding.get("id", "")).lower()
+            or "reflection" in str(finding.get("title", "")).lower()
+            for finding in finding_items
+        ) or int(report_api_counts.get("reflection") or 0) > 0
+
+        sql_injection_present = any("sql injection" in str(finding.get("title", "")).lower() for finding in finding_items)
+        sha1_present = bool(sha1_callers) or any(
+            "sha1" in value.lower() or "sha-1" in value.lower()
+            for value in code_indicator_values
+            if value
+        )
+
+        uses_provider_update = bool(provider_update_callers)
+        root_access_present = bool(runtime_exec_callers)
+        app_debuggable = self._coerce_bool_like(application.get("debuggable"))
+        sms_permission_present = "android.permission.SEND_SMS" in declared_permissions
+        accesses_unique_identifiers = bool(identifier_callers)
+        source_not_obfuscated = len(readable_app_classes) >= 3
+
+        return {
+            "accesses_unique_identifiers": self._code_evidence_entry(
+                present=accesses_unique_identifiers,
+                evidence=", ".join(identifier_callers[:5]) if identifier_callers else "no_identifier_api_hits",
+                details=identifier_callers[:10],
+            ),
+            "activities_accessible_to_other_apps": self._component_access_evidence(
+                app_components,
+                "exported_activities",
+                "activities",
+            ),
+            "app_is_debuggable": self._code_evidence_entry(
+                present=app_debuggable,
+                evidence=f"debuggable={str(app_debuggable).lower()}" if app_debuggable is not None else "",
+            ),
+            "contains_hard_coded_cryptographic_key": self._code_evidence_entry(
+                present=bool(crypto_secret_hits),
+                evidence=", ".join(
+                    self._first_non_empty(secret.get("location"), secret.get("value"))
+                    for secret in crypto_secret_hits[:5]
+                ) or "no_crypto_key_hits",
+                details=crypto_secret_hits[:10],
+            ),
+            "contains_native_code": self._code_evidence_entry(
+                present=bool(native_abis) or native_abi_presence is True,
+                evidence=(
+                    f"native_abis={','.join(native_abis)}"
+                    if native_abis
+                    else f"native_abi_presence={str(native_abi_presence).lower()}"
+                ),
+                details=native_abis,
+            ),
+            "contains_potential_hard_coded_password": self._code_evidence_entry(
+                present=bool(password_secret_hits),
+                evidence=", ".join(
+                    self._first_non_empty(secret.get("location"), secret.get("value"))
+                    for secret in password_secret_hits[:5]
+                ) or "no_password_hits",
+                details=password_secret_hits[:10],
+            ),
+            "contains_potential_sql_injection": self._code_evidence_entry(
+                present=sql_injection_present,
+                evidence=", ".join(sql_callers[:5]) if sql_injection_present else "no_sql_injection_finding",
+                details=sql_callers[:10],
+            ),
+            "contains_reflection_code": self._code_evidence_entry(
+                present=reflection_present,
+                evidence=", ".join(
+                    self._dedupe_preserve_order(
+                        [*reflection_callers[:3], *[loc for loc in code_indicator_locations[:10] if loc]]
+                    )[:5]
+                )
+                or f"reflection_count={int(report_api_counts.get('reflection') or 0)}",
+                details=reflection_callers[:10],
+            ),
+            "creates_blowfish_key_with_weak_length": self._code_evidence_entry(
+                present=any(value and "blowfish" in value.lower() for value in code_indicator_values),
+                evidence="no_blowfish_weak_key_hits",
+            ),
+            "creates_rsa_keys_with_weak_modulus_length": self._code_evidence_entry(
+                present=False,
+                evidence="no_weak_rsa_key_length_hits",
+            ),
+            "does_not_update_security_provider": self._code_evidence_entry(
+                present=not uses_provider_update,
+                evidence=(
+                    ", ".join(provider_update_callers[:5])
+                    if provider_update_callers
+                    else "no_security_provider_update_calls"
+                ),
+                details=provider_update_callers[:10],
+            ),
+            "receivers_accessible_to_other_apps": self._component_access_evidence(
+                app_components,
+                "exported_receivers",
+                "receivers",
+            ),
+            "requests_root_access": self._code_evidence_entry(
+                present=root_access_present,
+                evidence=", ".join(runtime_exec_callers[:5]) if runtime_exec_callers else "no_su_runtime_exec_hits",
+                details=runtime_exec_callers[:10],
+            ),
+            "services_accessible_to_other_apps": self._component_access_evidence(
+                app_components,
+                "exported_services",
+                "services",
+            ),
+            "sms_cve_2014_8610": self._code_evidence_entry(
+                present=not sms_permission_present,
+                evidence=(
+                    "android.permission.SEND_SMS missing"
+                    if not sms_permission_present
+                    else "android.permission.SEND_SMS declared"
+                ),
+            ),
+            "source_code_is_not_obfuscated": self._code_evidence_entry(
+                present=source_not_obfuscated,
+                evidence=", ".join(readable_app_classes[:5]) if readable_app_classes else "no_readable_app_class_names",
+                details=readable_app_classes[:10],
+            ),
+            "uses_sha1_hashing_algorithm": self._code_evidence_entry(
+                present=sha1_present,
+                evidence=", ".join(sha1_callers[:5]) if sha1_callers else "no_sha1_hits",
+                details=sha1_callers[:10],
+            ),
+            "weakly_configured_xml_parser": self._code_evidence_entry(
+                present=False,
+                evidence=", ".join(xml_parser_callers[:5]) if xml_parser_callers else "no_weak_xml_parser_hits",
+                details=xml_parser_callers[:10],
+            ),
+            "writes_sensitive_information_to_system_log": self._code_evidence_entry(
+                present=False,
+                evidence=f"logging_count={int(report_api_counts.get('logging') or 0)}",
+            ),
+            "uses_spoofable_values_for_authentication": self._code_evidence_entry(
+                present=False,
+                evidence=f"auth_string_count={int(report_string_counts.get('auth') or 0)}",
+            ),
+            "copies_sensitive_information_into_clipboard_without_user_consent": self._code_evidence_entry(
+                present=bool(clipboard_callers),
+                evidence=", ".join(clipboard_callers[:5]) if clipboard_callers else "no_clipboard_hits",
+                details=clipboard_callers[:10],
+            ),
+        }
+
+    def _component_access_evidence(
+        self,
+        app_components: dict[str, int],
+        exported_key: str,
+        label: str,
+    ) -> dict[str, Any]:
+        exported_count = int(app_components.get(exported_key) or 0)
+        return self._code_evidence_entry(
+            present=exported_count > 0,
+            evidence=f"{exported_key}={exported_count}",
+            details=[f"{label}={int(app_components.get(label) or 0)}"],
+        )
+
+    @staticmethod
+    def _code_evidence_entry(
+        *,
+        present: bool | None,
+        evidence: str,
+        details: list[Any] | None = None,
+    ) -> dict[str, Any]:
+        entry: dict[str, Any] = {
+            "present": present,
+            "evidence": evidence,
+        }
+        if details:
+            entry["details"] = details
+        return entry
+
+    def _readable_app_class_names(
+        self,
+        package_name: str,
+        loaded_outputs: dict[str, Any],
+        runtime_exec_callers: list[str],
+    ) -> list[str]:
+        candidates: list[str] = []
+        package_prefix = package_name.replace(".", "/")
+        if not package_prefix:
+            return []
+
+        aapt2_identity = loaded_outputs.get("aapt2_identity") or {}
+        main_activity = self._first_non_empty(aapt2_identity.get("launchable_activity"))
+        if main_activity:
+            candidates.append(main_activity)
+
+        androguard_components = loaded_outputs.get("androguard_components") or {}
+        for component_type in ("activities", "services", "receivers", "providers"):
+            for component in androguard_components.get(component_type) or []:
+                if not isinstance(component, dict):
+                    continue
+                candidates.append(
+                    self._first_non_empty(
+                        component.get("name"),
+                        component.get("class_name"),
+                    )
+                )
+
+        candidates.extend(runtime_exec_callers)
+
+        readable: list[str] = []
+        for candidate in candidates:
+            text = str(candidate or "").strip()
+            if not text:
+                continue
+            normalized = text.replace(".", "/")
+            if package_prefix not in normalized:
+                continue
+            simple_name = normalized.rsplit("/", 1)[-1].split(";")[0]
+            if self._looks_readable_class_name(simple_name) and simple_name not in readable:
+                readable.append(simple_name)
+        return readable
+
+    @staticmethod
+    def _looks_readable_class_name(value: str) -> bool:
+        text = str(value or "").strip("$;")
+        if len(text) < 4:
+            return False
+        if text.lower() == text or text.upper() == text:
+            return False
+        letters_only = "".join(char for char in text if char.isalpha())
+        if len(letters_only) < 4:
+            return False
+        return sum(char.lower() in "aeiou" for char in letters_only.lower()) >= 2
+
+    def _summarize_code_indicators(self, artifact: dict[str, Any]) -> dict[str, Any]:
+        items = artifact.get("items") or []
+        category_counts: dict[str, int] = {}
+        sample_values_by_category: dict[str, list[str]] = {}
+        sample_locations_by_category: dict[str, list[str]] = {}
+
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            category = self._first_non_empty((item.get("context") or {}).get("category")) or "uncategorized"
+            category_counts[category] = category_counts.get(category, 0) + 1
+
+            value = self._first_non_empty(item.get("value"))
+            if value:
+                sample_values_by_category.setdefault(category, [])
+                if value not in sample_values_by_category[category] and len(sample_values_by_category[category]) < 5:
+                    sample_values_by_category[category].append(value)
+
+            location = self._format_provenance_location(item.get("provenance") or {})
+            if location:
+                sample_locations_by_category.setdefault(category, [])
+                if location not in sample_locations_by_category[category] and len(sample_locations_by_category[category]) < 5:
+                    sample_locations_by_category[category].append(location)
+
+        return {
+            "item_count": len(items),
+            "category_counts": category_counts,
+            "sample_values_by_category": sample_values_by_category,
+            "sample_locations_by_category": sample_locations_by_category,
+        }
+
+    def _summarize_findings(self, artifact: dict[str, Any]) -> dict[str, Any]:
+        items = artifact.get("items") or []
+        severity_counts: dict[str, int] = {}
+        finding_ids: list[str] = []
+        finding_titles: list[str] = []
+        findings: list[dict[str, Any]] = []
+
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+
+            severity = self._first_non_empty(item.get("severity")).lower()
+            if severity:
+                severity_counts[severity] = severity_counts.get(severity, 0) + 1
+
+            finding_id = self._first_non_empty(item.get("id"))
+            title = self._first_non_empty(item.get("title"))
+            if finding_id and finding_id not in finding_ids:
+                finding_ids.append(finding_id)
+            if title and title not in finding_titles:
+                finding_titles.append(title)
+
+            evidence_callers: list[str] = []
+            for evidence_item in item.get("evidence") or []:
+                if not isinstance(evidence_item, dict):
+                    continue
+                caller_signature = self._first_non_empty(((evidence_item.get("caller") or {}).get("signature")))
+                if caller_signature and caller_signature not in evidence_callers and len(evidence_callers) < 5:
+                    evidence_callers.append(caller_signature)
+
+            findings.append(
+                {
+                    "id": finding_id,
+                    "title": title,
+                    "severity": severity,
+                    "confidence": self._first_non_empty(item.get("confidence")),
+                    "sample_callers": evidence_callers,
+                }
+            )
+
+        return {
+            "item_count": len(items),
+            "severity_counts": severity_counts,
+            "finding_ids": finding_ids,
+            "finding_titles": finding_titles,
+            "findings": findings,
+        }
+
+    def _summarize_strings(self, artifact: dict[str, Any]) -> dict[str, Any]:
+        items = artifact.get("items") or []
+        category_counts: dict[str, int] = {}
+        sample_values_by_category: dict[str, list[str]] = {}
+        sample_xrefs_by_category: dict[str, list[str]] = {}
+
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            categories = [str(category).strip() for category in (item.get("categories") or []) if str(category).strip()]
+            value = self._first_non_empty(item.get("value"))
+            xrefs = item.get("xrefs") or []
+
+            for category in categories or ["uncategorized"]:
+                category_counts[category] = category_counts.get(category, 0) + 1
+                if value:
+                    sample_values_by_category.setdefault(category, [])
+                    if value not in sample_values_by_category[category] and len(sample_values_by_category[category]) < 5:
+                        sample_values_by_category[category].append(value)
+
+                for xref in xrefs:
+                    if not isinstance(xref, dict):
+                        continue
+                    signature = self._first_non_empty(xref.get("signature"))
+                    if not signature:
+                        continue
+                    sample_xrefs_by_category.setdefault(category, [])
+                    if signature not in sample_xrefs_by_category[category] and len(sample_xrefs_by_category[category]) < 5:
+                        sample_xrefs_by_category[category].append(signature)
+
+        return {
+            "item_count": len(items),
+            "category_counts": category_counts,
+            "sample_values_by_category": sample_values_by_category,
+            "sample_xrefs_by_category": sample_xrefs_by_category,
         }
 
     def _looks_like_encoded_secret(self, value: str) -> bool:

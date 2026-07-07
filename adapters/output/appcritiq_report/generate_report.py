@@ -85,6 +85,206 @@ STORAGE_EVIDENCE_KEY_BY_CHECK = {
         "does_not_prevent_screen_capture_of_sensitive_information"
     ),
 }
+CODE_EVIDENCE_KEY_BY_CHECK = {
+    "accesses unique identifiers": "accesses_unique_identifiers",
+    "activities accessible to other apps": "activities_accessible_to_other_apps",
+    "app is debuggable": "app_is_debuggable",
+    "contains hard-coded cryptographic key": "contains_hard_coded_cryptographic_key",
+    "contains native code": "contains_native_code",
+    "contains potential hard-coded password": "contains_potential_hard_coded_password",
+    "contains potential sql injection": "contains_potential_sql_injection",
+    "contains reflection code": "contains_reflection_code",
+    "creates blowfish key with weak length": "creates_blowfish_key_with_weak_length",
+    "creates rsa keys with weak modulus length": "creates_rsa_keys_with_weak_modulus_length",
+    "does not update security provider": "does_not_update_security_provider",
+    "receivers accessible to other apps": "receivers_accessible_to_other_apps",
+    "requests root access": "requests_root_access",
+    "services accessible to other apps": "services_accessible_to_other_apps",
+    "sms cve-2014-8610": "sms_cve_2014_8610",
+    "source code is not obfuscated": "source_code_is_not_obfuscated",
+    "uses sha1 hashing algorithm": "uses_sha1_hashing_algorithm",
+    "weakly configured xml parser": "weakly_configured_xml_parser",
+    "writes sensitive information to system log": "writes_sensitive_information_to_system_log",
+    "uses spoofable values for authentication": "uses_spoofable_values_for_authentication",
+    "copies sensitive information into the clipboard without user consent": (
+        "copies_sensitive_information_into_clipboard_without_user_consent"
+    ),
+}
+CODE_CHECK_SPECS = (
+    {
+        "check": "Accesses Unique Identifiers",
+        "severity": "Medium",
+        "compliance": "NIAP: FDP_DEC_EXT.1.1; FDP_DEC_EXT.1.2",
+        "present_explanation": "The app accesses unique device or user identifiers.",
+        "not_present_explanation": "The app does not access any unique identifiers.",
+        "aliases": (),
+    },
+    {
+        "check": "Activities Accessible to Other Apps",
+        "severity": "High",
+        "compliance": "OWASP: 2016-M1-Improper Platform Usage",
+        "present_explanation": "One or more activities are exported or otherwise accessible to other apps.",
+        "not_present_explanation": "No activities are exported, or access to all activities is restricted by use of permissions.",
+        "aliases": ("unprotected exported activity",),
+    },
+    {
+        "check": "App is Debuggable",
+        "severity": "High",
+        "compliance": "OWASP: 2016-M10-Extraneous Functionality",
+        "present_explanation": (
+            "The app is debuggable. A malicious actor with physical access to a device that has USB "
+            "debugging enabled can attach a debugger to the app's process during execution. This is "
+            "dangerous because it could expose sensitive information, enable reverse engineering, and "
+            "allow the execution of arbitrary code."
+        ),
+        "not_present_explanation": "The app is not marked as debuggable based on the available manifest evidence.",
+        "aliases": (),
+    },
+    {
+        "check": "Contains Hard-coded Cryptographic Key",
+        "severity": "High",
+        "compliance": "OWASP: 2016-M5-Insufficient Cryptography; 2016-M9-Reverse Engineering",
+        "present_explanation": "Potential hard-coded cryptographic key material was found in the app.",
+        "not_present_explanation": "No hard-coded cryptographic keys were found in the app.",
+        "aliases": ("contains hard-coded cryptographic key / credentials",),
+    },
+    {
+        "check": "Contains Native Code",
+        "severity": "Medium",
+        "compliance": "OWASP: 2016-M7-Client Code Quality",
+        "present_explanation": "The app loads native code libraries.",
+        "not_present_explanation": "The app does not load native code libraries.",
+        "aliases": (),
+    },
+    {
+        "check": "Contains Potential Hard-coded Password",
+        "severity": "High",
+        "compliance": "OWASP: 2016-M9-Reverse Engineering",
+        "present_explanation": "Potential hard-coded password material was found in the app.",
+        "not_present_explanation": "No hard-coded passwords were found in the app.",
+        "aliases": (),
+    },
+    {
+        "check": "Contains Potential SQL Injection",
+        "severity": "High",
+        "compliance": "OWASP: 2016-M7-Client Code Quality; NIAP: FPT_API_EXT.2.1",
+        "present_explanation": "Potential SQL injection behavior was found in the app.",
+        "not_present_explanation": "No potential SQL injection vulnerabilities were found.",
+        "aliases": (),
+    },
+    {
+        "check": "Contains Reflection Code",
+        "severity": "Medium",
+        "compliance": "",
+        "present_explanation": "The app contains Java reflection code.",
+        "not_present_explanation": "The app does not contain Java reflection code.",
+        "aliases": (),
+    },
+    {
+        "check": "Creates Blowfish Key with Weak Length",
+        "severity": "High",
+        "compliance": "OWASP: 2016-M5-Insufficient Cryptography; NIAP: FCS_COP.1.1(1)",
+        "present_explanation": "The app creates a Blowfish key with less than 128 bits in length.",
+        "not_present_explanation": "The app does not create a Blowfish key with less than 128 bits in length.",
+        "aliases": (),
+    },
+    {
+        "check": "Creates RSA Keys with Weak Modulus Length",
+        "severity": "High",
+        "compliance": "OWASP: 2016-M5-Insufficient Cryptography; NIAP: FCS_CKM.1.1(1)",
+        "present_explanation": "The app creates an RSA key with modulus length less than 1024 bits.",
+        "not_present_explanation": "The app does not create an RSA key with modulus length less than 1024 bits.",
+        "aliases": (),
+    },
+    {
+        "check": "Does not Update Security Provider",
+        "severity": "Medium",
+        "compliance": "OWASP: 2016-M1-Improper Platform Usage; 2016-M5-Insufficient Cryptography",
+        "present_explanation": "The app does not appear to use the dynamic GmsCore_OpenSSL Provider to keep the security provider updated.",
+        "not_present_explanation": "The app uses the dynamic GmsCore_OpenSSL Provider to ensure that the device's security provider is always updated.",
+        "aliases": (),
+    },
+    {
+        "check": "Receivers Accessible to Other Apps",
+        "severity": "High",
+        "compliance": "OWASP: 2016-M1-Improper Platform Usage; NIAP: FMT_CFG_EXT.1.2",
+        "present_explanation": "One or more receivers are exported or otherwise accessible to other apps.",
+        "not_present_explanation": "The app does not contain receivers, no receivers are exported, or access to all exported receivers is restricted by use of permissions.",
+        "aliases": ("unprotected exported receiver",),
+    },
+    {
+        "check": "Requests Root Access",
+        "severity": "High",
+        "compliance": "OWASP: 2016-M8-Code Tampering",
+        "present_explanation": "The app requests root access or superuser privileges. This allows the app to execute more advanced or potentially dangerous operations on the device.",
+        "not_present_explanation": "No root-access or superuser execution requests were identified.",
+        "aliases": (),
+    },
+    {
+        "check": "Services Accessible to Other Apps",
+        "severity": "High",
+        "compliance": "OWASP: 2016-M1-Improper Platform Usage; NIAP: FMT_CFG_EXT.1.2",
+        "present_explanation": "One or more services are exported or otherwise accessible to other apps.",
+        "not_present_explanation": "The app does not contain services, no services are exported, or access to all services is restricted by use of permissions.",
+        "aliases": ("unprotected exported service",),
+    },
+    {
+        "check": "SMS CVE-2014-8610",
+        "severity": "Medium",
+        "compliance": "OWASP: 2016-M1-Improper Platform Usage",
+        "present_explanation": "The app may be exposed to SMS CVE-2014-8610 based on the available messaging evidence.",
+        "not_present_explanation": "The app does not send text messages or has the required SMS permission. It is protected from vulnerability CVE-2014-8610.",
+        "aliases": (),
+    },
+    {
+        "check": "Source Code is not Obfuscated",
+        "severity": "Medium",
+        "compliance": "OWASP: 2016-M9-Reverse Engineering",
+        "present_explanation": "This app does not obfuscate its code by renaming classes, fields, and methods. This means it is possible for an adversary to reverse-engineer the application.",
+        "not_present_explanation": "No strong evidence was found that the app source code is trivially non-obfuscated.",
+        "aliases": (),
+    },
+    {
+        "check": "Uses SHA1 Hashing Algorithm",
+        "severity": "High",
+        "compliance": "OWASP: 2016-M5-Insufficient Cryptography; NIAP: FCS_TUD_EXT.1.6",
+        "present_explanation": "The app uses the SHA1 hashing algorithm, which is vulnerable to collision attacks.",
+        "not_present_explanation": "No SHA1 hashing usage was identified in the available code-analysis evidence.",
+        "aliases": (),
+    },
+    {
+        "check": "Weakly Configured XML Parser",
+        "severity": "Medium",
+        "compliance": "OWASP: 2016-M7-Client Code Quality; NIAP: FPT_API_EXT.2.1",
+        "present_explanation": "Potential weakly configured XML parsing behavior was found.",
+        "not_present_explanation": "No potential weakly configured XML parsing is found.",
+        "aliases": (),
+    },
+    {
+        "check": "Writes Sensitive Information to System Log",
+        "severity": "Medium",
+        "compliance": "OWASP: 2016-M2-Insecure Data Storage; NIAP: FDP_DEC_EXT.1.2; HIPAA: 164.312(a)(2)(iv); GDPR: Articles 5, Article 25, Article 32",
+        "present_explanation": "The app may write sensitive information to the system log.",
+        "not_present_explanation": "This app was not observed to write sensitive information to the system log.",
+        "aliases": (),
+    },
+    {
+        "check": "Uses Spoofable Values for Authentication",
+        "severity": "High",
+        "compliance": "OWASP: 2016-M4-Insecure Authentication",
+        "present_explanation": "The app authenticates using values that may be spoofed.",
+        "not_present_explanation": "This app does not authenticate using values that can be spoofed.",
+        "aliases": (),
+    },
+    {
+        "check": "Copies Sensitive Information into the Clipboard Without User Consent",
+        "severity": "Medium",
+        "compliance": "OWASP: 2016-M2-Insecure Data Storage; HIPAA: 164.312(a)(2)(iv)",
+        "present_explanation": "The app copies sensitive information into the clipboard without the user's consent.",
+        "not_present_explanation": "This app does not copy sensitive information into the clipboard without the user's consent.",
+        "aliases": (),
+    },
+)
 STORAGE_CHECK_SPECS = (
     {
         "check": "Accesses External Storage",
@@ -523,6 +723,7 @@ def _configure_weasyprint_library_path() -> None:
 def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     report_data = _merge_nested(_blank_template(), data)
 
+    _canonicalize_code_section(report_data)
     _canonicalize_storage_section(report_data)
     _canonicalize_network_section(report_data)
     _apply_derived_vulnerability_checks(report_data)
@@ -595,6 +796,31 @@ def _permission_display_name(permission: object) -> str:
     if text.startswith(android_prefix):
         return text[len(android_prefix):]
     return text
+
+
+def _canonicalize_code_section(report_data: dict[str, Any]) -> None:
+    sections = report_data.get("vulnerability_sections")
+    if not isinstance(sections, list):
+        return
+
+    code_section = None
+    for section in sections:
+        if str(section.get("section_name", "")).strip().lower() == "code":
+            code_section = section
+            break
+    if code_section is None:
+        return
+
+    incoming_checks = list(code_section.get("checks") or [])
+    lookup = {
+        _normalized_check_name(check.get("check")): check
+        for check in incoming_checks
+        if isinstance(check, dict) and str(check.get("check", "")).strip()
+    }
+    code_section["checks"] = [
+        _canonical_code_check(report_data, spec, lookup)
+        for spec in CODE_CHECK_SPECS
+    ]
 
 
 def _canonicalize_network_section(report_data: dict[str, Any]) -> None:
@@ -683,6 +909,54 @@ def _canonical_storage_check(
         if alias_source is not None:
             result = _present_not_present(alias_source.get("result")) or result
             explanation = _storage_explanation(spec, result)
+            compliance = _non_empty_string(alias_source.get("compliance")) or compliance
+            evidence = _non_empty_string(alias_source.get("evidence"))
+            remediation_link = _non_empty_string(alias_source.get("remediation_link"))
+
+    return {
+        "check": spec["check"],
+        "result": result,
+        "explanation": explanation,
+        "compliance": compliance,
+        "remediation_link": remediation_link,
+        "evidence": evidence,
+        "severity": spec["severity"],
+    }
+
+
+def _canonical_code_check(
+    report_data: dict[str, Any],
+    spec: dict[str, Any],
+    lookup: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    result = "Not Present"
+    explanation = spec["not_present_explanation"]
+    compliance = spec["compliance"]
+    evidence = ""
+    remediation_link = ""
+
+    canonical_name = _normalized_check_name(spec["check"])
+    source = lookup.get(canonical_name)
+    code_evidence = _code_evidence_entry(report_data, canonical_name)
+
+    if code_evidence is not None and code_evidence.get("present") is not None:
+        result = "Present" if code_evidence.get("present") else "Not Present"
+        explanation = _code_explanation(spec, result)
+        evidence = _non_empty_string(code_evidence.get("evidence"))
+        if source is not None:
+            compliance = _non_empty_string(source.get("compliance")) or compliance
+            remediation_link = _non_empty_string(source.get("remediation_link"))
+    elif source is not None:
+        result = _present_not_present(source.get("result")) or result
+        explanation = _non_empty_string(source.get("explanation")) or _code_explanation(spec, result)
+        compliance = _non_empty_string(source.get("compliance")) or compliance
+        evidence = _non_empty_string(source.get("evidence"))
+        remediation_link = _non_empty_string(source.get("remediation_link"))
+    else:
+        alias_source = _first_matching_alias(spec, lookup)
+        if alias_source is not None:
+            result = _present_not_present(alias_source.get("result")) or result
+            explanation = _code_explanation(spec, result)
             compliance = _non_empty_string(alias_source.get("compliance")) or compliance
             evidence = _non_empty_string(alias_source.get("evidence"))
             remediation_link = _non_empty_string(alias_source.get("remediation_link"))
@@ -1013,6 +1287,19 @@ def _storage_evidence_entry(report_data: dict[str, Any], canonical_check_name: s
     return entry
 
 
+def _code_evidence_entry(report_data: dict[str, Any], canonical_check_name: str) -> dict[str, Any] | None:
+    code_evidence = report_data.get("code_evidence")
+    if not isinstance(code_evidence, dict):
+        return None
+    evidence_key = CODE_EVIDENCE_KEY_BY_CHECK.get(canonical_check_name)
+    if not evidence_key:
+        return None
+    entry = code_evidence.get(evidence_key)
+    if not isinstance(entry, dict):
+        return None
+    return entry
+
+
 def _first_matching_network_alias(
     spec: dict[str, Any],
     lookup: dict[str, dict[str, Any]],
@@ -1091,6 +1378,12 @@ def _network_explanation(spec: dict[str, Any], result: str) -> str:
 
 
 def _storage_explanation(spec: dict[str, Any], result: str) -> str:
+    if _normalized_check_name(result) == "present":
+        return spec["present_explanation"]
+    return spec["not_present_explanation"]
+
+
+def _code_explanation(spec: dict[str, Any], result: str) -> str:
     if _normalized_check_name(result) == "present":
         return spec["present_explanation"]
     return spec["not_present_explanation"]
