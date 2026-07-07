@@ -29,6 +29,7 @@ def test_android_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Pa
     _write_json(scan_dir / "aapt2" / "manifest_security_posture.json", {"posture_kind": "facts"})
     _write_json(scan_dir / "aapt2" / "permissions.json", {"permissions": []})
     _write_json(scan_dir / "apksigner" / "signing_evidence.json", {"verification": {}})
+    _write_json(scan_dir / "apktool" / "manifest_summary.json", {"application": {"debuggable": "true"}})
     _write_json(scan_dir / "apktool" / "permissions.json", {"declared": []})
     _write_json(scan_dir / "apktool" / "secrets_endpoints.json", {"items": []})
     _write_json(scan_dir / "apktool" / "network_security_config.json", {"config_file_present": False})
@@ -50,6 +51,7 @@ def test_android_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Pa
     assert loaded["aapt2_manifest_security_posture"] == {"posture_kind": "facts"}
     assert loaded["aapt2_permissions"] == {"permissions": []}
     assert loaded["apksigner_signing_evidence"] == {"verification": {}}
+    assert loaded["apktool_manifest_summary"] == {"application": {"debuggable": "true"}}
     assert loaded["apktool_permissions"] == {"declared": []}
     assert loaded["apktool_secrets_endpoints"] == {"items": []}
     assert loaded["apktool_network_security_config"] == {"config_file_present": False}
@@ -98,9 +100,17 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
         },
         "aapt2_application": {
             "uses_cleartext_traffic": None,
+            "debuggable": None,
+            "allow_backup": None,
         },
         "aapt2_manifest_security_posture": {
             "cleartext_traffic_permitted": None,
+        },
+        "apktool_manifest_summary": {
+            "application": {
+                "debuggable": "false",
+                "allow_backup": "true",
+            }
         },
         "aapt2_permissions": {
             "permissions": [
@@ -258,6 +268,8 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
         "min_sdk": "19",
         "max_sdk": "",
         "version_name": "3.20.70",
+        "debuggable": "false",
+        "allow_backup": "true",
         "app_store_id": "",
         "developer": "",
         "categories": "",
@@ -356,6 +368,13 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
         "present": True,
         "explanation": "Detect whether the app declares Android location permissions or uses Android location-related APIs.",
     }
+    assert sections["application"] == {
+        "debuggable": "false",
+        "allow_backup": "true",
+        "uses_cleartext_traffic": "",
+    }
+    assert sections["app_info"]["debuggable"] == "false"
+    assert sections["app_info"]["allow_backup"] == "true"
     assert sections["functionality"]["Camera"] == {
         "present": True,
         "explanation": "permission android.permission.CAMERA, which may indicate camera functionality.",

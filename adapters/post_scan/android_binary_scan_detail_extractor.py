@@ -283,6 +283,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     def extract_sections(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
         return {
             "app_info": self._build_app_info(loaded_outputs),
+            "application": self._build_application(loaded_outputs),
             "app_components": self._build_app_components(loaded_outputs),
             "certificate": self._build_certificate(loaded_outputs),
             "file_info": self._build_file_info(loaded_outputs),
@@ -298,6 +299,8 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     def _build_app_info(self, loaded_outputs: dict[str, Any]) -> dict[str, str]:
         androguard_metadata = loaded_outputs.get("androguard_metadata") or {}
         aapt2_identity = loaded_outputs.get("aapt2_identity") or {}
+        apktool_manifest_summary = loaded_outputs.get("apktool_manifest_summary") or {}
+        manifest_application = apktool_manifest_summary.get("application") or {}
 
         return {
             "icon_path": "",
@@ -323,10 +326,36 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
                 androguard_metadata.get("version_name"),
                 aapt2_identity.get("version_name"),
             ),
+            "debuggable": self._first_non_empty(
+                manifest_application.get("debuggable"),
+            ),
+            "allow_backup": self._first_non_empty(
+                manifest_application.get("allow_backup"),
+            ),
             "app_store_id": "",
             "developer": "",
             "categories": "",
             "trackers_detected": "",
+        }
+
+    def _build_application(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
+        aapt2_application = loaded_outputs.get("aapt2_application") or {}
+        apktool_manifest_summary = loaded_outputs.get("apktool_manifest_summary") or {}
+        manifest_application = apktool_manifest_summary.get("application") or {}
+
+        return {
+            "debuggable": self._first_non_empty(
+                manifest_application.get("debuggable"),
+                aapt2_application.get("debuggable"),
+            ),
+            "allow_backup": self._first_non_empty(
+                manifest_application.get("allow_backup"),
+                aapt2_application.get("allow_backup"),
+            ),
+            "uses_cleartext_traffic": self._first_non_empty(
+                manifest_application.get("uses_cleartext_traffic"),
+                aapt2_application.get("uses_cleartext_traffic"),
+            ),
         }
 
     def _build_app_components(self, loaded_outputs: dict[str, Any]) -> dict[str, int]:

@@ -29,6 +29,7 @@ class AndroidBinaryScanOutputLoader(ScanOutputLoaderPort):
             "aapt2_manifest_security_posture": self._load_json(root / "aapt2" / "manifest_security_posture.json"),
             "aapt2_permissions": self._load_json(root / "aapt2" / "permissions.json"),
             "apksigner_signing_evidence": self._load_json(root / "apksigner" / "signing_evidence.json"),
+            "apktool_manifest_summary": self._load_json(root / "apktool" / "manifest_summary.json"),
             "apktool_permissions": self._load_json(root / "apktool" / "permissions.json"),
             "apktool_secrets_endpoints": self._load_json(root / "apktool" / "secrets_endpoints.json"),
             "apktool_network_security_config": self._load_json(root / "apktool" / "network_security_config.json"),
