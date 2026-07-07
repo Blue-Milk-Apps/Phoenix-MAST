@@ -526,6 +526,8 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     _canonicalize_storage_section(report_data)
     _canonicalize_network_section(report_data)
     _apply_derived_vulnerability_checks(report_data)
+    _ensure_functionality_details(report_data)
+    _order_functionality_section(report_data)
     report_data["vulnerability_sections"] = [
         s for s in report_data.get("vulnerability_sections", [])
         if (s.get("section_name") or "").strip().lower() not in EXCLUDED_VULN_SECTIONS
@@ -535,6 +537,44 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     report_data["findings_severity"] = _build_findings_severity(report_data)
 
     return _prune_placeholder_rows(report_data)
+
+
+def _ensure_functionality_details(report_data: dict[str, Any]) -> None:
+    functionality = report_data.get("functionality")
+    if not isinstance(functionality, dict):
+        return
+
+    for name, details in functionality.items():
+        if not isinstance(details, dict):
+            continue
+        if _non_empty_string(details.get("explanation")):
+            continue
+        if bool(details.get("present")):
+            details["explanation"] = f"{name} functionality was identified in the available scan evidence."
+        else:
+            details["explanation"] = f"No permission or scan evidence indicated {name} functionality."
+
+
+def _order_functionality_section(report_data: dict[str, Any]) -> None:
+    functionality = report_data.get("functionality")
+    if not isinstance(functionality, dict):
+        return
+
+    present_items: list[tuple[str, dict[str, Any]]] = []
+    absent_items: list[tuple[str, dict[str, Any]]] = []
+
+    for name, details in functionality.items():
+        if not isinstance(details, dict):
+            continue
+        if bool(details.get("present")):
+            present_items.append((name, details))
+        else:
+            absent_items.append((name, details))
+
+    ordered: dict[str, dict[str, Any]] = {}
+    for name, details in [*present_items, *absent_items]:
+        ordered[name] = details
+    report_data["functionality"] = ordered
 
 
 def _canonicalize_network_section(report_data: dict[str, Any]) -> None:

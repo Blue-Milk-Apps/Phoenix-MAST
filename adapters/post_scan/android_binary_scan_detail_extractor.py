@@ -707,7 +707,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         functionality = {
             key: {
                 "present": False,
-                "explanation": "",
+                "explanation": self._absent_functionality_explanation(key),
             }
             for key in self.FUNCTIONALITY_KEYS
         }
@@ -992,6 +992,14 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         if opengrep_explanation:
             return opengrep_explanation
         return permission_explanation
+
+    @staticmethod
+    def _absent_functionality_explanation(capability: str) -> str:
+        capability_label = AndroidBinaryScanDetailExtractor.FUNCTIONALITY_EXPLANATION_LABELS.get(
+            capability,
+            capability.lower(),
+        )
+        return f"No permission or scan evidence indicated {capability_label} functionality."
 
     @staticmethod
     def _permission_based_functionality_explanation(capability: str, permission_names: list[str]) -> str:

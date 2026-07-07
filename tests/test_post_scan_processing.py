@@ -378,7 +378,7 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
     }
     assert sections["functionality"]["Audio"] == {
         "present": False,
-        "explanation": "",
+        "explanation": "No permission or scan evidence indicated audio functionality.",
     }
     assert sections["hardcoded_values"] == {
         "urls": [

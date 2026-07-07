@@ -147,7 +147,7 @@
     <tr>
       <td>{{ name }}</td>
       <td>{{ risk_badge('Info' if f.present else 'N/A', label=('Present' if f.present else 'Not Present')) }}</td>
-      <td>{{ f.explanation if f.present else '' }}</td>
+      <td>{{ f.explanation }}</td>
     </tr>
     {% endfor %}
   </table>

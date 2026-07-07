@@ -192,3 +192,38 @@ def test_load_report_data_keeps_storage_defaults_when_no_supporting_evidence_exi
 
     assert [check["check"] for check in checks] == CANONICAL_STORAGE_CHECKS
     assert all(check["result"] == "Not Present" for check in checks)
+
+
+def test_load_report_data_orders_present_functionalities_before_absent_ones() -> None:
+    report = load_report_data(
+        {
+            "functionality": {
+                "Audio": {
+                    "present": False,
+                    "explanation": "No permission or scan evidence indicated audio functionality.",
+                },
+                "Camera": {
+                    "present": True,
+                    "explanation": "permission android.permission.CAMERA, which may indicate camera functionality.",
+                },
+                "Bluetooth": {
+                    "present": False,
+                    "explanation": "No permission or scan evidence indicated Bluetooth functionality.",
+                },
+                "Location": {
+                    "present": True,
+                    "explanation": "Location usage detected.",
+                },
+            }
+        }
+    )
+
+    functionality_items = list(report["functionality"].items())
+    assert {name for name, _details in functionality_items[:2]} == {"Camera", "Location"}
+    assert all(details["present"] is False for _name, details in functionality_items[2:])
+    assert report["functionality"]["Audio"]["explanation"] == (
+        "No permission or scan evidence indicated audio functionality."
+    )
+    assert report["functionality"]["Contacts"]["explanation"] == (
+        "No permission or scan evidence indicated Contacts functionality."
+    )
