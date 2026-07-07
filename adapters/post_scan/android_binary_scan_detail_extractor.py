@@ -249,6 +249,8 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "file_info": self._build_file_info(loaded_outputs),
             "permissions": self._build_permissions(loaded_outputs),
             "functionality": self._build_functionality(loaded_outputs),
+            "network_evidence": self._build_network_evidence(loaded_outputs),
+            "deep_links": self._build_deep_links(loaded_outputs),
             "hardcoded_values": self._build_hardcoded_values(loaded_outputs),
             "endpoints": self._build_endpoints(loaded_outputs),
         }
@@ -452,6 +454,89 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
 
         return endpoints
 
+    def _build_network_evidence(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
+        network_security = loaded_outputs.get("apktool_network_security_config") or {}
+        aapt2_application = loaded_outputs.get("aapt2_application") or {}
+        aapt2_posture = loaded_outputs.get("aapt2_manifest_security_posture") or {}
+
+        domains = network_security.get("domains") or []
+        provenance = network_security.get("provenance") or {}
+        provenance_path = self._first_non_empty(provenance.get("path"), provenance.get("source"))
+        cleartext_present = self._coerce_true(
+            network_security.get("effective_cleartext_traffic_default")
+        ) or self._coerce_true(network_security.get("manifest_uses_cleartext_traffic"))
+
+        user_installed_ca_present = any(
+            "user" in {str(anchor).strip().lower() for anchor in (domain.get("trust_anchors") or [])}
+            for domain in domains
+        ) or any(
+            "user" in {str(anchor).strip().lower() for anchor in (override.get("trust_anchors") or [])}
+            for override in (network_security.get("debug_overrides") or [])
+        )
+
+        config_file_present = self._coerce_true(network_security.get("config_file_present"))
+        pin_sets_present = any(int(domain.get("pin_sets") or 0) > 0 for domain in domains)
+        missing_certificate_pinning = None
+        if config_file_present is True:
+            missing_certificate_pinning = not pin_sets_present
+        elif config_file_present is False:
+            missing_certificate_pinning = True
+
+        return {
+            "allows_cleartext_traffic_for_all_domains": {
+                "present": bool(cleartext_present),
+                "evidence": provenance_path or self._first_non_empty(network_security.get("policy_source")),
+            },
+            "contains_hostname_verifier_accepts_all": {
+                "present": None,
+                "evidence": "",
+            },
+            "contains_x509_trust_manager_accepts_all": {
+                "present": None,
+                "evidence": "",
+            },
+            "does_not_perform_certificate_pinning": {
+                "present": missing_certificate_pinning,
+                "evidence": provenance_path or self._first_non_empty(network_security.get("reference")),
+            },
+            "opens_listening_port": {
+                "present": None,
+                "evidence": "",
+            },
+            "sensitive_cookies_lack_security_attributes": {
+                "present": None,
+                "evidence": "",
+            },
+            "unnecessary_information_transmitted": {
+                "present": None,
+                "evidence": "",
+            },
+            "sensitive_information_unencrypted_in_transit": {
+                "present": None,
+                "evidence": "",
+            },
+            "password_not_hashed_in_transit": {
+                "present": None,
+                "evidence": "",
+            },
+            "weak_certificate_validation_enables_mitm": {
+                "present": user_installed_ca_present,
+                "evidence": provenance_path or self._first_non_empty(network_security.get("reference")),
+            },
+            "manifest_cleartext_traffic_permitted": self._coerce_true(
+                aapt2_posture.get("cleartext_traffic_permitted")
+            )
+            if aapt2_posture
+            else self._coerce_bool_like(aapt2_application.get("uses_cleartext_traffic")),
+        }
+
+    def _build_deep_links(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
+        apktool_deep_links = loaded_outputs.get("apktool_deep_links") or {}
+        deep_links = apktool_deep_links.get("deep_links")
+        if isinstance(deep_links, list):
+            return {"deep_links": deep_links}
+        return {"deep_links": []}
+
     def _build_hardcoded_values(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
         apktool_secrets_endpoints = loaded_outputs.get("apktool_secrets_endpoints") or {}
         strings_outputs = loaded_outputs.get("strings_outputs") or {}
@@ -526,6 +611,19 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
 
     def _looks_like_secret_label(self, value: str) -> bool:
         return self.SECRET_LABEL_PATTERN.fullmatch(value.strip()) is not None
+
+    @staticmethod
+    def _coerce_true(value: object) -> bool:
+        return str(value or "").strip().lower() == "true"
+
+    @staticmethod
+    def _coerce_bool_like(value: object) -> bool | None:
+        text = str(value or "").strip().lower()
+        if text in {"true", "1", "yes"}:
+            return True
+        if text in {"false", "0", "no"}:
+            return False
+        return None
 
     def _build_functionality(self, loaded_outputs: dict[str, Any]) -> dict[str, dict[str, Any]]:
         opengrep = loaded_outputs.get("opengrep") or {}

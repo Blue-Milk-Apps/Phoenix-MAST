@@ -58,6 +58,18 @@ CACHE_HINTS = ("cache/", "/cache/", "cache\\", "webviewcache", "httpcache")
 DEPRECATED_NETWORK_CHECK_NAMES = {
     "api authentication weakness (weak token handling / api key used as authentication)",
 }
+NETWORK_EVIDENCE_KEY_BY_CHECK = {
+    "allows cleartext traffic for all domains": "allows_cleartext_traffic_for_all_domains",
+    "contains hostnameverifier that accepts all hostnames": "contains_hostname_verifier_accepts_all",
+    "contains x509trustmanager that accepts all certificates": "contains_x509_trust_manager_accepts_all",
+    "does not perform certificate pinning": "does_not_perform_certificate_pinning",
+    "opens a listening port": "opens_listening_port",
+    "sensitive cookies lack security attributes": "sensitive_cookies_lack_security_attributes",
+    "unnecessary information transmitted": "unnecessary_information_transmitted",
+    "sensitive information is unencrypted in transit": "sensitive_information_unencrypted_in_transit",
+    "password is not hashed in transit": "password_not_hashed_in_transit",
+    "weak certificate validation enables mitm attacks": "weak_certificate_validation_enables_mitm",
+}
 NETWORK_CHECK_SPECS = (
     {
         "check": "Allows Cleartext Traffic for All Domains",
@@ -458,8 +470,16 @@ def _canonical_network_check(
 
     canonical_name = _normalized_check_name(spec["check"])
     source = lookup.get(canonical_name)
+    network_evidence = _network_evidence_entry(report_data, canonical_name)
 
-    if source is not None:
+    if network_evidence is not None and network_evidence.get("present") is not None:
+        result = "Present" if network_evidence.get("present") else "Not Present"
+        explanation = _network_explanation(spec, result)
+        evidence = _non_empty_string(network_evidence.get("evidence"))
+        if source is not None:
+            compliance = _non_empty_string(source.get("compliance")) or compliance
+            remediation_link = _non_empty_string(source.get("remediation_link"))
+    elif source is not None:
         result = _present_not_present(source.get("result")) or result
         explanation = _non_empty_string(source.get("explanation")) or _network_explanation(spec, result)
         compliance = _non_empty_string(source.get("compliance")) or compliance
@@ -472,7 +492,11 @@ def _canonical_network_check(
             explanation = _network_explanation(spec, result)
             evidence = _non_empty_string(alias_source.get("evidence"))
 
-    if source is None and canonical_name == "allows cleartext traffic for all domains":
+    if (
+        source is None
+        and (network_evidence is None or network_evidence.get("present") is None)
+        and canonical_name == "allows cleartext traffic for all domains"
+    ):
         cleartext_result, cleartext_evidence = _derive_cleartext_check(report_data, lookup)
         if cleartext_result is not None:
             result = cleartext_result
@@ -480,7 +504,11 @@ def _canonical_network_check(
             if cleartext_evidence:
                 evidence = cleartext_evidence
 
-    if source is None and canonical_name == "weak certificate validation enables mitm attacks":
+    if (
+        source is None
+        and (network_evidence is None or network_evidence.get("present") is None)
+        and canonical_name == "weak certificate validation enables mitm attacks"
+    ):
         mitm_result, mitm_evidence = _derive_mitm_check(lookup)
         if mitm_result is not None:
             result = mitm_result
@@ -716,6 +744,19 @@ def _secret_entries(report_data: dict[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(secrets, list):
         return []
     return [secret for secret in secrets if isinstance(secret, dict)]
+
+
+def _network_evidence_entry(report_data: dict[str, Any], canonical_check_name: str) -> dict[str, Any] | None:
+    network_evidence = report_data.get("network_evidence")
+    if not isinstance(network_evidence, dict):
+        return None
+    evidence_key = NETWORK_EVIDENCE_KEY_BY_CHECK.get(canonical_check_name)
+    if not evidence_key:
+        return None
+    entry = network_evidence.get(evidence_key)
+    if not isinstance(entry, dict):
+        return None
+    return entry
 
 
 def _first_matching_network_alias(

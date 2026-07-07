@@ -25,10 +25,13 @@ def test_android_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Pa
     _write_json(scan_dir / "aapt2" / "components.json", {"activities": []})
     _write_json(scan_dir / "aapt2" / "identity.json", {"application_label": "APKPure"})
     _write_json(scan_dir / "aapt2" / "application.json", {"id": "app"})
+    _write_json(scan_dir / "aapt2" / "manifest_security_posture.json", {"posture_kind": "facts"})
     _write_json(scan_dir / "aapt2" / "permissions.json", {"permissions": []})
     _write_json(scan_dir / "apksigner" / "signing_evidence.json", {"verification": {}})
     _write_json(scan_dir / "apktool" / "permissions.json", {"declared": []})
     _write_json(scan_dir / "apktool" / "secrets_endpoints.json", {"items": []})
+    _write_json(scan_dir / "apktool" / "network_security_config.json", {"config_file_present": False})
+    _write_json(scan_dir / "apktool" / "deep_links.json", {"deep_links": []})
 
     loaded = AndroidBinaryScanOutputLoader().load(scan_dir)
 
@@ -42,10 +45,13 @@ def test_android_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Pa
     assert loaded["aapt2_components"] == {"activities": []}
     assert loaded["aapt2_identity"] == {"application_label": "APKPure"}
     assert loaded["aapt2_application"] == {"id": "app"}
+    assert loaded["aapt2_manifest_security_posture"] == {"posture_kind": "facts"}
     assert loaded["aapt2_permissions"] == {"permissions": []}
     assert loaded["apksigner_signing_evidence"] == {"verification": {}}
     assert loaded["apktool_permissions"] == {"declared": []}
     assert loaded["apktool_secrets_endpoints"] == {"items": []}
+    assert loaded["apktool_network_security_config"] == {"config_file_present": False}
+    assert loaded["apktool_deep_links"] == {"deep_links": []}
 
 
 def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() -> None:
@@ -87,6 +93,12 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
             "launchable_activity": "com.apkpure.aegon.main.activity.FirstSeemPageActivity",
             "target_sdk_version": "34",
             "version_name": "3.20.70",
+        },
+        "aapt2_application": {
+            "uses_cleartext_traffic": None,
+        },
+        "aapt2_manifest_security_posture": {
+            "cleartext_traffic_permitted": None,
         },
         "aapt2_permissions": {
             "permissions": [
@@ -176,6 +188,17 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
                 }
             ]
         },
+        "apktool_network_security_config": {
+            "config_file_present": False,
+            "effective_cleartext_traffic_default": "true",
+            "manifest_uses_cleartext_traffic": "",
+            "policy_source": "manifest_default_no_network_security_config",
+            "domains": [],
+            "debug_overrides": [],
+            "provenance": {"path": "AndroidManifest.xml"},
+            "reference": "",
+        },
+        "apktool_deep_links": {"deep_links": []},
         "apktool_secrets_endpoints": {
             "items": [
                 {
@@ -275,49 +298,49 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
             "status": "dangerous",
             "info": "dangerous",
             "usage_description": "",
-            "general_description": "",
+            "general_description": "Allows the app to access precise location from GPS and other location providers.",
         },
         {
             "permission": "android.permission.CAMERA",
             "status": "dangerous",
             "info": "dangerous",
             "usage_description": "",
-            "general_description": "",
+            "general_description": "Allows the app to access the device camera.",
         },
         {
             "permission": "android.permission.RECORD_AUDIO",
             "status": "dangerous",
             "info": "dangerous",
             "usage_description": "",
-            "general_description": "",
+            "general_description": "Allows the app to capture audio using the microphone.",
         },
         {
             "permission": "android.permission.READ_CONTACTS",
             "status": "dangerous",
             "info": "dangerous",
             "usage_description": "",
-            "general_description": "",
+            "general_description": "Allows the app to read the user's contacts data.",
         },
         {
             "permission": "android.permission.READ_CALENDAR",
             "status": "dangerous",
             "info": "dangerous",
             "usage_description": "",
-            "general_description": "",
+            "general_description": "Allows the app to read calendar events and related details stored on the device.",
         },
         {
             "permission": "android.permission.BLUETOOTH_CONNECT",
             "status": "normal",
             "info": "unknown or normal",
             "usage_description": "",
-            "general_description": "",
+            "general_description": "Allows the app to connect to nearby Bluetooth devices.",
         },
         {
             "permission": "android.permission.INTERNET",
             "status": "normal",
             "info": "unknown or normal",
             "usage_description": "",
-            "general_description": "",
+            "general_description": "Allows the app to open network sockets and communicate over the internet.",
         },
         {
             "permission": "com.apkpure.aegon.permission.PROCESS_PUSH_MSG",
@@ -1119,21 +1142,49 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
             "status": "dangerous",
             "info": "dangerous",
             "usage_description": "",
-            "general_description": "",
+            "general_description": "Allows the app to access precise location from GPS and other location providers.",
         },
         {
             "permission": "android.permission.CAMERA",
             "status": "dangerous",
             "info": "dangerous",
             "usage_description": "",
-            "general_description": "",
+            "general_description": "Allows the app to access the device camera.",
+        },
+        {
+            "permission": "android.permission.RECORD_AUDIO",
+            "status": "dangerous",
+            "info": "dangerous",
+            "usage_description": "",
+            "general_description": "Allows the app to capture audio using the microphone.",
+        },
+        {
+            "permission": "android.permission.READ_CONTACTS",
+            "status": "dangerous",
+            "info": "dangerous",
+            "usage_description": "",
+            "general_description": "Allows the app to read the user's contacts data.",
+        },
+        {
+            "permission": "android.permission.READ_CALENDAR",
+            "status": "dangerous",
+            "info": "dangerous",
+            "usage_description": "",
+            "general_description": "Allows the app to read calendar events and related details stored on the device.",
+        },
+        {
+            "permission": "android.permission.BLUETOOTH_CONNECT",
+            "status": "normal",
+            "info": "unknown or normal",
+            "usage_description": "",
+            "general_description": "Allows the app to connect to nearby Bluetooth devices.",
         },
         {
             "permission": "android.permission.INTERNET",
             "status": "normal",
             "info": "unknown or normal",
             "usage_description": "",
-            "general_description": "",
+            "general_description": "Allows the app to open network sockets and communicate over the internet.",
         },
     ]
     assert result["functionality"]["Location"]["present"] is True
@@ -1141,6 +1192,50 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
         "present": True,
         "explanation": "permission android.permission.CAMERA, which may indicate camera functionality.",
     }
+    assert result["network_evidence"] == {
+        "allows_cleartext_traffic_for_all_domains": {
+            "present": True,
+            "evidence": "AndroidManifest.xml",
+        },
+        "contains_hostname_verifier_accepts_all": {
+            "present": None,
+            "evidence": "",
+        },
+        "contains_x509_trust_manager_accepts_all": {
+            "present": None,
+            "evidence": "",
+        },
+        "does_not_perform_certificate_pinning": {
+            "present": True,
+            "evidence": "AndroidManifest.xml",
+        },
+        "opens_listening_port": {
+            "present": None,
+            "evidence": "",
+        },
+        "sensitive_cookies_lack_security_attributes": {
+            "present": None,
+            "evidence": "",
+        },
+        "unnecessary_information_transmitted": {
+            "present": None,
+            "evidence": "",
+        },
+        "sensitive_information_unencrypted_in_transit": {
+            "present": None,
+            "evidence": "",
+        },
+        "password_not_hashed_in_transit": {
+            "present": None,
+            "evidence": "",
+        },
+        "weak_certificate_validation_enables_mitm": {
+            "present": False,
+            "evidence": "AndroidManifest.xml",
+        },
+        "manifest_cleartext_traffic_permitted": None,
+    }
+    assert result["deep_links"] == {"deep_links": []}
     assert result["hardcoded_values"] == {
         "urls": [
             {

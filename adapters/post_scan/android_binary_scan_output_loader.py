@@ -25,10 +25,13 @@ class AndroidBinaryScanOutputLoader(ScanOutputLoaderPort):
             "aapt2_components": self._load_json(root / "aapt2" / "components.json"),
             "aapt2_identity": self._load_json(root / "aapt2" / "identity.json"),
             "aapt2_application": self._load_json(root / "aapt2" / "application.json"),
+            "aapt2_manifest_security_posture": self._load_json(root / "aapt2" / "manifest_security_posture.json"),
             "aapt2_permissions": self._load_json(root / "aapt2" / "permissions.json"),
             "apksigner_signing_evidence": self._load_json(root / "apksigner" / "signing_evidence.json"),
             "apktool_permissions": self._load_json(root / "apktool" / "permissions.json"),
             "apktool_secrets_endpoints": self._load_json(root / "apktool" / "secrets_endpoints.json"),
+            "apktool_network_security_config": self._load_json(root / "apktool" / "network_security_config.json"),
+            "apktool_deep_links": self._load_json(root / "apktool" / "deep_links.json"),
             "strings_outputs": self._load_strings_outputs(root / "strings"),
         }
 

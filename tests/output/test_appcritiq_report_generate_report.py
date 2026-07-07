@@ -87,6 +87,39 @@ def test_load_report_data_derives_mitm_from_hostname_verifier() -> None:
         raise AssertionError("Network section missing")
 
 
+def test_load_report_data_uses_network_evidence_bundle_for_actual_checks() -> None:
+    report = load_report_data(
+        {
+            "network_evidence": {
+                "allows_cleartext_traffic_for_all_domains": {
+                    "present": True,
+                    "evidence": "AndroidManifest.xml",
+                },
+                "does_not_perform_certificate_pinning": {
+                    "present": True,
+                    "evidence": "res/xml/network_security_config.xml",
+                },
+                "weak_certificate_validation_enables_mitm": {
+                    "present": True,
+                    "evidence": "res/xml/network_security_config.xml",
+                },
+            }
+        }
+    )
+
+    for section in report["vulnerability_sections"]:
+        if section["section_name"] != "Network":
+            continue
+        check_map = _check_map(section["checks"])
+        assert check_map["Allows Cleartext Traffic for All Domains"]["result"] == "Present"
+        assert check_map["Allows Cleartext Traffic for All Domains"]["evidence"] == "AndroidManifest.xml"
+        assert check_map["Does not Perform Certificate Pinning"]["result"] == "Present"
+        assert check_map["Weak Certificate Validation Enables MitM Attacks"]["result"] == "Present"
+        break
+    else:
+        raise AssertionError("Network section missing")
+
+
 def test_load_report_data_keeps_network_defaults_when_no_supporting_evidence_exists() -> None:
     checks = _network_checks(BASE_DIR / "blank_template.json")
 
