@@ -26,6 +26,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     PASSWORD_HINT_PATTERN = re.compile(
         r"(?i)(?:passw(?:or)?d|passwd|pwd|newpassword|passcode|credential|login|auth)"
     )
+    FLAG_SECURE_PATTERN = re.compile(r"(?i)\bflag_secure\b")
+    SENSITIVE_UI_HINT_PATTERN = re.compile(
+        r"(?i)(?:login|logon|signin|signup|password|passcode|pin|account|transfer|statement|payment|auth|profile)"
+    )
     EXTERNAL_STORAGE_PERMISSIONS = {
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
@@ -652,6 +656,8 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         if credential_storage_callers and not keystore_present:
             authentication_credentials_present = True
 
+        screen_capture_protection = self._detect_screen_capture_protection(loaded_outputs)
+
         return {
             "accesses_external_storage": {
                 "present": bool(accesses_external_storage_evidence),
@@ -669,10 +675,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
                 "present": None,
                 "evidence": "",
             },
-            "does_not_prevent_screen_capture_of_sensitive_information": {
-                "present": None,
-                "evidence": "",
-            },
+            "does_not_prevent_screen_capture_of_sensitive_information": screen_capture_protection,
         }
 
     def _build_hardcoded_values(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
@@ -1601,6 +1604,47 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             }
         return {"present": None, "evidence": ""}
 
+    def _detect_screen_capture_protection(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
+        package_prefix = self._first_non_empty(
+            ((loaded_outputs.get("aapt2_identity") or {}).get("package_name")),
+            ((loaded_outputs.get("androguard_metadata") or {}).get("package")),
+        ).replace(".", "/")
+        api_calls = list(((loaded_outputs.get("androguard_api_calls") or {}).get("items") or []))
+        strings_outputs = loaded_outputs.get("strings_outputs") or {}
+
+        secure_flag_callers = self._matching_api_call_sites(
+            api_calls,
+            lambda item: self._caller_matches_package(item, package_prefix)
+            and self._is_window_flag_api_call(item),
+        )
+        secure_flag_source_hits = self._matching_strings_output_sources(
+            strings_outputs=strings_outputs,
+            pattern=self.FLAG_SECURE_PATTERN,
+            package_prefix=package_prefix,
+        )
+        sensitive_ui_classes = self._sensitive_ui_class_names(loaded_outputs, package_prefix)
+
+        secure_hits = self._dedupe_preserve_order([*secure_flag_callers, *secure_flag_source_hits])
+        if secure_hits:
+            return {
+                "present": False,
+                "evidence": secure_hits[0],
+                "details": secure_hits[:10],
+            }
+
+        if sensitive_ui_classes:
+            listed = ", ".join(sensitive_ui_classes[:5])
+            return {
+                "present": True,
+                "evidence": f"no FLAG_SECURE usage found in sensitive UI classes: {listed}",
+                "details": sensitive_ui_classes[:10],
+            }
+
+        return {
+            "present": None,
+            "evidence": "",
+        }
+
     def _matching_api_call_sites(
         self,
         api_calls: list[dict[str, Any]],
@@ -1635,6 +1679,67 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             caller.get("class_name"),
             caller.get("method_name"),
         )
+
+    def _caller_matches_package(self, item: dict[str, Any], package_prefix: str) -> bool:
+        if not package_prefix:
+            return False
+        caller_signature = self._api_call_caller_signature(item)
+        return package_prefix in caller_signature.replace(".", "/")
+
+    def _is_window_flag_api_call(self, item: dict[str, Any]) -> bool:
+        signature = self._api_call_signature(item).lower()
+        method_name = self._api_call_method_name(item).lower()
+        if method_name not in {"addflags", "setflags"}:
+            return False
+        return "android/view/window" in signature or "layoutparams" in signature
+
+    def _matching_strings_output_sources(
+        self,
+        *,
+        strings_outputs: dict[str, str],
+        pattern: re.Pattern[str],
+        package_prefix: str,
+    ) -> list[str]:
+        matches: list[str] = []
+        for source_name, content in strings_outputs.items():
+            if pattern.search(content or "") is None:
+                continue
+            normalized_source = source_name.replace(".", "/")
+            if package_prefix and package_prefix not in normalized_source:
+                continue
+            matches.append(f"strings/{source_name}")
+        return self._dedupe_preserve_order(matches)
+
+    def _sensitive_ui_class_names(self, loaded_outputs: dict[str, Any], package_prefix: str) -> list[str]:
+        candidates: list[str] = []
+        aapt2_identity = loaded_outputs.get("aapt2_identity") or {}
+        main_activity = self._first_non_empty(aapt2_identity.get("launchable_activity"))
+        if main_activity:
+            candidates.append(main_activity)
+
+        androguard_components = loaded_outputs.get("androguard_components") or {}
+        for activity in androguard_components.get("activities") or []:
+            if not isinstance(activity, dict):
+                continue
+            candidates.append(
+                self._first_non_empty(
+                    activity.get("name"),
+                    activity.get("class_name"),
+                )
+            )
+
+        sensitive: list[str] = []
+        for candidate in candidates:
+            text = str(candidate or "").strip()
+            if not text:
+                continue
+            normalized = text.replace(".", "/")
+            if package_prefix and package_prefix not in normalized:
+                continue
+            simple_name = normalized.rsplit("/", 1)[-1].split(";")[0]
+            if self.SENSITIVE_UI_HINT_PATTERN.search(simple_name) and simple_name not in sensitive:
+                sensitive.append(simple_name)
+        return sensitive
 
     def _is_network_api_call(self, item: dict[str, Any]) -> bool:
         categories = {str(category).strip().lower() for category in (item.get("categories") or [])}
