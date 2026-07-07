@@ -21,6 +21,7 @@ class AndroidBinaryScanOutputLoader(ScanOutputLoaderPort):
             "androguard_components": self._load_json(root / "androguard" / "components.json"),
             "androguard_metadata": self._load_json(root / "androguard" / "metadata.json"),
             "androguard_permissions": self._load_json(root / "androguard" / "permissions.json"),
+            "androguard_api_calls": self._load_json(root / "androguard" / "api_calls.json"),
             "androguard_certificates": self._load_json(root / "androguard" / "certificates.json"),
             "aapt2_components": self._load_json(root / "aapt2" / "components.json"),
             "aapt2_identity": self._load_json(root / "aapt2" / "identity.json"),

@@ -17,6 +17,13 @@ CANONICAL_NETWORK_CHECKS = [
     "Password is not Hashed in Transit",
     "Weak Certificate Validation Enables MitM Attacks",
 ]
+CANONICAL_STORAGE_CHECKS = [
+    "Accesses External Storage",
+    "Authentication Credentials Not Protected with Android Keystore",
+    "Sensitive Information Stored in World Readable or Writable File in Internal Storage",
+    "Sensitive Information Stored in External Storage",
+    "Does not Prevent Screen Capture of Sensitive Information",
+]
 
 
 def _network_checks(path: Path) -> list[dict[str, str]]:
@@ -29,6 +36,14 @@ def _network_checks(path: Path) -> list[dict[str, str]]:
 
 def _check_map(checks: list[dict[str, str]]) -> dict[str, dict[str, str]]:
     return {check["check"]: check for check in checks}
+
+
+def _storage_checks(path: Path) -> list[dict[str, str]]:
+    report = load_report_data(json.loads(path.read_text(encoding="utf-8")))
+    for section in report["vulnerability_sections"]:
+        if section["section_name"] == "Storage":
+            return section["checks"]
+    raise AssertionError("Storage section missing")
 
 
 def test_load_report_data_preserves_legacy_network_checks_in_canonical_form() -> None:
@@ -124,4 +139,56 @@ def test_load_report_data_keeps_network_defaults_when_no_supporting_evidence_exi
     checks = _network_checks(BASE_DIR / "blank_template.json")
 
     assert [check["check"] for check in checks] == CANONICAL_NETWORK_CHECKS
+    assert all(check["result"] == "Not Present" for check in checks)
+
+
+def test_load_report_data_preserves_canonical_storage_checks() -> None:
+    checks = _storage_checks(BASE_DIR / "sample_insecurebankv2.json")
+
+    assert [check["check"] for check in checks] == CANONICAL_STORAGE_CHECKS
+    check_map = _check_map(checks)
+    assert check_map["Accesses External Storage"]["result"] == "Present"
+    assert check_map["Sensitive Information Stored in External Storage"]["result"] == "Present"
+
+
+def test_load_report_data_maps_legacy_storage_vocabulary_to_canonical_checks() -> None:
+    checks = _storage_checks(BASE_DIR / "sample_mirrcast.json")
+
+    assert [check["check"] for check in checks] == CANONICAL_STORAGE_CHECKS
+    check_map = _check_map(checks)
+    assert check_map["Accesses External Storage"]["result"] == "Present"
+
+
+def test_load_report_data_uses_storage_evidence_bundle_for_actual_checks() -> None:
+    report = load_report_data(
+        {
+            "storage_evidence": {
+                "accesses_external_storage": {
+                    "present": True,
+                    "evidence": "android.permission.WRITE_EXTERNAL_STORAGE",
+                },
+                "authentication_credentials_not_protected_with_android_keystore": {
+                    "present": True,
+                    "evidence": "Lcom/example/LoginActivity; saveCreds (Ljava/lang/String;)V",
+                },
+            }
+        }
+    )
+
+    for section in report["vulnerability_sections"]:
+        if section["section_name"] != "Storage":
+            continue
+        check_map = _check_map(section["checks"])
+        assert check_map["Accesses External Storage"]["result"] == "Present"
+        assert check_map["Accesses External Storage"]["evidence"] == "android.permission.WRITE_EXTERNAL_STORAGE"
+        assert check_map["Authentication Credentials Not Protected with Android Keystore"]["result"] == "Present"
+        break
+    else:
+        raise AssertionError("Storage section missing")
+
+
+def test_load_report_data_keeps_storage_defaults_when_no_supporting_evidence_exists() -> None:
+    checks = _storage_checks(BASE_DIR / "blank_template.json")
+
+    assert [check["check"] for check in checks] == CANONICAL_STORAGE_CHECKS
     assert all(check["result"] == "Not Present" for check in checks)

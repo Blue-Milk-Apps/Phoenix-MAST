@@ -463,28 +463,46 @@
       "findings_text": "",
       "checks": [
         {
-          "check": "Sensitive Values Stored Insecurely in SharedPreferences",
+          "check": "Accesses External Storage",
           "result": "Not Present",
-          "explanation": "",
-          "compliance": "",
+          "explanation": "No evidence was found that the app accesses shared external storage.",
+          "compliance": "OWASP: 2016-M2-Insecure Data Storage; NIAP: FDP_DAR_EXT.1.1; HIPAA: 164.312(a)(2)(iv); GDPR: Articles 5, 25, 32",
           "remediation_link": "",
           "evidence": "",
           "severity": "Medium"
         },
         {
-          "check": "Sensitive Data in HTTP Cache Databases",
+          "check": "Authentication Credentials Not Protected with Android Keystore",
           "result": "Not Present",
-          "explanation": "",
-          "compliance": "",
+          "explanation": "No evidence was found that authentication credentials are stored without Android Keystore protection.",
+          "compliance": "OWASP: 2016-M2-Insecure Data Storage; NIAP: FDP_DAR_EXT.1.1; HIPAA: 164.312(a)(2)(iv); GDPR: Articles 5, 25, 32",
           "remediation_link": "",
           "evidence": "",
-          "severity": "Medium"
+          "severity": "High"
         },
         {
-          "check": "Sensitive Data Exposed Through Deep Link / URL Handler",
+          "check": "Sensitive Information Stored in World Readable or Writable File in Internal Storage",
           "result": "Not Present",
-          "explanation": "",
-          "compliance": "",
+          "explanation": "This app does not create world readable or writable files with sensitive information in its internal storage.",
+          "compliance": "OWASP: 2016-M2-Insecure Data Storage; NIAP: FDP_DAR_EXT.1.1; FMT_CFG_EXT.1.2; FMT_MEC_EXT.1.1; HIPAA: 164.312(a)(2)(iv); GDPR: Articles 5, 25, 32",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Sensitive Information Stored in External Storage",
+          "result": "Not Present",
+          "explanation": "No evidence was found that the app stores sensitive information in external storage.",
+          "compliance": "OWASP: 2016-M2-Insecure Data Storage; NIAP: FDP_DAR_EXT.1.1; FMT_CFG_EXT.1.2; FMT_MEC_EXT.1.1; HIPAA: 164.312(a)(2)(iv); GDPR: Articles 5, 25, 32",
+          "remediation_link": "",
+          "evidence": "",
+          "severity": "High"
+        },
+        {
+          "check": "Does not Prevent Screen Capture of Sensitive Information",
+          "result": "Not Present",
+          "explanation": "No evidence was found that the app leaves sensitive screens capturable without FLAG_SECURE protection.",
+          "compliance": "OWASP: 2016-M2-Insecure Data Storage",
           "remediation_link": "",
           "evidence": "",
           "severity": "Medium"

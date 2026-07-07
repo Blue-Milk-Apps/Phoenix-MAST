@@ -70,6 +70,112 @@ NETWORK_EVIDENCE_KEY_BY_CHECK = {
     "password is not hashed in transit": "password_not_hashed_in_transit",
     "weak certificate validation enables mitm attacks": "weak_certificate_validation_enables_mitm",
 }
+STORAGE_EVIDENCE_KEY_BY_CHECK = {
+    "accesses external storage": "accesses_external_storage",
+    "authentication credentials not protected with android keystore": (
+        "authentication_credentials_not_protected_with_android_keystore"
+    ),
+    "sensitive information stored in world readable or writable file in internal storage": (
+        "sensitive_information_stored_in_world_readable_or_writable_file_in_internal_storage"
+    ),
+    "sensitive information stored in external storage": (
+        "sensitive_information_stored_in_external_storage"
+    ),
+    "does not prevent screen capture of sensitive information": (
+        "does_not_prevent_screen_capture_of_sensitive_information"
+    ),
+}
+STORAGE_CHECK_SPECS = (
+    {
+        "check": "Accesses External Storage",
+        "severity": "Medium",
+        "compliance": (
+            "OWASP: 2016-M2-Insecure Data Storage; NIAP: FDP_DAR_EXT.1.1; "
+            "HIPAA: 164.312(a)(2)(iv); GDPR: Articles 5, 25, 32"
+        ),
+        "present_explanation": (
+            "The app accesses the external storage directory (SDCard), which "
+            "can be accessed by any app on the device with the "
+            "READ/WRITE_EXTERNAL_STORAGE permission."
+        ),
+        "not_present_explanation": (
+            "No evidence was found that the app accesses shared external storage."
+        ),
+        "aliases": (
+            "app can read/write to external storage",
+        ),
+    },
+    {
+        "check": "Authentication Credentials Not Protected with Android Keystore",
+        "severity": "High",
+        "compliance": (
+            "OWASP: 2016-M2-Insecure Data Storage; NIAP: FDP_DAR_EXT.1.1; "
+            "HIPAA: 164.312(a)(2)(iv); GDPR: Articles 5, 25, 32"
+        ),
+        "present_explanation": (
+            "The app stores user authentication credentials (e.g. passwords, "
+            "tokens) without using the Android Keystore system for "
+            "hardware-backed protection."
+        ),
+        "not_present_explanation": (
+            "No evidence was found that authentication credentials are stored "
+            "without Android Keystore protection."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "Sensitive Information Stored in World Readable or Writable File in Internal Storage",
+        "severity": "High",
+        "compliance": (
+            "OWASP: 2016-M2-Insecure Data Storage; NIAP: FDP_DAR_EXT.1.1; "
+            "FMT_CFG_EXT.1.2; FMT_MEC_EXT.1.1; HIPAA: 164.312(a)(2)(iv); "
+            "GDPR: Articles 5, 25, 32"
+        ),
+        "present_explanation": (
+            "The app stores sensitive information in internal storage using "
+            "world-readable or world-writable file modes."
+        ),
+        "not_present_explanation": (
+            "This app does not create world readable or writable files with "
+            "sensitive information in its internal storage."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "Sensitive Information Stored in External Storage",
+        "severity": "High",
+        "compliance": (
+            "OWASP: 2016-M2-Insecure Data Storage; NIAP: FDP_DAR_EXT.1.1; "
+            "FMT_CFG_EXT.1.2; FMT_MEC_EXT.1.1; HIPAA: 164.312(a)(2)(iv); "
+            "GDPR: Articles 5, 25, 32"
+        ),
+        "present_explanation": (
+            "The app stores sensitive information on the device in external "
+            "storage, accessible from any app on the device with the "
+            "READ_EXTERNAL_STORAGE permission."
+        ),
+        "not_present_explanation": (
+            "No evidence was found that the app stores sensitive information in "
+            "external storage."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "Does not Prevent Screen Capture of Sensitive Information",
+        "severity": "Medium",
+        "compliance": "OWASP: 2016-M2-Insecure Data Storage",
+        "present_explanation": (
+            "The app does not prevent sensitive information on screen from "
+            "being captured via screenshot or video by setting the "
+            "FLAG_SECURE window layout parameter."
+        ),
+        "not_present_explanation": (
+            "No evidence was found that the app leaves sensitive screens "
+            "capturable without FLAG_SECURE protection."
+        ),
+        "aliases": (),
+    },
+)
 NETWORK_CHECK_SPECS = (
     {
         "check": "Allows Cleartext Traffic for All Domains",
@@ -417,6 +523,7 @@ def _configure_weasyprint_library_path() -> None:
 def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     report_data = _merge_nested(_blank_template(), data)
 
+    _canonicalize_storage_section(report_data)
     _canonicalize_network_section(report_data)
     _apply_derived_vulnerability_checks(report_data)
     report_data["vulnerability_sections"] = [
@@ -455,6 +562,80 @@ def _canonicalize_network_section(report_data: dict[str, Any]) -> None:
         for spec in NETWORK_CHECK_SPECS
     ]
     network_section["checks"] = canonical_checks
+
+
+def _canonicalize_storage_section(report_data: dict[str, Any]) -> None:
+    sections = report_data.get("vulnerability_sections")
+    if not isinstance(sections, list):
+        return
+
+    storage_section = None
+    for section in sections:
+        if str(section.get("section_name", "")).strip().lower() == "storage":
+            storage_section = section
+            break
+    if storage_section is None:
+        return
+
+    incoming_checks = list(storage_section.get("checks") or [])
+    lookup = {
+        _normalized_check_name(check.get("check")): check
+        for check in incoming_checks
+        if isinstance(check, dict) and str(check.get("check", "")).strip()
+    }
+
+    storage_section["checks"] = [
+        _canonical_storage_check(report_data, spec, lookup)
+        for spec in STORAGE_CHECK_SPECS
+    ]
+
+
+def _canonical_storage_check(
+    report_data: dict[str, Any],
+    spec: dict[str, Any],
+    lookup: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    result = "Not Present"
+    explanation = spec["not_present_explanation"]
+    compliance = spec["compliance"]
+    evidence = ""
+    remediation_link = ""
+
+    canonical_name = _normalized_check_name(spec["check"])
+    source = lookup.get(canonical_name)
+    storage_evidence = _storage_evidence_entry(report_data, canonical_name)
+
+    if storage_evidence is not None and storage_evidence.get("present") is not None:
+        result = "Present" if storage_evidence.get("present") else "Not Present"
+        explanation = _storage_explanation(spec, result)
+        evidence = _non_empty_string(storage_evidence.get("evidence"))
+        if source is not None:
+            compliance = _non_empty_string(source.get("compliance")) or compliance
+            remediation_link = _non_empty_string(source.get("remediation_link"))
+    elif source is not None:
+        result = _present_not_present(source.get("result")) or result
+        explanation = _non_empty_string(source.get("explanation")) or _storage_explanation(spec, result)
+        compliance = _non_empty_string(source.get("compliance")) or compliance
+        evidence = _non_empty_string(source.get("evidence"))
+        remediation_link = _non_empty_string(source.get("remediation_link"))
+    else:
+        alias_source = _first_matching_alias(spec, lookup)
+        if alias_source is not None:
+            result = _present_not_present(alias_source.get("result")) or result
+            explanation = _storage_explanation(spec, result)
+            compliance = _non_empty_string(alias_source.get("compliance")) or compliance
+            evidence = _non_empty_string(alias_source.get("evidence"))
+            remediation_link = _non_empty_string(alias_source.get("remediation_link"))
+
+    return {
+        "check": spec["check"],
+        "result": result,
+        "explanation": explanation,
+        "compliance": compliance,
+        "remediation_link": remediation_link,
+        "evidence": evidence,
+        "severity": spec["severity"],
+    }
 
 
 def _canonical_network_check(
@@ -759,7 +940,27 @@ def _network_evidence_entry(report_data: dict[str, Any], canonical_check_name: s
     return entry
 
 
+def _storage_evidence_entry(report_data: dict[str, Any], canonical_check_name: str) -> dict[str, Any] | None:
+    storage_evidence = report_data.get("storage_evidence")
+    if not isinstance(storage_evidence, dict):
+        return None
+    evidence_key = STORAGE_EVIDENCE_KEY_BY_CHECK.get(canonical_check_name)
+    if not evidence_key:
+        return None
+    entry = storage_evidence.get(evidence_key)
+    if not isinstance(entry, dict):
+        return None
+    return entry
+
+
 def _first_matching_network_alias(
+    spec: dict[str, Any],
+    lookup: dict[str, dict[str, Any]],
+) -> dict[str, Any] | None:
+    return _first_matching_alias(spec, lookup)
+
+
+def _first_matching_alias(
     spec: dict[str, Any],
     lookup: dict[str, dict[str, Any]],
 ) -> dict[str, Any] | None:
@@ -824,6 +1025,12 @@ def _derive_mitm_check(
 
 
 def _network_explanation(spec: dict[str, Any], result: str) -> str:
+    if _normalized_check_name(result) == "present":
+        return spec["present_explanation"]
+    return spec["not_present_explanation"]
+
+
+def _storage_explanation(spec: dict[str, Any], result: str) -> str:
     if _normalized_check_name(result) == "present":
         return spec["present_explanation"]
     return spec["not_present_explanation"]

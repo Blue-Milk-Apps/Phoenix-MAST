@@ -21,6 +21,7 @@ def test_android_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Pa
     _write_json(scan_dir / "androguard" / "components.json", {"activities": []})
     _write_json(scan_dir / "androguard" / "metadata.json", {"app_name": "APKPure"})
     _write_json(scan_dir / "androguard" / "permissions.json", {"items": []})
+    _write_json(scan_dir / "androguard" / "api_calls.json", {"items": []})
     _write_json(scan_dir / "androguard" / "certificates.json", {"all": []})
     _write_json(scan_dir / "aapt2" / "components.json", {"activities": []})
     _write_json(scan_dir / "aapt2" / "identity.json", {"application_label": "APKPure"})
@@ -41,6 +42,7 @@ def test_android_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Pa
     assert loaded["androguard_components"] == {"activities": []}
     assert loaded["androguard_metadata"] == {"app_name": "APKPure"}
     assert loaded["androguard_permissions"] == {"items": []}
+    assert loaded["androguard_api_calls"] == {"items": []}
     assert loaded["androguard_certificates"] == {"all": []}
     assert loaded["aapt2_components"] == {"activities": []}
     assert loaded["aapt2_identity"] == {"application_label": "APKPure"}
@@ -1265,6 +1267,71 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
             "country": "",
         }
     ]
+
+
+def test_android_binary_scan_detail_extractor_builds_storage_evidence_from_permissions_and_api_calls() -> None:
+    loaded_outputs = {
+        "aapt2_permissions": {
+            "permissions": [
+                {
+                    "name": "android.permission.READ_EXTERNAL_STORAGE",
+                    "protection_level_hint": "dangerous",
+                },
+                {
+                    "name": "android.permission.WRITE_EXTERNAL_STORAGE",
+                    "protection_level_hint": "dangerous",
+                },
+            ]
+        },
+        "androguard_api_calls": {
+            "items": [
+                {
+                    "callee": {
+                        "method_name": "getSharedPreferences",
+                        "signature": (
+                            "Landroid/content/Context; getSharedPreferences "
+                            "(Ljava/lang/String; I)Landroid/content/SharedPreferences;"
+                        ),
+                    },
+                    "caller": {
+                        "signature": (
+                            "Lcom/example/LoginActivity; savePassword "
+                            "(Ljava/lang/String;)V"
+                        ),
+                    },
+                }
+            ]
+        },
+        "opengrep": {"results": []},
+    }
+
+    sections = AndroidBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert sections["storage_evidence"] == {
+        "accesses_external_storage": {
+            "present": True,
+            "evidence": (
+                "android.permission.READ_EXTERNAL_STORAGE, "
+                "android.permission.WRITE_EXTERNAL_STORAGE"
+            ),
+        },
+        "authentication_credentials_not_protected_with_android_keystore": {
+            "present": True,
+            "evidence": "Lcom/example/LoginActivity; savePassword (Ljava/lang/String;)V",
+        },
+        "sensitive_information_stored_in_world_readable_or_writable_file_in_internal_storage": {
+            "present": None,
+            "evidence": "",
+        },
+        "sensitive_information_stored_in_external_storage": {
+            "present": None,
+            "evidence": "",
+        },
+        "does_not_prevent_screen_capture_of_sensitive_information": {
+            "present": None,
+            "evidence": "",
+        },
+    }
 
 
 def _write_json(path: Path, payload: dict) -> None:

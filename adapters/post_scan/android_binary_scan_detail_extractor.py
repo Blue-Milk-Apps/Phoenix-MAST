@@ -20,6 +20,18 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     SECRET_LABEL_PATTERN = re.compile(
         r"(?i)^(?:api[_-]?key|client[_-]?secret|secret[_-]?key|access[_-]?token|secretkey)$"
     )
+    STORAGE_CREDENTIAL_HINT_PATTERN = re.compile(
+        r"(?i)(?:auth|credential|login|passw(?:or)?d|token|session|rememberme)"
+    )
+    EXTERNAL_STORAGE_PERMISSIONS = {
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.MANAGE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+    }
     ANDROID_PERMISSION_DESCRIPTIONS = {
         "android.permission.ACCESS_COARSE_LOCATION": "Allows the app to access approximate location derived from network-based sources such as Wi-Fi and cell towers.",
         "android.permission.ACCESS_FINE_LOCATION": "Allows the app to access precise location from GPS and other location providers.",
@@ -250,6 +262,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "permissions": self._build_permissions(loaded_outputs),
             "functionality": self._build_functionality(loaded_outputs),
             "network_evidence": self._build_network_evidence(loaded_outputs),
+            "storage_evidence": self._build_storage_evidence(loaded_outputs),
             "deep_links": self._build_deep_links(loaded_outputs),
             "hardcoded_values": self._build_hardcoded_values(loaded_outputs),
             "endpoints": self._build_endpoints(loaded_outputs),
@@ -536,6 +549,69 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         if isinstance(deep_links, list):
             return {"deep_links": deep_links}
         return {"deep_links": []}
+
+    def _build_storage_evidence(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
+        aapt2_permissions = loaded_outputs.get("aapt2_permissions") or {}
+        androguard_api_calls = loaded_outputs.get("androguard_api_calls") or {}
+
+        declared_permissions = {
+            self._first_non_empty(permission.get("name"))
+            for permission in aapt2_permissions.get("permissions") or []
+        }
+        declared_permissions.discard("")
+
+        external_storage_permissions = sorted(
+            permission
+            for permission in declared_permissions
+            if permission in self.EXTERNAL_STORAGE_PERMISSIONS
+        )
+
+        api_call_items = list(androguard_api_calls.get("items") or [])
+        external_storage_callers = self._matching_api_call_sites(
+            api_call_items,
+            lambda item: "externalstorage" in self._api_call_signature(item).replace("_", "").lower(),
+        )
+        shared_preferences_callers = self._matching_api_call_sites(
+            api_call_items,
+            lambda item: self._api_call_method_name(item) == "getSharedPreferences",
+        )
+        credential_storage_callers = [
+            caller
+            for caller in shared_preferences_callers
+            if self.STORAGE_CREDENTIAL_HINT_PATTERN.search(caller)
+        ]
+
+        accesses_external_storage_evidence = self._dedupe_preserve_order(
+            [*external_storage_permissions, *external_storage_callers]
+        )
+        keystore_present = self._functionality_present(loaded_outputs, "Keystore")
+
+        authentication_credentials_present = None
+        if credential_storage_callers and not keystore_present:
+            authentication_credentials_present = True
+
+        return {
+            "accesses_external_storage": {
+                "present": bool(accesses_external_storage_evidence),
+                "evidence": ", ".join(accesses_external_storage_evidence),
+            },
+            "authentication_credentials_not_protected_with_android_keystore": {
+                "present": authentication_credentials_present,
+                "evidence": ", ".join(self._dedupe_preserve_order(credential_storage_callers)),
+            },
+            "sensitive_information_stored_in_world_readable_or_writable_file_in_internal_storage": {
+                "present": None,
+                "evidence": "",
+            },
+            "sensitive_information_stored_in_external_storage": {
+                "present": None,
+                "evidence": "",
+            },
+            "does_not_prevent_screen_capture_of_sensitive_information": {
+                "present": None,
+                "evidence": "",
+            },
+        }
 
     def _build_hardcoded_values(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
         apktool_secrets_endpoints = loaded_outputs.get("apktool_secrets_endpoints") or {}
@@ -929,6 +1005,11 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             return f"permission {permission_names[0]}, which may indicate {capability_label} functionality."
         return f"permissions {', '.join(permission_names)}, which may indicate {capability_label} functionality."
 
+    def _functionality_present(self, loaded_outputs: dict[str, Any], capability: str) -> bool:
+        functionality = self._build_functionality(loaded_outputs)
+        details = functionality.get(capability) or {}
+        return bool(details.get("present"))
+
     @staticmethod
     def _looks_like_email(value: str) -> bool:
         if "@" not in value:
@@ -943,3 +1024,41 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         if path and line not in (None, ""):
             return f"{path}:{line}"
         return path
+
+    def _matching_api_call_sites(
+        self,
+        api_calls: list[dict[str, Any]],
+        predicate: Any,
+    ) -> list[str]:
+        callers: list[str] = []
+        for item in api_calls:
+            if not isinstance(item, dict) or not predicate(item):
+                continue
+            caller = item.get("caller") or {}
+            signature = self._first_non_empty(caller.get("signature"))
+            if signature:
+                callers.append(signature)
+        return self._dedupe_preserve_order(callers)
+
+    def _api_call_method_name(self, item: dict[str, Any]) -> str:
+        callee = item.get("callee") or {}
+        return self._first_non_empty(callee.get("method_name"))
+
+    def _api_call_signature(self, item: dict[str, Any]) -> str:
+        callee = item.get("callee") or {}
+        return self._first_non_empty(
+            callee.get("signature"),
+            callee.get("class_name"),
+            callee.get("method_name"),
+        )
+
+    @staticmethod
+    def _dedupe_preserve_order(values: list[str]) -> list[str]:
+        seen: set[str] = set()
+        deduped: list[str] = []
+        for value in values:
+            if not value or value in seen:
+                continue
+            seen.add(value)
+            deduped.append(value)
+        return deduped
