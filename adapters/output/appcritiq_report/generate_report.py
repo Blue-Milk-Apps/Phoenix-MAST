@@ -1545,13 +1545,21 @@ def _build_overall_evaluation(report_data: dict[str, Any]) -> list[dict[str, Any
             check for check in (section.get("checks") or [])
             if str(check.get("result", "")).strip().lower() == "present"
         ]
-        summary_findings = [str(check.get("check", "")).strip() for check in present_checks if str(check.get("check", "")).strip()]
-        risk_rating = _highest_present_severity(present_checks)
+        summary_checks = [
+            check for check in present_checks
+            if str(check.get("severity", "")).strip().lower() in {"critical", "high", "medium"}
+        ]
+        summary_findings = [
+            str(check.get("check", "")).strip()
+            for check in summary_checks
+            if str(check.get("check", "")).strip()
+        ]
+        risk_rating = _highest_present_severity(summary_checks) if summary_checks else "Low"
 
         rows_by_area[area_label] = {
             "area_of_concern": area_label,
             "risk_rating": risk_rating,
-            "summary_findings": summary_findings or ["No present findings identified in this scan"],
+            "summary_findings": summary_findings or ["No medium-or-higher findings identified in this scan"],
         }
 
     ordered_rows: list[dict[str, Any]] = []
