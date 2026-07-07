@@ -526,6 +526,7 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     _canonicalize_storage_section(report_data)
     _canonicalize_network_section(report_data)
     _apply_derived_vulnerability_checks(report_data)
+    _add_permission_display_names(report_data)
     _ensure_functionality_details(report_data)
     _order_functionality_section(report_data)
     report_data["vulnerability_sections"] = [
@@ -537,6 +538,17 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     report_data["findings_severity"] = _build_findings_severity(report_data)
 
     return _prune_placeholder_rows(report_data)
+
+
+def _add_permission_display_names(report_data: dict[str, Any]) -> None:
+    permissions = report_data.get("permissions")
+    if not isinstance(permissions, list):
+        return
+
+    for permission in permissions:
+        if not isinstance(permission, dict):
+            continue
+        permission["display_permission"] = _permission_display_name(permission.get("permission"))
 
 
 def _ensure_functionality_details(report_data: dict[str, Any]) -> None:
@@ -575,6 +587,14 @@ def _order_functionality_section(report_data: dict[str, Any]) -> None:
     for name, details in [*present_items, *absent_items]:
         ordered[name] = details
     report_data["functionality"] = ordered
+
+
+def _permission_display_name(permission: object) -> str:
+    text = str(permission or "").strip()
+    android_prefix = "android.permission."
+    if text.startswith(android_prefix):
+        return text[len(android_prefix):]
+    return text
 
 
 def _canonicalize_network_section(report_data: dict[str, Any]) -> None:

@@ -177,7 +177,7 @@
     <tr><th>Permission</th><th>Status</th><th>Description</th></tr>
     {% for p in data.permissions %}
     <tr>
-      <td class="mono">{{ p.permission }}</td>
+      <td class="mono">{{ p.display_permission or p.permission }}</td>
       <td>{{ risk_badge('High' if p.status == 'dangerous' else 'Info', label=p.status) }}</td>
       <td>{{ p.general_description }}{% if p.usage_description %}<br><span class="small">{{ p.usage_description }}</span>{% endif %}</td>
     </tr>

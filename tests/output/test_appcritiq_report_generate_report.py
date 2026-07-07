@@ -227,3 +227,31 @@ def test_load_report_data_orders_present_functionalities_before_absent_ones() ->
     assert report["functionality"]["Contacts"]["explanation"] == (
         "No permission or scan evidence indicated Contacts functionality."
     )
+
+
+def test_load_report_data_adds_display_permission_names() -> None:
+    report = load_report_data(
+        {
+            "permissions": [
+                {
+                    "permission": "android.permission.ACCESS_COARSE_LOCATION",
+                    "status": "dangerous",
+                    "info": "dangerous",
+                    "usage_description": "",
+                    "general_description": "Allows the app to access approximate location.",
+                },
+                {
+                    "permission": "com.example.app.permission.C2D_MESSAGE",
+                    "status": "normal",
+                    "info": "unknown or normal",
+                    "usage_description": "",
+                    "general_description": "Custom application permission.",
+                },
+            ]
+        }
+    )
+
+    assert report["permissions"][0]["permission"] == "android.permission.ACCESS_COARSE_LOCATION"
+    assert report["permissions"][0]["display_permission"] == "ACCESS_COARSE_LOCATION"
+    assert report["permissions"][1]["permission"] == "com.example.app.permission.C2D_MESSAGE"
+    assert report["permissions"][1]["display_permission"] == "com.example.app.permission.C2D_MESSAGE"
