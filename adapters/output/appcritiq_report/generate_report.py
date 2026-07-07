@@ -85,6 +85,10 @@ STORAGE_EVIDENCE_KEY_BY_CHECK = {
         "does_not_prevent_screen_capture_of_sensitive_information"
     ),
 }
+RESILIENCE_EVIDENCE_KEY_BY_CHECK = {
+    "root detection missing": "root_detection_missing",
+    "biometric / local authentication bypass possible": "biometric_local_authentication_bypass_possible",
+}
 CODE_EVIDENCE_KEY_BY_CHECK = {
     "accesses unique identifiers": "accesses_unique_identifiers",
     "activities accessible to other apps": "activities_accessible_to_other_apps",
@@ -373,6 +377,24 @@ STORAGE_CHECK_SPECS = (
             "No evidence was found that the app leaves sensitive screens "
             "capturable without FLAG_SECURE protection."
         ),
+        "aliases": (),
+    },
+)
+RESILIENCE_CHECK_SPECS = (
+    {
+        "check": "Root Detection Missing",
+        "severity": "Medium",
+        "compliance": "",
+        "present_explanation": "No root-detection or rooted-environment checks were identified in the available app evidence.",
+        "not_present_explanation": "The app appears to contain root-detection or rooted-environment checks.",
+        "aliases": (),
+    },
+    {
+        "check": "Biometric / Local Authentication Bypass Possible",
+        "severity": "Medium",
+        "compliance": "",
+        "present_explanation": "Biometric or local authentication use was identified without strong evidence of crypto-backed binding or equivalent hardening.",
+        "not_present_explanation": "No biometric/local authentication flow was identified, or available evidence suggests crypto-backed hardening is present.",
         "aliases": (),
     },
 )
@@ -726,6 +748,7 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     _canonicalize_code_section(report_data)
     _canonicalize_storage_section(report_data)
     _canonicalize_network_section(report_data)
+    _canonicalize_resilience_section(report_data)
     _apply_derived_vulnerability_checks(report_data)
     _add_permission_display_names(report_data)
     _ensure_functionality_details(report_data)
@@ -873,6 +896,32 @@ def _canonicalize_storage_section(report_data: dict[str, Any]) -> None:
     storage_section["checks"] = [
         _canonical_storage_check(report_data, spec, lookup)
         for spec in STORAGE_CHECK_SPECS
+    ]
+
+
+def _canonicalize_resilience_section(report_data: dict[str, Any]) -> None:
+    sections = report_data.get("vulnerability_sections")
+    if not isinstance(sections, list):
+        return
+
+    resilience_section = None
+    for section in sections:
+        if str(section.get("section_name", "")).strip().lower() == "resilience":
+            resilience_section = section
+            break
+    if resilience_section is None:
+        return
+
+    incoming_checks = list(resilience_section.get("checks") or [])
+    lookup = {
+        _normalized_check_name(check.get("check")): check
+        for check in incoming_checks
+        if isinstance(check, dict) and str(check.get("check", "")).strip()
+    }
+
+    resilience_section["checks"] = [
+        _canonical_resilience_check(report_data, spec, lookup)
+        for spec in RESILIENCE_CHECK_SPECS
     ]
 
 
@@ -1030,6 +1079,46 @@ def _canonical_network_check(
             explanation = _network_explanation(spec, result)
             if mitm_evidence:
                 evidence = mitm_evidence
+
+    return {
+        "check": spec["check"],
+        "result": result,
+        "explanation": explanation,
+        "compliance": compliance,
+        "remediation_link": remediation_link,
+        "evidence": evidence,
+        "severity": spec["severity"],
+    }
+
+
+def _canonical_resilience_check(
+    report_data: dict[str, Any],
+    spec: dict[str, Any],
+    lookup: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    result = "Not Present"
+    explanation = spec["not_present_explanation"]
+    compliance = spec["compliance"]
+    evidence = ""
+    remediation_link = ""
+
+    canonical_name = _normalized_check_name(spec["check"])
+    source = lookup.get(canonical_name)
+    resilience_evidence = _resilience_evidence_entry(report_data, canonical_name)
+
+    if resilience_evidence is not None and resilience_evidence.get("present") is not None:
+        result = "Present" if resilience_evidence.get("present") else "Not Present"
+        explanation = _resilience_explanation(spec, result)
+        evidence = _non_empty_string(resilience_evidence.get("evidence"))
+        if source is not None:
+            compliance = _non_empty_string(source.get("compliance")) or compliance
+            remediation_link = _non_empty_string(source.get("remediation_link"))
+    elif source is not None:
+        result = _present_not_present(source.get("result")) or result
+        explanation = _non_empty_string(source.get("explanation")) or _resilience_explanation(spec, result)
+        compliance = _non_empty_string(source.get("compliance")) or compliance
+        evidence = _non_empty_string(source.get("evidence"))
+        remediation_link = _non_empty_string(source.get("remediation_link"))
 
     return {
         "check": spec["check"],
@@ -1287,6 +1376,19 @@ def _storage_evidence_entry(report_data: dict[str, Any], canonical_check_name: s
     return entry
 
 
+def _resilience_evidence_entry(report_data: dict[str, Any], canonical_check_name: str) -> dict[str, Any] | None:
+    resilience_evidence = report_data.get("resilience_evidence")
+    if not isinstance(resilience_evidence, dict):
+        return None
+    evidence_key = RESILIENCE_EVIDENCE_KEY_BY_CHECK.get(canonical_check_name)
+    if not evidence_key:
+        return None
+    entry = resilience_evidence.get(evidence_key)
+    if not isinstance(entry, dict):
+        return None
+    return entry
+
+
 def _code_evidence_entry(report_data: dict[str, Any], canonical_check_name: str) -> dict[str, Any] | None:
     code_evidence = report_data.get("code_evidence")
     if not isinstance(code_evidence, dict):
@@ -1378,6 +1480,12 @@ def _network_explanation(spec: dict[str, Any], result: str) -> str:
 
 
 def _storage_explanation(spec: dict[str, Any], result: str) -> str:
+    if _normalized_check_name(result) == "present":
+        return spec["present_explanation"]
+    return spec["not_present_explanation"]
+
+
+def _resilience_explanation(spec: dict[str, Any], result: str) -> str:
     if _normalized_check_name(result) == "present":
         return spec["present_explanation"]
     return spec["not_present_explanation"]

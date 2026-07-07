@@ -27,6 +27,11 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         r"(?i)(?:passw(?:or)?d|passwd|pwd|newpassword|passcode|credential|login|auth)"
     )
     FLAG_SECURE_PATTERN = re.compile(r"(?i)\bflag_secure\b")
+    WORLD_MODE_PATTERN = re.compile(r"(?i)mode_world_(?:readable|writable)")
+    COOKIE_PATTERN = re.compile(r"(?i)\bcookie\b")
+    COOKIE_SECURITY_ATTR_PATTERN = re.compile(r"(?i)\b(?:secure|httponly|samesite)\b")
+    HTTP_URL_PATTERN = re.compile(r"(?i)\bhttp://[^\s'\"<>]+")
+    ROOT_DETECTION_PATTERN = re.compile(r"(?i)(?:\bsu\b|busybox|supersu|magisk|test-keys|rootbeer|isrooted|rootcheck)")
     SENSITIVE_UI_HINT_PATTERN = re.compile(
         r"(?i)(?:login|logon|signin|signup|password|passcode|pin|account|transfer|statement|payment|auth|profile)"
     )
@@ -295,6 +300,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "permissions": self._build_permissions(loaded_outputs),
             "functionality": self._build_functionality(loaded_outputs),
             "network_evidence": self._build_network_evidence(loaded_outputs),
+            "resilience_evidence": self._build_resilience_evidence(loaded_outputs),
             "storage_evidence": self._build_storage_evidence(loaded_outputs),
             "deep_links": self._build_deep_links(loaded_outputs),
             "hardcoded_values": self._build_hardcoded_values(loaded_outputs),
@@ -533,6 +539,8 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         aapt2_application = loaded_outputs.get("aapt2_application") or {}
         aapt2_posture = loaded_outputs.get("aapt2_manifest_security_posture") or {}
         androguard_api_calls = loaded_outputs.get("androguard_api_calls") or {}
+        hardcoded_values = self._build_hardcoded_values(loaded_outputs)
+        package_prefix = self._app_package_prefix(loaded_outputs)
 
         domains = network_security.get("domains") or []
         provenance = network_security.get("provenance") or {}
@@ -560,6 +568,39 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         password_not_hashed_in_transit = self._derive_password_not_hashed_in_transit(
             list(androguard_api_calls.get("items") or [])
         )
+        api_call_items = list(androguard_api_calls.get("items") or [])
+        hostname_verifier_hits = self._matching_api_call_sites(
+            api_call_items,
+            lambda item: self._caller_matches_package(item, package_prefix)
+            and (
+                "allow_all_hostname_verifier" in self._api_call_signature(item).lower()
+                or "sethostnameverifier" in self._api_call_signature(item).lower()
+            ),
+        )
+        trust_manager_hits = self._matching_api_call_sites(
+            api_call_items,
+            lambda item: self._caller_matches_package(item, package_prefix)
+            and "checkservertrusted" in self._api_call_caller_signature(item).lower(),
+        )
+        listening_port_hits = self._matching_api_call_sites(
+            api_call_items,
+            lambda item: self._caller_matches_package(item, package_prefix)
+            and any(
+                token in self._api_call_signature(item).lower()
+                for token in ("serversocket", "localserversocket", "datagramsocket; bind")
+            ),
+        )
+        cookie_insecurity = self._detect_cookie_security_issue(loaded_outputs, package_prefix)
+        unnecessary_info = self._detect_unnecessary_information_transmission(
+            loaded_outputs,
+            package_prefix,
+        )
+        unencrypted_transit = self._detect_unencrypted_transit_issue(
+            loaded_outputs,
+            hardcoded_values,
+            cleartext_present=bool(cleartext_present),
+            password_not_hashed_in_transit=password_not_hashed_in_transit,
+        )
 
         return {
             "allows_cleartext_traffic_for_all_domains": {
@@ -567,33 +608,24 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
                 "evidence": provenance_path or self._first_non_empty(network_security.get("policy_source")),
             },
             "contains_hostname_verifier_accepts_all": {
-                "present": None,
-                "evidence": "",
+                "present": True if hostname_verifier_hits else None,
+                "evidence": ", ".join(hostname_verifier_hits[:5]) if hostname_verifier_hits else "",
             },
             "contains_x509_trust_manager_accepts_all": {
-                "present": None,
-                "evidence": "",
+                "present": True if trust_manager_hits else None,
+                "evidence": ", ".join(trust_manager_hits[:5]) if trust_manager_hits else "",
             },
             "does_not_perform_certificate_pinning": {
                 "present": missing_certificate_pinning,
                 "evidence": provenance_path or self._first_non_empty(network_security.get("reference")),
             },
             "opens_listening_port": {
-                "present": None,
-                "evidence": "",
+                "present": bool(listening_port_hits) if api_call_items else None,
+                "evidence": ", ".join(listening_port_hits[:5]) if listening_port_hits else "",
             },
-            "sensitive_cookies_lack_security_attributes": {
-                "present": None,
-                "evidence": "",
-            },
-            "unnecessary_information_transmitted": {
-                "present": None,
-                "evidence": "",
-            },
-            "sensitive_information_unencrypted_in_transit": {
-                "present": None,
-                "evidence": "",
-            },
+            "sensitive_cookies_lack_security_attributes": cookie_insecurity,
+            "unnecessary_information_transmitted": unnecessary_info,
+            "sensitive_information_unencrypted_in_transit": unencrypted_transit,
             "password_not_hashed_in_transit": {
                 "present": password_not_hashed_in_transit["present"],
                 "evidence": password_not_hashed_in_transit["evidence"],
@@ -657,6 +689,11 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             authentication_credentials_present = True
 
         screen_capture_protection = self._detect_screen_capture_protection(loaded_outputs)
+        world_readable_internal = self._detect_world_readable_internal_storage(api_call_items)
+        sensitive_external_storage = self._detect_sensitive_external_storage(
+            external_storage_callers,
+            hardcoded_values=self._build_hardcoded_values(loaded_outputs),
+        )
 
         return {
             "accesses_external_storage": {
@@ -667,14 +704,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
                 "present": authentication_credentials_present,
                 "evidence": ", ".join(self._dedupe_preserve_order(credential_storage_callers)),
             },
-            "sensitive_information_stored_in_world_readable_or_writable_file_in_internal_storage": {
-                "present": None,
-                "evidence": "",
-            },
-            "sensitive_information_stored_in_external_storage": {
-                "present": None,
-                "evidence": "",
-            },
+            "sensitive_information_stored_in_world_readable_or_writable_file_in_internal_storage": (
+                world_readable_internal
+            ),
+            "sensitive_information_stored_in_external_storage": sensitive_external_storage,
             "does_not_prevent_screen_capture_of_sensitive_information": screen_capture_protection,
         }
 
@@ -737,6 +770,33 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "urls": urls,
             "emails": emails,
             "secrets": secrets,
+        }
+
+    def _build_resilience_evidence(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
+        package_prefix = self._app_package_prefix(loaded_outputs)
+        api_calls = list(((loaded_outputs.get("androguard_api_calls") or {}).get("items") or []))
+        root_detection_hits = self._detect_root_detection_signals(
+            loaded_outputs,
+            package_prefix,
+            api_calls,
+        )
+        biometric_bypass = self._detect_biometric_bypass_possible(
+            loaded_outputs,
+            package_prefix,
+            api_calls,
+        )
+
+        return {
+            "root_detection_missing": {
+                "present": not bool(root_detection_hits),
+                "evidence": (
+                    "no_root_detection_signals_found"
+                    if not root_detection_hits
+                    else ", ".join(root_detection_hits[:5])
+                ),
+                "details": root_detection_hits[:10] if root_detection_hits else [],
+            },
+            "biometric_local_authentication_bypass_possible": biometric_bypass,
         }
 
     def _build_code_evidence(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
@@ -1645,6 +1705,177 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "evidence": "",
         }
 
+    def _detect_cookie_security_issue(self, loaded_outputs: dict[str, Any], package_prefix: str) -> dict[str, Any]:
+        cookie_hits = self._matching_string_xrefs(
+            loaded_outputs=loaded_outputs,
+            value_predicate=lambda value: self.COOKIE_PATTERN.search(value) is not None,
+            xref_predicate=lambda signature: package_prefix in signature.replace(".", "/") if package_prefix else False,
+        )
+        cookie_attr_hits = self._matching_string_xrefs(
+            loaded_outputs=loaded_outputs,
+            value_predicate=lambda value: self.COOKIE_SECURITY_ATTR_PATTERN.search(value) is not None,
+            xref_predicate=lambda signature: package_prefix in signature.replace(".", "/") if package_prefix else False,
+        )
+        if cookie_hits and not cookie_attr_hits:
+            return {"present": True, "evidence": cookie_hits[0], "details": cookie_hits[:10]}
+        if cookie_hits and cookie_attr_hits:
+            return {"present": False, "evidence": cookie_attr_hits[0], "details": cookie_attr_hits[:10]}
+        return {"present": None, "evidence": ""}
+
+    def _detect_unnecessary_information_transmission(
+        self,
+        loaded_outputs: dict[str, Any],
+        package_prefix: str,
+    ) -> dict[str, Any]:
+        api_calls = list(((loaded_outputs.get("androguard_api_calls") or {}).get("items") or []))
+        identifier_callers = set(
+            self._matching_api_call_sites(
+                api_calls,
+                lambda item: self._caller_matches_package(item, package_prefix)
+                and any(
+                    token in self._api_call_signature(item).lower()
+                    for token in (
+                        "advertisingid",
+                        "settings$secure",
+                        "android_id",
+                        "telephonymanager",
+                        "getdeviceid",
+                        "getsubscriberid",
+                        "getsimserialnumber",
+                    )
+                ),
+            )
+        )
+        network_callers = set(
+            self._matching_api_call_sites(
+                api_calls,
+                lambda item: self._caller_matches_package(item, package_prefix)
+                and self._is_network_api_call(item),
+            )
+        )
+        overlapping = [caller for caller in identifier_callers if caller in network_callers]
+        if overlapping:
+            return {"present": True, "evidence": overlapping[0], "details": overlapping[:10]}
+        if not identifier_callers:
+            return {"present": False, "evidence": "no_unique_identifier_network_overlap"}
+        return {"present": None, "evidence": ""}
+
+    def _detect_unencrypted_transit_issue(
+        self,
+        loaded_outputs: dict[str, Any],
+        hardcoded_values: dict[str, Any],
+        *,
+        cleartext_present: bool,
+        password_not_hashed_in_transit: dict[str, Any],
+    ) -> dict[str, Any]:
+        urls = [str(item.get("url", "")).strip() for item in hardcoded_values.get("urls") or []]
+        insecure_urls = [
+            url for url in urls
+            if url.lower().startswith("http://") and "localhost" not in url.lower() and "127.0.0.1" not in url
+        ]
+        if insecure_urls:
+            return {"present": True, "evidence": insecure_urls[0], "details": insecure_urls[:10]}
+        if cleartext_present and password_not_hashed_in_transit.get("present") is True:
+            return {
+                "present": True,
+                "evidence": password_not_hashed_in_transit.get("evidence", ""),
+            }
+        if not cleartext_present and not insecure_urls:
+            return {"present": False, "evidence": "no_http_endpoints_detected"}
+        return {"present": None, "evidence": ""}
+
+    def _detect_world_readable_internal_storage(self, api_calls: list[dict[str, Any]]) -> dict[str, Any]:
+        world_mode_hits = self._matching_api_call_sites(
+            api_calls,
+            lambda item: self.WORLD_MODE_PATTERN.search(self._api_call_signature(item)) is not None
+            or self.WORLD_MODE_PATTERN.search(self._api_call_caller_signature(item)) is not None,
+        )
+        if world_mode_hits:
+            return {"present": True, "evidence": world_mode_hits[0], "details": world_mode_hits[:10]}
+        if api_calls:
+            return {"present": False, "evidence": "no_world_readable_internal_storage_hits"}
+        return {"present": None, "evidence": ""}
+
+    def _detect_sensitive_external_storage(
+        self,
+        external_storage_callers: list[str],
+        *,
+        hardcoded_values: dict[str, Any],
+    ) -> dict[str, Any]:
+        sensitive_callers = [
+            caller for caller in external_storage_callers
+            if self.PASSWORD_HINT_PATTERN.search(caller) or self.SENSITIVE_UI_HINT_PATTERN.search(caller)
+        ]
+        if sensitive_callers:
+            return {"present": True, "evidence": sensitive_callers[0], "details": sensitive_callers[:10]}
+        secrets = hardcoded_values.get("secrets") or []
+        external_secret_hits = [
+            secret for secret in secrets
+            if "external" in str(secret.get("location", "")).lower()
+        ]
+        if external_secret_hits:
+            evidence = self._first_non_empty(
+                external_secret_hits[0].get("location"),
+                external_secret_hits[0].get("value"),
+            )
+            return {"present": True, "evidence": evidence, "details": external_secret_hits[:10]}
+        if not external_storage_callers:
+            return {"present": False, "evidence": "no_external_storage_sensitive_hits"}
+        return {"present": None, "evidence": ""}
+
+    def _detect_root_detection_signals(
+        self,
+        loaded_outputs: dict[str, Any],
+        package_prefix: str,
+        api_calls: list[dict[str, Any]],
+    ) -> list[str]:
+        api_hits = self._matching_api_call_sites(
+            api_calls,
+            lambda item: self._caller_matches_package(item, package_prefix)
+            and self.ROOT_DETECTION_PATTERN.search(
+                f"{self._api_call_signature(item)} {self._api_call_caller_signature(item)}"
+            )
+            is not None,
+        )
+        string_hits = self._matching_string_xrefs(
+            loaded_outputs=loaded_outputs,
+            value_predicate=lambda value: self.ROOT_DETECTION_PATTERN.search(value) is not None,
+            xref_predicate=lambda signature: package_prefix in signature.replace(".", "/") if package_prefix else False,
+        )
+        return self._dedupe_preserve_order([*api_hits, *string_hits])
+
+    def _detect_biometric_bypass_possible(
+        self,
+        loaded_outputs: dict[str, Any],
+        package_prefix: str,
+        api_calls: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        biometric_callers = self._matching_api_call_sites(
+            api_calls,
+            lambda item: self._caller_matches_package(item, package_prefix)
+            and any(
+                token in self._api_call_signature(item).lower()
+                for token in ("biometricprompt", "fingerprintmanager", "fingerprint")
+            ),
+        )
+        hardening_callers = self._matching_api_call_sites(
+            api_calls,
+            lambda item: self._caller_matches_package(item, package_prefix)
+            and any(
+                token in self._api_call_signature(item).lower()
+                for token in (
+                    "cryptoobject",
+                    "setuserauthenticationrequired",
+                    "keygenparameterspec",
+                )
+            ),
+        )
+        if biometric_callers and not hardening_callers:
+            return {"present": True, "evidence": biometric_callers[0], "details": biometric_callers[:10]}
+        if biometric_callers and hardening_callers:
+            return {"present": False, "evidence": hardening_callers[0], "details": hardening_callers[:10]}
+        return {"present": False, "evidence": "no_biometric_authentication_flow_detected"}
+
     def _matching_api_call_sites(
         self,
         api_calls: list[dict[str, Any]],
@@ -1709,6 +1940,35 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
                 continue
             matches.append(f"strings/{source_name}")
         return self._dedupe_preserve_order(matches)
+
+    def _matching_string_xrefs(
+        self,
+        *,
+        loaded_outputs: dict[str, Any],
+        value_predicate: Any,
+        xref_predicate: Any,
+    ) -> list[str]:
+        androguard_strings = loaded_outputs.get("androguard_strings") or {}
+        matches: list[str] = []
+        for item in androguard_strings.get("items") or []:
+            if not isinstance(item, dict):
+                continue
+            value = self._first_non_empty(item.get("value"))
+            if not value or not value_predicate(value):
+                continue
+            for xref in item.get("xrefs") or []:
+                if not isinstance(xref, dict):
+                    continue
+                signature = self._first_non_empty(xref.get("signature"))
+                if signature and xref_predicate(signature):
+                    matches.append(signature)
+        return self._dedupe_preserve_order(matches)
+
+    def _app_package_prefix(self, loaded_outputs: dict[str, Any]) -> str:
+        return self._first_non_empty(
+            ((loaded_outputs.get("aapt2_identity") or {}).get("package_name")),
+            ((loaded_outputs.get("androguard_metadata") or {}).get("package")),
+        ).replace(".", "/")
 
     def _sensitive_ui_class_names(self, loaded_outputs: dict[str, Any], package_prefix: str) -> list[str]:
         candidates: list[str] = []
