@@ -1334,5 +1334,82 @@ def test_android_binary_scan_detail_extractor_builds_storage_evidence_from_permi
     }
 
 
+def test_android_binary_scan_detail_extractor_marks_password_not_hashed_in_transit_present() -> None:
+    loaded_outputs = {
+        "aapt2_application": {},
+        "aapt2_manifest_security_posture": {},
+        "apktool_network_security_config": {},
+        "androguard_api_calls": {
+            "items": [
+                {
+                    "callee": {
+                        "method_name": "openConnection",
+                        "signature": "Ljava/net/URL; openConnection ()Ljava/net/URLConnection;",
+                    },
+                    "caller": {
+                        "signature": (
+                            "Lcom/example/LoginActivity; submitPassword "
+                            "(Ljava/lang/String;)V"
+                        ),
+                    },
+                    "categories": ["network"],
+                }
+            ]
+        },
+    }
+
+    sections = AndroidBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert sections["network_evidence"]["password_not_hashed_in_transit"] == {
+        "present": True,
+        "evidence": "Lcom/example/LoginActivity; submitPassword (Ljava/lang/String;)V",
+    }
+
+
+def test_android_binary_scan_detail_extractor_marks_password_not_hashed_in_transit_not_present_when_hash_seen() -> None:
+    loaded_outputs = {
+        "aapt2_application": {},
+        "aapt2_manifest_security_posture": {},
+        "apktool_network_security_config": {},
+        "androguard_api_calls": {
+            "items": [
+                {
+                    "callee": {
+                        "method_name": "openConnection",
+                        "signature": "Ljava/net/URL; openConnection ()Ljava/net/URLConnection;",
+                    },
+                    "caller": {
+                        "signature": (
+                            "Lcom/example/LoginActivity; submitPassword "
+                            "(Ljava/lang/String;)V"
+                        ),
+                    },
+                    "categories": ["network"],
+                },
+                {
+                    "callee": {
+                        "method_name": "digest",
+                        "signature": "Ljava/security/MessageDigest; digest ([B)[B",
+                    },
+                    "caller": {
+                        "signature": (
+                            "Lcom/example/LoginActivity; submitPassword "
+                            "(Ljava/lang/String;)V"
+                        ),
+                    },
+                    "categories": ["crypto"],
+                },
+            ]
+        },
+    }
+
+    sections = AndroidBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert sections["network_evidence"]["password_not_hashed_in_transit"] == {
+        "present": False,
+        "evidence": "Lcom/example/LoginActivity; submitPassword (Ljava/lang/String;)V",
+    }
+
+
 def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")

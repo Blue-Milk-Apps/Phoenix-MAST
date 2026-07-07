@@ -23,6 +23,9 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     STORAGE_CREDENTIAL_HINT_PATTERN = re.compile(
         r"(?i)(?:auth|credential|login|passw(?:or)?d|token|session|rememberme)"
     )
+    PASSWORD_HINT_PATTERN = re.compile(
+        r"(?i)(?:passw(?:or)?d|passwd|pwd|newpassword|passcode|credential|login|auth)"
+    )
     EXTERNAL_STORAGE_PERMISSIONS = {
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
@@ -71,6 +74,30 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         "android.permission.WRITE_SETTINGS": "Allows the app to modify system settings.",
         "android.permission.WRITE_SMS": "Allows the app to create or modify SMS messages stored on the device.",
     }
+    NETWORK_API_HINTS = (
+        "httpurlconnection",
+        "httpsurlconnection",
+        "okhttp",
+        "retrofit",
+        "org/apache/http",
+        "httpclient",
+        "socket",
+        "url; openconnection",
+        "webview",
+        "posturl",
+        "loadurl",
+    )
+    HASH_API_HINTS = (
+        "messagedigest",
+        "digest",
+        "java/security/mac",
+        "mac; dofinal",
+        "secretkeyfactory",
+        "pbkdf",
+        "bcrypt",
+        "scrypt",
+        "argon2",
+    )
 
     FUNCTIONALITY_KEYS = [
         "Audio",
@@ -471,6 +498,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         network_security = loaded_outputs.get("apktool_network_security_config") or {}
         aapt2_application = loaded_outputs.get("aapt2_application") or {}
         aapt2_posture = loaded_outputs.get("aapt2_manifest_security_posture") or {}
+        androguard_api_calls = loaded_outputs.get("androguard_api_calls") or {}
 
         domains = network_security.get("domains") or []
         provenance = network_security.get("provenance") or {}
@@ -494,6 +522,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             missing_certificate_pinning = not pin_sets_present
         elif config_file_present is False:
             missing_certificate_pinning = True
+
+        password_not_hashed_in_transit = self._derive_password_not_hashed_in_transit(
+            list(androguard_api_calls.get("items") or [])
+        )
 
         return {
             "allows_cleartext_traffic_for_all_domains": {
@@ -529,8 +561,8 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
                 "evidence": "",
             },
             "password_not_hashed_in_transit": {
-                "present": None,
-                "evidence": "",
+                "present": password_not_hashed_in_transit["present"],
+                "evidence": password_not_hashed_in_transit["evidence"],
             },
             "weak_certificate_validation_enables_mitm": {
                 "present": user_installed_ca_present,
@@ -1033,6 +1065,43 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             return f"{path}:{line}"
         return path
 
+    def _derive_password_not_hashed_in_transit(self, api_calls: list[dict[str, Any]]) -> dict[str, Any]:
+        if not api_calls:
+            return {"present": None, "evidence": ""}
+
+        password_network_callers: list[str] = []
+        hashed_password_callers: list[str] = []
+
+        for item in api_calls:
+            if not isinstance(item, dict):
+                continue
+            caller_signature = self._api_call_caller_signature(item)
+            if not caller_signature or not self.PASSWORD_HINT_PATTERN.search(caller_signature):
+                continue
+            if self._is_network_api_call(item):
+                password_network_callers.append(caller_signature)
+            if self._is_hash_api_call(item):
+                hashed_password_callers.append(caller_signature)
+
+        password_network_callers = self._dedupe_preserve_order(password_network_callers)
+        hashed_password_callers = self._dedupe_preserve_order(hashed_password_callers)
+        unhashed_callers = [
+            caller for caller in password_network_callers
+            if caller not in set(hashed_password_callers)
+        ]
+
+        if unhashed_callers:
+            return {
+                "present": True,
+                "evidence": ", ".join(unhashed_callers),
+            }
+        if password_network_callers and hashed_password_callers:
+            return {
+                "present": False,
+                "evidence": ", ".join(password_network_callers),
+            }
+        return {"present": None, "evidence": ""}
+
     def _matching_api_call_sites(
         self,
         api_calls: list[dict[str, Any]],
@@ -1059,6 +1128,31 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             callee.get("class_name"),
             callee.get("method_name"),
         )
+
+    def _api_call_caller_signature(self, item: dict[str, Any]) -> str:
+        caller = item.get("caller") or {}
+        return self._first_non_empty(
+            caller.get("signature"),
+            caller.get("class_name"),
+            caller.get("method_name"),
+        )
+
+    def _is_network_api_call(self, item: dict[str, Any]) -> bool:
+        categories = {str(category).strip().lower() for category in (item.get("categories") or [])}
+        if "network" in categories:
+            return True
+        signature = self._api_call_signature(item).lower()
+        return any(hint in signature for hint in self.NETWORK_API_HINTS)
+
+    def _is_hash_api_call(self, item: dict[str, Any]) -> bool:
+        categories = {str(category).strip().lower() for category in (item.get("categories") or [])}
+        if "crypto" in categories:
+            return True
+        signature = self._api_call_signature(item).lower()
+        method_name = self._api_call_method_name(item).lower()
+        if any(hint in signature for hint in self.HASH_API_HINTS):
+            return True
+        return method_name in {"digest", "dofinal"}
 
     @staticmethod
     def _dedupe_preserve_order(values: list[str]) -> list[str]:
