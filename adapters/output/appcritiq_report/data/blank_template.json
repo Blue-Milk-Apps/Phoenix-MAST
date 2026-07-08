@@ -7,7 +7,7 @@
     "platform": "Android",
     "version_name": "",
     "version_code": "",
-    "reviewer_org": "AppCritique Security Report"
+    "reviewer_org": "AppCritIQ Security Report"
   },
   "findings_severity": {
     "critical": 0,

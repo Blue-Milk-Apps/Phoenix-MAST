@@ -1,7 +1,7 @@
-# AppCritique Security Report Generator
+# AppCritIQ Security Report Generator
 
 Turns a JSON scan-data file into a formatted PDF report, matching the
-structure of your AppCritique spec: cover page with app summary card ->
+structure of your AppCritIQ spec: cover page with app summary card ->
 polar risk chart -> overall evaluation -> certificate/file/app info ->
 functionality table & SDK inventory -> permissions -> one section per
 vulnerability category with findings + checks-conducted table -> hardcoded
@@ -40,7 +40,7 @@ values -> endpoint connections.
 - `data/sample_insecurebankv2.json` - filled example built from the
   InsecureBankv2 sample report you provided, so you can see the full
   report style end to end.
-- `output/InsecureBankv2_AppCritique_Report.pdf` - that sample rendered.
+- `output/InsecureBankv2_AppCritIQ_Report.pdf` - that sample rendered.
 
 ## Usage
 

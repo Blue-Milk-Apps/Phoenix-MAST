@@ -107,7 +107,7 @@ class MobileScannerFactory:
 
 class MobileAnalysisWorkflowService:
     POST_SCAN_OUTPUT_FILE_NAME = "post_scan_processing.json"
-    GENERATED_REPORT_FILE_NAME = "AppCritique_Report.pdf"
+    GENERATED_REPORT_FILE_NAME = "AppCritIQ_Report.pdf"
 
     def run(self, scan_config: ScanConfig) -> None:
         print("AppcritIQ scan")

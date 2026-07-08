@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
-AppCritique Security Report generator.
+AppCritIQ Security Report generator.
 
 Usage:
     python3 generate_report.py <data.json> <output.pdf>
 
 Feed it a JSON file matching the schema in data/blank_template.json (a filled
 example is at data/sample_insecurebankv2.json) and it renders a PDF report in
-the AppCritique / mobile-app-pentest style: cover page, risk donuts, overall
+the AppCritIQ / mobile-app-pentest style: cover page, risk donuts, overall
 evaluation table, certificate/file/app info, functionality & SDK inventory,
 permissions, one section per vulnerability category with a findings narrative
 and a checks-conducted table, hardcoded values, and endpoint connections.
 """
+
 import base64
 import copy
 import io
@@ -78,9 +79,7 @@ STORAGE_EVIDENCE_KEY_BY_CHECK = {
     "sensitive information stored in world readable or writable file in internal storage": (
         "sensitive_information_stored_in_world_readable_or_writable_file_in_internal_storage"
     ),
-    "sensitive information stored in external storage": (
-        "sensitive_information_stored_in_external_storage"
-    ),
+    "sensitive information stored in external storage": ("sensitive_information_stored_in_external_storage"),
     "does not prevent screen capture of sensitive information": (
         "does_not_prevent_screen_capture_of_sensitive_information"
     ),
@@ -302,12 +301,8 @@ STORAGE_CHECK_SPECS = (
             "can be accessed by any app on the device with the "
             "READ/WRITE_EXTERNAL_STORAGE permission."
         ),
-        "not_present_explanation": (
-            "No evidence was found that the app accesses shared external storage."
-        ),
-        "aliases": (
-            "app can read/write to external storage",
-        ),
+        "not_present_explanation": ("No evidence was found that the app accesses shared external storage."),
+        "aliases": ("app can read/write to external storage",),
     },
     {
         "check": "Authentication Credentials Not Protected with Android Keystore",
@@ -322,8 +317,7 @@ STORAGE_CHECK_SPECS = (
             "hardware-backed protection."
         ),
         "not_present_explanation": (
-            "No evidence was found that authentication credentials are stored "
-            "without Android Keystore protection."
+            "No evidence was found that authentication credentials are stored without Android Keystore protection."
         ),
         "aliases": (),
     },
@@ -359,8 +353,7 @@ STORAGE_CHECK_SPECS = (
             "READ_EXTERNAL_STORAGE permission."
         ),
         "not_present_explanation": (
-            "No evidence was found that the app stores sensitive information in "
-            "external storage."
+            "No evidence was found that the app stores sensitive information in external storage."
         ),
         "aliases": (),
     },
@@ -374,8 +367,7 @@ STORAGE_CHECK_SPECS = (
             "FLAG_SECURE window layout parameter."
         ),
         "not_present_explanation": (
-            "No evidence was found that the app leaves sensitive screens "
-            "capturable without FLAG_SECURE protection."
+            "No evidence was found that the app leaves sensitive screens capturable without FLAG_SECURE protection."
         ),
         "aliases": (),
     },
@@ -453,8 +445,7 @@ NETWORK_CHECK_SPECS = (
             "app's TLS network communication using a rogue certificate."
         ),
         "not_present_explanation": (
-            "The app implements certificate pinning or no lack of certificate "
-            "pinning was identified in this scan."
+            "The app implements certificate pinning or no lack of certificate pinning was identified in this scan."
         ),
         "aliases": (),
     },
@@ -488,10 +479,7 @@ NETWORK_CHECK_SPECS = (
         "check": "Unnecessary Information Transmitted",
         "severity": "Low",
         "compliance": "GDPR: Article 23; NIAP: FDP_NET_EXT.1.1; FPR_ANO_EXT.1.1",
-        "present_explanation": (
-            "The app transmits unnecessary user or device information over the "
-            "network."
-        ),
+        "present_explanation": ("The app transmits unnecessary user or device information over the network."),
         "not_present_explanation": "This app does not send any unnecessary user or device information.",
         "aliases": (),
     },
@@ -508,8 +496,7 @@ NETWORK_CHECK_SPECS = (
             "easily capture this sensitive information."
         ),
         "not_present_explanation": (
-            "No unencrypted transmission of sensitive information was identified "
-            "in this scan."
+            "No unencrypted transmission of sensitive information was identified in this scan."
         ),
         "aliases": (),
     },
@@ -525,10 +512,7 @@ NETWORK_CHECK_SPECS = (
             "practice to hash the password before sending it off the client "
             "device, and then to hash the result again once it reaches the server."
         ),
-        "not_present_explanation": (
-            "No evidence was found that the app sends unhashed passwords over "
-            "the network."
-        ),
+        "not_present_explanation": ("No evidence was found that the app sends unhashed passwords over the network."),
         "aliases": (),
     },
     {
@@ -547,12 +531,9 @@ NETWORK_CHECK_SPECS = (
             "hijacking or DNS cache poisoning."
         ),
         "not_present_explanation": (
-            "No weak certificate-validation behavior leading to man-in-the-middle "
-            "exposure was identified in this scan."
+            "No weak certificate-validation behavior leading to man-in-the-middle exposure was identified in this scan."
         ),
-        "aliases": (
-            "network security configuration allows user-installed cas",
-        ),
+        "aliases": ("network security configuration allows user-installed cas",),
     },
 )
 
@@ -605,6 +586,7 @@ def make_overall_risk_polar_chart(risk_summary):
     both render correctly with the same code."""
     import matplotlib
     import numpy as np
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
@@ -641,8 +623,7 @@ def make_overall_risk_polar_chart(risk_summary):
     ax = fig.add_subplot(111, projection="polar")
     ax.set_theta_zero_location("N")
 
-    bars = ax.bar(theta, radii, width=width, color=colors, alpha=0.85,
-                   edgecolor="white", linewidth=2, bottom=0)
+    bars = ax.bar(theta, radii, width=width, color=colors, alpha=0.85, edgecolor="white", linewidth=2, bottom=0)
 
     ax.set_ylim(0, 4.3)
     ax.set_yticks([1, 2, 3])
@@ -660,8 +641,7 @@ def make_overall_risk_polar_chart(risk_summary):
 
     for angle, radius, level in zip(theta, radii, [c[1] for c in categories]):
         label_r = max(radius - 0.55, 0.6)
-        ax.text(angle, label_r, level.title(), ha="center", va="center",
-                 fontsize=9, fontweight="bold", color="white")
+        ax.text(angle, label_r, level.title(), ha="center", va="center", fontsize=9, fontweight="bold", color="white")
 
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=200, bbox_inches="tight", transparent=True)
@@ -754,7 +734,8 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     _ensure_functionality_details(report_data)
     _order_functionality_section(report_data)
     report_data["vulnerability_sections"] = [
-        s for s in report_data.get("vulnerability_sections", [])
+        s
+        for s in report_data.get("vulnerability_sections", [])
         if (s.get("section_name") or "").strip().lower() not in EXCLUDED_VULN_SECTIONS
     ]
     report_data["overall_evaluation"] = _build_overall_evaluation(report_data)
@@ -817,7 +798,7 @@ def _permission_display_name(permission: object) -> str:
     text = str(permission or "").strip()
     android_prefix = "android.permission."
     if text.startswith(android_prefix):
-        return text[len(android_prefix):]
+        return text[len(android_prefix) :]
     return text
 
 
@@ -840,10 +821,7 @@ def _canonicalize_code_section(report_data: dict[str, Any]) -> None:
         for check in incoming_checks
         if isinstance(check, dict) and str(check.get("check", "")).strip()
     }
-    code_section["checks"] = [
-        _canonical_code_check(report_data, spec, lookup)
-        for spec in CODE_CHECK_SPECS
-    ]
+    code_section["checks"] = [_canonical_code_check(report_data, spec, lookup) for spec in CODE_CHECK_SPECS]
 
 
 def _canonicalize_network_section(report_data: dict[str, Any]) -> None:
@@ -866,10 +844,7 @@ def _canonicalize_network_section(report_data: dict[str, Any]) -> None:
         if isinstance(check, dict) and str(check.get("check", "")).strip()
     }
 
-    canonical_checks = [
-        _canonical_network_check(report_data, spec, lookup)
-        for spec in NETWORK_CHECK_SPECS
-    ]
+    canonical_checks = [_canonical_network_check(report_data, spec, lookup) for spec in NETWORK_CHECK_SPECS]
     network_section["checks"] = canonical_checks
 
 
@@ -893,10 +868,7 @@ def _canonicalize_storage_section(report_data: dict[str, Any]) -> None:
         if isinstance(check, dict) and str(check.get("check", "")).strip()
     }
 
-    storage_section["checks"] = [
-        _canonical_storage_check(report_data, spec, lookup)
-        for spec in STORAGE_CHECK_SPECS
-    ]
+    storage_section["checks"] = [_canonical_storage_check(report_data, spec, lookup) for spec in STORAGE_CHECK_SPECS]
 
 
 def _canonicalize_resilience_section(report_data: dict[str, Any]) -> None:
@@ -920,8 +892,7 @@ def _canonicalize_resilience_section(report_data: dict[str, Any]) -> None:
     }
 
     resilience_section["checks"] = [
-        _canonical_resilience_check(report_data, spec, lookup)
-        for spec in RESILIENCE_CHECK_SPECS
+        _canonical_resilience_check(report_data, spec, lookup) for spec in RESILIENCE_CHECK_SPECS
     ]
 
 
@@ -1170,10 +1141,7 @@ def _apply_derived_code_check(report_data: dict[str, Any], check: dict[str, Any]
                 "The manifest allows application data backup, which can expose "
                 "app data through device backup mechanisms."
             ),
-            not_present_explanation=(
-                "Application data backup is not enabled based on the available "
-                "report data."
-            ),
+            not_present_explanation=("Application data backup is not enabled based on the available report data."),
             evidence_label="allow_backup",
         )
         return
@@ -1188,13 +1156,9 @@ def _apply_derived_code_check(report_data: dict[str, Any], check: dict[str, Any]
                 ("manifest", "debuggable"),
             ],
             present_explanation=(
-                "The app is marked as debuggable, which can expose runtime "
-                "state and make reverse engineering easier."
+                "The app is marked as debuggable, which can expose runtime state and make reverse engineering easier."
             ),
-            not_present_explanation=(
-                "The app is not marked as debuggable based on the available "
-                "report data."
-            ),
+            not_present_explanation=("The app is not marked as debuggable based on the available report data."),
             evidence_label="debuggable",
         )
         return
@@ -1214,9 +1178,7 @@ def _apply_derived_storage_check(report_data: dict[str, Any], check: dict[str, A
                 "Secret-like values were found in SharedPreferences-related paths, "
                 "indicating sensitive data may be stored insecurely in local preferences."
             ),
-            not_present_explanation=(
-                "No secret-like values were found in SharedPreferences-related paths."
-            ),
+            not_present_explanation=("No secret-like values were found in SharedPreferences-related paths."),
             evidence_label="shared_prefs_secret_hits",
         )
         return
@@ -1230,9 +1192,7 @@ def _apply_derived_storage_check(report_data: dict[str, Any], check: dict[str, A
                 "Secret-like values were found in cache-related paths, indicating "
                 "sensitive data may be present in application cache storage."
             ),
-            not_present_explanation=(
-                "No secret-like values were found in cache-related paths."
-            ),
+            not_present_explanation=("No secret-like values were found in cache-related paths."),
             evidence_label="cache_secret_hits",
         )
 
@@ -1257,9 +1217,7 @@ def _apply_exported_component_check(
     if exported_count > 0:
         check["result"] = "Present"
         noun = singular if exported_count == 1 else plural
-        check["explanation"] = (
-            f"{exported_count} exported {noun} detected in the manifest."
-        )
+        check["explanation"] = f"{exported_count} exported {noun} detected in the manifest."
         check["evidence"] = f"{component_key}={exported_count}"
         return
 
@@ -1303,9 +1261,7 @@ def _apply_deep_link_check(report_data: dict[str, Any], check: dict[str, Any]) -
     if count > 0:
         check["result"] = "Present"
         noun = "handler" if count == 1 else "handlers"
-        check["explanation"] = (
-            f"{count} custom URL scheme or deep link {noun} detected in the app."
-        )
+        check["explanation"] = f"{count} custom URL scheme or deep link {noun} detected in the app."
         check["evidence"] = f"deep_links={count}"
         return
 
@@ -1324,10 +1280,7 @@ def _apply_location_based_secret_check(
     evidence_label: str,
 ) -> None:
     secrets = _secret_entries(report_data)
-    matched = [
-        secret for secret in secrets
-        if any(hint in str(secret.get("location", "")).lower() for hint in hints)
-    ]
+    matched = [secret for secret in secrets if any(hint in str(secret.get("location", "")).lower() for hint in hints)]
     if matched:
         check["result"] = "Present"
         check["explanation"] = present_explanation
@@ -1542,17 +1495,17 @@ def _build_overall_evaluation(report_data: dict[str, Any]) -> list[dict[str, Any
 
         area_label, _risk_key = area_details
         present_checks = [
-            check for check in (section.get("checks") or [])
+            check
+            for check in (section.get("checks") or [])
             if str(check.get("result", "")).strip().lower() == "present"
         ]
         summary_checks = [
-            check for check in present_checks
+            check
+            for check in present_checks
             if str(check.get("severity", "")).strip().lower() in {"critical", "high", "medium"}
         ]
         summary_findings = [
-            str(check.get("check", "")).strip()
-            for check in summary_checks
-            if str(check.get("check", "")).strip()
+            str(check.get("check", "")).strip() for check in summary_checks if str(check.get("check", "")).strip()
         ]
         risk_rating = _highest_present_severity(summary_checks) if summary_checks else "Low"
 

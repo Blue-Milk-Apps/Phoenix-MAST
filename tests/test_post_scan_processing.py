@@ -642,7 +642,9 @@ def test_android_binary_scan_detail_extractor_maps_recent_opengrep_functionality
                 },
                 {
                     "check_id": "android.usb.devices.usage.present",
-                    "extra": {"metadata": {"appcritiq": {"check_id": 70, "description": "USB devices usage detected."}}},
+                    "extra": {
+                        "metadata": {"appcritiq": {"check_id": 70, "description": "USB devices usage detected."}}
+                    },
                 },
                 {
                     "check_id": "android.geofencing.usage.present",
@@ -650,11 +652,15 @@ def test_android_binary_scan_detail_extractor_maps_recent_opengrep_functionality
                 },
                 {
                     "check_id": "android.health.data.usage.present",
-                    "extra": {"metadata": {"appcritiq": {"check_id": 72, "description": "Health data usage detected."}}},
+                    "extra": {
+                        "metadata": {"appcritiq": {"check_id": 72, "description": "Health data usage detected."}}
+                    },
                 },
                 {
                     "check_id": "android.infrared.led.usage.present",
-                    "extra": {"metadata": {"appcritiq": {"check_id": 73, "description": "Infrared LED usage detected."}}},
+                    "extra": {
+                        "metadata": {"appcritiq": {"check_id": 73, "description": "Infrared LED usage detected."}}
+                    },
                 },
                 {
                     "check_id": "android.audio.usage.present",
@@ -1118,7 +1124,7 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
                     "context": {"category": "secret_keyword"},
                     "provenance": {"path": "AndroidManifest.xml", "line": 88},
                     "value": "token=abc123",
-                }
+                },
             ]
         },
     )
@@ -1136,7 +1142,7 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
         "platform": "Android",
         "version_name": "3.20.70",
         "version_code": "3207037",
-        "reviewer_org": "AppCritique Security Report",
+        "reviewer_org": "AppCritIQ Security Report",
     }
     assert result["app_info"]["main_activity"] == "com.apkpure.aegon.main.activity.FirstSeemPageActivity"
     assert result["app_components"] == {
@@ -1284,7 +1290,7 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
             "tags": "domain",
             "ip_address": "",
             "country": "",
-        }
+        },
     ]
 
 
@@ -1313,10 +1319,7 @@ def test_android_binary_scan_detail_extractor_builds_storage_evidence_from_permi
                         ),
                     },
                     "caller": {
-                        "signature": (
-                            "Lcom/example/LoginActivity; savePassword "
-                            "(Ljava/lang/String;)V"
-                        ),
+                        "signature": ("Lcom/example/LoginActivity; savePassword (Ljava/lang/String;)V"),
                     },
                 }
             ]
@@ -1329,10 +1332,7 @@ def test_android_binary_scan_detail_extractor_builds_storage_evidence_from_permi
     assert sections["storage_evidence"] == {
         "accesses_external_storage": {
             "present": True,
-            "evidence": (
-                "android.permission.READ_EXTERNAL_STORAGE, "
-                "android.permission.WRITE_EXTERNAL_STORAGE"
-            ),
+            "evidence": ("android.permission.READ_EXTERNAL_STORAGE, android.permission.WRITE_EXTERNAL_STORAGE"),
         },
         "authentication_credentials_not_protected_with_android_keystore": {
             "present": True,
@@ -1366,10 +1366,7 @@ def test_android_binary_scan_detail_extractor_marks_password_not_hashed_in_trans
                         "signature": "Ljava/net/URL; openConnection ()Ljava/net/URLConnection;",
                     },
                     "caller": {
-                        "signature": (
-                            "Lcom/example/LoginActivity; submitPassword "
-                            "(Ljava/lang/String;)V"
-                        ),
+                        "signature": ("Lcom/example/LoginActivity; submitPassword (Ljava/lang/String;)V"),
                     },
                     "categories": ["network"],
                 }
@@ -1398,10 +1395,7 @@ def test_android_binary_scan_detail_extractor_marks_password_not_hashed_in_trans
                         "signature": "Ljava/net/URL; openConnection ()Ljava/net/URLConnection;",
                     },
                     "caller": {
-                        "signature": (
-                            "Lcom/example/LoginActivity; submitPassword "
-                            "(Ljava/lang/String;)V"
-                        ),
+                        "signature": ("Lcom/example/LoginActivity; submitPassword (Ljava/lang/String;)V"),
                     },
                     "categories": ["network"],
                 },
@@ -1411,10 +1405,7 @@ def test_android_binary_scan_detail_extractor_marks_password_not_hashed_in_trans
                         "signature": "Ljava/security/MessageDigest; digest ([B)[B",
                     },
                     "caller": {
-                        "signature": (
-                            "Lcom/example/LoginActivity; submitPassword "
-                            "(Ljava/lang/String;)V"
-                        ),
+                        "signature": ("Lcom/example/LoginActivity; submitPassword (Ljava/lang/String;)V"),
                     },
                     "categories": ["crypto"],
                 },

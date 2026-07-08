@@ -1,1 +1,1 @@
-"""AppCritique PDF report package assets and generator."""
+"""AppCritIQ PDF report package assets and generator."""

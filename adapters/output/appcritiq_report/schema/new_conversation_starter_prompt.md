@@ -1,11 +1,11 @@
-# Starter prompt -- continue AppCritique check-schema work in a new chat
+# Starter prompt -- continue AppCritIQ check-schema work in a new chat
 
 Copy everything below the line into a new conversation, then upload the file
 that wouldn't fit here.
 
 ---
 
-I'm building out a security-report tool called **AppCritique** -- a Python +
+I'm building out a security-report tool called **AppCritIQ** -- a Python +
 Jinja2 + WeasyPrint pipeline that turns scan data (JSON) into a formatted PDF
 security report for mobile apps (Android-focused so far). The report has
 these sections: cover (app summary, icon, meta table), Findings by Severity
@@ -26,7 +26,7 @@ I built a **JSON Schema for a single security "check" record**
    MASTG/MSTG, CVE, Phoenix Output Location (which tool + JSON path produced
    the finding -- tools included mobsf, androguard, apktool, lief, strings,
    gitleaks, trufflehog, opengrep, syft, apksigner, or "dynamic").
-2. AppCritique's own checks-conducted table fields: Check, Result,
+2. AppCritIQ's own checks-conducted table fields: Check, Result,
    Explanation, Compliance, Remediation link, Evidence.
 
 Deliberately excluded: any NowSecure-specific concepts (numeric 0-10
@@ -49,8 +49,8 @@ Field notes:
 - description = what the check looks for in the abstract (capabilities.csv
   Description column).
 - impact = plain-language consequence of THIS finding specifically
-  (AppCritique's Explanation column) -- distinct from description.
-- status = Present / Not Present / Not Evaluated (AppCritique's Result
+  (AppCritIQ's Explanation column) -- distinct from description.
+- status = Present / Not Present / Not Evaluated (AppCritIQ's Result
   column). Use "Not Evaluated" rather than guessing when a check didn't run.
 - severity = capabilities.csv's Default Severity column, plus "Variable"
   (used in the CSV itself for checks like "Components with known
@@ -58,7 +58,7 @@ Field notes:
   "N/A" (for pure inventory/artifact checks with no risk rating of their
   own).
 - compliance folds in HIPAA/GDPR/legacy-OWASP-Mobile-Top-10 tags too, since
-  those appear in AppCritique's own Compliance column even though they're
+  those appear in AppCritIQ's own Compliance column even though they're
   not columns in capabilities.csv itself.
 - evidence[].tool / output_location map directly to capabilities.csv's
   "Phoenix Output Location" column.
@@ -87,11 +87,11 @@ Please:
 3. Update check.schema.json with those additions only -- keep it valid
    JSON Schema (Draft 2020-12), keep backward compatibility (don't remove
    or rename existing fields), and keep it scoped to capabilities.csv +
-   AppCritique's own report fields, same as before.
+   AppCritIQ's own report fields, same as before.
 4. Validate the updated schema is syntactically valid, and construct one
    filled example record from the new file's data and validate it against
    the updated schema (jsonschema.validate).
 
-Don't limit new fields to only what would render in the AppCritique PDF --
+Don't limit new fields to only what would render in the AppCritIQ PDF --
 the schema is meant to be a complete data record that a report template
 can choose to display or ignore.

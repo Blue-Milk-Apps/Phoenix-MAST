@@ -17,7 +17,7 @@ AppcritIQ scanner adapters call external tools from the local `PATH`. The curren
 | Strings | `strings` | App binaries and embedded frameworks / native libraries |
 | OWASP Dependency-Check | `dependency-check` | NVD data under `nvd-owasp-data/` or `DEPENDENCY_CHECK_DATA_DIR` |
 | Syft | `syft` | None |
-| AppCritique PDF Report | Python `jinja2`, `weasyprint`, `matplotlib`, `numpy`, `markupsafe` packages | Native WeasyPrint libraries such as `pango`, `glib`, and `cairo` |
+| AppCritIQ PDF Report | Python `jinja2`, `weasyprint`, `matplotlib`, `numpy`, `markupsafe` packages | Native WeasyPrint libraries such as `pango`, `glib`, and `cairo` |
 
 These setup notes document the manual steps that the Makefile targets should later automate.
 
@@ -63,7 +63,7 @@ docker compose build appcritiq --build-arg GITLEAKS_VERSION=8.30.1
 
 AppcritIQ uses `MOBSF_URL` to find the MobSF service for binary scans. If `MOBSF_URL` is not set, AppcritIQ skips MobSF and continues with the other configured scanners. When using `make services-up`, MobSF is available at `http://localhost:8000`.
 
-## AppCritique PDF report setup
+## AppCritIQ PDF report setup
 
 WeasyPrint also requires native shared libraries that `uv` does not install.
 On macOS, the supported local setup is Homebrew:

@@ -13,7 +13,7 @@ from ports.scan_output_loader_port import ScanOutputLoaderPort
 class PostScanProcessingService:
     """Assemble report sections from persisted scan outputs."""
 
-    DEFAULT_REVIEWER_ORG = "AppCritique Security Report"
+    DEFAULT_REVIEWER_ORG = "AppCritIQ Security Report"
 
     def __init__(
         self,
