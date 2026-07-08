@@ -26,12 +26,28 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     PASSWORD_HINT_PATTERN = re.compile(
         r"(?i)(?:passw(?:or)?d|passwd|pwd|newpassword|passcode|credential|login|auth)"
     )
+    SENSITIVE_LOG_VALUE_PATTERN = re.compile(
+        r"(?i)(?:passw(?:or)?d|passwd|pwd|token|secret|session|credential|pin|phonenumber|account)"
+    )
     FLAG_SECURE_PATTERN = re.compile(r"(?i)\bflag_secure\b")
     WORLD_MODE_PATTERN = re.compile(r"(?i)mode_world_(?:readable|writable)")
     COOKIE_PATTERN = re.compile(r"(?i)\bcookie\b")
     COOKIE_SECURITY_ATTR_PATTERN = re.compile(r"(?i)\b(?:secure|httponly|samesite)\b")
     HTTP_URL_PATTERN = re.compile(r"(?i)\bhttp://[^\s'\"<>]+")
     ROOT_DETECTION_PATTERN = re.compile(r"(?i)(?:\bsu\b|busybox|supersu|magisk|test-keys|rootbeer|isrooted|rootcheck)")
+    SHA1_PATTERN = re.compile(r"(?i)\bsha(?:-|_)?1(?:withrsa)?\b")
+    BLOWFISH_PATTERN = re.compile(r"(?i)\bblowfish\b")
+    WEAK_BLOWFISH_KEY_BITS_PATTERN = re.compile(r"\b(?:32|40|56|64|96|112|120)\b")
+    RSA_PATTERN = re.compile(r"(?i)\brsa\b")
+    WEAK_RSA_KEY_BITS_PATTERN = re.compile(r"\b(?:256|384|512|768)\b")
+    XML_PARSER_PATTERN = re.compile(r"(?i)(?:xmlpullparser|saxparserfactory|documentbuilderfactory|xmlreader)")
+    WEAK_XML_PATTERN = re.compile(
+        r"(?i)(?:external-general-entities|external-parameter-entities|load-external-dtd|disallow-doctype-decl|resolveentity|setfeature)"
+    )
+    AUTH_VALUE_PATTERN = re.compile(r"(?i)(?:auth|login|token|password|session|credential)")
+    SPOOFABLE_IDENTIFIER_PATTERN = re.compile(
+        r"(?i)(?:android_id|advertisingid|deviceid|getdeviceid|getsubscriberid|getsimserialnumber|telephonymanager)"
+    )
     SENSITIVE_UI_HINT_PATTERN = re.compile(
         r"(?i)(?:login|logon|signin|signup|password|passcode|pin|account|transfer|statement|payment|auth|profile)"
     )
@@ -822,6 +838,8 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             if self._first_non_empty(permission.get("name"))
         }
 
+        package_prefix = self._app_package_prefix(loaded_outputs)
+
         reflection_callers = self._matching_api_call_sites(
             api_calls,
             lambda item: "reflect" in self._api_call_signature(item).lower(),
@@ -864,24 +882,6 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             ),
         )
 
-        sha1_callers = self._matching_api_call_sites(
-            api_calls,
-            lambda item: "sha1" in self._api_call_signature(item).lower()
-            or "sha-1" in self._api_call_signature(item).lower(),
-        )
-
-        xml_parser_callers = self._matching_api_call_sites(
-            api_calls,
-            lambda item: any(
-                token in self._api_call_signature(item).lower()
-                for token in (
-                    "xmlpullparser",
-                    "saxparserfactory",
-                    "documentbuilderfactory",
-                )
-            ),
-        )
-
         clipboard_callers = self._matching_api_call_sites(
             api_calls,
             lambda item: "clipboard" in self._api_call_signature(item).lower()
@@ -894,7 +894,6 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             for item in code_indicator_items
         ]
         report_api_counts = dict(androguard_report_summary.get("api_category_counts") or {})
-        report_string_counts = dict(androguard_report_summary.get("string_category_counts") or {})
 
         password_secret_hits = [
             secret for secret in hardcoded_values.get("secrets") or []
@@ -931,18 +930,46 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         ) or int(report_api_counts.get("reflection") or 0) > 0
 
         sql_injection_present = any("sql injection" in str(finding.get("title", "")).lower() for finding in finding_items)
-        sha1_present = bool(sha1_callers) or any(
-            "sha1" in value.lower() or "sha-1" in value.lower()
-            for value in code_indicator_values
-            if value
-        )
-
         uses_provider_update = bool(provider_update_callers)
         root_access_present = bool(runtime_exec_callers)
         app_debuggable = self._coerce_bool_like(application.get("debuggable"))
         sms_permission_present = "android.permission.SEND_SMS" in declared_permissions
         accesses_unique_identifiers = bool(identifier_callers)
         source_not_obfuscated = len(readable_app_classes) >= 3
+        sha1_evidence = self._detect_sha1_usage(
+            loaded_outputs,
+            package_prefix,
+            api_calls,
+            code_indicator_items,
+        )
+        weak_blowfish_evidence = self._detect_weak_blowfish_key_length(
+            loaded_outputs,
+            package_prefix,
+            api_calls,
+            code_indicator_items,
+        )
+        weak_rsa_evidence = self._detect_weak_rsa_key_length(
+            loaded_outputs,
+            package_prefix,
+            api_calls,
+            code_indicator_items,
+        )
+        weak_xml_evidence = self._detect_weak_xml_parser(
+            loaded_outputs,
+            package_prefix,
+            api_calls,
+            code_indicator_items,
+        )
+        sensitive_log_evidence = self._detect_sensitive_logging(
+            loaded_outputs,
+            package_prefix,
+            api_calls,
+        )
+        spoofable_auth_evidence = self._detect_spoofable_authentication(
+            loaded_outputs,
+            package_prefix,
+            api_calls,
+        )
 
         return {
             "accesses_unique_identifiers": self._code_evidence_entry(
@@ -1000,12 +1027,14 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
                 details=reflection_callers[:10],
             ),
             "creates_blowfish_key_with_weak_length": self._code_evidence_entry(
-                present=any(value and "blowfish" in value.lower() for value in code_indicator_values),
-                evidence="no_blowfish_weak_key_hits",
+                present=weak_blowfish_evidence.get("present"),
+                evidence=weak_blowfish_evidence.get("evidence", ""),
+                details=weak_blowfish_evidence.get("details"),
             ),
             "creates_rsa_keys_with_weak_modulus_length": self._code_evidence_entry(
-                present=False,
-                evidence="no_weak_rsa_key_length_hits",
+                present=weak_rsa_evidence.get("present"),
+                evidence=weak_rsa_evidence.get("evidence", ""),
+                details=weak_rsa_evidence.get("details"),
             ),
             "does_not_update_security_provider": self._code_evidence_entry(
                 present=not uses_provider_update,
@@ -1045,22 +1074,24 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
                 details=readable_app_classes[:10],
             ),
             "uses_sha1_hashing_algorithm": self._code_evidence_entry(
-                present=sha1_present,
-                evidence=", ".join(sha1_callers[:5]) if sha1_callers else "no_sha1_hits",
-                details=sha1_callers[:10],
+                present=sha1_evidence.get("present"),
+                evidence=sha1_evidence.get("evidence", ""),
+                details=sha1_evidence.get("details"),
             ),
             "weakly_configured_xml_parser": self._code_evidence_entry(
-                present=False,
-                evidence=", ".join(xml_parser_callers[:5]) if xml_parser_callers else "no_weak_xml_parser_hits",
-                details=xml_parser_callers[:10],
+                present=weak_xml_evidence.get("present"),
+                evidence=weak_xml_evidence.get("evidence", ""),
+                details=weak_xml_evidence.get("details"),
             ),
             "writes_sensitive_information_to_system_log": self._code_evidence_entry(
-                present=False,
-                evidence=f"logging_count={int(report_api_counts.get('logging') or 0)}",
+                present=sensitive_log_evidence.get("present"),
+                evidence=sensitive_log_evidence.get("evidence", ""),
+                details=sensitive_log_evidence.get("details"),
             ),
             "uses_spoofable_values_for_authentication": self._code_evidence_entry(
-                present=False,
-                evidence=f"auth_string_count={int(report_string_counts.get('auth') or 0)}",
+                present=spoofable_auth_evidence.get("present"),
+                evidence=spoofable_auth_evidence.get("evidence", ""),
+                details=spoofable_auth_evidence.get("details"),
             ),
             "copies_sensitive_information_into_clipboard_without_user_consent": self._code_evidence_entry(
                 present=bool(clipboard_callers),
@@ -1876,6 +1907,212 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             return {"present": False, "evidence": hardening_callers[0], "details": hardening_callers[:10]}
         return {"present": False, "evidence": "no_biometric_authentication_flow_detected"}
 
+    def _detect_sha1_usage(
+        self,
+        loaded_outputs: dict[str, Any],
+        package_prefix: str,
+        api_calls: list[dict[str, Any]],
+        code_indicator_items: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        crypto_callers = self._matching_api_call_sites(
+            api_calls,
+            lambda item: self._caller_matches_package(item, package_prefix)
+            and (
+                self._is_hash_api_call(item)
+                or any(
+                    token in self._api_call_signature(item).lower()
+                    for token in ("messagedigest", "signature;", "mac;")
+                )
+            ),
+        )
+        sha1_xrefs = self._matching_string_xrefs(
+            loaded_outputs=loaded_outputs,
+            value_predicate=lambda value: self.SHA1_PATTERN.search(value) is not None,
+            xref_predicate=lambda signature: package_prefix in signature.replace(".", "/") if package_prefix else False,
+        )
+        sha1_indicator_locations = self._matching_code_indicator_locations(
+            code_indicator_items,
+            package_prefix=package_prefix,
+            value_predicate=lambda value: self.SHA1_PATTERN.search(value) is not None,
+        )
+        overlapping = [caller for caller in crypto_callers if caller in set(sha1_xrefs)]
+        evidence_hits = self._dedupe_preserve_order([*overlapping, *sha1_indicator_locations, *sha1_xrefs])
+        if evidence_hits:
+            return {"present": True, "evidence": evidence_hits[0], "details": evidence_hits[:10]}
+        if crypto_callers:
+            return {"present": False, "evidence": "no_sha1_hits", "details": crypto_callers[:10]}
+        return {"present": False, "evidence": "no_sha1_hits"}
+
+    def _detect_weak_blowfish_key_length(
+        self,
+        loaded_outputs: dict[str, Any],
+        package_prefix: str,
+        api_calls: list[dict[str, Any]],
+        code_indicator_items: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        crypto_callers = self._matching_api_call_sites(
+            api_calls,
+            lambda item: self._caller_matches_package(item, package_prefix)
+            and any(
+                token in self._api_call_signature(item).lower()
+                for token in ("cipher;", "secretkeyspec", "keygenerator", "secretkeyfactory")
+            ),
+        )
+        blowfish_xrefs = self._matching_string_xrefs(
+            loaded_outputs=loaded_outputs,
+            value_predicate=lambda value: self.BLOWFISH_PATTERN.search(value) is not None,
+            xref_predicate=lambda signature: package_prefix in signature.replace(".", "/") if package_prefix else False,
+        )
+        weak_size_xrefs = self._matching_string_xrefs(
+            loaded_outputs=loaded_outputs,
+            value_predicate=lambda value: self.WEAK_BLOWFISH_KEY_BITS_PATTERN.search(value) is not None,
+            xref_predicate=lambda signature: package_prefix in signature.replace(".", "/") if package_prefix else False,
+        )
+        weak_indicator_locations = self._matching_code_indicator_locations(
+            code_indicator_items,
+            package_prefix=package_prefix,
+            value_predicate=lambda value: self.BLOWFISH_PATTERN.search(value) is not None
+            and self.WEAK_BLOWFISH_KEY_BITS_PATTERN.search(value) is not None,
+        )
+        overlapping = [
+            caller for caller in crypto_callers
+            if caller in set(blowfish_xrefs) and caller in set(weak_size_xrefs)
+        ]
+        evidence_hits = self._dedupe_preserve_order([*overlapping, *weak_indicator_locations])
+        if evidence_hits:
+            return {"present": True, "evidence": evidence_hits[0], "details": evidence_hits[:10]}
+        if crypto_callers or blowfish_xrefs:
+            return {"present": False, "evidence": "no_blowfish_weak_key_hits"}
+        return {"present": False, "evidence": "no_blowfish_weak_key_hits"}
+
+    def _detect_weak_rsa_key_length(
+        self,
+        loaded_outputs: dict[str, Any],
+        package_prefix: str,
+        api_calls: list[dict[str, Any]],
+        code_indicator_items: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        rsa_callers = self._matching_api_call_sites(
+            api_calls,
+            lambda item: self._caller_matches_package(item, package_prefix)
+            and any(
+                token in self._api_call_signature(item).lower()
+                for token in ("keypairgenerator", "rsakeygenparameterspec", "keyfactory", "rsapublickeyspec")
+            ),
+        )
+        rsa_xrefs = self._matching_string_xrefs(
+            loaded_outputs=loaded_outputs,
+            value_predicate=lambda value: self.RSA_PATTERN.search(value) is not None,
+            xref_predicate=lambda signature: package_prefix in signature.replace(".", "/") if package_prefix else False,
+        )
+        weak_size_xrefs = self._matching_string_xrefs(
+            loaded_outputs=loaded_outputs,
+            value_predicate=lambda value: self.WEAK_RSA_KEY_BITS_PATTERN.search(value) is not None,
+            xref_predicate=lambda signature: package_prefix in signature.replace(".", "/") if package_prefix else False,
+        )
+        weak_indicator_locations = self._matching_code_indicator_locations(
+            code_indicator_items,
+            package_prefix=package_prefix,
+            value_predicate=lambda value: self.RSA_PATTERN.search(value) is not None
+            and self.WEAK_RSA_KEY_BITS_PATTERN.search(value) is not None,
+        )
+        overlapping = [
+            caller for caller in rsa_callers
+            if caller in set(rsa_xrefs) and caller in set(weak_size_xrefs)
+        ]
+        evidence_hits = self._dedupe_preserve_order([*overlapping, *weak_indicator_locations])
+        if evidence_hits:
+            return {"present": True, "evidence": evidence_hits[0], "details": evidence_hits[:10]}
+        if rsa_callers or rsa_xrefs:
+            return {"present": False, "evidence": "no_weak_rsa_key_length_hits"}
+        return {"present": False, "evidence": "no_weak_rsa_key_length_hits"}
+
+    def _detect_weak_xml_parser(
+        self,
+        loaded_outputs: dict[str, Any],
+        package_prefix: str,
+        api_calls: list[dict[str, Any]],
+        code_indicator_items: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        parser_callers = self._matching_api_call_sites(
+            api_calls,
+            lambda item: self._caller_matches_package(item, package_prefix)
+            and self.XML_PARSER_PATTERN.search(self._api_call_signature(item)) is not None,
+        )
+        weak_xrefs = self._matching_string_xrefs(
+            loaded_outputs=loaded_outputs,
+            value_predicate=lambda value: self.WEAK_XML_PATTERN.search(value) is not None,
+            xref_predicate=lambda signature: package_prefix in signature.replace(".", "/") if package_prefix else False,
+        )
+        weak_indicator_locations = self._matching_code_indicator_locations(
+            code_indicator_items,
+            package_prefix=package_prefix,
+            value_predicate=lambda value: self.WEAK_XML_PATTERN.search(value) is not None,
+        )
+        overlapping = [caller for caller in parser_callers if caller in set(weak_xrefs)]
+        evidence_hits = self._dedupe_preserve_order([*overlapping, *weak_indicator_locations, *weak_xrefs])
+        if evidence_hits:
+            return {"present": True, "evidence": evidence_hits[0], "details": evidence_hits[:10]}
+        if parser_callers:
+            return {"present": False, "evidence": "no_weak_xml_parser_hits", "details": parser_callers[:10]}
+        return {"present": False, "evidence": "no_weak_xml_parser_hits"}
+
+    def _detect_sensitive_logging(
+        self,
+        loaded_outputs: dict[str, Any],
+        package_prefix: str,
+        api_calls: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        log_callers = self._matching_api_call_sites(
+            api_calls,
+            lambda item: self._caller_matches_package(item, package_prefix)
+            and "android/util/log" in self._api_call_signature(item).lower(),
+        )
+        if not log_callers:
+            return {"present": False, "evidence": "no_sensitive_logging_hits"}
+
+        sensitive_xrefs = self._matching_string_xrefs(
+            loaded_outputs=loaded_outputs,
+            value_predicate=lambda value: self.SENSITIVE_LOG_VALUE_PATTERN.search(value) is not None,
+            xref_predicate=lambda signature: package_prefix in signature.replace(".", "/") if package_prefix else False,
+        )
+        overlapping = [caller for caller in log_callers if caller in set(sensitive_xrefs)]
+        if overlapping:
+            return {"present": True, "evidence": overlapping[0], "details": overlapping[:10]}
+        return {"present": False, "evidence": "no_sensitive_logging_hits", "details": log_callers[:10]}
+
+    def _detect_spoofable_authentication(
+        self,
+        loaded_outputs: dict[str, Any],
+        package_prefix: str,
+        api_calls: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        identifier_callers = self._matching_api_call_sites(
+            api_calls,
+            lambda item: self._caller_matches_package(item, package_prefix)
+            and self.SPOOFABLE_IDENTIFIER_PATTERN.search(self._api_call_signature(item)) is not None,
+        )
+        auth_xrefs = self._matching_string_xrefs(
+            loaded_outputs=loaded_outputs,
+            value_predicate=lambda value: self.AUTH_VALUE_PATTERN.search(value) is not None,
+            xref_predicate=lambda signature: package_prefix in signature.replace(".", "/") if package_prefix else False,
+        )
+        network_callers = self._matching_api_call_sites(
+            api_calls,
+            lambda item: self._caller_matches_package(item, package_prefix)
+            and self._is_network_api_call(item),
+        )
+
+        overlapping = [
+            caller for caller in identifier_callers
+            if caller in set(auth_xrefs) or caller in set(network_callers)
+        ]
+        if overlapping:
+            return {"present": True, "evidence": overlapping[0], "details": overlapping[:10]}
+        if identifier_callers:
+            return {"present": False, "evidence": "no_spoofable_authentication_hits", "details": identifier_callers[:10]}
+        return {"present": False, "evidence": "no_spoofable_authentication_hits"}
+
     def _matching_api_call_sites(
         self,
         api_calls: list[dict[str, Any]],
@@ -1916,6 +2153,31 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             return False
         caller_signature = self._api_call_caller_signature(item)
         return package_prefix in caller_signature.replace(".", "/")
+
+    def _matching_code_indicator_locations(
+        self,
+        code_indicator_items: list[dict[str, Any]],
+        *,
+        package_prefix: str,
+        value_predicate: Any,
+    ) -> list[str]:
+        matches: list[str] = []
+        normalized_package = package_prefix.replace(".", "/")
+        for item in code_indicator_items:
+            if not isinstance(item, dict):
+                continue
+            value = self._first_non_empty(item.get("value"))
+            if not value or not value_predicate(value):
+                continue
+            provenance = item.get("provenance") or {}
+            path = self._first_non_empty(provenance.get("path"), provenance.get("source"))
+            normalized_path = path.replace(".", "/")
+            if normalized_package and normalized_package not in normalized_path:
+                continue
+            location = self._format_provenance_location(provenance)
+            if location:
+                matches.append(location)
+        return self._dedupe_preserve_order(matches)
 
     def _is_window_flag_api_call(self, item: dict[str, Any]) -> bool:
         signature = self._api_call_signature(item).lower()
