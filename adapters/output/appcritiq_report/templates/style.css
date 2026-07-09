@@ -33,10 +33,54 @@ p { margin: 0 0 8px 0; }
   page-break-after: always;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   height: 23cm;
+  padding-top: 10px;
 }
-.cover .brand { font-size: 11pt; letter-spacing: 2px; color: #7a7a7a; text-transform: uppercase; margin-bottom: 40px; }
+.cover-topbar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 34px; }
+.cover .brand {
+  font-size: 10pt;
+  letter-spacing: 1.8px;
+  color: #7a7a7a;
+  text-transform: uppercase;
+  margin-top: 14px;
+  text-align: right;
+  max-width: 32%;
+}
+.report-brand-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  background: #ffffff;
+  border-radius: 16px;
+  min-width: 300px;
+}
+.report-brand-icon {
+  width: 84px;
+  height: 84px;
+  flex-shrink: 0;
+}
+.report-brand-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.report-brand-name {
+  font-size: 20pt;
+  font-weight: bold;
+  letter-spacing: 0.4px;
+  color: #16233c;
+  line-height: 1.05;
+}
+.report-brand-tag {
+  margin-top: 4px;
+  font-size: 9pt;
+  font-weight: bold;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: #16233c;
+}
 .cover .title { font-size: 30pt; font-weight: bold; color: #16233c; margin-bottom: 6px; }
 .cover .subtitle { font-size: 15pt; color: #444; margin-bottom: 30px; }
 .cover .meta-table { width: 60%; border-collapse: collapse; margin-top: 30px; }
@@ -98,7 +142,7 @@ table.compact th, table.compact td { font-size: 8pt; padding: 4px 6px; }
 .polar-chart { width: 65%; max-width: 380px; }
 
 /* ---------- Cover heading (icon + title) ---------- */
-.cover-heading { display: flex; align-items: center; margin-bottom: 6px; }
+.cover-heading { display: flex; align-items: center; margin-bottom: 6px; margin-top: 8px; }
 .cover-icon { width: 54px; height: 54px; border-radius: 12px; margin-right: 18px; flex-shrink: 0; }
 .cover-heading-text .title { margin-bottom: 2px; }
 .cover-heading-text .subtitle { margin-bottom: 0; }

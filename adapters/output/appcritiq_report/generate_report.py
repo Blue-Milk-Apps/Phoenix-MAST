@@ -545,6 +545,7 @@ EXCLUDED_VULN_SECTIONS = {"authentication", "cryptography", "platform"}
 # Path to the generic placeholder app-icon image used on the cover page
 # when app_info.icon_path isn't provided.
 PLACEHOLDER_ICON_PATH = BASE_DIR / "assets" / "placeholder_icon.png"
+REPORT_BRAND_ICON_PATH = BASE_DIR.parents[2] / "assets" / "appcritiq-icon-white-back.png"
 
 
 def risk_badge(rating, label=None):
@@ -664,6 +665,16 @@ def get_app_icon_data_uri(data):
         target = path
     else:
         target = PLACEHOLDER_ICON_PATH
+    return _image_file_to_data_uri(target)
+
+
+def get_report_brand_icon_data_uri() -> str:
+    """Return a stable file URI for the AppCritIQ brand icon shown on the cover."""
+    target = REPORT_BRAND_ICON_PATH if REPORT_BRAND_ICON_PATH.is_file() else PLACEHOLDER_ICON_PATH
+    return target.resolve().as_uri()
+
+
+def _image_file_to_data_uri(target: Path) -> str:
     ext = target.suffix.lstrip(".").lower() or "png"
     mime = "jpeg" if ext in ("jpg", "jpeg") else ext
     encoded = base64.b64encode(target.read_bytes()).decode("ascii")
@@ -690,13 +701,20 @@ def generate_report(input_data: dict[str, Any] | Path | str, output_path: Path |
     css_text = (TEMPLATES_DIR / "style.css").read_text(encoding="utf-8")
     charts = build_charts(data)
     app_icon_uri = get_app_icon_data_uri(data)
+    appcritiq_brand_icon_uri = get_report_brand_icon_data_uri()
 
     env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
     env.globals["risk_badge"] = risk_badge
     env.globals["result_badge"] = result_badge
 
     template = env.get_template("report.html.jinja")
-    html_out = template.render(data=data, css=css_text, charts=charts, app_icon_uri=app_icon_uri)
+    html_out = template.render(
+        data=data,
+        css=css_text,
+        charts=charts,
+        app_icon_uri=app_icon_uri,
+        appcritiq_brand_icon_uri=appcritiq_brand_icon_uri,
+    )
 
     resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
     HTML(string=html_out, base_url=str(BASE_DIR)).write_pdf(str(resolved_output_path))
