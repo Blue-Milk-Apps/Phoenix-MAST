@@ -26,17 +26,17 @@ class PostScanProcessingService:
     def process(self, scan_output_path: Path) -> dict[str, Any]:
         """Build the first post-scan output shape, starting with the meta section."""
 
-        loaded_outputs = self._scan_output_loader.load(scan_output_path)
-        other_sections = self._scan_detail_extractor.extract_sections(loaded_outputs)
+        scanner_outputs = self._scan_output_loader.load(scan_output_path)
+        findings_from_scanners = self._scan_detail_extractor.extract_sections(scanner_outputs)
         return {
-            "meta": self._build_meta(loaded_outputs),
-            **other_sections,
+            "meta": self._build_meta(scanner_outputs),
+            **findings_from_scanners,
         }
 
-    def _build_meta(self, loaded_outputs: dict[str, Any]) -> dict[str, str]:
-        scan_metadata = loaded_outputs.get("scan_metadata") or {}
-        androguard_metadata = loaded_outputs.get("androguard_metadata") or {}
-        aapt2_identity = loaded_outputs.get("aapt2_identity") or {}
+    def _build_meta(self, scanner_outputs: dict[str, Any]) -> dict[str, str]:
+        scan_metadata = scanner_outputs.get("scan_metadata") or {}
+        androguard_metadata = scanner_outputs.get("androguard_metadata") or {}
+        aapt2_identity = scanner_outputs.get("aapt2_identity") or {}
         app_display_name = self._first_non_empty(
             androguard_metadata.get("app_name"),
             aapt2_identity.get("application_label"),
@@ -63,7 +63,7 @@ class PostScanProcessingService:
             "app_display_name": app_display_name,
             "file_name": file_name,
             "package_name": package_name,
-            "scan_date": self._derive_scan_date(scan_metadata, Path(loaded_outputs["scan_output_path"])),
+            "scan_date": self._derive_scan_date(scan_metadata, Path(scanner_outputs["scan_output_path"])),
             "platform": platform,
             "version_name": version_name,
             "version_code": version_code,
