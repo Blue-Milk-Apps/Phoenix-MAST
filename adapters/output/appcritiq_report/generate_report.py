@@ -545,7 +545,7 @@ EXCLUDED_VULN_SECTIONS = {"authentication", "cryptography", "platform"}
 # Path to the generic placeholder app-icon image used on the cover page
 # when app_info.icon_path isn't provided.
 PLACEHOLDER_ICON_PATH = BASE_DIR / "assets" / "placeholder_icon.png"
-REPORT_BRAND_ICON_PATH = BASE_DIR.parents[2] / "assets" / "appcritiq-icon-white-back.png"
+REPORT_BRAND_ICON_PATH = BASE_DIR / "assets" / "appcritiq-icon-white-back.png"
 
 
 def risk_badge(rating, label=None):
@@ -669,9 +669,9 @@ def get_app_icon_data_uri(data):
 
 
 def get_report_brand_icon_data_uri() -> str:
-    """Return a stable file URI for the AppCritIQ brand icon shown on the cover."""
+    """Return a data: URI for the AppCritIQ brand icon shown on the cover."""
     target = REPORT_BRAND_ICON_PATH if REPORT_BRAND_ICON_PATH.is_file() else PLACEHOLDER_ICON_PATH
-    return target.resolve().as_uri()
+    return _image_file_to_data_uri(target)
 
 
 def _image_file_to_data_uri(target: Path) -> str:
