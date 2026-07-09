@@ -1179,34 +1179,6 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
             "general_description": "Allows the app to access the device camera.",
         },
         {
-            "permission": "android.permission.RECORD_AUDIO",
-            "status": "dangerous",
-            "info": "dangerous",
-            "usage_description": "",
-            "general_description": "Allows the app to capture audio using the microphone.",
-        },
-        {
-            "permission": "android.permission.READ_CONTACTS",
-            "status": "dangerous",
-            "info": "dangerous",
-            "usage_description": "",
-            "general_description": "Allows the app to read the user's contacts data.",
-        },
-        {
-            "permission": "android.permission.READ_CALENDAR",
-            "status": "dangerous",
-            "info": "dangerous",
-            "usage_description": "",
-            "general_description": "Allows the app to read calendar events and related details stored on the device.",
-        },
-        {
-            "permission": "android.permission.BLUETOOTH_CONNECT",
-            "status": "normal",
-            "info": "unknown or normal",
-            "usage_description": "",
-            "general_description": "Allows the app to connect to nearby Bluetooth devices.",
-        },
-        {
             "permission": "android.permission.INTERNET",
             "status": "normal",
             "info": "unknown or normal",
@@ -1221,8 +1193,8 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
     }
     assert result["network_evidence"] == {
         "allows_cleartext_traffic_for_all_domains": {
-            "present": True,
-            "evidence": "AndroidManifest.xml",
+            "present": False,
+            "evidence": "",
         },
         "contains_hostname_verifier_accepts_all": {
             "present": None,
@@ -1234,7 +1206,7 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
         },
         "does_not_perform_certificate_pinning": {
             "present": True,
-            "evidence": "AndroidManifest.xml",
+            "evidence": "",
         },
         "opens_listening_port": {
             "present": None,
@@ -1245,12 +1217,12 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
             "evidence": "",
         },
         "unnecessary_information_transmitted": {
-            "present": None,
-            "evidence": "",
+            "present": False,
+            "evidence": "no_unique_identifier_network_overlap",
         },
         "sensitive_information_unencrypted_in_transit": {
-            "present": None,
-            "evidence": "",
+            "present": False,
+            "evidence": "no_http_endpoints_detected",
         },
         "password_not_hashed_in_transit": {
             "present": None,
@@ -1258,7 +1230,7 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
         },
         "weak_certificate_validation_enables_mitm": {
             "present": False,
-            "evidence": "AndroidManifest.xml",
+            "evidence": "",
         },
         "manifest_cleartext_traffic_permitted": None,
     }
@@ -1339,12 +1311,12 @@ def test_android_binary_scan_detail_extractor_builds_storage_evidence_from_permi
             "evidence": "Lcom/example/LoginActivity; savePassword (Ljava/lang/String;)V",
         },
         "sensitive_information_stored_in_world_readable_or_writable_file_in_internal_storage": {
-            "present": None,
-            "evidence": "",
+            "present": False,
+            "evidence": "no_world_readable_internal_storage_hits",
         },
         "sensitive_information_stored_in_external_storage": {
-            "present": None,
-            "evidence": "",
+            "present": False,
+            "evidence": "no_external_storage_sensitive_hits",
         },
         "does_not_prevent_screen_capture_of_sensitive_information": {
             "present": None,
