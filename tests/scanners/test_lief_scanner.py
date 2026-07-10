@@ -26,7 +26,6 @@ def test_lief_scan_requires_ipa(monkeypatch, tmp_path: Path) -> None:
         project_path=target,
         output_path=tmp_path / "scan-results",
         mode="binary",
-        enabled_scans=[ScanType.LIEF],
     )
 
     results = LIEFScanner().scan(config)
@@ -59,7 +58,6 @@ def test_lief_scan_returns_raw_output(monkeypatch, tmp_path: Path) -> None:
         project_path=ipa_path,
         output_path=tmp_path / "scan-results",
         mode="binary",
-        enabled_scans=[ScanType.LIEF],
     )
 
     class FakeSection:

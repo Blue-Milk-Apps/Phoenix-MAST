@@ -15,6 +15,8 @@ from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
 from utilities.apk_utils import is_apk_file
 
+ANDROID_XML_NAMESPACE = "http://schemas.android.com/apk/res/android"
+
 
 @dataclass(frozen=True)
 class AndroguardScanContext:
@@ -241,8 +243,11 @@ class AndroguardScanner(ScannerPort):
     ) -> dict[str, Any]:
         manifest = self._call(androguard_context.apk, "get_android_manifest_xml")
         if manifest is None:
-            return {"xml": ""}
-        return {"xml": ElementTree.tostring(manifest, encoding="unicode")}
+            return {"manifest": None, "xml": ""}
+        return {
+            "manifest": self._element_to_dict(manifest),
+            "xml": ElementTree.tostring(manifest, encoding="unicode"),
+        }
 
     def _extract_permissions(
         self, androguard_context: AndroguardScanContext
@@ -259,19 +264,20 @@ class AndroguardScanner(ScannerPort):
         self, androguard_context: AndroguardScanContext
     ) -> dict[str, Any]:
         apk = androguard_context.apk
+        manifest = self._call(apk, "get_android_manifest_xml")
         return {
             "main_activity": self._call(apk, "get_main_activity"),
             "activities": self._component_records(
-                apk, "activity", self._call(apk, "get_activities", []) or []
+                apk, manifest, "activity", self._call(apk, "get_activities", []) or []
             ),
             "services": self._component_records(
-                apk, "service", self._call(apk, "get_services", []) or []
+                apk, manifest, "service", self._call(apk, "get_services", []) or []
             ),
             "receivers": self._component_records(
-                apk, "receiver", self._call(apk, "get_receivers", []) or []
+                apk, manifest, "receiver", self._call(apk, "get_receivers", []) or []
             ),
             "providers": self._component_records(
-                apk, "provider", self._call(apk, "get_providers", []) or []
+                apk, manifest, "provider", self._call(apk, "get_providers", []) or []
             ),
         }
 
@@ -677,6 +683,7 @@ class AndroguardScanner(ScannerPort):
         self, androguard_context: AndroguardScanContext
     ) -> list[dict[str, Any]]:
         apk = androguard_context.apk
+        manifest = self._call(apk, "get_android_manifest_xml")
         evidence: list[dict[str, Any]] = []
         component_getters = {
             "activity": "get_activities",
@@ -686,7 +693,7 @@ class AndroguardScanner(ScannerPort):
         }
         for component_type, getter_name in component_getters.items():
             for name in self._call(apk, getter_name, []) or []:
-                record = self._component_record(apk, component_type, name)
+                record = self._component_record(apk, manifest, component_type, name)
                 exported = record["exported"]
                 if exported is None:
                     exported = record["has_intent_filters"]
@@ -779,26 +786,76 @@ class AndroguardScanner(ScannerPort):
         }
 
     def _component_records(
-        self, apk: Any, component_type: str, component_names: list[str]
+        self,
+        apk: Any,
+        manifest: ElementTree.Element | None,
+        component_type: str,
+        component_names: list[str],
     ) -> list[dict[str, Any]]:
         return [
-            self._component_record(apk, component_type, name)
+            self._component_record(apk, manifest, component_type, name)
             for name in sorted(component_names)
         ]
 
     def _component_record(
-        self, apk: Any, component_type: str, name: str
+        self,
+        apk: Any,
+        manifest: ElementTree.Element | None,
+        component_type: str,
+        name: str,
     ) -> dict[str, Any]:
         intent_filters = apk.get_intent_filters(component_type, name) or {}
         return {
             "name": name,
             "exported": self._boolean_manifest_value(
-                apk.get_attribute_value(component_type, name, "exported")
+                self._manifest_component_attribute(
+                    apk, manifest, component_type, name, "exported"
+                )
             ),
-            "permission": apk.get_attribute_value(component_type, name, "permission"),
+            "permission": self._manifest_component_attribute(
+                apk, manifest, component_type, name, "permission"
+            ),
             "has_intent_filters": any(intent_filters.values()),
             "intent_filters": intent_filters,
         }
+
+    def _manifest_component_attribute(
+        self,
+        apk: Any,
+        manifest: ElementTree.Element | None,
+        component_type: str,
+        component_name: str,
+        attribute_name: str,
+    ) -> str | None:
+        if manifest is None:
+            return None
+
+        application = manifest.find("application")
+        if application is None:
+            return None
+
+        package_name = str(self._call(apk, "get_package"))
+        target_name = self._normalize_component_name(package_name, component_name)
+        android_name = f"{{{ANDROID_XML_NAMESPACE}}}name"
+        android_attribute = f"{{{ANDROID_XML_NAMESPACE}}}{attribute_name}"
+
+        for element in application.findall(component_type):
+            raw_name = element.get(android_name)
+            normalized_name = self._normalize_component_name(package_name, raw_name)
+            if normalized_name == target_name:
+                return element.get(android_attribute)
+
+        return None
+
+    @staticmethod
+    def _normalize_component_name(package_name: str, component_name: str | None) -> str:
+        if not component_name:
+            return ""
+        if component_name.startswith("."):
+            return f"{package_name}{component_name}"
+        if "." not in component_name:
+            return f"{package_name}.{component_name}"
+        return component_name
 
     def _boolean_manifest_value(self, value: Any) -> bool | None:
         if value is None:
@@ -829,6 +886,27 @@ class AndroguardScanner(ScannerPort):
         if native is not None:
             return native
         return str(value)
+
+    def _element_to_dict(self, element: ElementTree.Element) -> dict[str, Any]:
+        children = list(element)
+        grouped_children: dict[str, list[dict[str, Any]]] = {}
+        for child in children:
+            grouped_children.setdefault(child.tag, []).append(self._element_to_dict(child))
+
+        child_payload: dict[str, Any] = {}
+        for tag, items in grouped_children.items():
+            child_payload[tag] = items[0] if len(items) == 1 else items
+
+        text = (element.text or "").strip()
+        payload: dict[str, Any] = {
+            "tag": element.tag,
+            "attributes": dict(element.attrib),
+        }
+        if child_payload:
+            payload["children"] = child_payload
+        if text:
+            payload["text"] = text
+        return payload
 
     def _call(self, obj: Any, method_name: str, default: Any = "") -> Any:
         method = getattr(obj, method_name, None)

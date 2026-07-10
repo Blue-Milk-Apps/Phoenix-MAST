@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import tempfile
-from collections.abc import Mapping
 from pathlib import Path
 
 from domain.models import ScanConfig, ScanResult
@@ -36,7 +35,6 @@ class StoreToFile(ArtifactStorePort):
     def persist_scan_metadata(
         self,
         config: ScanConfig,
-        report_context: Mapping[str, str],
         storage_path: Path,
     ) -> Path:
         output_dir = Path(storage_path)
@@ -46,9 +44,9 @@ class StoreToFile(ArtifactStorePort):
             json.dumps(
                 {
                     "scan_label": config.scan_label,
-                    "platform": report_context["platform"],
-                    "target_type": report_context["target_type"],
-                    "stack": report_context["stack"],
+                    "platform": config.platform,
+                    "target_type": config.target_type,
+                    "stack": config.stack,
                     "project_path": str(config.project_path),
                     "output_path": str(config.output_path),
                 },
