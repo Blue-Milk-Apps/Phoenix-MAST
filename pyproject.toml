@@ -10,8 +10,12 @@ requires-python = ">=3.12"
 dependencies = [
     "androguard>=4.1.3",
     "apkid==3.1.0",
+    "jinja2>=3.1.6",
     "lief",
-    "opengrep",
+    "markupsafe>=3.0.3",
+    "matplotlib>=3.10.9",
+    "numpy>=2.4.5",
+    "weasyprint>=69.0",
 ]
 
 [dependency-groups]
@@ -28,6 +32,8 @@ packages = [
     "adapters",
     "adapters.binary_scanners",
     "adapters.output",
+    "adapters.output.appcritiq_report",
+    "adapters.post_scan",
     "adapters.storage",
     "adapters.source_code_scanners",
     "application",
@@ -35,6 +41,15 @@ packages = [
     "entrypoints",
     "ports",
     "utilities",
+]
+
+[tool.setuptools.package-data]
+"adapters.output.appcritiq_report" = [
+    "assets/*",
+    "data/*",
+    "docs/*",
+    "schema/*",
+    "templates/*",
 ]
 
 
@@ -48,6 +63,3 @@ line-length = 120
 
 [tool.ruff.lint]
 extend-select = ["I"]
-
-[tool.uv.sources]
-opengrep = { git = "https://github.com/opengrep/opengrep", subdirectory = "cli", rev = "v1.22.0" }

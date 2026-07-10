@@ -8,7 +8,6 @@ from adapters.binary_scanners.apktool_scanner import ApktoolScanner
 from adapters.binary_scanners.ipsw_scanner import IpswScanner
 from adapters.binary_scanners.lief_scanner import LIEFScanner
 from adapters.binary_scanners.mobsf_scanner import MobSFScanner, MobSFScannerError
-from adapters.binary_scanners.opengrep_binary_scanner import BinaryOpenGrepScanner
 from adapters.binary_scanners.plist_binary_scanner import PlistBinaryScanner
 
 __all__ = [
@@ -21,6 +20,5 @@ __all__ = [
     "LIEFScanner",
     "MobSFScanner",
     "MobSFScannerError",
-    "BinaryOpenGrepScanner",
     "PlistBinaryScanner",
 ]

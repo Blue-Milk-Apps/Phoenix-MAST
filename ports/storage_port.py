@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Protocol
 
@@ -19,6 +18,5 @@ class ArtifactStorePort(Protocol):
     def persist_scan_metadata(
         self,
         config: ScanConfig,
-        report_context: Mapping[str, str],
         storage_path: Path,
     ) -> Path: ...

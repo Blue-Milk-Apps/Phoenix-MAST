@@ -41,7 +41,6 @@ def test_scanner_service_returns_empty_results_without_scanners(tmp_path: Path) 
     config = ScanConfig(
         project_path=tmp_path,
         output_path=tmp_path / "scan-results",
-        enabled_scans=[],
     )
 
     results = ScannerService(scanners=[]).scan_project(config)
@@ -55,7 +54,6 @@ def test_scanner_service_writes_scan_results_to_output(tmp_path: Path) -> None:
     config = ScanConfig(
         project_path=tmp_path,
         output_path=tmp_path / "scan-results",
-        enabled_scans=[ScanType.GITLEAKS],
     )
 
     results = ScannerService(scanners=[scanner]).scan_project(config)
@@ -75,7 +73,6 @@ def test_scanner_service_writes_unavailable_result_to_output(tmp_path: Path) -> 
     config = ScanConfig(
         project_path=tmp_path,
         output_path=tmp_path / "scan-results",
-        enabled_scans=[ScanType.GITLEAKS],
     )
 
     results = ScannerService(scanners=[scanner]).scan_project(config)

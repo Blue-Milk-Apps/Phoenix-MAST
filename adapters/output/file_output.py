@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from pathlib import Path
 
 from adapters.storage import StoreToFile
@@ -28,10 +27,8 @@ class FileScanOutput(ScanOutputPort):
     def write_scan_metadata(
         self,
         config: ScanConfig,
-        report_context: Mapping[str, str],
     ) -> Path:
         return self._artifact_store.persist_scan_metadata(
             config,
-            report_context,
             self._storage_path,
         )

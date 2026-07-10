@@ -31,7 +31,6 @@ class RecordingArtifactStore(ArtifactStorePort):
     def persist_scan_metadata(
         self,
         config: ScanConfig,
-        report_context: dict[str, str],
         storage_path: Path,
     ) -> Path:
         return storage_path / SCAN_METADATA_FILE_NAME
@@ -105,17 +104,10 @@ def test_file_scan_output_writes_scan_metadata(tmp_path: Path) -> None:
         output_path=storage_path,
         mode="binary",
         scan_label="iOS binary",
+        platform="IOS",
+        stack="ANY",
     )
-    report_context = {
-        "platform": "IOS",
-        "target_type": "BINARY",
-        "stack": "ANY",
-    }
-
-    metadata_path = FileScanOutput(storage_path).write_scan_metadata(
-        config,
-        report_context,
-    )
+    metadata_path = FileScanOutput(storage_path).write_scan_metadata(config)
 
     assert metadata_path == storage_path / SCAN_METADATA_FILE_NAME
     assert '"platform": "IOS"' in metadata_path.read_text(encoding="utf-8")
