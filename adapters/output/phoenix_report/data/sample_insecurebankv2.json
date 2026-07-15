@@ -7,7 +7,7 @@
     "platform": "Android",
     "version_name": "1.0",
     "version_code": "1",
-    "reviewer_org": "AppCritIQ Security Report"
+    "reviewer_org": "Phoenix Security Report"
   },
   "findings_severity": {
     "high": 13,

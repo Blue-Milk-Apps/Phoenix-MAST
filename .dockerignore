@@ -8,7 +8,7 @@ __pycache__/
 .DS_Store
 .env
 
-appcritiq/
+phoenix/
 scan-results/
 owasp-data/
 uv.lock

@@ -34,8 +34,8 @@ class FakeName:
 
 
 class FakeCertificate:
-    subject = FakeName({"common_name": "AppcritIQ Test"})
-    issuer = FakeName({"common_name": "AppcritIQ CA"})
+    subject = FakeName({"common_name": "Phoenix Test"})
+    issuer = FakeName({"common_name": "Phoenix CA"})
     serial_number = 12345
     not_valid_before = "2026-01-01 00:00:00+00:00"
     not_valid_after = "2027-01-01 00:00:00+00:00"
@@ -264,8 +264,8 @@ def test_androguard_scan_emits_expected_json_outputs(monkeypatch, tmp_path: Path
     assert component["intent_filters"] == {"action": ["com.example.SYNC"]}
 
     certificate = outputs["certificates.json"]["all"][0]
-    assert certificate["subject"] == {"common_name": "AppcritIQ Test"}
-    assert certificate["issuer"] == {"common_name": "AppcritIQ CA"}
+    assert certificate["subject"] == {"common_name": "Phoenix Test"}
+    assert certificate["issuer"] == {"common_name": "Phoenix CA"}
     assert certificate["sha1"] == hashlib.sha1(b"certificate-bytes").hexdigest()
     assert certificate["sha256"] == hashlib.sha256(b"certificate-bytes").hexdigest()
 

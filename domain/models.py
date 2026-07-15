@@ -1,4 +1,4 @@
-"""Domain models for AppcritIQ security scanning platform."""
+"""Domain models for Phoenix security scanning platform."""
 
 from dataclasses import dataclass, field
 from enum import Enum

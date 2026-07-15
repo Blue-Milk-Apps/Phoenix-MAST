@@ -1,9 +1,9 @@
 .PHONY: help build build-mobsf-owaspdc run test hooks-install services-up services-down compose-run compose-run-standalone compose-run-mobsf-owaspdc compose-down
 
 # Image Variables
-IMAGE_NAME ?= appcritiq-core
+IMAGE_NAME ?= phoenix
 TAG ?= latest
-MOBSF_API_KEY ?= appcritiq-local-mobsf-api-key
+MOBSF_API_KEY ?= phoenix-local-mobsf-api-key
 MODE ?= source
 
 # Local Paths
@@ -12,12 +12,12 @@ RESULTS_DIR ?= $(shell pwd)/scan-results
 PHOENIX_SCAN_PATH ?= /workspace
 
 help:
-	@echo "AppcritIQ Core"
+	@echo "Phoenix MAST"
 	@echo ""
 	@echo "Targets:"
-	@echo "  make build         Build the appcritiq-core image"
+	@echo "  make build         Build the phoenix image"
 	@echo "  make build-mobsf-owaspdc"
-	@echo "                     Build the appcritiq-core compose image with MobSF and NVD sidecars"
+	@echo "                     Build the phoenix compose image with MobSF and NVD sidecars"
 	@echo "  make run           Run a standalone docker run scan"
 	@echo "  make services-up   Start the MobSF sidecar"
 	@echo "  make services-down Stop the MobSF sidecar"
@@ -39,12 +39,12 @@ build:
 		-t $(IMAGE_NAME):$(TAG) .
 
 build-mobsf-owaspdc:
-	docker compose build appcritiq-mobsf-owaspdc
+	docker compose build phoenix-mobsf-owaspdc
 
 run:
 	@mkdir -p $(RESULTS_DIR)
 	@if [ -z "$(SCAN_FLAG)" ]; then \
-		echo "Set SCAN_FLAG to one AppcritIQ scan target flag"; \
+		echo "Set SCAN_FLAG to one phoenix scan target flag"; \
 		exit 1; \
 	fi; \
 	PROJECT_MOUNT_PATH="$(PROJECT_PATH)"; \
@@ -75,7 +75,7 @@ services-up:
 		status=$$(docker inspect -f '{{.State.Health.Status}}' "$$container_id" 2>/dev/null || echo starting); \
 		if [ "$$status" = "healthy" ]; then \
 			echo "MobSF scanner is ready at http://localhost:8000"; \
-			echo 'Run: MOBSF_URL=http://localhost:8000 uv run appcritiq scan --ios-binary-path "path/to/app.ipa"'; \
+			echo 'Run: MOBSF_URL=http://localhost:8000 uv run phoenix scan --ios-binary-path "path/to/app.ipa"'; \
 			exit 0; \
 		fi; \
 		sleep 2; \
@@ -89,7 +89,7 @@ services-down:
 compose-run:
 	@mkdir -p "$(RESULTS_DIR)"
 	@if [ -z "$(SCAN_FLAG)" ]; then \
-		echo "Set SCAN_FLAG to one AppcritIQ scan target flag"; \
+		echo "Set SCAN_FLAG to one phoenix scan target flag"; \
 		exit 1; \
 	fi; \
 	PROJECT_MOUNT_PATH="$(PROJECT_PATH)"; \
@@ -112,12 +112,12 @@ compose-run:
 	SCAN_FLAG="$(SCAN_FLAG)" \
 	PHOENIX_SCAN_PATH="$$SCAN_PATH" \
 	GITLEAKS_SCAN_PATH="$${GITLEAKS_SCAN_PATH:-}" \
-	docker compose up --build --exit-code-from appcritiq appcritiq
+	docker compose up --build --exit-code-from phoenix phoenix
 
 compose-run:
 	@mkdir -p "$(RESULTS_DIR)"
 	@if [ -z "$(SCAN_FLAG)" ]; then \
-		echo "Set SCAN_FLAG to one AppcritIQ scan target flag"; \
+		echo "Set SCAN_FLAG to one phoenix scan target flag"; \
 		exit 1; \
 	fi; \
 	PROJECT_MOUNT_PATH="$(PROJECT_PATH)"; \
@@ -140,12 +140,12 @@ compose-run:
 	SCAN_FLAG="$(SCAN_FLAG)" \
 	PHOENIX_SCAN_PATH="$$SCAN_PATH" \
 	GITLEAKS_SCAN_PATH="$${GITLEAKS_SCAN_PATH:-}" \
-	docker compose up --build --exit-code-from appcritiq appcritiq
+	docker compose up --build --exit-code-from phoenix phoenix
 
 compose-run-mobsf-owaspdc:
 	@mkdir -p "$(RESULTS_DIR)"
 	@if [ -z "$(SCAN_FLAG)" ]; then \
-		echo "Set SCAN_FLAG to one AppcritIQ scan target flag"; \
+		echo "Set SCAN_FLAG to one phoenix scan target flag"; \
 		exit 1; \
 	fi; \
 	PROJECT_MOUNT_PATH="$(PROJECT_PATH)"; \
@@ -168,7 +168,7 @@ compose-run-mobsf-owaspdc:
 	SCAN_FLAG="$(SCAN_FLAG)" \
 	PHOENIX_SCAN_PATH="$$SCAN_PATH" \
 	GITLEAKS_SCAN_PATH="$${GITLEAKS_SCAN_PATH:-}" \
-	docker compose up --build --exit-code-from appcritiq-mobsf-owaspdc appcritiq-mobsf-owaspdc
+	docker compose up --build --exit-code-from phoenix-mobsf-owaspdc phoenix-mobsf-owaspdc
 
 compose-down:
 	docker compose down

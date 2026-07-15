@@ -1,6 +1,6 @@
 # Strings Scanner Setup
 
-AppcritIQ includes a simple strings extractor for binary scans.
+Phoenix includes a simple strings extractor for binary scans.
 
 ## Local Install
 
@@ -14,13 +14,13 @@ strings --help
 
 On Linux, `strings` is usually provided by `binutils`. On macOS, it is typically available from the system toolchain.
 
-## AppcritIQ Usage
+## Phoenix Usage
 
 Strings runs automatically during binary scans:
 
 ```bash
-uv run appcritiq scan --ios-binary-path path/to/app.ipa
-uv run appcritiq scan --android-binary-path path/to/app.apk
+uv run phoenix scan --ios-binary-path path/to/app.ipa
+uv run phoenix scan --android-binary-path path/to/app.apk
 ```
 
-For IPA files, AppcritIQ targets the app runner binary plus embedded framework binaries. For APK files, AppcritIQ targets extracted native `.so` libraries. The scanner writes one raw string per line into separate files under `scan-results/.../strings/`.
+For IPA files, Phoenix targets the app runner binary plus embedded framework binaries. For APK files, Phoenix targets extracted native `.so` libraries. The scanner writes one raw string per line into separate files under `scan-results/.../strings/`.

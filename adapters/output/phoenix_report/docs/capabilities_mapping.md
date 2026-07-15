@@ -1,7 +1,7 @@
-# AppCritIQ Report → capabilities.csv Mapping (Android)
+# phoenix Report → capabilities.csv Mapping (Android)
 
 This maps every Android-platform capability in `capabilities.csv` to where it
-lives in the AppCritIQ report template (`generate_report.py` /
+lives in the phoenix report template (`generate_report.py` /
 `report.html.jinja` / the JSON schema), and flags anything that's only
 partially covered or not covered at all.
 

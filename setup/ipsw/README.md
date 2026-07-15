@@ -1,10 +1,10 @@
 # ipsw Scanner Setup
 
-AppcritIQ uses `ipsw` during IPA binary scans to collect focused Apple-specific Mach-O, code-signature, and entitlement evidence from app and framework binaries. The scanner writes compact analyst-facing summaries into AppcritIQ scan artifacts and does not generate findings by itself.
+Phoenix uses `ipsw` during IPA binary scans to collect focused Apple-specific Mach-O, code-signature, and entitlement evidence from app and framework binaries. The scanner writes compact analyst-facing summaries into Phoenix scan artifacts and does not generate findings by itself.
 
 ## Local Install
 
-AppcritIQ resolves `ipsw` from the local `PATH`.
+Phoenix resolves `ipsw` from the local `PATH`.
 
 On macOS, install `ipsw` with Homebrew:
 
@@ -20,35 +20,35 @@ sudo snap install ipsw
 
 If snap is not available for your Linux environment, install a release archive from the `ipsw` GitHub releases page and place the `ipsw` binary somewhere on your `PATH`.
 
-Verify that AppcritIQ can resolve the same command:
+Verify that Phoenix can resolve the same command:
 
 ```bash
 which ipsw
 ipsw version
 ```
 
-AppcritIQ does not use an `IPSW_PATH` override. If `ipsw` is not on `PATH`, the scanner skips and reports that the tool is unavailable.
+Phoenix does not use an `IPSW_PATH` override. If `ipsw` is not on `PATH`, the scanner skips and reports that the tool is unavailable.
 
 ## Docker Install
 
-For Docker scans, do not install `ipsw` on the host just for AppcritIQ. The AppcritIQ Docker image installs `ipsw` inside the container from a pinned GitHub release archive and verifies it during image build:
+For Docker scans, do not install `ipsw` on the host just for Phoenix. The Phoenix Docker image installs `ipsw` inside the container from a pinned GitHub release archive and verifies it during image build:
 
 ```bash
-docker compose build appcritiq
+docker compose build phoenix
 ```
 
 Verify the container command directly:
 
 ```bash
-docker compose run --rm --entrypoint ipsw appcritiq version
+docker compose run --rm --entrypoint ipsw phoenix version
 ```
 
-## AppcritIQ Usage
+## Phoenix Usage
 
 ipsw runs automatically during iOS binary scans:
 
 ```bash
-uv run appcritiq scan --ios-binary-path path/to/app.ipa
+uv run phoenix scan --ios-binary-path path/to/app.ipa
 ```
 
 The scanner skips non-IPA inputs, including APK files and source directories. It emits one JSON artifact per scanned Mach-O binary under:

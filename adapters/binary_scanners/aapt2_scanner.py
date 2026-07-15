@@ -297,7 +297,7 @@ class Aapt2Scanner(ScannerPort):
         return {
             "schema_version": self.SCHEMA_VERSION,
             "extractor": {
-                "name": "appcritiq-aapt2",
+                "name": "phoenix-aapt2",
                 "version": self.EXTRACTOR_VERSION,
                 "parser_version": self.PARSER_VERSION,
             },
