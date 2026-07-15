@@ -113,7 +113,7 @@ class SyftScanner(ScannerPort):
             )
         if not output_format.endswith("-json"):
             raise ValueError(
-                "Syft output format must be JSON so AppcritIQ can persist a .json report. "
+                "Syft output format must be JSON so phoenix can persist a .json report. "
                 "Use a format such as 'cyclonedx-json', 'spdx-json', or 'syft-json'."
             )
         return output_format

@@ -1,4 +1,4 @@
-"""Command-line interface for AppcritIQ."""
+"""Command-line interface for Phoenix."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ DEFAULT_OPENGREP_RULES_DIRS = {
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the AppcritIQ command-line interface."""
+    """Run the phoenix command-line interface."""
     parser = _build_parser()
     args = parser.parse_args(argv)
 
@@ -36,8 +36,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="appcritiq",
-        description="AppcritIQ - Mobile Application Security Platform",
+        prog="phoenix",
+        description="Phoenix - Mobile Application Security Platform",
     )
     parser.add_argument(
         "--version",
@@ -47,7 +47,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command")
 
-    scan_parser = subparsers.add_parser("scan", help="Run a AppcritIQ scan")
+    scan_parser = subparsers.add_parser("scan", help="Run a Phoenix scan")
     scan_paths = scan_parser.add_mutually_exclusive_group(required=True)
     scan_paths.add_argument(
         "--ios-binary-path",
@@ -117,7 +117,7 @@ def _scan_command(args: argparse.Namespace) -> int:
 
 def _package_version() -> str:
     try:
-        return version("appcritiq-core")
+        return version("phoenix")
     except PackageNotFoundError:
         return "0.1.0"
 

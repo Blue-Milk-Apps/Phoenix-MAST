@@ -195,7 +195,7 @@ class ApksignerScanner(ScannerPort):
         return {
             "schema_version": self.SCHEMA_VERSION,
             "extractor": {
-                "name": "appcritiq-apksigner",
+                "name": "phoenix-apksigner",
                 "version": self.EXTRACTOR_VERSION,
             },
             "apk": self._apk_identity(apk_path),

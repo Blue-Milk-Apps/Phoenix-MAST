@@ -30,3 +30,6 @@ repos:
     rev: v1.5.0
     hooks:
       - id: detect-secrets  # Scans staged files for likely secrets and credentials
+        args:
+          - --exclude-files
+          - ^adapters/output/phoenix_report/data/sample_(insecurebankv2|mirrcast)\.json$

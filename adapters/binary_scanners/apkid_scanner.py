@@ -309,7 +309,7 @@ class ApkidScanner(ScannerPort):
         return {
             "schema_version": self.SCHEMA_VERSION,
             "extractor": {
-                "name": "appcritiq-apkid",
+                "name": "phoenix-apkid",
                 "version": self.EXTRACTOR_VERSION,
                 "philosophy": "environmental_intelligence_not_vulnerability_scanning",
             },

@@ -1,8 +1,8 @@
-# AppCritIQ Core
+# Phoenix MAST
 
-AppCritIQ Core is an open source mobile application security testing toolkit for iOS and Android. It packages a practical set of OSS security and analysis tools into a Docker-first workflow, then adds lightweight Python orchestration so teams can run repeatable checks against source projects and mobile binaries.
+Phoenix MAST is an open source mobile application security testing toolkit for iOS and Android. It packages a practical set of OSS security and analysis tools into a Docker-first workflow, then adds lightweight Python orchestration so teams can run repeatable checks against source projects and mobile binaries.
 
-The project is intentionally modular. Scanner adapters live behind stable ports, so AppCritIQ can be extended, slimmed down, or customized for a specific review process without rewriting the whole pipeline.
+The project is intentionally modular. Scanner adapters live behind stable ports, so phoenix can be extended, slimmed down, or customized for a specific review process without rewriting the whole pipeline.
 
 ## Features
 
@@ -18,7 +18,7 @@ The project is intentionally modular. Scanner adapters live behind stable ports,
 
 ## Quick Start
 
-The most convenient way to run AppCritIQ is the released Docker image from GitHub Container Registry.
+The most convenient way to run phoenix is the released Docker image from GitHub Container Registry.
 
 ```bash
 mkdir -p scan-results
@@ -26,7 +26,7 @@ mkdir -p scan-results
 docker run --rm \
   -v "$PWD:/workspace:ro" \
   -v "$PWD/scan-results:/app/results" \
-  ghcr.io/blue-milk-apps/appcritiq-core:<version> \
+  ghcr.io/blue-milk-apps/phoenix:<version> \
   scan --native-ios-source-path /workspace --output /app/results
 ```
 
@@ -34,24 +34,24 @@ Replace `<version>` with the release tag you want to run, and replace the scan f
 
 ## Scan Targets
 
-`appcritiq scan` requires exactly one scan target flag.
+`phoenix scan` requires exactly one scan target flag.
 
 ```bash
-appcritiq scan --ios-binary-path path/to/app.ipa
-appcritiq scan --android-binary-path path/to/app.apk
-appcritiq scan --flutter-source-path path/to/project
-appcritiq scan --react-native-source-path path/to/project
-appcritiq scan --native-android-source-path path/to/project
-appcritiq scan --native-ios-source-path path/to/project
+phoenix scan --ios-binary-path path/to/app.ipa
+phoenix scan --android-binary-path path/to/app.apk
+phoenix scan --flutter-source-path path/to/project
+phoenix scan --react-native-source-path path/to/project
+phoenix scan --native-android-source-path path/to/project
+phoenix scan --native-ios-source-path path/to/project
 ```
 
 Source scans run Gitleaks, TruffleHog, Dependency-Check, and Syft, with plist extraction included for Flutter, React Native, and native iOS source scans.
 
 Binary scans run Strings, with LIEF, ipsw, and plist extraction for iOS binaries and Androguard, Apktool, Apksigner, and APKiD for Android binaries. MobSF runs for binary scans only when `MOBSF_URL` is configured.
 
-OpenGrep runs only when a rules path is available. For source targets, OpenGrep scans the project directory directly. For binary targets, AppCritIQ first generates `strings` output from the IPA or APK contents and then runs OpenGrep over those generated text artifacts.
+OpenGrep runs only when a rules path is available. For source targets, OpenGrep scans the project directory directly. For binary targets, phoenix first generates `strings` output from the IPA or APK contents and then runs OpenGrep over those generated text artifacts.
 
-By default, AppCritIQ looks for OpenGrep rules in these folders:
+By default, phoenix looks for OpenGrep rules in these folders:
 
 - `rules/ios` for `--ios-binary-path` and `--native-ios-source-path`
 - `rules/android` for `--android-binary-path` and `--native-android-source-path`
@@ -67,11 +67,11 @@ You can override the default rules location per scan target with these flags:
 - `--native-android-source-opengrep-rules-path`
 - `--native-ios-source-opengrep-rules-path`
 
-These override flags can point to rule directories outside this repository when you run `appcritiq scan` directly. For container runs, the rules directory must be mounted into the container and passed as a container path. The current `make compose-run` wrapper does not provide a dedicated variable for passing extra OpenGrep override flags, so direct `appcritiq scan` or `docker run` is the better path when you want an external rules directory.
+These override flags can point to rule directories outside this repository when you run `phoenix scan` directly. For container runs, the rules directory must be mounted into the container and passed as a container path. The current `make compose-run` wrapper does not provide a dedicated variable for passing extra OpenGrep override flags, so direct `phoenix scan` or `docker run` is the better path when you want an external rules directory.
 
 Binary scans require the binary to be unsigned. If you have access to source code, you can build an unsigned .ipa easily [using these instructions](docs/UnsignediOSBinaries.md).
 
-## Running AppCritIQ
+## Running phoenix
 
 ### 1. Released Docker Image
 
@@ -85,7 +85,7 @@ mkdir -p scan-results
 docker run --rm \
   -v "/path/to/project:/workspace:ro" \
   -v "$PWD/scan-results:/app/results" \
-  ghcr.io/blue-milk-apps/appcritiq-core:<version> \
+  ghcr.io/blue-milk-apps/phoenix:<version> \
   scan --react-native-source-path /workspace --output /app/results
 ```
 
@@ -97,7 +97,7 @@ mkdir -p scan-results
 docker run --rm \
   -v "/path/to/binaries:/workspace:ro" \
   -v "$PWD/scan-results:/app/results" \
-  ghcr.io/blue-milk-apps/appcritiq-core:<version> \
+  ghcr.io/blue-milk-apps/phoenix:<version> \
   scan --ios-binary-path /workspace/app.ipa --output /app/results
 ```
 
@@ -105,11 +105,11 @@ Use `--android-binary-path /workspace/app.apk` for APK scans.
 
 ### 2. Local Docker Compose
 
-Use `make compose-run` when you are working from a clone of this repository and want AppCritIQ to build locally, start its Compose services, mount the target, and write results to `./scan-results`.
+Use `make compose-run` when you are working from a clone of this repository and want phoenix to build locally, start its Compose services, mount the target, and write results to `./scan-results`.
 
 ```bash
-git clone https://github.com/Blue-Milk-Apps/appcritiq-core.git
-cd appcritiq-core
+git clone https://github.com/Blue-Milk-Apps/phoenix.git
+cd phoenix
 
 make compose-run PROJECT_PATH=path/to/project SCAN_FLAG=--native-ios-source-path
 ```
@@ -133,7 +133,7 @@ When `PROJECT_PATH` is a directory that contains a binary, set `PHOENIX_SCAN_PAT
 make compose-run PROJECT_PATH=path/to/files SCAN_FLAG=--ios-binary-path PHOENIX_SCAN_PATH=/workspace/app.ipa
 ```
 
-To include MobSF in a Compose scan, point AppCritIQ at the MobSF sidecar:
+To include MobSF in a Compose scan, point phoenix at the MobSF sidecar:
 
 ```bash
 MOBSF_URL=http://mobsf-scanner:8000 \
@@ -142,7 +142,7 @@ make compose-run PROJECT_PATH=path/to/app.ipa SCAN_FLAG=--ios-binary-path
 
 ### 3. Local Developer Install
 
-Use a local install when you are developing AppCritIQ itself, debugging scanner adapters, or intentionally running against tools installed on your host.
+Use a local install when you are developing phoenix itself, debugging scanner adapters, or intentionally running against tools installed on your host.
 
 Install `uv`:
 
@@ -159,8 +159,8 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 Clone and install the project:
 
 ```bash
-git clone https://github.com/Blue-Milk-Apps/appcritiq-core.git
-cd appcritiq-core
+git clone https://github.com/Blue-Milk-Apps/phoenix.git
+cd phoenix
 uv venv
 source .venv/bin/activate
 uv sync
@@ -169,23 +169,23 @@ make hooks-install
 
 `make hooks-install` installs the repository's pre-commit hook. It runs the test suite, Ruff lint, formatting, and secret detection before each commit.
 
-`uv sync` installs the Python package dependencies for AppCritIQ, but that alone is not enough for local OpenGrep scans. The Python `opengrep` package is only a launcher and still requires a real `opengrep-core` binary on your host.
+`uv sync` installs the Python package dependencies for phoenix, but that alone is not enough for local OpenGrep scans. The Python `opengrep` package is only a launcher and still requires a real `opengrep-core` binary on your host.
 
 Run the CLI locally:
 
 ```bash
-uv run appcritiq scan --native-ios-source-path path/to/project
+uv run phoenix scan --native-ios-source-path path/to/project
 ```
 
 To use a non-default OpenGrep rules directory locally:
 
 ```bash
-uv run appcritiq scan \
+uv run phoenix scan \
   --native-ios-source-path path/to/project \
   --native-ios-source-opengrep-rules-path path/to/rules
 ```
 
-If you want OpenGrep locally, install the standalone OpenGrep binary so that both `opengrep` and `opengrep-core` are available on your `PATH`, or run AppCritIQ through Docker or Docker Compose instead.
+If you want OpenGrep locally, install the standalone OpenGrep binary so that both `opengrep` and `opengrep-core` are available on your `PATH`, or run phoenix through Docker or Docker Compose instead.
 
 Local scans use scanner binaries from your host `PATH`. Install the tools you plan to run before using this mode.
 
@@ -213,7 +213,7 @@ For local CLI scans with MobSF:
 
 ```bash
 make services-up
-MOBSF_URL=http://localhost:8000 uv run appcritiq scan --ios-binary-path "path/to/app.ipa"
+MOBSF_URL=http://localhost:8000 uv run phoenix scan --ios-binary-path "path/to/app.ipa"
 make services-down
 ```
 
@@ -239,7 +239,7 @@ make test
 Run the CLI from the local environment:
 
 ```bash
-uv run appcritiq scan <scan-target-flag> path/to/target
+uv run phoenix scan <scan-target-flag> path/to/target
 ```
 
 The codebase follows a port-and-adapter layout:
@@ -256,13 +256,13 @@ The codebase follows a port-and-adapter layout:
 Use GitHub issues for bugs, setup problems, and feature requests:
 
 ```text
-https://github.com/Blue-Milk-Apps/appcritiq-core/issues
+https://github.com/Blue-Milk-Apps/phoenix/issues
 ```
 
 ## Maintainers And Contributors
 
-AppCritIQ Core is maintained by Blue Milk Apps. Contributions should be made through pull requests against this repository.
+Phoenix MAST is maintained by Blue Milk Apps. Contributions should be made through pull requests against this repository.
 
 ## License
 
-AppCritIQ Core is released under the [Apache License 2.0](LICENSE).
+Phoenix MAST is released under the [Apache License 2.0](LICENSE).

@@ -7,7 +7,7 @@
     "platform": "Android",
     "version_name": "3.1.2",
     "version_code": "312",
-    "reviewer_org": "AppCritIQ Security Report"
+    "reviewer_org": "phoenix Security Report"
   },
   "findings_severity": {
     "high": 5,

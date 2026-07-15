@@ -1,9 +1,9 @@
 import json
 from pathlib import Path
 
-from adapters.output.appcritiq_report.generate_report import load_report_data
+from adapters.output.phoenix_report.generate_report import load_report_data
 
-BASE_DIR = Path(__file__).resolve().parents[2] / "adapters" / "output" / "appcritiq_report" / "data"
+BASE_DIR = Path(__file__).resolve().parents[2] / "adapters" / "output" / "phoenix_report" / "data"
 CANONICAL_NETWORK_CHECKS = [
     "Allows Cleartext Traffic for All Domains",
     "Contains HostnameVerifier That Accepts All Hostnames",

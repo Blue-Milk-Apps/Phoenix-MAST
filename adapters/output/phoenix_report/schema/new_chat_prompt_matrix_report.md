@@ -1,11 +1,11 @@
-# Starter prompt -- AppCritIQ check schema + matrix report review
+# Starter prompt -- phoenix check schema + matrix report review
 
 Copy everything below the line into a new conversation, then upload the
 matrix report file.
 
 ---
 
-I'm building a security-report tool called **AppCritIQ** -- a Python +
+I'm building a security-report tool called **phoenix** -- a Python +
 Jinja2 + WeasyPrint pipeline that turns scan data (JSON) into a formatted
 PDF security report for mobile apps (Android-focused so far). The report
 has these sections: cover (app summary, icon, meta table), Findings by
@@ -28,11 +28,11 @@ or "dynamic"). That file is NOT the matrix report I'm about to upload here
 including everything useful I already extracted from it below so you have
 full context without needing it re-uploaded.
 
-## Check schema built from capabilities.csv + AppCritIQ's own fields
+## Check schema built from capabilities.csv + phoenix's own fields
 
 I built a JSON Schema for a single security check record
 (`check.schema.json`), deliberately scoped to only two sources:
-capabilities.csv's own columns, and the field set AppCritIQ's own
+capabilities.csv's own columns, and the field set phoenix's own
 checks-conducted table already uses (Check, Result, Explanation,
 Compliance, Remediation link, Evidence). No NowSecure-specific concepts
 (numeric 0-10 severity scoring, policy-category buckets, finding-card
@@ -55,8 +55,8 @@ Field notes:
 - `description` = what the check looks for in the abstract (csv's
   Description column).
 - `impact` = plain-language consequence of THIS finding specifically
-  (AppCritIQ's Explanation column) -- distinct from `description`.
-- `status` = Present / Not Present / Not Evaluated (AppCritIQ's Result
+  (phoenix's Explanation column) -- distinct from `description`.
+- `status` = Present / Not Present / Not Evaluated (phoenix's Result
   column). Use "Not Evaluated" rather than guessing when a check didn't
   run.
 - `severity` = csv's Default Severity values (Critical/High/Medium/Low/
@@ -65,14 +65,14 @@ Field notes:
   depends on the specific CVE) and "N/A" (pure inventory/artifact checks
   with no risk rating of their own).
 - `compliance` folds in HIPAA/GDPR/legacy-OWASP-Mobile-Top-10 tags too,
-  since those appear in AppCritIQ's own Compliance column even though
+  since those appear in phoenix's own Compliance column even though
   csv doesn't carry them as dedicated columns.
 - `evidence[].tool` / `output_location` map directly to csv's "Phoenix
   Output Location" column.
 - `report_section` is presentation-only -- the one field tying an
   otherwise source-agnostic record to this specific report template.
 
-## Full capabilities.csv -> AppCritIQ mapping (Android, everything I'd already worked out)
+## Full capabilities.csv -> phoenix mapping (Android, everything I'd already worked out)
 
 Status legend: Covered / Partial / Gap / Out-of-scope (dynamic-only)
 
@@ -159,7 +159,7 @@ Status legend: Covered / Partial / Gap / Out-of-scope (dynamic-only)
 - 81. Root detection implemented or observed -> Resilience: "Root Detection Missing" -- Covered
 
 **Summary of prior state:** 65 of 71 in-scope Android capabilities were
-fully covered by a named AppCritIQ check or report field; 2 were out of
+fully covered by a named phoenix check or report field; 2 were out of
 scope as dynamic-only; 11 were partial/gap (IDs 4, 6, 8, 9, 35, 61, 62, 65,
 66, 69, 70, 75, 76 -- listed above with exactly what's missing on each).
 
@@ -188,6 +188,6 @@ prior conversation). Please:
 
 Keep the same ground rules as before: no NowSecure-specific concepts, no
 ID fields that cross-reference a specific external system's row number,
-and don't limit new fields to only what would render in the AppCritIQ
+and don't limit new fields to only what would render in the phoenix
 PDF today -- this is meant to stay a complete data record a report
 template can choose to display or ignore.

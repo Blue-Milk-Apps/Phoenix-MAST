@@ -1566,7 +1566,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         if rule_id in self.FUNCTIONALITY_RULE_ID_MAP:
             return self.FUNCTIONALITY_RULE_ID_MAP[rule_id]
 
-        metadata = ((result.get("extra") or {}).get("metadata") or {}).get("appcritiq") or {}
+        metadata = ((result.get("extra") or {}).get("metadata") or {}).get("phoenix") or {}
 
         check_id = metadata.get("check_id")
         title = str(metadata.get("title", "")).strip().lower()
@@ -1603,7 +1603,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     @staticmethod
     def _functionality_explanation_for_result(result: dict[str, Any]) -> str:
         extra = result.get("extra") or {}
-        metadata = (extra.get("metadata") or {}).get("appcritiq") or {}
+        metadata = (extra.get("metadata") or {}).get("phoenix") or {}
         return (
             str(metadata.get("description", "")).strip()
             or str(metadata.get("title", "")).strip()
