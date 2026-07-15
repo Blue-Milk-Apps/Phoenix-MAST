@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://phoenix.local/schemas/check.schema.json",
-  "title": "phoenix Security Check",
+  "title": "Phoenix Security Check",
   "description": "Schema for a single security check record, built from two sources only: (1) capabilities.csv's own columns (ID, Platform, CapabilityType, Category, Title, Description, Default Severity, NIAP, OWASP MASVS, OWASP MASWE, OWASP MASTG/MSTG, CVE, Phoenix Output Location), and (2) the field set phoenix's own checks-conducted table already uses (Check, Result, Explanation, Compliance, Remediation, Evidence). No NowSecure-specific concepts and no cross-reference ID fields tied to an external source system. Not every field here is rendered in the PDF today -- this is meant as a complete data record a report template can choose to draw from.",
   "type": "object",
   "required": ["check_id", "title", "category", "platform", "description", "status", "severity"],
