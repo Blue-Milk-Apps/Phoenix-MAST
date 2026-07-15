@@ -545,7 +545,7 @@ EXCLUDED_VULN_SECTIONS = {"authentication", "cryptography", "platform"}
 # Path to the generic placeholder app-icon image used on the cover page
 # when app_info.icon_path isn't provided.
 PLACEHOLDER_ICON_PATH = BASE_DIR / "assets" / "placeholder_icon.png"
-REPORT_BRAND_ICON_PATH = BASE_DIR / "assets" / "phoenix-icon-white-back.png"
+REPORT_BRAND_ICON_PATH = BASE_DIR / "assets" / "PhoenixShield.png"
 
 
 def risk_badge(rating, label=None):
