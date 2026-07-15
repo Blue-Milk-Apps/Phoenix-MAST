@@ -1,14 +1,14 @@
 # APKiD Environmental Intelligence Integration
 
-AppcritIQ uses APKiD as a signature-based environmental intelligence source during Android binary evidence extraction. Its job is to describe analysis context: packers, protectors, anti-debug indicators, anti-VM indicators, runtime loaders, anti-tamper signals, compilers, and build-chain fingerprints that may affect how later tools should be routed and interpreted.
+Phoenix uses APKiD as a signature-based environmental intelligence source during Android binary evidence extraction. Its job is to describe analysis context: packers, protectors, anti-debug indicators, anti-VM indicators, runtime loaders, anti-tamper signals, compilers, and build-chain fingerprints that may affect how later tools should be routed and interpreted.
 
 APKiD output is not treated as a vulnerability report. It is evidence about the environment in which other evidence should be collected, weighted, and correlated.
 
 ## Availability Model
 
-AppcritIQ resolves APKiD from the process `PATH` with the `apkid` command. The scanner checks availability before execution and skips with an explicit unavailable-tool result when `apkid` cannot be found.
+Phoenix resolves APKiD from the process `PATH` with the `apkid` command. The scanner checks availability before execution and skips with an explicit unavailable-tool result when `apkid` cannot be found.
 
-The AppcritIQ Docker image installs APKiD into the AppcritIQ virtual environment and verifies it during image build. Because `/opt/appcritiq-venv/bin` is on the container `PATH`, Docker-based AppcritIQ scans can resolve `apkid` without a host APKiD install. The Docker build pins APKiD through the `APKID_VERSION` build argument so upgrades are explicit.
+The Phoenix Docker image installs APKiD into the Phoenix virtual environment and verifies it during image build. Because `/opt/phoenix-venv/bin` is on the container `PATH`, Docker-based Phoenix scans can resolve `apkid` without a host APKiD install. The Docker build pins APKiD through the `APKID_VERSION` build argument so upgrades are explicit.
 
 Local scans depend on the uv-managed project environment. APKiD is declared in `pyproject.toml`, so the repeatable setup path is:
 
@@ -17,7 +17,7 @@ uv sync
 uv run apkid --version
 ```
 
-After that, `uv run appcritiq ...` resolves `apkid` from the same project environment used by AppcritIQ.
+After that, `uv run phoenix ...` resolves `apkid` from the same project environment used by Phoenix.
 
 When intentionally changing the APKiD version, update the project metadata and lockfile with `uv add`:
 
@@ -30,11 +30,11 @@ If APKiD is not available locally, Android binary scans continue and the APKiD s
 
 ## Docker Verification
 
-Build the AppcritIQ image and verify that APKiD resolves inside the container:
+Build the Phoenix image and verify that APKiD resolves inside the container:
 
 ```bash
-docker compose build appcritiq
-docker compose run --rm --entrypoint apkid appcritiq --version
+docker compose build phoenix
+docker compose run --rm --entrypoint apkid phoenix --version
 ```
 
 ## Operational Purpose
@@ -51,7 +51,7 @@ APKiD is useful because it can identify environmental signals early and cheaply.
 
 ## What APKiD Is
 
-In AppcritIQ, APKiD is:
+In Phoenix, APKiD is:
 
 - a signature-based environmental intelligence tool
 - a context enricher for Android binary analysis
@@ -61,7 +61,7 @@ In AppcritIQ, APKiD is:
 
 ## What APKiD Is Not
 
-In AppcritIQ, APKiD is not:
+In Phoenix, APKiD is not:
 
 - a vulnerability scanner
 - a semantic analyzer
@@ -74,7 +74,7 @@ A detection such as a packer, compiler, anti-debug check, or Kotlin fingerprint 
 
 ## Evidence Extraction Philosophy
 
-The integration favors high-signal, bounded evidence over exhaustive dumps. APKiD can expose useful signatures, but raw signature internals and bulk output are usually poor long-term pipeline artifacts. AppcritIQ preserves the operational meaning and the relationship to source artifacts, while avoiding noisy data that makes downstream reasoning harder.
+The integration favors high-signal, bounded evidence over exhaustive dumps. APKiD can expose useful signatures, but raw signature internals and bulk output are usually poor long-term pipeline artifacts. Phoenix preserves the operational meaning and the relationship to source artifacts, while avoiding noisy data that makes downstream reasoning harder.
 
 The extractor intentionally prioritizes:
 
@@ -102,7 +102,7 @@ This keeps artifacts LLM-friendly, machine-readable, auditable, and suitable for
 
 ## Evidence Lifecycle
 
-AppcritIQ separates APKiD evidence into five lifecycle stages.
+Phoenix separates APKiD evidence into five lifecycle stages.
 
 1. Raw output
 
@@ -171,7 +171,7 @@ Representative structure:
 {
   "schema_version": "1.0",
   "extractor": {
-    "name": "appcritiq-apkid",
+    "name": "phoenix-apkid",
     "version": "1.0",
     "philosophy": "environmental_intelligence_not_vulnerability_scanning"
   },
@@ -211,7 +211,7 @@ The normalized artifact is the preferred machine-consumption surface. Raw output
 
 ## Relationship Strategy
 
-AppcritIQ preserves meaningful shallow relationships:
+Phoenix preserves meaningful shallow relationships:
 
 - detection to source artifact
 - detection to analysis impact

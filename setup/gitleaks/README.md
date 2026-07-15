@@ -1,6 +1,6 @@
 # Gitleaks Setup
 
-Gitleaks is AppcritIQ's static secrets scanner for source projects.
+Gitleaks is Phoenix's static secrets scanner for source projects.
 
 ## Local Install
 
@@ -20,7 +20,7 @@ Gitleaks will look for a config file in this order:
 2. `.gitleaks.toml` in the scanned project
 3. Gitleaks default rules
 
-If you want custom rules, add a `.gitleaks.toml` file to the project root or point `GITLEAKS_CONFIG` at another file path before running AppcritIQ with the scan target flag that matches your source project. See the [`<scan-target-flag>` list](../README.md#scan-target-flags) for valid options.
+If you want custom rules, add a `.gitleaks.toml` file to the project root or point `GITLEAKS_CONFIG` at another file path before running Phoenix with the scan target flag that matches your source project. See the [`<scan-target-flag>` list](../README.md#scan-target-flags) for valid options.
 
 ## Verification
 

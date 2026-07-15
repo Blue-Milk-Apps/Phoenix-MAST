@@ -159,8 +159,8 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
                     "not_valid_after": "2040-07-16 05:48:59+00:00",
                     "not_valid_before": "2015-07-23 05:48:59+00:00",
                     "serial_number": "1437630539",
-                    "sha1": "ec330db8c45c5cceb66797163779bf1d186aecaf",
-                    "sha256": "22311a95d67057b82318e23b3efd7cc878e190b8dcd55ac2e7bb745343957474",
+                    "sha1": "ec330db8c45c5cceb66797163779bf1d186aecaf",  # pragma: allowlist secret
+                    "sha256": "22311a95d67057b82318e23b3efd7cc878e190b8dcd55ac2e7bb745343957474",  # pragma: allowlist secret
                     "subject": {
                         "common_name": "apkpure",
                         "organization_name": "apkpure",
@@ -172,7 +172,7 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
         "apksigner_signing_evidence": {
             "apk": {
                 "file_name": "APKPure.apk",
-                "sha256": "9614118b4e75e72e4fb65909fe95649efd89d00fb8435e99e5bebbec75bb1a31",
+                "sha256": "9614118b4e75e72e4fb65909fe95649efd89d00fb8435e99e5bebbec75bb1a31",  # pragma: allowlist secret
                 "size_bytes": 25760048,
             },
             "signature_schemes": {
@@ -185,7 +185,7 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
                 {
                     "certificate": {
                         "public_key_algorithm": "RSA",
-                        "sha256": "22311A95D67057B82318E23B3EFD7CC878E190B8DCD55AC2E7BB745343957474",
+                        "sha256": "22311A95D67057B82318E23B3EFD7CC878E190B8DCD55AC2E7BB745343957474",  # pragma: allowlist secret
                         "signature_algorithm": "UNKNOWN",
                         "subject_dn": "CN=apkpure, OU=apkpure, O=apkpure",
                     }
@@ -242,7 +242,7 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
                     "extra": {
                         "message": "App declares or uses Android location services.",
                         "metadata": {
-                            "appcritiq": {
+                            "phoenix": {
                                 "check_id": 55,
                                 "description": (
                                     "Detect whether the app declares Android location permissions "
@@ -295,8 +295,9 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
         "v3": False,
         "v4": False,
     }
-    assert sections["certificate"]["fingerprint"] == (
-        "22311a95d67057b82318e23b3efd7cc878e190b8dcd55ac2e7bb745343957474"
+    assert (
+        sections["certificate"]["fingerprint"]
+        == "22311a95d67057b82318e23b3efd7cc878e190b8dcd55ac2e7bb745343957474"  # pragma: allowlist secret
     )
     assert sections["certificate"]["unique_certs"] == "1"
     assert sections["file_info"] == {
@@ -304,7 +305,7 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
         "size": "25760048",
         "md5": "",
         "sha1": "",
-        "sha256": "9614118b4e75e72e4fb65909fe95649efd89d00fb8435e99e5bebbec75bb1a31",
+        "sha256": "9614118b4e75e72e4fb65909fe95649efd89d00fb8435e99e5bebbec75bb1a31",  # pragma: allowlist secret
     }
     assert sections["permissions"] == [
         {
@@ -438,7 +439,7 @@ def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks
                 {
                     "extra": {
                         "metadata": {
-                            "appcritiq": {
+                            "phoenix": {
                                 "check_id": 9,
                                 "title": "Background execution modes declared by the app",
                                 "description": "Background execution detected.",
@@ -449,7 +450,7 @@ def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks
                 {
                     "extra": {
                         "metadata": {
-                            "appcritiq": {
+                            "phoenix": {
                                 "check_id": 53,
                                 "title": "Camera usage declaration present",
                                 "description": "Camera usage detected.",
@@ -460,7 +461,7 @@ def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks
                 {
                     "extra": {
                         "metadata": {
-                            "appcritiq": {
+                            "phoenix": {
                                 "check_id": 54,
                                 "title": "Microphone usage declaration present",
                                 "description": "Microphone usage detected.",
@@ -471,7 +472,7 @@ def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks
                 {
                     "extra": {
                         "metadata": {
-                            "appcritiq": {
+                            "phoenix": {
                                 "check_id": 56,
                                 "title": "NFC usage declaration present",
                                 "description": "NFC usage detected.",
@@ -483,7 +484,7 @@ def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks
                     "check_id": "android.fingerprint.usage.present",
                     "extra": {
                         "metadata": {
-                            "appcritiq": {
+                            "phoenix": {
                                 "check_id": 57,
                                 "title": "Fingerprint usage declaration present",
                                 "description": "Fingerprint usage detected.",
@@ -494,7 +495,7 @@ def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks
                 {
                     "extra": {
                         "metadata": {
-                            "appcritiq": {
+                            "phoenix": {
                                 "check_id": 58,
                                 "title": "Bluetooth usage declaration present",
                                 "description": "Bluetooth usage detected.",
@@ -506,7 +507,7 @@ def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks
                     "check_id": "android.sms.usage.present",
                     "extra": {
                         "metadata": {
-                            "appcritiq": {
+                            "phoenix": {
                                 "check_id": 59,
                                 "title": "SMS usage declaration present",
                                 "description": "SMS usage detected.",
@@ -517,7 +518,7 @@ def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks
                 {
                     "extra": {
                         "metadata": {
-                            "appcritiq": {
+                            "phoenix": {
                                 "check_id": 60,
                                 "title": "Contacts usage declaration present",
                                 "description": "Contacts usage detected.",
@@ -528,7 +529,7 @@ def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks
                 {
                     "extra": {
                         "metadata": {
-                            "appcritiq": {
+                            "phoenix": {
                                 "check_id": 60,
                                 "title": "Calendar usage declaration present",
                                 "description": "Calendar usage detected.",
@@ -539,7 +540,7 @@ def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks
                 {
                     "extra": {
                         "metadata": {
-                            "appcritiq": {
+                            "phoenix": {
                                 "check_id": 61,
                                 "title": "Push notification registration and background push behavior present",
                                 "description": "Push messaging usage detected.",
@@ -602,83 +603,75 @@ def test_android_binary_scan_detail_extractor_maps_recent_opengrep_functionality
             "results": [
                 {
                     "check_id": "android.maps.usage.present",
-                    "extra": {"metadata": {"appcritiq": {"check_id": 62, "description": "Maps usage detected."}}},
+                    "extra": {"metadata": {"phoenix": {"check_id": 62, "description": "Maps usage detected."}}},
                 },
                 {
                     "check_id": "android.networking.usage.present",
-                    "extra": {"metadata": {"appcritiq": {"check_id": 63, "description": "Networking usage detected."}}},
+                    "extra": {"metadata": {"phoenix": {"check_id": 63, "description": "Networking usage detected."}}},
                 },
                 {
                     "check_id": "android.telephony.usage.present",
-                    "extra": {"metadata": {"appcritiq": {"check_id": 64, "description": "Telephony usage detected."}}},
+                    "extra": {"metadata": {"phoenix": {"check_id": 64, "description": "Telephony usage detected."}}},
                 },
                 {
                     "check_id": "android.photos.usage.present",
-                    "extra": {"metadata": {"appcritiq": {"check_id": 65, "description": "Photos usage detected."}}},
+                    "extra": {"metadata": {"phoenix": {"check_id": 65, "description": "Photos usage detected."}}},
                 },
                 {
                     "check_id": "android.in_app_purchases.usage.present",
                     "extra": {
-                        "metadata": {"appcritiq": {"check_id": 66, "description": "In-app purchases usage detected."}}
+                        "metadata": {"phoenix": {"check_id": 66, "description": "In-app purchases usage detected."}}
                     },
                 },
                 {
                     "check_id": "android.device.administrator.usage.present",
                     "extra": {
-                        "metadata": {
-                            "appcritiq": {"check_id": 67, "description": "Device administrator usage detected."}
-                        }
+                        "metadata": {"phoenix": {"check_id": 67, "description": "Device administrator usage detected."}}
                     },
                 },
                 {
                     "check_id": "android.camera.delegation.usage.present",
                     "extra": {
-                        "metadata": {"appcritiq": {"check_id": 68, "description": "Camera delegation usage detected."}}
+                        "metadata": {"phoenix": {"check_id": 68, "description": "Camera delegation usage detected."}}
                     },
                 },
                 {
                     "check_id": "android.sensors.usage.present",
-                    "extra": {"metadata": {"appcritiq": {"check_id": 69, "description": "Sensors usage detected."}}},
+                    "extra": {"metadata": {"phoenix": {"check_id": 69, "description": "Sensors usage detected."}}},
                 },
                 {
                     "check_id": "android.usb.devices.usage.present",
-                    "extra": {
-                        "metadata": {"appcritiq": {"check_id": 70, "description": "USB devices usage detected."}}
-                    },
+                    "extra": {"metadata": {"phoenix": {"check_id": 70, "description": "USB devices usage detected."}}},
                 },
                 {
                     "check_id": "android.geofencing.usage.present",
-                    "extra": {"metadata": {"appcritiq": {"check_id": 71, "description": "Geofencing usage detected."}}},
+                    "extra": {"metadata": {"phoenix": {"check_id": 71, "description": "Geofencing usage detected."}}},
                 },
                 {
                     "check_id": "android.health.data.usage.present",
-                    "extra": {
-                        "metadata": {"appcritiq": {"check_id": 72, "description": "Health data usage detected."}}
-                    },
+                    "extra": {"metadata": {"phoenix": {"check_id": 72, "description": "Health data usage detected."}}},
                 },
                 {
                     "check_id": "android.infrared.led.usage.present",
-                    "extra": {
-                        "metadata": {"appcritiq": {"check_id": 73, "description": "Infrared LED usage detected."}}
-                    },
+                    "extra": {"metadata": {"phoenix": {"check_id": 73, "description": "Infrared LED usage detected."}}},
                 },
                 {
                     "check_id": "android.audio.usage.present",
-                    "extra": {"metadata": {"appcritiq": {"check_id": 74, "description": "Audio usage detected."}}},
+                    "extra": {"metadata": {"phoenix": {"check_id": 74, "description": "Audio usage detected."}}},
                 },
                 {
                     "check_id": "android.payment.services.usage.present",
                     "extra": {
-                        "metadata": {"appcritiq": {"check_id": 75, "description": "Payment services usage detected."}}
+                        "metadata": {"phoenix": {"check_id": 75, "description": "Payment services usage detected."}}
                     },
                 },
                 {
                     "check_id": "android.secure.rng.usage.present",
-                    "extra": {"metadata": {"appcritiq": {"check_id": 76, "description": "Secure RNG usage detected."}}},
+                    "extra": {"metadata": {"phoenix": {"check_id": 76, "description": "Secure RNG usage detected."}}},
                 },
                 {
                     "check_id": "android.keystore.usage.present",
-                    "extra": {"metadata": {"appcritiq": {"check_id": 77, "description": "Keystore usage detected."}}},
+                    "extra": {"metadata": {"phoenix": {"check_id": 77, "description": "Keystore usage detected."}}},
                 },
             ]
         },
@@ -750,7 +743,7 @@ def test_android_binary_scan_detail_extractor_combines_permission_and_opengrep_f
                     "check_id": "android.background.execution.present",
                     "extra": {
                         "metadata": {
-                            "appcritiq": {
+                            "phoenix": {
                                 "check_id": 9,
                                 "title": "Background execution modes declared by the app",
                                 "description": "Background execution detected.",
@@ -762,7 +755,7 @@ def test_android_binary_scan_detail_extractor_combines_permission_and_opengrep_f
                     "check_id": "android.calendar.usage.present",
                     "extra": {
                         "metadata": {
-                            "appcritiq": {
+                            "phoenix": {
                                 "check_id": 60,
                                 "title": "Calendar usage declaration present",
                                 "description": "Calendar usage detected.",
@@ -774,7 +767,7 @@ def test_android_binary_scan_detail_extractor_combines_permission_and_opengrep_f
                     "check_id": "android.sms.usage.present",
                     "extra": {
                         "metadata": {
-                            "appcritiq": {
+                            "phoenix": {
                                 "check_id": 59,
                                 "title": "SMS usage declaration present",
                                 "description": "SMS usage detected.",
@@ -786,7 +779,7 @@ def test_android_binary_scan_detail_extractor_combines_permission_and_opengrep_f
                     "check_id": "android.fingerprint.usage.present",
                     "extra": {
                         "metadata": {
-                            "appcritiq": {
+                            "phoenix": {
                                 "check_id": 57,
                                 "title": "Fingerprint usage declaration present",
                                 "description": "Fingerprint usage detected.",
@@ -913,7 +906,7 @@ def test_android_binary_scan_detail_extractor_maps_shared_check_id_60_with_rule_
                     "check_id": "android.contacts.usage.present",
                     "extra": {
                         "metadata": {
-                            "appcritiq": {
+                            "phoenix": {
                                 "check_id": 60,
                                 "title": "Contacts usage declaration present",
                                 "description": "Contacts usage detected.",
@@ -925,7 +918,7 @@ def test_android_binary_scan_detail_extractor_maps_shared_check_id_60_with_rule_
                     "check_id": "android.calendar.usage.present",
                     "extra": {
                         "metadata": {
-                            "appcritiq": {
+                            "phoenix": {
                                 "check_id": 60,
                                 "title": "Calendar usage declaration present",
                                 "description": "Calendar usage detected.",
@@ -974,7 +967,7 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
                 {
                     "extra": {
                         "metadata": {
-                            "appcritiq": {
+                            "phoenix": {
                                 "check_id": 55,
                                 "description": "Detect whether the app declares Android location permissions or uses Android location-related APIs.",
                             }
@@ -1031,8 +1024,8 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
                     "not_valid_after": "2040-07-16 05:48:59+00:00",
                     "not_valid_before": "2015-07-23 05:48:59+00:00",
                     "serial_number": "1437630539",
-                    "sha1": "ec330db8c45c5cceb66797163779bf1d186aecaf",
-                    "sha256": "22311a95d67057b82318e23b3efd7cc878e190b8dcd55ac2e7bb745343957474",
+                    "sha1": "ec330db8c45c5cceb66797163779bf1d186aecaf",  # pragma: allowlist secret
+                    "sha256": "22311a95d67057b82318e23b3efd7cc878e190b8dcd55ac2e7bb745343957474",  # pragma: allowlist secret
                     "subject": {
                         "common_name": "apkpure",
                         "organization_name": "apkpure",
@@ -1086,7 +1079,7 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
         {
             "apk": {
                 "file_name": "APKPure.apk",
-                "sha256": "9614118b4e75e72e4fb65909fe95649efd89d00fb8435e99e5bebbec75bb1a31",
+                "sha256": "9614118b4e75e72e4fb65909fe95649efd89d00fb8435e99e5bebbec75bb1a31",  # pragma: allowlist secret
                 "size_bytes": apk_path.stat().st_size,
             },
             "signature_schemes": {
@@ -1099,7 +1092,7 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
                 {
                     "certificate": {
                         "public_key_algorithm": "RSA",
-                        "sha256": "22311A95D67057B82318E23B3EFD7CC878E190B8DCD55AC2E7BB745343957474",
+                        "sha256": "22311A95D67057B82318E23B3EFD7CC878E190B8DCD55AC2E7BB745343957474",  # pragma: allowlist secret
                         "signature_algorithm": "UNKNOWN",
                         "subject_dn": "CN=apkpure, OU=apkpure, O=apkpure",
                     }
@@ -1142,7 +1135,7 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
         "platform": "Android",
         "version_name": "3.20.70",
         "version_code": "3207037",
-        "reviewer_org": "AppCritIQ Security Report",
+        "reviewer_org": "Phoenix Security Report",
     }
     assert result["app_info"]["main_activity"] == "com.apkpure.aegon.main.activity.FirstSeemPageActivity"
     assert result["app_components"] == {
@@ -1159,9 +1152,9 @@ def test_post_scan_processing_service_merges_meta_and_extracted_sections(tmp_pat
     assert result["file_info"] == {
         "filename": "APKPure.apk",
         "size": str(apk_path.stat().st_size),
-        "md5": "d8db041096e5576650d5c1b0ac38bcca",
-        "sha1": "dadc430a84587e51b2231daa1024ee0506806f96",
-        "sha256": "cb4870807289f0ebb14bbfc941421b08f5766fa0346c1828bd5f09a955ccd560",
+        "md5": "d8db041096e5576650d5c1b0ac38bcca",  # pragma: allowlist secret
+        "sha1": "dadc430a84587e51b2231daa1024ee0506806f96",  # pragma: allowlist secret
+        "sha256": "cb4870807289f0ebb14bbfc941421b08f5766fa0346c1828bd5f09a955ccd560",  # pragma: allowlist secret
     }
     assert result["permissions"] == [
         {

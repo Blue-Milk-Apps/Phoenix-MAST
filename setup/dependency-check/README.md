@@ -1,15 +1,15 @@
 # OWASP Dependency-Check Setup
 
-AppcritIQ uses OWASP Dependency-Check for dependency vulnerability scanning. The adapter expects a `dependency-check` command on `PATH` and runs scans with `--noupdate`, so the NVD data must already exist locally before offline AppcritIQ scans work.
+Phoenix uses OWASP Dependency-Check for dependency vulnerability scanning. The adapter expects a `dependency-check` command on `PATH` and runs scans with `--noupdate`, so the NVD data must already exist locally before offline Phoenix scans work.
 
-## What AppcritIQ expects
+## What Phoenix expects
 
 - Java installed.
 - `dependency-check` installed and available on `PATH`.
-- Local Dependency-Check data in `nvd-owasp-data/` at the AppcritIQ repo root, or a path supplied with `DEPENDENCY_CHECK_DATA_DIR`.
+- Local Dependency-Check data in `nvd-owasp-data/` at the Phoenix repo root, or a path supplied with `DEPENDENCY_CHECK_DATA_DIR`.
 - The data directory must include `odc.mv.db`.
 
-The current adapter also passes `--disableBundleAudit`, `--disableYarnAudit`, `--disableNodeAudit`, `--disableAssembly`, and `--enableExperimental`. That keeps AppcritIQ focused on the local Dependency-Check database and avoids several analyzers that would otherwise need extra language tooling.
+The current adapter also passes `--disableBundleAudit`, `--disableYarnAudit`, `--disableNodeAudit`, `--disableAssembly`, and `--enableExperimental`. That keeps Phoenix focused on the local Dependency-Check database and avoids several analyzers that would otherwise need extra language tooling.
 
 ## Install Java
 
@@ -141,7 +141,7 @@ cp /path/to/extracted-data/jsrepository.json* nvd-owasp-data/ 2>/dev/null || tru
 
 The required file is `odc.mv.db`. The cache, hosted suppressions, and RetireJS files are useful when present because they reduce network dependency and update time.
 
-## Configure AppcritIQ
+## Configure Phoenix
 
 The simplest local configuration is:
 
@@ -161,7 +161,7 @@ export DEPENDENCY_CHECK_DATA_DIR="$(pwd)/nvd-owasp-data"
 Run a scan with the scan target flag that matches your app or source project. See the [`<scan-target-flag>` list](../README.md#scan-target-flags) for valid options.
 
 ```bash
-uv run appcritiq scan <scan-target-flag> path/to/target
+uv run phoenix scan <scan-target-flag> path/to/target
 ```
 
 ## Troubleshooting

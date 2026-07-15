@@ -1,4 +1,4 @@
-name: appcritiq-core
+name: phoenix
 
 services:
   # MobSF provider for static binary scanning of IPA and APK file types.
@@ -8,7 +8,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - MOBSF_API_KEY=${MOBSF_API_KEY:-appcritiq-local-mobsf-api-key}
+      - MOBSF_API_KEY=${MOBSF_API_KEY:-phoenix-local-mobsf-api-key}
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8000/ -o /dev/null"]
       interval: 10s
@@ -46,14 +46,14 @@ services:
       "/app/results/gitleaks-report.json"
     ]
 
-  # AppcritIQ Core Service with MobSF and OWASP Dependency-Check data sidecars.
-  appcritiq-mobsf-owaspdc:
-    image: appcritiq-core:latest
+  # Phoenix MAST Service with MobSF and OWASP Dependency-Check data sidecars.
+  phoenix-mobsf-owaspdc:
+    image: phoenix:latest
     build:
       context: .
       dockerfile: Dockerfile
     user: "1001:1001"
-    container_name: appcritiq-core-mobsf-owaspdc
+    container_name: phoenix-mobsf-owaspdc
     depends_on:
       mobsf-scanner:
         condition: service_healthy
@@ -68,28 +68,28 @@ services:
       - DEPENDENCY_CHECK_DATA_DIR=/opt/dependency-check/data
       - DC_NO_UPDATE=1
       - CI=true
-    command: ["scan", "${SCAN_FLAG:?Set SCAN_FLAG to one AppcritIQ scan target flag}", "${PHOENIX_SCAN_PATH:?Set PHOENIX_SCAN_PATH to the scan path inside the container}", "--output", "/app/results"]
+    command: ["scan", "${SCAN_FLAG:?Set SCAN_FLAG to one phoenix scan target flag}", "${PHOENIX_SCAN_PATH:?Set PHOENIX_SCAN_PATH to the scan path inside the container}", "--output", "/app/results"]
 
 
-  # Primary AppcritIQ Core Service without MobSF or NVD sidecars.
-  appcritiq:
-    image: appcritiq-core:latest
+  # Primary Phoenix MAST Service without MobSF or NVD sidecars.
+  phoenix:
+    image: phoenix:latest
     build:
       context: .
       dockerfile: Dockerfile
     user: "1001:1001"
-    container_name: appcritiq-core
+    container_name: phoenix
     volumes:
       - ${PROJECT_MOUNT_PATH:-.}:/workspace:ro
       - ${OUTPUT_PATH:-./scan-results}:/app/results
     environment:
       - CI=true
       - MOBSF_URL=
-    command: ["scan", "${SCAN_FLAG:?Set SCAN_FLAG to one AppcritIQ scan target flag}", "${PHOENIX_SCAN_PATH:?Set PHOENIX_SCAN_PATH to the scan path inside the container}", "--output", "/app/results"]
+    command: ["scan", "${SCAN_FLAG:?Set SCAN_FLAG to one phoenix scan target flag}", "${PHOENIX_SCAN_PATH:?Set PHOENIX_SCAN_PATH to the scan path inside the container}", "--output", "/app/results"]
 
 
-  appcritiq-secrets:
-    image: appcritiq-core:latest
+  phoenix-secrets:
+    image: phoenix:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -97,10 +97,10 @@ services:
     volumes:
       - ${PROJECT_MOUNT_PATH:-./sample-project}:/workspace:ro
       - ${OUTPUT_PATH:-./scan-results}:/app/results
-    command: ["scan", "${SCAN_FLAG:?Set SCAN_FLAG to one AppcritIQ scan target flag}", "${PHOENIX_SCAN_PATH:?Set PHOENIX_SCAN_PATH to the scan path inside the container}", "--output", "/app/results"]
+    command: ["scan", "${SCAN_FLAG:?Set SCAN_FLAG to one phoenix scan target flag}", "${PHOENIX_SCAN_PATH:?Set PHOENIX_SCAN_PATH to the scan path inside the container}", "--output", "/app/results"]
 
-  appcritiq-deps:
-    image: appcritiq-core:latest
+  phoenix-deps:
+    image: phoenix:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -112,11 +112,11 @@ services:
       - ${PROJECT_MOUNT_PATH:-./sample-project}:/workspace:ro
       - ${OUTPUT_PATH:-./scan-results}:/app/results
       - nvd-owasp-data:/opt/dependency-check/data
-    command: ["scan", "${SCAN_FLAG:?Set SCAN_FLAG to one AppcritIQ scan target flag}", "${PHOENIX_SCAN_PATH:?Set PHOENIX_SCAN_PATH to the scan path inside the container}", "--output", "/app/results"]
+    command: ["scan", "${SCAN_FLAG:?Set SCAN_FLAG to one phoenix scan target flag}", "${PHOENIX_SCAN_PATH:?Set PHOENIX_SCAN_PATH to the scan path inside the container}", "--output", "/app/results"]
 
 volumes:
   nvd-owasp-data:
 
 networks:
   default:
-    name: appcritiq-core
+    name: phoenix

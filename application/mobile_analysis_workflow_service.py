@@ -14,8 +14,8 @@ from adapters.binary_scanners import (
     MobSFScanner,
     PlistBinaryScanner,
 )
-from adapters.output.appcritiq_report.generate_report import generate_report
 from adapters.output.file_output import FileScanOutput
+from adapters.output.phoenix_report.generate_report import generate_report
 from adapters.post_scan import (
     AndroidBinaryScanDetailExtractor,
     AndroidBinaryScanOutputLoader,
@@ -107,10 +107,10 @@ class MobileScannerFactory:
 
 class MobileAnalysisWorkflowService:
     POST_SCAN_OUTPUT_FILE_NAME = "post_scan_processing.json"
-    GENERATED_REPORT_FILE_NAME = "AppCritIQ_Report.pdf"
+    GENERATED_REPORT_FILE_NAME = "phoenix_Report.pdf"
 
     def run(self, scan_config: ScanConfig) -> None:
-        print("AppcritIQ scan")
+        print("Phoenix scan")
         print(f"Project: {scan_config.project_path}")
         print(f"Output: {scan_config.output_path}")
         print(f"Scan type: {scan_config.scan_label}")

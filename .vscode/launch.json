@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run appcritiq scan (IPA)",
+      "name": "Run phoenix scan (IPA)",
       "type": "python",
       "request": "launch",
       "program": "${workspaceFolder}/entrypoints/cli.py",
@@ -26,7 +26,7 @@
     {
       "id": "file_path",
       "type": "promptString",
-      "description": "Path to file",
+      "description": "Path to file"
     }
   ]
 }

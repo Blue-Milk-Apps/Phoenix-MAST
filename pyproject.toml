@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "appcritiq-core"
+name = "phoenix"
 version = "0.1.0"
 description = "All-in-one MobSec MAST tool for iOS and Android"
 requires-python = ">=3.12"
@@ -26,14 +26,14 @@ dev = [
 ]
 
 [project.scripts]
-appcritiq = "entrypoints.cli:main"
+phoenix = "entrypoints.cli:main"
 
 [tool.setuptools]
 packages = [
     "adapters",
     "adapters.binary_scanners",
     "adapters.output",
-    "adapters.output.appcritiq_report",
+    "adapters.output.phoenix_report",
     "adapters.post_scan",
     "adapters.storage",
     "adapters.source_code_scanners",
@@ -45,7 +45,7 @@ packages = [
 ]
 
 [tool.setuptools.package-data]
-"adapters.output.appcritiq_report" = [
+"adapters.output.phoenix_report" = [
     "assets/*",
     "data/*",
     "docs/*",
@@ -64,3 +64,6 @@ line-length = 120
 
 [tool.ruff.lint]
 extend-select = ["I"]
+
+[tool.ruff.lint.per-file-ignores]
+"adapters/output/phoenix_report/generate_report.py" = ["F841"]

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://AppCritIQ.local/schemas/check.schema.json",
-  "title": "AppCritIQ Security Check",
-  "description": "Schema for a single security check record, built from two sources only: (1) capabilities.csv's own columns (ID, Platform, CapabilityType, Category, Title, Description, Default Severity, NIAP, OWASP MASVS, OWASP MASWE, OWASP MASTG/MSTG, CVE, Phoenix Output Location), and (2) the field set AppCritIQ's own checks-conducted table already uses (Check, Result, Explanation, Compliance, Remediation, Evidence). No NowSecure-specific concepts and no cross-reference ID fields tied to an external source system. Not every field here is rendered in the PDF today -- this is meant as a complete data record a report template can choose to draw from.",
+  "$id": "https://phoenix.local/schemas/check.schema.json",
+  "title": "Phoenix Security Check",
+  "description": "Schema for a single security check record, built from two sources only: (1) capabilities.csv's own columns (ID, Platform, CapabilityType, Category, Title, Description, Default Severity, NIAP, OWASP MASVS, OWASP MASWE, OWASP MASTG/MSTG, CVE, Phoenix Output Location), and (2) the field set phoenix's own checks-conducted table already uses (Check, Result, Explanation, Compliance, Remediation, Evidence). No NowSecure-specific concepts and no cross-reference ID fields tied to an external source system. Not every field here is rendered in the PDF today -- this is meant as a complete data record a report template can choose to draw from.",
   "type": "object",
   "required": ["check_id", "title", "category", "platform", "description", "status", "severity"],
   "properties": {
@@ -50,7 +50,7 @@
     "status": {
       "type": "string",
       "enum": ["Present", "Not Present", "Not Evaluated"],
-      "description": "Outcome of this check on a specific scan. Matches the 'Result' column in AppCritIQ's checks-conducted table. Use 'Not Evaluated' rather than guessing when the check didn't run or the tool didn't cover it, instead of defaulting to 'Not Present'."
+      "description": "Outcome of this check on a specific scan. Matches the 'Result' column in phoenix's checks-conducted table. Use 'Not Evaluated' rather than guessing when the check didn't run or the tool didn't cover it, instead of defaulting to 'Not Present'."
     },
 
     "severity": {
@@ -61,12 +61,12 @@
 
     "impact": {
       "type": "string",
-      "description": "Plain-language explanation of what happens if this check's status is 'Present' (i.e. the issue exists) -- matches the 'Explanation' column in AppCritIQ's checks-conducted table. Distinct from description: description explains what the check looks for in general; impact explains the consequence for this specific finding."
+      "description": "Plain-language explanation of what happens if this check's status is 'Present' (i.e. the issue exists) -- matches the 'Explanation' column in phoenix's checks-conducted table. Distinct from description: description explains what the check looks for in general; impact explains the consequence for this specific finding."
     },
 
     "remediation": {
       "type": "object",
-      "description": "Matches the remediation-link field in AppCritIQ's checks-conducted table.",
+      "description": "Matches the remediation-link field in phoenix's checks-conducted table.",
       "properties": {
         "guidance": {
           "type": ["string", "null"],
@@ -89,7 +89,7 @@
 
     "compliance": {
       "type": "object",
-      "description": "Every standards mapping capabilities.csv carries for a check, plus the additional tags (HIPAA/GDPR/legacy OWASP Mobile Top 10) that show up in the 'Compliance' column of AppCritIQ's own checks-conducted table. Populate whichever apply; leave the rest as empty arrays.",
+      "description": "Every standards mapping capabilities.csv carries for a check, plus the additional tags (HIPAA/GDPR/legacy OWASP Mobile Top 10) that show up in the 'Compliance' column of phoenix's own checks-conducted table. Populate whichever apply; leave the rest as empty arrays.",
       "properties": {
         "niap": {
           "type": "array",
@@ -113,12 +113,12 @@
         },
         "owasp_top10_mobile_2016": {
           "type": ["string", "null"],
-          "description": "Legacy OWASP Mobile Top 10 (2016) category, e.g. 'M5: Insufficient Cryptography'. Not a capabilities.csv column, but appears in AppCritIQ's own Compliance field for many checks and is worth carrying alongside MASVS."
+          "description": "Legacy OWASP Mobile Top 10 (2016) category, e.g. 'M5: Insufficient Cryptography'. Not a capabilities.csv column, but appears in phoenix's own Compliance field for many checks and is worth carrying alongside MASVS."
         },
         "cwe": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "CWE IDs, e.g. 'CWE-327'. Not a dedicated capabilities.csv column on its own, but shows up bundled into it for a handful of checks and consistently appears in AppCritIQ's Compliance field."
+          "description": "CWE IDs, e.g. 'CWE-327'. Not a dedicated capabilities.csv column on its own, but shows up bundled into it for a handful of checks and consistently appears in phoenix's Compliance field."
         },
         "cve": {
           "type": "array",
@@ -128,19 +128,19 @@
         "hipaa": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "HIPAA citations, e.g. '164.312(a)(2)(iv)'. Not a capabilities.csv column, but appears in AppCritIQ's Compliance field for storage/transport-related checks."
+          "description": "HIPAA citations, e.g. '164.312(a)(2)(iv)'. Not a capabilities.csv column, but appears in phoenix's Compliance field for storage/transport-related checks."
         },
         "gdpr": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "GDPR article references, e.g. 'Articles 5, 25, 32'. Same source as hipaa -- AppCritIQ's own Compliance field, not capabilities.csv."
+          "description": "GDPR article references, e.g. 'Articles 5, 25, 32'. Same source as hipaa -- phoenix's own Compliance field, not capabilities.csv."
         }
       }
     },
 
     "evidence": {
       "type": "array",
-      "description": "Where the finding was (or would be) observed. Matches the 'Evidence' column in AppCritIQ's checks-conducted table, extended with capabilities.csv's Phoenix Output Location column (which tool produced the data and where in its raw output).",
+      "description": "Where the finding was (or would be) observed. Matches the 'Evidence' column in phoenix's checks-conducted table, extended with capabilities.csv's Phoenix Output Location column (which tool produced the data and where in its raw output).",
       "items": {
         "type": "object",
         "properties": {
@@ -163,7 +163,7 @@
     "report_section": {
       "type": ["string", "null"],
       "enum": ["Code", "Network", "Resilience", "Storage", "Permissions", "Certificate Info", "App Info", "Hardcoded Values", "Endpoint Connections", null],
-      "description": "Which AppCritIQ report section this check's result would render under, if displayed. Presentation-only -- everything above this field is source-of-truth data independent of any one report layout."
+      "description": "Which phoenix report section this check's result would render under, if displayed. Presentation-only -- everything above this field is source-of-truth data independent of any one report layout."
     }
   }
 }

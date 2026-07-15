@@ -1,6 +1,6 @@
 # aapt2 Evidence Extractor
 
-AppcritIQ uses `aapt2` as an Android packaging, manifest, and resource evidence
+Phoenix uses `aapt2` as an Android packaging, manifest, and resource evidence
 source during APK binary scans. The integration is designed for deterministic
 evidence extraction in AppSec and malware-analysis pipelines.
 
@@ -31,7 +31,7 @@ correlate against.
 
 ## What aapt2 Extracts
 
-AppcritIQ runs targeted `aapt2 dump` commands independently:
+Phoenix runs targeted `aapt2 dump` commands independently:
 
 ```bash
 aapt2 dump badging <apk>
@@ -65,13 +65,13 @@ The integration supports:
   native ABI presence, deep links, or suspicious resource names.
 - AppSec automation where a lightweight packaging evidence source is useful
   before deeper code or runtime analysis.
-- Evidence indexing across a larger AppcritIQ scan result set.
+- Evidence indexing across a larger Phoenix scan result set.
 - Downstream code/resource correlation with Androguard, Apktool, JADX, native
   analysis, and runtime instrumentation.
 
 ## Availability And Version Pinning
 
-AppcritIQ resolves `aapt2` from the local `PATH` and records:
+Phoenix resolves `aapt2` from the local `PATH` and records:
 
 ```bash
 aapt2 version
@@ -101,7 +101,7 @@ comparability.
 
 ## Artifacts
 
-AppcritIQ writes normalized evidence and raw command output separately:
+Phoenix writes normalized evidence and raw command output separately:
 
 ```text
 scan-results/.../aapt2/aapt2_evidence.json
@@ -190,7 +190,7 @@ Every normalized evidence object should be traceable to:
   `resources`;
 - the raw evidence reference, such as
   `raw/aapt2_xmltree_manifest_stdout.txt`;
-- the AppcritIQ parser version;
+- the Phoenix parser version;
 - the aapt2 tool version;
 - the command profile and argv shape;
 - stdout/stderr hashes where output exists.

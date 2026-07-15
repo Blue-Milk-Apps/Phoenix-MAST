@@ -37,7 +37,7 @@ class MobSFScanner(ScannerPort):
     """Scanner for IPA/APK binaries using a MobSF API container."""
 
     DEFAULT_BASE_URL = "http://mobsf-scanner:8000"
-    DEFAULT_API_KEY = "appcritiq-local-mobsf-api-key"  # pragma: allowlist secret
+    DEFAULT_API_KEY = "phoenix-local-mobsf-api-key"  # pragma: allowlist secret
     DEFAULT_TIMEOUT_SECONDS = 120
     REPORT_PATH = "mobsf_report.json"
     SUPPORTED_EXTENSIONS = (".ipa", ".apk", ".zip", ".appx")

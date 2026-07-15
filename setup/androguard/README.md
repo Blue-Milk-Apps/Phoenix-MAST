@@ -1,6 +1,6 @@
 # Androguard Android Evidence Scanner
 
-AppcritIQ uses Androguard for Android static-analysis evidence extraction during APK binary scans. Androguard is a Python toolkit for Android APK and DEX analysis. It is static-analysis focused and is useful for APK metadata extraction, AndroidManifest parsing, DEX inspection, StringAnalysis, sensitive API detection, and cross-reference relationship extraction.
+Phoenix uses Androguard for Android static-analysis evidence extraction during APK binary scans. Androguard is a Python toolkit for Android APK and DEX analysis. It is static-analysis focused and is useful for APK metadata extraction, AndroidManifest parsing, DEX inspection, StringAnalysis, sensitive API detection, and cross-reference relationship extraction.
 
 This system intentionally avoids full APK dumping. The goal is actionable Android security evidence extraction.
 
@@ -18,18 +18,18 @@ If you need to install it manually into an existing environment:
 uv pip install androguard
 ```
 
-Verify the import path AppcritIQ uses:
+Verify the import path Phoenix uses:
 
 ```bash
 uv run python -c "from androguard.misc import AnalyzeAPK; print(AnalyzeAPK)"
 ```
 
-## AppcritIQ Usage
+## Phoenix Usage
 
-Run AppcritIQ against one APK at a time:
+Run Phoenix against one APK at a time:
 
 ```bash
-uv run appcritiq scan --android-binary-path path/to/app.apk
+uv run Phoenix scan --android-binary-path path/to/app.apk
 ```
 
 The Androguard scanner skips non-APK inputs. It emits deterministic machine-readable JSON files under:
@@ -64,7 +64,7 @@ The scanner writes one JSON artifact per evidence category:
 
 ## Extraction Philosophy
 
-AppcritIQ treats Androguard output as structured AppSec evidence, not as a reverse-engineering dump. The extractor favors high-signal evidence, contextual enrichment, deterministic JSON, and downstream automation.
+Phoenix treats Androguard output as structured AppSec evidence, not as a reverse-engineering dump. The extractor favors high-signal evidence, contextual enrichment, deterministic JSON, and downstream automation.
 
 The scanner preserves raw values, including strings, URLs, endpoints, and token-like values. Redaction is intentionally not performed in this layer because downstream systems may need exact evidence for correlation, triage, or policy matching.
 
@@ -134,11 +134,11 @@ The scanner is designed for CI/CD and automation workflows:
 - no PDF or human-report generation
 - no full decompilation workflow
 
-If one extractor fails, AppcritIQ records the failure in `errors.json`, emits a partial artifact for that stage, and continues extraction where possible.
+If one extractor fails, Phoenix records the failure in `errors.json`, emits a partial artifact for that stage, and continues extraction where possible.
 
 ## Why Androguard
 
-Androguard is a good fit for AppcritIQ because it provides APK and DEX analysis from Python, including manifest parsing, DEX metadata, StringAnalysis, xrefs, and API relationship extraction. Its Python API is suitable for repeatable local scans, CI jobs, and downstream JSON evidence generation without shelling out to a decompiler pipeline.
+Androguard is a good fit for Phoenix because it provides APK and DEX analysis from Python, including manifest parsing, DEX metadata, StringAnalysis, xrefs, and API relationship extraction. Its Python API is suitable for repeatable local scans, CI jobs, and downstream JSON evidence generation without shelling out to a decompiler pipeline.
 
 ## What This Scanner Avoids
 

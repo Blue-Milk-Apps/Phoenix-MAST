@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-AppCritIQ Security Report generator.
+Phoenix Security Report generator.
 
 Usage:
     python3 generate_report.py <data.json> <output.pdf>
 
 Feed it a JSON file matching the schema in data/blank_template.json (a filled
 example is at data/sample_insecurebankv2.json) and it renders a PDF report in
-the AppCritIQ / mobile-app-pentest style: cover page, risk donuts, overall
+the phoenix / mobile-app-pentest style: cover page, risk donuts, overall
 evaluation table, certificate/file/app info, functionality & SDK inventory,
 permissions, one section per vulnerability category with a findings narrative
 and a checks-conducted table, hardcoded values, and endpoint connections.
@@ -94,7 +94,7 @@ CODE_EVIDENCE_KEY_BY_CHECK = {
     "app is debuggable": "app_is_debuggable",
     "contains hard-coded cryptographic key": "contains_hard_coded_cryptographic_key",
     "contains native code": "contains_native_code",
-    "contains potential hard-coded password": "contains_potential_hard_coded_password",
+    "contains potential hard-coded password": "contains_potential_hard_coded_password",  # pragma: allowlist secret
     "contains potential sql injection": "contains_potential_sql_injection",
     "contains reflection code": "contains_reflection_code",
     "creates blowfish key with weak length": "creates_blowfish_key_with_weak_length",
@@ -545,7 +545,7 @@ EXCLUDED_VULN_SECTIONS = {"authentication", "cryptography", "platform"}
 # Path to the generic placeholder app-icon image used on the cover page
 # when app_info.icon_path isn't provided.
 PLACEHOLDER_ICON_PATH = BASE_DIR / "assets" / "placeholder_icon.png"
-REPORT_BRAND_ICON_PATH = BASE_DIR / "assets" / "appcritiq-icon-white-back.png"
+REPORT_BRAND_ICON_PATH = BASE_DIR / "assets" / "PhoenixShield.png"
 
 
 def risk_badge(rating, label=None):
@@ -623,7 +623,6 @@ def make_overall_risk_polar_chart(risk_summary):
     fig = plt.figure(figsize=(5.6, 4.8))
     ax = fig.add_subplot(111, projection="polar")
     ax.set_theta_zero_location("N")
-
     bars = ax.bar(theta, radii, width=width, color=colors, alpha=0.85, edgecolor="white", linewidth=2, bottom=0)
 
     ax.set_ylim(0, 4.3)
@@ -669,7 +668,7 @@ def get_app_icon_data_uri(data):
 
 
 def get_report_brand_icon_data_uri() -> str:
-    """Return a data: URI for the AppCritIQ brand icon shown on the cover."""
+    """Return a data: URI for the phoenix brand icon shown on the cover."""
     target = REPORT_BRAND_ICON_PATH if REPORT_BRAND_ICON_PATH.is_file() else PLACEHOLDER_ICON_PATH
     return _image_file_to_data_uri(target)
 
@@ -701,7 +700,7 @@ def generate_report(input_data: dict[str, Any] | Path | str, output_path: Path |
     css_text = (TEMPLATES_DIR / "style.css").read_text(encoding="utf-8")
     charts = build_charts(data)
     app_icon_uri = get_app_icon_data_uri(data)
-    appcritiq_brand_icon_uri = get_report_brand_icon_data_uri()
+    phoenix_brand_icon_uri = get_report_brand_icon_data_uri()
 
     env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)))
     env.globals["risk_badge"] = risk_badge
@@ -713,7 +712,7 @@ def generate_report(input_data: dict[str, Any] | Path | str, output_path: Path |
         css=css_text,
         charts=charts,
         app_icon_uri=app_icon_uri,
-        appcritiq_brand_icon_uri=appcritiq_brand_icon_uri,
+        phoenix_brand_icon_uri=phoenix_brand_icon_uri,
     )
 
     resolved_output_path.parent.mkdir(parents=True, exist_ok=True)

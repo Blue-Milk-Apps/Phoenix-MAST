@@ -16,7 +16,7 @@ Verified using v2 scheme (APK Signature Scheme v2): true
 Verified using v3 scheme (APK Signature Scheme v3): false
 Verified using v4 scheme (APK Signature Scheme v4): false
 Number of signers: 1
-Signer #1 certificate DN: CN=AppcritIQ,O=Blue Milk Apps,C=US
+Signer #1 certificate DN: CN=Phoenix,O=Blue Milk Apps,C=US
 Signer #1 certificate SHA-256 digest: aa:bb:cc
 Signer #1 certificate SHA-1 digest: 11:22:33
 Signer #1 certificate MD5 digest: de:ad:be:ef
@@ -106,7 +106,7 @@ def test_apksigner_verified_apk_extracts_signing_evidence(monkeypatch, tmp_path:
     assert evidence["verification"]["overall_status"] == "VERIFIED"
     assert evidence["signature_schemes"]["v1"]["state"] == "VERIFIED"
     assert evidence["signature_schemes"]["v3"]["state"] == "MISSING"
-    assert evidence["signers"][0]["certificate"]["subject_dn"] == ("CN=AppcritIQ,O=Blue Milk Apps,C=US")
+    assert evidence["signers"][0]["certificate"]["subject_dn"] == ("CN=Phoenix,O=Blue Milk Apps,C=US")
     assert evidence["signers"][0]["certificate"]["sha256"] == "AABBCC"
     assert evidence["signers"][0]["certificate"]["public_key_algorithm"] == "RSA"
     assert evidence["signers"][0]["certificate"]["public_key_size_bits"] == 2048

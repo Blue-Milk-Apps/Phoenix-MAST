@@ -183,7 +183,7 @@ class IpswScanner(ScannerPort):
         return {
             "schema_version": self.SCHEMA_VERSION,
             "scanner": {
-                "name": "appcritiq-ipsw",
+                "name": "phoenix-ipsw",
                 "version": self.SCANNER_VERSION,
             },
             "app_info": app_info,

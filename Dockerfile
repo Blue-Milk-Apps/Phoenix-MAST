@@ -1,14 +1,14 @@
 # syntax=docker/dockerfile:1.7
-FROM python:3.12-slim-bookworm AS appcritiq-core
+FROM python:3.12-slim-bookworm AS phoenix
 
-LABEL org.opencontainers.image.source="https://github.com/Blue-Milk-Apps/appcritiq-core"
+LABEL org.opencontainers.image.source="https://github.com/Blue-Milk-Apps/phoenix"
 
 # 1. Environment & Global Settings
 ENV DEBIAN_FRONTEND=noninteractive \
     FORCE_COLOR=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/opt/appcritiq-venv/bin:/usr/local/bin:$PATH" \
+    PATH="/opt/phoenix-venv/bin:/usr/local/bin:$PATH" \
     OPENGREP_OFFLINE=1 \
     OPENGREP_DISABLE_METRICS=1 \
     OPENGREP_SEND_METRICS=off \
@@ -64,7 +64,7 @@ ARG ANDROGUARD_VERSION=4.1.3
 ARG LIEF_VERSION=0.17.2
 ARG OPENGREP_VERSION=1.22.0
 ARG TARGETARCH
-RUN python -m venv /opt/appcritiq-venv \
+RUN python -m venv /opt/phoenix-venv \
     && case "${TARGETARCH:-amd64}" in \
         amd64) OPENGREP_ASSET="opengrep_manylinux_x86" ;; \
         arm64) OPENGREP_ASSET="opengrep_manylinux_aarch64" ;; \
@@ -75,13 +75,13 @@ RUN python -m venv /opt/appcritiq-venv \
         -o /usr/local/bin/opengrep \
     && chmod +x /usr/local/bin/opengrep \
     && ln -sf /usr/local/bin/opengrep /usr/local/bin/opengrep-core \
-    && /opt/appcritiq-venv/bin/pip install --no-cache-dir \
+    && /opt/phoenix-venv/bin/pip install --no-cache-dir \
         "androguard==${ANDROGUARD_VERSION}" \
         "lief==${LIEF_VERSION}" \
         "apkid==${APKID_VERSION}" \
     && opengrep --version \
-    && /opt/appcritiq-venv/bin/python -c "from importlib.metadata import version; print('apkid ' + version('apkid'))" \
-    && /opt/appcritiq-venv/bin/python -c "from androguard.misc import AnalyzeAPK; import lief; print('androguard and lief imports ok')"
+    && /opt/phoenix-venv/bin/python -c "from importlib.metadata import version; print('apkid ' + version('apkid'))" \
+    && /opt/phoenix-venv/bin/python -c "from androguard.misc import AnalyzeAPK; import lief; print('androguard and lief imports ok')"
 
 # 6. Copy Modular Source Code
 WORKDIR /app
@@ -95,17 +95,17 @@ COPY entrypoints ./entrypoints
 COPY ports ./ports
 COPY rules ./rules
 
-RUN /opt/appcritiq-venv/bin/pip install --no-cache-dir .
+RUN /opt/phoenix-venv/bin/pip install --no-cache-dir .
 
 # 7. Permissions & Working Dir
-# We need to ensure the 'appcritiq' user owns the data mount point
+# We need to ensure the 'phoenix' user owns the data mount point
 # so it can create the H2 database lock files.
-RUN useradd -m -u 1001 appcritiq \
+RUN useradd -m -u 1001 phoenix \
     && mkdir -p /opt/dependency-check/data \
-    && chown -R appcritiq:appcritiq /app /opt/dependency-check /opt/appcritiq-venv /usr/local/bin/opengrep
+    && chown -R phoenix:phoenix /app /opt/dependency-check /opt/phoenix-venv /usr/local/bin/opengrep
 
-USER appcritiq
+USER phoenix
 WORKDIR /workspace
 
-ENTRYPOINT ["appcritiq"]
+ENTRYPOINT ["phoenix"]
 CMD ["--help"]

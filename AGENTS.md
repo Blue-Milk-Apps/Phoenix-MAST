@@ -1,10 +1,10 @@
 # AGENTS.md
 
-This file gives repo-specific guidance to AI coding agents working on AppcritIQ Core. It is not runtime code and is not used by the Python package.
+This file gives repo-specific guidance to AI coding agents working on Phoenix MAST. It is not runtime code and is not used by the Python package.
 
 ## Project Summary
 
-AppcritIQ Core is the Python foundation for AppcritIQ, an all-in-one Mobile Application Security Testing (MAST) tool for iOS and Android applications.
+Phoenix MAST is the Python foundation for phoenix, an all-in-one Mobile Application Security Testing (MAST) tool for iOS and Android applications.
 
 The project coordinates security scanning workflows for:
 
@@ -14,7 +14,7 @@ The project coordinates security scanning workflows for:
 - Software Bill of Materials (SBOM) generation
 - IPA/APK binary analysis
 
-AppcritIQ Core is intended to make mobile application reviews repeatable by collecting scanner orchestration, configuration, adapter behavior in one Python project.
+Phoenix MAST is intended to make mobile application reviews repeatable by collecting scanner orchestration, configuration, adapter behavior in one Python project.
 
 ## Architecture
 
@@ -28,7 +28,7 @@ Use the existing port-and-adapter structure.
 - `adapters/source_code_scanners/` contains source/source code scanner adapters.
 - `adapters/binary_scanners/` contains binary scanner adapters.
 - `adapters/storage/` contains storage adapters.
-- `entrypoints/cli.py` contains the AppcritIQ CLI.
+- `entrypoints/cli.py` contains the phoenix CLI.
 - `utilities/` contains helper code for APK/IPA extraction and binary target discovery.
 - `setup/` contains local setup notes for external scanner tools.
 - `tests/` contains unit and integration tests.
@@ -77,25 +77,25 @@ uv sync
 make test
 python -m pytest
 uv run pytest
-uv run appcritiq scan <scan-target-flag> path/to/target
+uv run phoenix scan <scan-target-flag> path/to/target
 ```
 
 The CLI entrypoint accepts exactly one scan target flag:
 
 ```bash
-appcritiq scan --ios-binary-path path/to/app.ipa
-appcritiq scan --android-binary-path path/to/app.apk
-appcritiq scan --flutter-source-path path/to/project
-appcritiq scan --react-native-source-path path/to/project
-appcritiq scan --native-android-source-path path/to/project
-appcritiq scan --native-ios-source-path path/to/project
+phoenix scan --ios-binary-path path/to/app.ipa
+phoenix scan --android-binary-path path/to/app.apk
+phoenix scan --flutter-source-path path/to/project
+phoenix scan --react-native-source-path path/to/project
+phoenix scan --native-android-source-path path/to/project
+phoenix scan --native-ios-source-path path/to/project
 ```
 
 For local MobSF binary scans:
 
 ```bash
 make services-up
-MOBSF_URL=http://localhost:8000 uv run appcritiq scan --ios-binary-path path/to/app.ipa
+MOBSF_URL=http://localhost:8000 uv run phoenix scan --ios-binary-path path/to/app.ipa
 make services-down
 ```
 
@@ -115,7 +115,7 @@ Integration tests that require external tools, Docker, MobSF, network access, or
 
 ## External Scanner Notes
 
-AppcritIQ may use the following tools from the local `PATH`:
+phoenix may use the following tools from the local `PATH`:
 
 - `trufflehog`
 - `gitleaks`

@@ -6,7 +6,7 @@ __pycache__/
 
 owasp-data/
 scan-results/
-appcritiq/
+phoenix/
 rules/
 
 sample-project/
