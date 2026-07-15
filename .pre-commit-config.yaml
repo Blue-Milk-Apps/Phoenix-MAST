@@ -7,6 +7,16 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+      - id: ruff
+        name: Ruff lint
+        entry: uv run ruff check --fix
+        language: system
+        types: [python]
+      - id: ruff-format
+        name: Ruff format
+        entry: uv run ruff format
+        language: system
+        types: [python]
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
@@ -16,12 +26,6 @@ repos:
       - id: check-toml               # Validates syntax of your TOML files
       - id: check-json               # Validates syntax of your JSON files
       - id: check-merge-conflict     # Ensures no remaining git merge conflict markers (<<<<<<<) exist
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.0  # Use the latest Ruff version
-    hooks:
-      - id: ruff         # Runs the linter to catch bugs and unused imports
-        args: [ --fix ]  # Automatically fixes safe issues
-      - id: ruff-format
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
     hooks:
