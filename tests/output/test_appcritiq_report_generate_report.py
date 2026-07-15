@@ -3,7 +3,6 @@ from pathlib import Path
 
 from adapters.output.appcritiq_report.generate_report import load_report_data
 
-
 BASE_DIR = Path(__file__).resolve().parents[2] / "adapters" / "output" / "appcritiq_report" / "data"
 CANONICAL_NETWORK_CHECKS = [
     "Allows Cleartext Traffic for All Domains",
@@ -64,7 +63,10 @@ def test_load_report_data_maps_newer_network_vocabulary_to_canonical_checks() ->
     assert check_map["Allows Cleartext Traffic for All Domains"]["result"] == "Present"
     assert check_map["Allows Cleartext Traffic for All Domains"]["evidence"] == "res/xml/network_security_config.xml"
     assert check_map["Weak Certificate Validation Enables MitM Attacks"]["result"] == "Present"
-    assert check_map["Weak Certificate Validation Enables MitM Attacks"]["evidence"] == "res/xml/network_security_config.xml"
+    assert (
+        check_map["Weak Certificate Validation Enables MitM Attacks"]["evidence"]
+        == "res/xml/network_security_config.xml"
+    )
 
 
 def test_load_report_data_derives_mitm_from_hostname_verifier() -> None:

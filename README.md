@@ -164,7 +164,10 @@ cd appcritiq-core
 uv venv
 source .venv/bin/activate
 uv sync
+make hooks-install
 ```
+
+`make hooks-install` installs the repository's pre-commit hook. It runs the test suite, Ruff lint, formatting, and secret detection before each commit.
 
 `uv sync` installs the Python package dependencies for AppCritIQ, but that alone is not enough for local OpenGrep scans. The Python `opengrep` package is only a launcher and still requires a real `opengrep-core` binary on your host.
 

@@ -13,9 +13,7 @@ from ports.scan_detail_extractor_port import ScanDetailExtractorPort
 class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     """Extract Android-binary-specific sections from loaded scan outputs."""
 
-    ENCODED_SECRET_PATTERN = re.compile(
-        r"(?<![A-Za-z0-9+/=])[A-Za-z0-9+/]{40,}={0,2}(?![A-Za-z0-9+/=])"
-    )
+    ENCODED_SECRET_PATTERN = re.compile(r"(?<![A-Za-z0-9+/=])[A-Za-z0-9+/]{40,}={0,2}(?![A-Za-z0-9+/=])")
     JVM_DESCRIPTOR_PATTERN = re.compile(r"^\+?L(?:[A-Za-z0-9_$]+/)+[A-Za-z0-9_$]+$")
     SECRET_LABEL_PATTERN = re.compile(
         r"(?i)^(?:api[_-]?key|client[_-]?secret|secret[_-]?key|access[_-]?token|secretkey)$"
@@ -23,9 +21,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     STORAGE_CREDENTIAL_HINT_PATTERN = re.compile(
         r"(?i)(?:auth|credential|login|passw(?:or)?d|token|session|rememberme)"
     )
-    PASSWORD_HINT_PATTERN = re.compile(
-        r"(?i)(?:passw(?:or)?d|passwd|pwd|newpassword|passcode|credential|login|auth)"
-    )
+    PASSWORD_HINT_PATTERN = re.compile(r"(?i)(?:passw(?:or)?d|passwd|pwd|newpassword|passcode|credential|login|auth)")
     SENSITIVE_LOG_VALUE_PATTERN = re.compile(
         r"(?i)(?:passw(?:or)?d|passwd|pwd|token|secret|session|credential|pin|phonenumber|account)"
     )
@@ -587,23 +583,29 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         api_call_items = list(androguard_api_calls.get("items") or [])
         hostname_verifier_hits = self._matching_api_call_sites(
             api_call_items,
-            lambda item: self._caller_matches_package(item, package_prefix)
-            and (
-                "allow_all_hostname_verifier" in self._api_call_signature(item).lower()
-                or "sethostnameverifier" in self._api_call_signature(item).lower()
+            lambda item: (
+                self._caller_matches_package(item, package_prefix)
+                and (
+                    "allow_all_hostname_verifier" in self._api_call_signature(item).lower()
+                    or "sethostnameverifier" in self._api_call_signature(item).lower()
+                )
             ),
         )
         trust_manager_hits = self._matching_api_call_sites(
             api_call_items,
-            lambda item: self._caller_matches_package(item, package_prefix)
-            and "checkservertrusted" in self._api_call_caller_signature(item).lower(),
+            lambda item: (
+                self._caller_matches_package(item, package_prefix)
+                and "checkservertrusted" in self._api_call_caller_signature(item).lower()
+            ),
         )
         listening_port_hits = self._matching_api_call_sites(
             api_call_items,
-            lambda item: self._caller_matches_package(item, package_prefix)
-            and any(
-                token in self._api_call_signature(item).lower()
-                for token in ("serversocket", "localserversocket", "datagramsocket; bind")
+            lambda item: (
+                self._caller_matches_package(item, package_prefix)
+                and any(
+                    token in self._api_call_signature(item).lower()
+                    for token in ("serversocket", "localserversocket", "datagramsocket; bind")
+                )
             ),
         )
         cookie_insecurity = self._detect_cookie_security_issue(loaded_outputs, package_prefix)
@@ -650,9 +652,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
                 "present": user_installed_ca_present,
                 "evidence": provenance_path or self._first_non_empty(network_security.get("reference")),
             },
-            "manifest_cleartext_traffic_permitted": self._coerce_true(
-                aapt2_posture.get("cleartext_traffic_permitted")
-            )
+            "manifest_cleartext_traffic_permitted": self._coerce_true(aapt2_posture.get("cleartext_traffic_permitted"))
             if aapt2_posture
             else self._coerce_bool_like(aapt2_application.get("uses_cleartext_traffic")),
         }
@@ -669,15 +669,12 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         androguard_api_calls = loaded_outputs.get("androguard_api_calls") or {}
 
         declared_permissions = {
-            self._first_non_empty(permission.get("name"))
-            for permission in aapt2_permissions.get("permissions") or []
+            self._first_non_empty(permission.get("name")) for permission in aapt2_permissions.get("permissions") or []
         }
         declared_permissions.discard("")
 
         external_storage_permissions = sorted(
-            permission
-            for permission in declared_permissions
-            if permission in self.EXTERNAL_STORAGE_PERMISSIONS
+            permission for permission in declared_permissions if permission in self.EXTERNAL_STORAGE_PERMISSIONS
         )
 
         api_call_items = list(androguard_api_calls.get("items") or [])
@@ -690,9 +687,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             lambda item: self._api_call_method_name(item) == "getSharedPreferences",
         )
         credential_storage_callers = [
-            caller
-            for caller in shared_preferences_callers
-            if self.STORAGE_CREDENTIAL_HINT_PATTERN.search(caller)
+            caller for caller in shared_preferences_callers if self.STORAGE_CREDENTIAL_HINT_PATTERN.search(caller)
         ]
 
         accesses_external_storage_evidence = self._dedupe_preserve_order(
@@ -806,9 +801,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "root_detection_missing": {
                 "present": not bool(root_detection_hits),
                 "evidence": (
-                    "no_root_detection_signals_found"
-                    if not root_detection_hits
-                    else ", ".join(root_detection_hits[:5])
+                    "no_root_detection_signals_found" if not root_detection_hits else ", ".join(root_detection_hits[:5])
                 ),
                 "details": root_detection_hits[:10] if root_detection_hits else [],
             },
@@ -850,8 +843,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         )
         provider_update_callers = self._matching_api_call_sites(
             api_calls,
-            lambda item: "providerinstaller" in self._api_call_caller_signature(item).lower()
-            or "providerinstaller" in self._api_call_signature(item).lower(),
+            lambda item: (
+                "providerinstaller" in self._api_call_caller_signature(item).lower()
+                or "providerinstaller" in self._api_call_signature(item).lower()
+            ),
         )
 
         identifier_callers = self._matching_api_call_sites(
@@ -884,26 +879,26 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
 
         clipboard_callers = self._matching_api_call_sites(
             api_calls,
-            lambda item: "clipboard" in self._api_call_signature(item).lower()
-            or "setprimaryclip" in self._api_call_signature(item).lower(),
+            lambda item: (
+                "clipboard" in self._api_call_signature(item).lower()
+                or "setprimaryclip" in self._api_call_signature(item).lower()
+            ),
         )
 
-        code_indicator_values = [self._first_non_empty(item.get("value")) for item in code_indicator_items]
         code_indicator_locations = [
-            self._format_provenance_location(item.get("provenance") or {})
-            for item in code_indicator_items
+            self._format_provenance_location(item.get("provenance") or {}) for item in code_indicator_items
         ]
         report_api_counts = dict(androguard_report_summary.get("api_category_counts") or {})
 
         password_secret_hits = [
-            secret for secret in hardcoded_values.get("secrets") or []
-            if self.PASSWORD_HINT_PATTERN.search(
-                f"{secret.get('value', '')} {secret.get('location', '')}"
-            )
+            secret
+            for secret in hardcoded_values.get("secrets") or []
+            if self.PASSWORD_HINT_PATTERN.search(f"{secret.get('value', '')} {secret.get('location', '')}")
         ]
 
         crypto_secret_hits = [
-            secret for secret in hardcoded_values.get("secrets") or []
+            secret
+            for secret in hardcoded_values.get("secrets") or []
             if any(
                 token in f"{secret.get('value', '')} {secret.get('location', '')}".lower()
                 for token in ("key", "crypto", "cipher", "aes", "rsa", "des", "blowfish")
@@ -923,13 +918,19 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         native_abis = list(aapt2_identity.get("native_abis") or [])
         native_abi_presence = self._coerce_bool_like(aapt2_posture.get("native_abi_presence"))
 
-        reflection_present = bool(reflection_callers) or any(
-            "reflection" in str(finding.get("id", "")).lower()
-            or "reflection" in str(finding.get("title", "")).lower()
-            for finding in finding_items
-        ) or int(report_api_counts.get("reflection") or 0) > 0
+        reflection_present = (
+            bool(reflection_callers)
+            or any(
+                "reflection" in str(finding.get("id", "")).lower()
+                or "reflection" in str(finding.get("title", "")).lower()
+                for finding in finding_items
+            )
+            or int(report_api_counts.get("reflection") or 0) > 0
+        )
 
-        sql_injection_present = any("sql injection" in str(finding.get("title", "")).lower() for finding in finding_items)
+        sql_injection_present = any(
+            "sql injection" in str(finding.get("title", "")).lower() for finding in finding_items
+        )
         uses_provider_update = bool(provider_update_callers)
         root_access_present = bool(runtime_exec_callers)
         app_debuggable = self._coerce_bool_like(application.get("debuggable"))
@@ -991,7 +992,8 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
                 evidence=", ".join(
                     self._first_non_empty(secret.get("location"), secret.get("value"))
                     for secret in crypto_secret_hits[:5]
-                ) or "no_crypto_key_hits",
+                )
+                or "no_crypto_key_hits",
                 details=crypto_secret_hits[:10],
             ),
             "contains_native_code": self._code_evidence_entry(
@@ -1008,7 +1010,8 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
                 evidence=", ".join(
                     self._first_non_empty(secret.get("location"), secret.get("value"))
                     for secret in password_secret_hits[:5]
-                ) or "no_password_hits",
+                )
+                or "no_password_hits",
                 details=password_secret_hits[:10],
             ),
             "contains_potential_sql_injection": self._code_evidence_entry(
@@ -1204,7 +1207,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             location = self._format_provenance_location(item.get("provenance") or {})
             if location:
                 sample_locations_by_category.setdefault(category, [])
-                if location not in sample_locations_by_category[category] and len(sample_locations_by_category[category]) < 5:
+                if (
+                    location not in sample_locations_by_category[category]
+                    and len(sample_locations_by_category[category]) < 5
+                ):
                     sample_locations_by_category[category].append(location)
 
         return {
@@ -1279,7 +1285,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
                 category_counts[category] = category_counts.get(category, 0) + 1
                 if value:
                     sample_values_by_category.setdefault(category, [])
-                    if value not in sample_values_by_category[category] and len(sample_values_by_category[category]) < 5:
+                    if (
+                        value not in sample_values_by_category[category]
+                        and len(sample_values_by_category[category]) < 5
+                    ):
                         sample_values_by_category[category].append(value)
 
                 for xref in xrefs:
@@ -1289,7 +1298,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
                     if not signature:
                         continue
                     sample_xrefs_by_category.setdefault(category, [])
-                    if signature not in sample_xrefs_by_category[category] and len(sample_xrefs_by_category[category]) < 5:
+                    if (
+                        signature not in sample_xrefs_by_category[category]
+                        and len(sample_xrefs_by_category[category]) < 5
+                    ):
                         sample_xrefs_by_category[category].append(signature)
 
         return {
@@ -1485,10 +1497,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             1
             for component in components
             if component.get("exported") is True
-            or (
-                component.get("exported") is None
-                and bool(component.get("has_intent_filters"))
-            )
+            or (component.get("exported") is None and bool(component.get("has_intent_filters")))
         )
 
     @staticmethod
@@ -1678,10 +1687,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
 
         password_network_callers = self._dedupe_preserve_order(password_network_callers)
         hashed_password_callers = self._dedupe_preserve_order(hashed_password_callers)
-        unhashed_callers = [
-            caller for caller in password_network_callers
-            if caller not in set(hashed_password_callers)
-        ]
+        unhashed_callers = [caller for caller in password_network_callers if caller not in set(hashed_password_callers)]
 
         if unhashed_callers:
             return {
@@ -1705,8 +1711,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
 
         secure_flag_callers = self._matching_api_call_sites(
             api_calls,
-            lambda item: self._caller_matches_package(item, package_prefix)
-            and self._is_window_flag_api_call(item),
+            lambda item: self._caller_matches_package(item, package_prefix) and self._is_window_flag_api_call(item),
         )
         secure_flag_source_hits = self._matching_strings_output_sources(
             strings_outputs=strings_outputs,
@@ -1762,17 +1767,19 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         identifier_callers = set(
             self._matching_api_call_sites(
                 api_calls,
-                lambda item: self._caller_matches_package(item, package_prefix)
-                and any(
-                    token in self._api_call_signature(item).lower()
-                    for token in (
-                        "advertisingid",
-                        "settings$secure",
-                        "android_id",
-                        "telephonymanager",
-                        "getdeviceid",
-                        "getsubscriberid",
-                        "getsimserialnumber",
+                lambda item: (
+                    self._caller_matches_package(item, package_prefix)
+                    and any(
+                        token in self._api_call_signature(item).lower()
+                        for token in (
+                            "advertisingid",
+                            "settings$secure",
+                            "android_id",
+                            "telephonymanager",
+                            "getdeviceid",
+                            "getsubscriberid",
+                            "getsimserialnumber",
+                        )
                     )
                 ),
             )
@@ -1780,8 +1787,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         network_callers = set(
             self._matching_api_call_sites(
                 api_calls,
-                lambda item: self._caller_matches_package(item, package_prefix)
-                and self._is_network_api_call(item),
+                lambda item: self._caller_matches_package(item, package_prefix) and self._is_network_api_call(item),
             )
         )
         overlapping = [caller for caller in identifier_callers if caller in network_callers]
@@ -1801,7 +1807,8 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     ) -> dict[str, Any]:
         urls = [str(item.get("url", "")).strip() for item in hardcoded_values.get("urls") or []]
         insecure_urls = [
-            url for url in urls
+            url
+            for url in urls
             if url.lower().startswith("http://") and "localhost" not in url.lower() and "127.0.0.1" not in url
         ]
         if insecure_urls:
@@ -1818,8 +1825,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     def _detect_world_readable_internal_storage(self, api_calls: list[dict[str, Any]]) -> dict[str, Any]:
         world_mode_hits = self._matching_api_call_sites(
             api_calls,
-            lambda item: self.WORLD_MODE_PATTERN.search(self._api_call_signature(item)) is not None
-            or self.WORLD_MODE_PATTERN.search(self._api_call_caller_signature(item)) is not None,
+            lambda item: (
+                self.WORLD_MODE_PATTERN.search(self._api_call_signature(item)) is not None
+                or self.WORLD_MODE_PATTERN.search(self._api_call_caller_signature(item)) is not None
+            ),
         )
         if world_mode_hits:
             return {"present": True, "evidence": world_mode_hits[0], "details": world_mode_hits[:10]}
@@ -1834,16 +1843,14 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         hardcoded_values: dict[str, Any],
     ) -> dict[str, Any]:
         sensitive_callers = [
-            caller for caller in external_storage_callers
+            caller
+            for caller in external_storage_callers
             if self.PASSWORD_HINT_PATTERN.search(caller) or self.SENSITIVE_UI_HINT_PATTERN.search(caller)
         ]
         if sensitive_callers:
             return {"present": True, "evidence": sensitive_callers[0], "details": sensitive_callers[:10]}
         secrets = hardcoded_values.get("secrets") or []
-        external_secret_hits = [
-            secret for secret in secrets
-            if "external" in str(secret.get("location", "")).lower()
-        ]
+        external_secret_hits = [secret for secret in secrets if "external" in str(secret.get("location", "")).lower()]
         if external_secret_hits:
             evidence = self._first_non_empty(
                 external_secret_hits[0].get("location"),
@@ -1862,11 +1869,13 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     ) -> list[str]:
         api_hits = self._matching_api_call_sites(
             api_calls,
-            lambda item: self._caller_matches_package(item, package_prefix)
-            and self.ROOT_DETECTION_PATTERN.search(
-                f"{self._api_call_signature(item)} {self._api_call_caller_signature(item)}"
-            )
-            is not None,
+            lambda item: (
+                self._caller_matches_package(item, package_prefix)
+                and self.ROOT_DETECTION_PATTERN.search(
+                    f"{self._api_call_signature(item)} {self._api_call_caller_signature(item)}"
+                )
+                is not None
+            ),
         )
         string_hits = self._matching_string_xrefs(
             loaded_outputs=loaded_outputs,
@@ -1883,21 +1892,25 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     ) -> dict[str, Any]:
         biometric_callers = self._matching_api_call_sites(
             api_calls,
-            lambda item: self._caller_matches_package(item, package_prefix)
-            and any(
-                token in self._api_call_signature(item).lower()
-                for token in ("biometricprompt", "fingerprintmanager", "fingerprint")
+            lambda item: (
+                self._caller_matches_package(item, package_prefix)
+                and any(
+                    token in self._api_call_signature(item).lower()
+                    for token in ("biometricprompt", "fingerprintmanager", "fingerprint")
+                )
             ),
         )
         hardening_callers = self._matching_api_call_sites(
             api_calls,
-            lambda item: self._caller_matches_package(item, package_prefix)
-            and any(
-                token in self._api_call_signature(item).lower()
-                for token in (
-                    "cryptoobject",
-                    "setuserauthenticationrequired",
-                    "keygenparameterspec",
+            lambda item: (
+                self._caller_matches_package(item, package_prefix)
+                and any(
+                    token in self._api_call_signature(item).lower()
+                    for token in (
+                        "cryptoobject",
+                        "setuserauthenticationrequired",
+                        "keygenparameterspec",
+                    )
                 )
             ),
         )
@@ -1916,12 +1929,14 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     ) -> dict[str, Any]:
         crypto_callers = self._matching_api_call_sites(
             api_calls,
-            lambda item: self._caller_matches_package(item, package_prefix)
-            and (
-                self._is_hash_api_call(item)
-                or any(
-                    token in self._api_call_signature(item).lower()
-                    for token in ("messagedigest", "signature;", "mac;")
+            lambda item: (
+                self._caller_matches_package(item, package_prefix)
+                and (
+                    self._is_hash_api_call(item)
+                    or any(
+                        token in self._api_call_signature(item).lower()
+                        for token in ("messagedigest", "signature;", "mac;")
+                    )
                 )
             ),
         )
@@ -1952,10 +1967,12 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     ) -> dict[str, Any]:
         crypto_callers = self._matching_api_call_sites(
             api_calls,
-            lambda item: self._caller_matches_package(item, package_prefix)
-            and any(
-                token in self._api_call_signature(item).lower()
-                for token in ("cipher;", "secretkeyspec", "keygenerator", "secretkeyfactory")
+            lambda item: (
+                self._caller_matches_package(item, package_prefix)
+                and any(
+                    token in self._api_call_signature(item).lower()
+                    for token in ("cipher;", "secretkeyspec", "keygenerator", "secretkeyfactory")
+                )
             ),
         )
         blowfish_xrefs = self._matching_string_xrefs(
@@ -1971,12 +1988,13 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         weak_indicator_locations = self._matching_code_indicator_locations(
             code_indicator_items,
             package_prefix=package_prefix,
-            value_predicate=lambda value: self.BLOWFISH_PATTERN.search(value) is not None
-            and self.WEAK_BLOWFISH_KEY_BITS_PATTERN.search(value) is not None,
+            value_predicate=lambda value: (
+                self.BLOWFISH_PATTERN.search(value) is not None
+                and self.WEAK_BLOWFISH_KEY_BITS_PATTERN.search(value) is not None
+            ),
         )
         overlapping = [
-            caller for caller in crypto_callers
-            if caller in set(blowfish_xrefs) and caller in set(weak_size_xrefs)
+            caller for caller in crypto_callers if caller in set(blowfish_xrefs) and caller in set(weak_size_xrefs)
         ]
         evidence_hits = self._dedupe_preserve_order([*overlapping, *weak_indicator_locations])
         if evidence_hits:
@@ -1994,10 +2012,12 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     ) -> dict[str, Any]:
         rsa_callers = self._matching_api_call_sites(
             api_calls,
-            lambda item: self._caller_matches_package(item, package_prefix)
-            and any(
-                token in self._api_call_signature(item).lower()
-                for token in ("keypairgenerator", "rsakeygenparameterspec", "keyfactory", "rsapublickeyspec")
+            lambda item: (
+                self._caller_matches_package(item, package_prefix)
+                and any(
+                    token in self._api_call_signature(item).lower()
+                    for token in ("keypairgenerator", "rsakeygenparameterspec", "keyfactory", "rsapublickeyspec")
+                )
             ),
         )
         rsa_xrefs = self._matching_string_xrefs(
@@ -2013,13 +2033,11 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         weak_indicator_locations = self._matching_code_indicator_locations(
             code_indicator_items,
             package_prefix=package_prefix,
-            value_predicate=lambda value: self.RSA_PATTERN.search(value) is not None
-            and self.WEAK_RSA_KEY_BITS_PATTERN.search(value) is not None,
+            value_predicate=lambda value: (
+                self.RSA_PATTERN.search(value) is not None and self.WEAK_RSA_KEY_BITS_PATTERN.search(value) is not None
+            ),
         )
-        overlapping = [
-            caller for caller in rsa_callers
-            if caller in set(rsa_xrefs) and caller in set(weak_size_xrefs)
-        ]
+        overlapping = [caller for caller in rsa_callers if caller in set(rsa_xrefs) and caller in set(weak_size_xrefs)]
         evidence_hits = self._dedupe_preserve_order([*overlapping, *weak_indicator_locations])
         if evidence_hits:
             return {"present": True, "evidence": evidence_hits[0], "details": evidence_hits[:10]}
@@ -2036,8 +2054,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     ) -> dict[str, Any]:
         parser_callers = self._matching_api_call_sites(
             api_calls,
-            lambda item: self._caller_matches_package(item, package_prefix)
-            and self.XML_PARSER_PATTERN.search(self._api_call_signature(item)) is not None,
+            lambda item: (
+                self._caller_matches_package(item, package_prefix)
+                and self.XML_PARSER_PATTERN.search(self._api_call_signature(item)) is not None
+            ),
         )
         weak_xrefs = self._matching_string_xrefs(
             loaded_outputs=loaded_outputs,
@@ -2065,8 +2085,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     ) -> dict[str, Any]:
         log_callers = self._matching_api_call_sites(
             api_calls,
-            lambda item: self._caller_matches_package(item, package_prefix)
-            and "android/util/log" in self._api_call_signature(item).lower(),
+            lambda item: (
+                self._caller_matches_package(item, package_prefix)
+                and "android/util/log" in self._api_call_signature(item).lower()
+            ),
         )
         if not log_callers:
             return {"present": False, "evidence": "no_sensitive_logging_hits"}
@@ -2089,8 +2111,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     ) -> dict[str, Any]:
         identifier_callers = self._matching_api_call_sites(
             api_calls,
-            lambda item: self._caller_matches_package(item, package_prefix)
-            and self.SPOOFABLE_IDENTIFIER_PATTERN.search(self._api_call_signature(item)) is not None,
+            lambda item: (
+                self._caller_matches_package(item, package_prefix)
+                and self.SPOOFABLE_IDENTIFIER_PATTERN.search(self._api_call_signature(item)) is not None
+            ),
         )
         auth_xrefs = self._matching_string_xrefs(
             loaded_outputs=loaded_outputs,
@@ -2099,18 +2123,20 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         )
         network_callers = self._matching_api_call_sites(
             api_calls,
-            lambda item: self._caller_matches_package(item, package_prefix)
-            and self._is_network_api_call(item),
+            lambda item: self._caller_matches_package(item, package_prefix) and self._is_network_api_call(item),
         )
 
         overlapping = [
-            caller for caller in identifier_callers
-            if caller in set(auth_xrefs) or caller in set(network_callers)
+            caller for caller in identifier_callers if caller in set(auth_xrefs) or caller in set(network_callers)
         ]
         if overlapping:
             return {"present": True, "evidence": overlapping[0], "details": overlapping[:10]}
         if identifier_callers:
-            return {"present": False, "evidence": "no_spoofable_authentication_hits", "details": identifier_callers[:10]}
+            return {
+                "present": False,
+                "evidence": "no_spoofable_authentication_hits",
+                "details": identifier_callers[:10],
+            }
         return {"present": False, "evidence": "no_spoofable_authentication_hits"}
 
     def _matching_api_call_sites(

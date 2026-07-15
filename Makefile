@@ -1,4 +1,4 @@
-.PHONY: help build build-mobsf-owaspdc run test services-up services-down compose-run compose-run-standalone compose-run-mobsf-owaspdc compose-down
+.PHONY: help build build-mobsf-owaspdc run test hooks-install services-up services-down compose-run compose-run-standalone compose-run-mobsf-owaspdc compose-down
 
 # Image Variables
 IMAGE_NAME ?= appcritiq-core
@@ -25,6 +25,7 @@ help:
 	@echo "  make compose-run-mobsf-owaspdc"
 	@echo "                     Build and run a compose scan with MobSF and NVD sidecars"
 	@echo "  make test          Run local pytest"
+	@echo "  make hooks-install Install the repository pre-commit hook"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make run PROJECT_PATH=/path/to/project SCAN_FLAG=--native-ios-source-path"
@@ -179,3 +180,6 @@ clean-docker:
 
 test:
 	@PYTHONPATH=. PYTHONDONTWRITEBYTECODE=1 uv run --no-project --with pytest pytest
+
+hooks-install:
+	@uv run pre-commit install --install-hooks
