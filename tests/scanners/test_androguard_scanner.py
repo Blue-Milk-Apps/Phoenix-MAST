@@ -7,7 +7,7 @@ from pathlib import Path
 from xml.etree import ElementTree
 
 from adapters.binary_scanners.androguard_scanner import AndroguardScanner
-from domain.models import ScanConfig, ScanType
+from domain.models import ScanConfig
 
 EXPECTED_ARTIFACTS = [
     "metadata.json",
