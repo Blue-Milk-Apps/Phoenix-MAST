@@ -1,8 +1,9 @@
-# Phoenix MAST
+<h1>
+  <img alt="Phoenix MAST logo" src="./assets/PhoenixShield1280x640.png" width="100" valign="middle">
+  &nbsp;Phoenix MAST
+</h1>
 
-Phoenix MAST is an open source mobile application security testing toolkit for iOS and Android. It packages a practical set of OSS security and analysis tools into a Docker-first workflow, then adds lightweight Python orchestration so teams can run repeatable checks against source projects and mobile binaries.
-
-The project is intentionally modular. Scanner adapters live behind stable ports, so phoenix can be extended, slimmed down, or customized for a specific review process without rewriting the whole pipeline.
+Phoenix MAST is an open source mobile application security testing toolkit for iOS and Android. It packages a practical set of OSS security and analysis tools into a Docker-first workflow, then adds lightweight Python orchestration so teams can run repeatable checks against source projects and mobile binaries. The project is intentionally modular. Scanner adapters live behind stable ports, so phoenix can be extended, slimmed down, or customized for a specific review process without rewriting the whole pipeline.|
 
 ## Features
 
