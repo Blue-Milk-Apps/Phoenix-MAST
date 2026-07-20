@@ -16,9 +16,9 @@ from domain.post_scan.android.endpoints_builder import EndpointsBuilder
 from domain.post_scan.android.file_info_builder import FileInfoBuilder
 from domain.post_scan.android.functionality_builder import FunctionalityBuilder
 from domain.post_scan.android.hardcoded_values_builder import HardcodedValuesBuilder
+from domain.post_scan.android.network_evidence_builder import NetworkEvidenceBuilder
 from domain.post_scan.android.permissions_builder import PermissionsBuilder
 from domain.post_scan.android.resilience_evidence_builder import ResilienceEvidenceBuilder
-from domain.post_scan.utilities import coerce_bool_like
 from ports.scan_detail_extractor_port import ScanDetailExtractorPort
 
 
@@ -39,9 +39,6 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     )
     FLAG_SECURE_PATTERN = re.compile(r"(?i)\bflag_secure\b")
     WORLD_MODE_PATTERN = re.compile(r"(?i)mode_world_(?:readable|writable)")
-    COOKIE_PATTERN = re.compile(r"(?i)\bcookie\b")
-    COOKIE_SECURITY_ATTR_PATTERN = re.compile(r"(?i)\b(?:secure|httponly|samesite)\b")
-    HTTP_URL_PATTERN = re.compile(r"(?i)\bhttp://[^\s'\"<>]+")
     ROOT_DETECTION_PATTERN = re.compile(r"(?i)(?:\bsu\b|busybox|supersu|magisk|test-keys|rootbeer|isrooted|rootcheck)")
     SHA1_PATTERN = re.compile(r"(?i)\bsha(?:-|_)?1(?:withrsa)?\b")
     BLOWFISH_PATTERN = re.compile(r"(?i)\bblowfish\b")
@@ -105,6 +102,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         resilience_evidence = ResilienceEvidenceBuilder(loaded_outputs)
         deeplink_builder = DeepLinksBuilder(loaded_outputs)
         hardcoded_values = HardcodedValuesBuilder(loaded_outputs)
+        network_evidence = NetworkEvidenceBuilder(loaded_outputs, hardcoded_values)
         endpoints = EndpointsBuilder(loaded_outputs).items
 
         return {
@@ -116,124 +114,12 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "file_info": asdict(file_info),
             "permissions": permissions,
             "functionality": functionality,
-            "network_evidence": self._build_network_evidence(loaded_outputs, hardcoded_values),
+            "network_evidence": asdict(network_evidence),
             "resilience_evidence": asdict(resilience_evidence),
             "storage_evidence": self._build_storage_evidence(loaded_outputs, hardcoded_values),
             "deep_links": asdict(deeplink_builder),
             "hardcoded_values": asdict(hardcoded_values),
             "endpoints": endpoints,
-        }
-
-    def _build_network_evidence(
-        self, loaded_outputs: dict[str, Any], hardcoded_values: HardcodedValuesBuilder
-    ) -> dict[str, Any]:
-        network_security = loaded_outputs.get("apktool_network_security_config") or {}
-        aapt2_application = loaded_outputs.get("aapt2_application") or {}
-        aapt2_posture = loaded_outputs.get("aapt2_manifest_security_posture") or {}
-        androguard_api_calls = loaded_outputs.get("androguard_api_calls") or {}
-        package_prefix = self._app_package_prefix(loaded_outputs)
-
-        domains = network_security.get("domains") or []
-        provenance = network_security.get("provenance") or {}
-        provenance_path = self._first_non_empty(provenance.get("path"), provenance.get("source"))
-        cleartext_present = self._coerce_true(
-            network_security.get("effective_cleartext_traffic_default")
-        ) or self._coerce_true(network_security.get("manifest_uses_cleartext_traffic"))
-
-        user_installed_ca_present = any(
-            "user" in {str(anchor).strip().lower() for anchor in (domain.get("trust_anchors") or [])}
-            for domain in domains
-        ) or any(
-            "user" in {str(anchor).strip().lower() for anchor in (override.get("trust_anchors") or [])}
-            for override in (network_security.get("debug_overrides") or [])
-        )
-
-        config_file_present = self._coerce_true(network_security.get("config_file_present"))
-        pin_sets_present = any(int(domain.get("pin_sets") or 0) > 0 for domain in domains)
-        missing_certificate_pinning = None
-        if config_file_present is True:
-            missing_certificate_pinning = not pin_sets_present
-        elif config_file_present is False:
-            missing_certificate_pinning = True
-
-        password_not_hashed_in_transit = self._derive_password_not_hashed_in_transit(
-            list(androguard_api_calls.get("items") or [])
-        )
-        api_call_items = list(androguard_api_calls.get("items") or [])
-        hostname_verifier_hits = self._matching_api_call_sites(
-            api_call_items,
-            lambda item: (
-                self._caller_matches_package(item, package_prefix)
-                and (
-                    "allow_all_hostname_verifier" in self._api_call_signature(item).lower()
-                    or "sethostnameverifier" in self._api_call_signature(item).lower()
-                )
-            ),
-        )
-        trust_manager_hits = self._matching_api_call_sites(
-            api_call_items,
-            lambda item: (
-                self._caller_matches_package(item, package_prefix)
-                and "checkservertrusted" in self._api_call_caller_signature(item).lower()
-            ),
-        )
-        listening_port_hits = self._matching_api_call_sites(
-            api_call_items,
-            lambda item: (
-                self._caller_matches_package(item, package_prefix)
-                and any(
-                    token in self._api_call_signature(item).lower()
-                    for token in ("serversocket", "localserversocket", "datagramsocket; bind")
-                )
-            ),
-        )
-        cookie_insecurity = self._detect_cookie_security_issue(loaded_outputs, package_prefix)
-        unnecessary_info = self._detect_unnecessary_information_transmission(
-            loaded_outputs,
-            package_prefix,
-        )
-        unencrypted_transit = self._detect_unencrypted_transit_issue(
-            loaded_outputs,
-            hardcoded_values,
-            cleartext_present=bool(cleartext_present),
-            password_not_hashed_in_transit=password_not_hashed_in_transit,
-        )
-
-        return {
-            "allows_cleartext_traffic_for_all_domains": {
-                "present": bool(cleartext_present),
-                "evidence": provenance_path or self._first_non_empty(network_security.get("policy_source")),
-            },
-            "contains_hostname_verifier_accepts_all": {
-                "present": True if hostname_verifier_hits else None,
-                "evidence": ", ".join(hostname_verifier_hits[:5]) if hostname_verifier_hits else "",
-            },
-            "contains_x509_trust_manager_accepts_all": {
-                "present": True if trust_manager_hits else None,
-                "evidence": ", ".join(trust_manager_hits[:5]) if trust_manager_hits else "",
-            },
-            "does_not_perform_certificate_pinning": {
-                "present": missing_certificate_pinning,
-                "evidence": provenance_path or self._first_non_empty(network_security.get("reference")),
-            },
-            "opens_listening_port": {
-                "present": bool(listening_port_hits) if api_call_items else None,
-                "evidence": ", ".join(listening_port_hits[:5]) if listening_port_hits else "",
-            },
-            "sensitive_cookies_lack_security_attributes": cookie_insecurity,
-            "unnecessary_information_transmitted": unnecessary_info,
-            "sensitive_information_unencrypted_in_transit": unencrypted_transit,
-            "password_not_hashed_in_transit": {
-                "present": password_not_hashed_in_transit["present"],
-                "evidence": password_not_hashed_in_transit["evidence"],
-            },
-            "weak_certificate_validation_enables_mitm": {
-                "present": user_installed_ca_present,
-                "evidence": provenance_path or self._first_non_empty(network_security.get("reference")),
-            },
-            "manifest_cleartext_traffic_permitted": self._coerce_true(aapt2_posture.get("cleartext_traffic_permitted"))
-            if aapt2_posture
-            else coerce_bool_like(aapt2_application.get("uses_cleartext_traffic")),
         }
 
     def _build_storage_evidence(
@@ -492,10 +378,6 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         return self.SECRET_LABEL_PATTERN.fullmatch(value.strip()) is not None
 
     @staticmethod
-    def _coerce_true(value: object) -> bool:
-        return str(value or "").strip().lower() == "true"
-
-    @staticmethod
     def _primary_certificate(
         androguard_certificates: dict[str, Any],
         apksigner_signing_evidence: dict[str, Any],
@@ -589,40 +471,6 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             return f"{path}:{line}"
         return path
 
-    def _derive_password_not_hashed_in_transit(self, api_calls: list[dict[str, Any]]) -> dict[str, Any]:
-        if not api_calls:
-            return {"present": None, "evidence": ""}
-
-        password_network_callers: list[str] = []
-        hashed_password_callers: list[str] = []
-
-        for item in api_calls:
-            if not isinstance(item, dict):
-                continue
-            caller_signature = self._api_call_caller_signature(item)
-            if not caller_signature or not self.PASSWORD_HINT_PATTERN.search(caller_signature):
-                continue
-            if self._is_network_api_call(item):
-                password_network_callers.append(caller_signature)
-            if self._is_hash_api_call(item):
-                hashed_password_callers.append(caller_signature)
-
-        password_network_callers = self._dedupe_preserve_order(password_network_callers)
-        hashed_password_callers = self._dedupe_preserve_order(hashed_password_callers)
-        unhashed_callers = [caller for caller in password_network_callers if caller not in set(hashed_password_callers)]
-
-        if unhashed_callers:
-            return {
-                "present": True,
-                "evidence": ", ".join(unhashed_callers),
-            }
-        if password_network_callers and hashed_password_callers:
-            return {
-                "present": False,
-                "evidence": ", ".join(password_network_callers),
-            }
-        return {"present": None, "evidence": ""}
-
     def _detect_screen_capture_protection(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
         package_prefix = self._first_non_empty(
             ((loaded_outputs.get("aapt2_identity") or {}).get("package_name")),
@@ -662,87 +510,6 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "present": None,
             "evidence": "",
         }
-
-    def _detect_cookie_security_issue(self, loaded_outputs: dict[str, Any], package_prefix: str) -> dict[str, Any]:
-        cookie_hits = self._matching_string_xrefs(
-            loaded_outputs=loaded_outputs,
-            value_predicate=lambda value: self.COOKIE_PATTERN.search(value) is not None,
-            xref_predicate=lambda signature: package_prefix in signature.replace(".", "/") if package_prefix else False,
-        )
-        cookie_attr_hits = self._matching_string_xrefs(
-            loaded_outputs=loaded_outputs,
-            value_predicate=lambda value: self.COOKIE_SECURITY_ATTR_PATTERN.search(value) is not None,
-            xref_predicate=lambda signature: package_prefix in signature.replace(".", "/") if package_prefix else False,
-        )
-        if cookie_hits and not cookie_attr_hits:
-            return {"present": True, "evidence": cookie_hits[0], "details": cookie_hits[:10]}
-        if cookie_hits and cookie_attr_hits:
-            return {"present": False, "evidence": cookie_attr_hits[0], "details": cookie_attr_hits[:10]}
-        return {"present": None, "evidence": ""}
-
-    def _detect_unnecessary_information_transmission(
-        self,
-        loaded_outputs: dict[str, Any],
-        package_prefix: str,
-    ) -> dict[str, Any]:
-        api_calls = list(((loaded_outputs.get("androguard_api_calls") or {}).get("items") or []))
-        identifier_callers = set(
-            self._matching_api_call_sites(
-                api_calls,
-                lambda item: (
-                    self._caller_matches_package(item, package_prefix)
-                    and any(
-                        token in self._api_call_signature(item).lower()
-                        for token in (
-                            "advertisingid",
-                            "settings$secure",
-                            "android_id",
-                            "telephonymanager",
-                            "getdeviceid",
-                            "getsubscriberid",
-                            "getsimserialnumber",
-                        )
-                    )
-                ),
-            )
-        )
-        network_callers = set(
-            self._matching_api_call_sites(
-                api_calls,
-                lambda item: self._caller_matches_package(item, package_prefix) and self._is_network_api_call(item),
-            )
-        )
-        overlapping = [caller for caller in identifier_callers if caller in network_callers]
-        if overlapping:
-            return {"present": True, "evidence": overlapping[0], "details": overlapping[:10]}
-        if not identifier_callers:
-            return {"present": False, "evidence": "no_unique_identifier_network_overlap"}
-        return {"present": None, "evidence": ""}
-
-    def _detect_unencrypted_transit_issue(
-        self,
-        loaded_outputs: dict[str, Any],
-        hardcoded_values: HardcodedValuesBuilder,
-        *,
-        cleartext_present: bool,
-        password_not_hashed_in_transit: dict[str, Any],
-    ) -> dict[str, Any]:
-        urls = [str(item.get("url", "")).strip() for item in hardcoded_values.urls]
-        insecure_urls = [
-            url
-            for url in urls
-            if url.lower().startswith("http://") and "localhost" not in url.lower() and "127.0.0.1" not in url
-        ]
-        if insecure_urls:
-            return {"present": True, "evidence": insecure_urls[0], "details": insecure_urls[:10]}
-        if cleartext_present and password_not_hashed_in_transit.get("present") is True:
-            return {
-                "present": True,
-                "evidence": password_not_hashed_in_transit.get("evidence", ""),
-            }
-        if not cleartext_present and not insecure_urls:
-            return {"present": False, "evidence": "no_http_endpoints_detected"}
-        return {"present": None, "evidence": ""}
 
     def _detect_world_readable_internal_storage(self, api_calls: list[dict[str, Any]]) -> dict[str, Any]:
         world_mode_hits = self._matching_api_call_sites(
