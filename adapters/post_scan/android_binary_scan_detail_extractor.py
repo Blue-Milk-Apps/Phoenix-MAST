@@ -4,9 +4,16 @@ from __future__ import annotations
 
 import hashlib
 import re
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from domain.post_scan.android.app_certificate_builder import AppCertificateBuilder
+from domain.post_scan.android.app_component_builder import AppComponentBuilder
+from domain.post_scan.android.app_info_builder import AndroidAppInfoBuilder
+from domain.post_scan.android.application_builder import ApplicationBuilder
+from domain.post_scan.android.code_evidence_builder import CodeEvidenceBuilder
+from domain.post_scan.utilities import build_hardcoded_values
 from ports.scan_detail_extractor_port import ScanDetailExtractorPort
 
 
@@ -302,12 +309,17 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     }
 
     def extract_sections(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
+        app_info = AndroidAppInfoBuilder(loaded_outputs)
+        application = ApplicationBuilder(loaded_outputs)
+        app_components = AppComponentBuilder(loaded_outputs)
+        certificate = AppCertificateBuilder(loaded_outputs)
+        code_evidence = CodeEvidenceBuilder(loaded_outputs, app_components, application, app_info)
         return {
-            "app_info": self._build_app_info(loaded_outputs),
-            "application": self._build_application(loaded_outputs),
-            "app_components": self._build_app_components(loaded_outputs),
-            "certificate": self._build_certificate(loaded_outputs),
-            "code_evidence": self._build_code_evidence(loaded_outputs),
+            "app_info": asdict(app_info),
+            "application": asdict(application),
+            "app_components": asdict(app_components),
+            "certificate": asdict(certificate),
+            "code_evidence": asdict(code_evidence),
             "file_info": self._build_file_info(loaded_outputs),
             "permissions": self._build_permissions(loaded_outputs),
             "functionality": self._build_functionality(loaded_outputs),
@@ -319,7 +331,6 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "endpoints": self._build_endpoints(loaded_outputs),
         }
 
-    def _build_app_info(self, loaded_outputs: dict[str, Any]) -> dict[str, str]:
         androguard_metadata = loaded_outputs.get("androguard_metadata") or {}
         aapt2_identity = loaded_outputs.get("aapt2_identity") or {}
         apktool_manifest_summary = loaded_outputs.get("apktool_manifest_summary") or {}
@@ -361,104 +372,6 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "trackers_detected": "",
         }
 
-    def _build_application(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
-        aapt2_application = loaded_outputs.get("aapt2_application") or {}
-        apktool_manifest_summary = loaded_outputs.get("apktool_manifest_summary") or {}
-        manifest_application = apktool_manifest_summary.get("application") or {}
-
-        return {
-            "debuggable": self._first_non_empty(
-                manifest_application.get("debuggable"),
-                aapt2_application.get("debuggable"),
-            ),
-            "allow_backup": self._first_non_empty(
-                manifest_application.get("allow_backup"),
-                aapt2_application.get("allow_backup"),
-            ),
-            "uses_cleartext_traffic": self._first_non_empty(
-                manifest_application.get("uses_cleartext_traffic"),
-                aapt2_application.get("uses_cleartext_traffic"),
-            ),
-        }
-
-    def _build_app_components(self, loaded_outputs: dict[str, Any]) -> dict[str, int]:
-        androguard_components = loaded_outputs.get("androguard_components") or {}
-
-        activities = androguard_components.get("activities") or []
-        services = androguard_components.get("services") or []
-        receivers = androguard_components.get("receivers") or []
-        providers = androguard_components.get("providers") or []
-
-        return {
-            "activities": len(activities),
-            "services": len(services),
-            "receivers": len(receivers),
-            "providers": len(providers),
-            "exported_activities": self._count_exported(activities),
-            "exported_services": self._count_exported(services),
-            "exported_receivers": self._count_exported(receivers),
-            "exported_providers": self._count_exported(providers),
-        }
-
-    def _build_certificate(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
-        androguard_certificates = loaded_outputs.get("androguard_certificates") or {}
-        apksigner_signing_evidence = loaded_outputs.get("apksigner_signing_evidence") or {}
-
-        primary_certificate = self._primary_certificate(androguard_certificates, apksigner_signing_evidence)
-        subject = primary_certificate.get("subject") or {}
-        issuer = primary_certificate.get("issuer") or {}
-        signature_schemes = apksigner_signing_evidence.get("signature_schemes") or {}
-
-        return {
-            "owner_name": self._first_non_empty(
-                subject.get("common_name"),
-                self._extract_dn_value(
-                    (((apksigner_signing_evidence.get("signers") or [{}])[0]).get("certificate") or {}).get(
-                        "subject_dn"
-                    ),
-                    "CN",
-                ),
-            ),
-            "organization": self._first_non_empty(
-                subject.get("organization_name"),
-                self._extract_dn_value(
-                    (((apksigner_signing_evidence.get("signers") or [{}])[0]).get("certificate") or {}).get(
-                        "subject_dn"
-                    ),
-                    "O",
-                ),
-            ),
-            "organizational_unit": self._first_non_empty(
-                subject.get("organizational_unit_name"),
-                self._extract_dn_value(
-                    (((apksigner_signing_evidence.get("signers") or [{}])[0]).get("certificate") or {}).get(
-                        "subject_dn"
-                    ),
-                    "OU",
-                ),
-            ),
-            "location": "",
-            "validity": self._format_validity(
-                primary_certificate.get("not_valid_before"),
-                primary_certificate.get("not_valid_after"),
-            ),
-            "issuer": self._format_identity(issuer),
-            "serial_number": self._first_non_empty(primary_certificate.get("serial_number")),
-            "signature_versions": {
-                "v1": self._signature_scheme_verified(signature_schemes.get("v1")),
-                "v2": self._signature_scheme_verified(signature_schemes.get("v2")),
-                "v3": self._signature_scheme_verified(signature_schemes.get("v3")),
-                "v4": self._signature_scheme_verified(signature_schemes.get("v4")),
-            },
-            "hash_algorithms": self._format_hash_algorithms(primary_certificate, apksigner_signing_evidence),
-            "fingerprint": self._first_non_empty(
-                primary_certificate.get("sha256"),
-                (((apksigner_signing_evidence.get("signers") or [{}])[0]).get("certificate") or {}).get("sha256"),
-                primary_certificate.get("sha1"),
-            ),
-            "unique_certs": str(len(androguard_certificates.get("all") or [])),
-        }
-
     def _build_file_info(self, loaded_outputs: dict[str, Any]) -> dict[str, str]:
         scan_metadata = loaded_outputs.get("scan_metadata") or {}
         androguard_metadata = loaded_outputs.get("androguard_metadata") or {}
@@ -488,6 +401,9 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
                 apk_details.get("sha256"),
             ),
         }
+
+    def _build_hardcoded_values(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
+        return build_hardcoded_values(self, loaded_outputs)
 
     def _build_permissions(self, loaded_outputs: dict[str, Any]) -> list[dict[str, str]]:
         aapt2_permissions = loaded_outputs.get("aapt2_permissions") or {}
@@ -722,67 +638,6 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "does_not_prevent_screen_capture_of_sensitive_information": screen_capture_protection,
         }
 
-    def _build_hardcoded_values(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
-        apktool_secrets_endpoints = loaded_outputs.get("apktool_secrets_endpoints") or {}
-        strings_outputs = loaded_outputs.get("strings_outputs") or {}
-
-        urls: list[dict[str, str]] = []
-        emails: list[str] = []
-        secrets: list[dict[str, str]] = []
-        seen_urls: set[str] = set()
-        seen_emails: set[str] = set()
-        seen_secrets: set[tuple[str, str]] = set()
-
-        for item in apktool_secrets_endpoints.get("items") or []:
-            context = item.get("context") or {}
-            category = str(context.get("category", "")).strip().lower()
-            value = self._first_non_empty(item.get("value"))
-            if not value:
-                continue
-
-            if category == "url":
-                if value in seen_urls:
-                    continue
-                seen_urls.add(value)
-                urls.append({"url": value, "country": ""})
-                continue
-
-            if self._looks_like_email(value):
-                if value in seen_emails:
-                    continue
-                seen_emails.add(value)
-                emails.append(value)
-                continue
-
-            if category == "secret_keyword":
-                if self._looks_like_secret_label(value):
-                    continue
-                location = self._format_provenance_location(item.get("provenance") or {})
-                dedupe_key = (value, location)
-                if dedupe_key in seen_secrets:
-                    continue
-                seen_secrets.add(dedupe_key)
-                secrets.append({"value": value, "location": location})
-
-        for source_name, content in strings_outputs.items():
-            for line_number, line in enumerate(content.splitlines(), start=1):
-                for match in self.ENCODED_SECRET_PATTERN.finditer(line):
-                    value = match.group(0)
-                    if not self._looks_like_encoded_secret(value):
-                        continue
-                    location = f"strings/{source_name}:{line_number}"
-                    dedupe_key = (value, location)
-                    if dedupe_key in seen_secrets:
-                        continue
-                    seen_secrets.add(dedupe_key)
-                    secrets.append({"value": value, "location": location})
-
-        return {
-            "urls": urls,
-            "emails": emails,
-            "secrets": secrets,
-        }
-
     def _build_resilience_evidence(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
         package_prefix = self._app_package_prefix(loaded_outputs)
         api_calls = list(((loaded_outputs.get("androguard_api_calls") or {}).get("items") or []))
@@ -807,329 +662,6 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             },
             "biometric_local_authentication_bypass_possible": biometric_bypass,
         }
-
-    def _build_code_evidence(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
-        app_components = self._build_app_components(loaded_outputs)
-        application = self._build_application(loaded_outputs)
-        app_info = self._build_app_info(loaded_outputs)
-        hardcoded_values = self._build_hardcoded_values(loaded_outputs)
-
-        aapt2_identity = loaded_outputs.get("aapt2_identity") or {}
-        aapt2_permissions = loaded_outputs.get("aapt2_permissions") or {}
-        aapt2_posture = loaded_outputs.get("aapt2_manifest_security_posture") or {}
-        androguard_api_calls = loaded_outputs.get("androguard_api_calls") or {}
-        androguard_findings = loaded_outputs.get("androguard_findings") or {}
-        androguard_report_summary = loaded_outputs.get("androguard_report_summary") or {}
-        apktool_code_indicators = loaded_outputs.get("apktool_code_indicators") or {}
-
-        api_calls = list(androguard_api_calls.get("items") or [])
-        finding_items = list(androguard_findings.get("items") or [])
-        code_indicator_items = list(apktool_code_indicators.get("items") or [])
-        declared_permissions = {
-            self._first_non_empty(permission.get("name"))
-            for permission in aapt2_permissions.get("permissions") or []
-            if self._first_non_empty(permission.get("name"))
-        }
-
-        package_prefix = self._app_package_prefix(loaded_outputs)
-
-        reflection_callers = self._matching_api_call_sites(
-            api_calls,
-            lambda item: "reflect" in self._api_call_signature(item).lower(),
-        )
-        runtime_exec_callers = self._matching_api_call_sites(
-            api_calls,
-            lambda item: "runtime; exec" in self._api_call_signature(item).lower(),
-        )
-        provider_update_callers = self._matching_api_call_sites(
-            api_calls,
-            lambda item: (
-                "providerinstaller" in self._api_call_caller_signature(item).lower()
-                or "providerinstaller" in self._api_call_signature(item).lower()
-            ),
-        )
-
-        identifier_callers = self._matching_api_call_sites(
-            api_calls,
-            lambda item: any(
-                token in self._api_call_signature(item).lower()
-                for token in (
-                    "advertisingid",
-                    "settings$secure",
-                    "android_id",
-                    "telephonymanager",
-                    "getdeviceid",
-                    "getsubscriberid",
-                    "getsimserialnumber",
-                )
-            ),
-        )
-
-        sql_callers = self._matching_api_call_sites(
-            api_calls,
-            lambda item: any(
-                token in self._api_call_signature(item).lower()
-                for token in (
-                    "rawquery",
-                    "execsql",
-                    "sqlitequerybuilder",
-                )
-            ),
-        )
-
-        clipboard_callers = self._matching_api_call_sites(
-            api_calls,
-            lambda item: (
-                "clipboard" in self._api_call_signature(item).lower()
-                or "setprimaryclip" in self._api_call_signature(item).lower()
-            ),
-        )
-
-        code_indicator_locations = [
-            self._format_provenance_location(item.get("provenance") or {}) for item in code_indicator_items
-        ]
-        report_api_counts = dict(androguard_report_summary.get("api_category_counts") or {})
-
-        password_secret_hits = [
-            secret
-            for secret in hardcoded_values.get("secrets") or []
-            if self.PASSWORD_HINT_PATTERN.search(f"{secret.get('value', '')} {secret.get('location', '')}")
-        ]
-
-        crypto_secret_hits = [
-            secret
-            for secret in hardcoded_values.get("secrets") or []
-            if any(
-                token in f"{secret.get('value', '')} {secret.get('location', '')}".lower()
-                for token in ("key", "crypto", "cipher", "aes", "rsa", "des", "blowfish")
-            )
-        ]
-
-        source_package = self._first_non_empty(
-            app_info.get("package_name"),
-            aapt2_identity.get("package_name"),
-        )
-        readable_app_classes = self._readable_app_class_names(
-            source_package,
-            loaded_outputs,
-            runtime_exec_callers,
-        )
-
-        native_abis = list(aapt2_identity.get("native_abis") or [])
-        native_abi_presence = self._coerce_bool_like(aapt2_posture.get("native_abi_presence"))
-
-        reflection_present = (
-            bool(reflection_callers)
-            or any(
-                "reflection" in str(finding.get("id", "")).lower()
-                or "reflection" in str(finding.get("title", "")).lower()
-                for finding in finding_items
-            )
-            or int(report_api_counts.get("reflection") or 0) > 0
-        )
-
-        sql_injection_present = any(
-            "sql injection" in str(finding.get("title", "")).lower() for finding in finding_items
-        )
-        uses_provider_update = bool(provider_update_callers)
-        root_access_present = bool(runtime_exec_callers)
-        app_debuggable = self._coerce_bool_like(application.get("debuggable"))
-        sms_permission_present = "android.permission.SEND_SMS" in declared_permissions
-        accesses_unique_identifiers = bool(identifier_callers)
-        source_not_obfuscated = len(readable_app_classes) >= 3
-        sha1_evidence = self._detect_sha1_usage(
-            loaded_outputs,
-            package_prefix,
-            api_calls,
-            code_indicator_items,
-        )
-        weak_blowfish_evidence = self._detect_weak_blowfish_key_length(
-            loaded_outputs,
-            package_prefix,
-            api_calls,
-            code_indicator_items,
-        )
-        weak_rsa_evidence = self._detect_weak_rsa_key_length(
-            loaded_outputs,
-            package_prefix,
-            api_calls,
-            code_indicator_items,
-        )
-        weak_xml_evidence = self._detect_weak_xml_parser(
-            loaded_outputs,
-            package_prefix,
-            api_calls,
-            code_indicator_items,
-        )
-        sensitive_log_evidence = self._detect_sensitive_logging(
-            loaded_outputs,
-            package_prefix,
-            api_calls,
-        )
-        spoofable_auth_evidence = self._detect_spoofable_authentication(
-            loaded_outputs,
-            package_prefix,
-            api_calls,
-        )
-
-        return {
-            "accesses_unique_identifiers": self._code_evidence_entry(
-                present=accesses_unique_identifiers,
-                evidence=", ".join(identifier_callers[:5]) if identifier_callers else "no_identifier_api_hits",
-                details=identifier_callers[:10],
-            ),
-            "activities_accessible_to_other_apps": self._component_access_evidence(
-                app_components,
-                "exported_activities",
-                "activities",
-            ),
-            "app_is_debuggable": self._code_evidence_entry(
-                present=app_debuggable,
-                evidence=f"debuggable={str(app_debuggable).lower()}" if app_debuggable is not None else "",
-            ),
-            "contains_hard_coded_cryptographic_key": self._code_evidence_entry(
-                present=bool(crypto_secret_hits),
-                evidence=", ".join(
-                    self._first_non_empty(secret.get("location"), secret.get("value"))
-                    for secret in crypto_secret_hits[:5]
-                )
-                or "no_crypto_key_hits",
-                details=crypto_secret_hits[:10],
-            ),
-            "contains_native_code": self._code_evidence_entry(
-                present=bool(native_abis) or native_abi_presence is True,
-                evidence=(
-                    f"native_abis={','.join(native_abis)}"
-                    if native_abis
-                    else f"native_abi_presence={str(native_abi_presence).lower()}"
-                ),
-                details=native_abis,
-            ),
-            "contains_potential_hard_coded_password": self._code_evidence_entry(
-                present=bool(password_secret_hits),
-                evidence=", ".join(
-                    self._first_non_empty(secret.get("location"), secret.get("value"))
-                    for secret in password_secret_hits[:5]
-                )
-                or "no_password_hits",
-                details=password_secret_hits[:10],
-            ),
-            "contains_potential_sql_injection": self._code_evidence_entry(
-                present=sql_injection_present,
-                evidence=", ".join(sql_callers[:5]) if sql_injection_present else "no_sql_injection_finding",
-                details=sql_callers[:10],
-            ),
-            "contains_reflection_code": self._code_evidence_entry(
-                present=reflection_present,
-                evidence=", ".join(
-                    self._dedupe_preserve_order(
-                        [*reflection_callers[:3], *[loc for loc in code_indicator_locations[:10] if loc]]
-                    )[:5]
-                )
-                or f"reflection_count={int(report_api_counts.get('reflection') or 0)}",
-                details=reflection_callers[:10],
-            ),
-            "creates_blowfish_key_with_weak_length": self._code_evidence_entry(
-                present=weak_blowfish_evidence.get("present"),
-                evidence=weak_blowfish_evidence.get("evidence", ""),
-                details=weak_blowfish_evidence.get("details"),
-            ),
-            "creates_rsa_keys_with_weak_modulus_length": self._code_evidence_entry(
-                present=weak_rsa_evidence.get("present"),
-                evidence=weak_rsa_evidence.get("evidence", ""),
-                details=weak_rsa_evidence.get("details"),
-            ),
-            "does_not_update_security_provider": self._code_evidence_entry(
-                present=not uses_provider_update,
-                evidence=(
-                    ", ".join(provider_update_callers[:5])
-                    if provider_update_callers
-                    else "no_security_provider_update_calls"
-                ),
-                details=provider_update_callers[:10],
-            ),
-            "receivers_accessible_to_other_apps": self._component_access_evidence(
-                app_components,
-                "exported_receivers",
-                "receivers",
-            ),
-            "requests_root_access": self._code_evidence_entry(
-                present=root_access_present,
-                evidence=", ".join(runtime_exec_callers[:5]) if runtime_exec_callers else "no_su_runtime_exec_hits",
-                details=runtime_exec_callers[:10],
-            ),
-            "services_accessible_to_other_apps": self._component_access_evidence(
-                app_components,
-                "exported_services",
-                "services",
-            ),
-            "sms_cve_2014_8610": self._code_evidence_entry(
-                present=not sms_permission_present,
-                evidence=(
-                    "android.permission.SEND_SMS missing"
-                    if not sms_permission_present
-                    else "android.permission.SEND_SMS declared"
-                ),
-            ),
-            "source_code_is_not_obfuscated": self._code_evidence_entry(
-                present=source_not_obfuscated,
-                evidence=", ".join(readable_app_classes[:5]) if readable_app_classes else "no_readable_app_class_names",
-                details=readable_app_classes[:10],
-            ),
-            "uses_sha1_hashing_algorithm": self._code_evidence_entry(
-                present=sha1_evidence.get("present"),
-                evidence=sha1_evidence.get("evidence", ""),
-                details=sha1_evidence.get("details"),
-            ),
-            "weakly_configured_xml_parser": self._code_evidence_entry(
-                present=weak_xml_evidence.get("present"),
-                evidence=weak_xml_evidence.get("evidence", ""),
-                details=weak_xml_evidence.get("details"),
-            ),
-            "writes_sensitive_information_to_system_log": self._code_evidence_entry(
-                present=sensitive_log_evidence.get("present"),
-                evidence=sensitive_log_evidence.get("evidence", ""),
-                details=sensitive_log_evidence.get("details"),
-            ),
-            "uses_spoofable_values_for_authentication": self._code_evidence_entry(
-                present=spoofable_auth_evidence.get("present"),
-                evidence=spoofable_auth_evidence.get("evidence", ""),
-                details=spoofable_auth_evidence.get("details"),
-            ),
-            "copies_sensitive_information_into_clipboard_without_user_consent": self._code_evidence_entry(
-                present=bool(clipboard_callers),
-                evidence=", ".join(clipboard_callers[:5]) if clipboard_callers else "no_clipboard_hits",
-                details=clipboard_callers[:10],
-            ),
-        }
-
-    def _component_access_evidence(
-        self,
-        app_components: dict[str, int],
-        exported_key: str,
-        label: str,
-    ) -> dict[str, Any]:
-        exported_count = int(app_components.get(exported_key) or 0)
-        return self._code_evidence_entry(
-            present=exported_count > 0,
-            evidence=f"{exported_key}={exported_count}",
-            details=[f"{label}={int(app_components.get(label) or 0)}"],
-        )
-
-    @staticmethod
-    def _code_evidence_entry(
-        *,
-        present: bool | None,
-        evidence: str,
-        details: list[Any] | None = None,
-    ) -> dict[str, Any]:
-        entry: dict[str, Any] = {
-            "present": present,
-            "evidence": evidence,
-        }
-        if details:
-            entry["details"] = details
-        return entry
 
     def _readable_app_class_names(
         self,
@@ -1403,12 +935,6 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         return {}
 
     @staticmethod
-    def _signature_scheme_verified(signature_scheme: dict[str, Any] | None) -> bool:
-        if not signature_scheme:
-            return False
-        return str(signature_scheme.get("state", "")).upper() == "VERIFIED"
-
-    @staticmethod
     def _format_validity(not_before: object, not_after: object) -> str:
         start = str(not_before or "").strip()
         end = str(not_after or "").strip()
@@ -1490,15 +1016,6 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "sha1": sha1.hexdigest(),
             "sha256": sha256.hexdigest(),
         }
-
-    @staticmethod
-    def _count_exported(components: list[dict[str, Any]]) -> int:
-        return sum(
-            1
-            for component in components
-            if component.get("exported") is True
-            or (component.get("exported") is None and bool(component.get("has_intent_filters")))
-        )
 
     @staticmethod
     def _declared_permission_map(apktool_permissions: dict[str, Any]) -> dict[str, str]:
@@ -2139,6 +1656,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             }
         return {"present": False, "evidence": "no_spoofable_authentication_hits"}
 
+    def _api_call_method_name(self, item: dict[str, Any]) -> str:
+        callee = item.get("callee") or {}
+        return self._first_non_empty(callee.get("method_name"))
+
     def _matching_api_call_sites(
         self,
         api_calls: list[dict[str, Any]],
@@ -2148,15 +1669,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         for item in api_calls:
             if not isinstance(item, dict) or not predicate(item):
                 continue
-            caller = item.get("caller") or {}
-            signature = self._first_non_empty(caller.get("signature"))
+            signature = self._first_non_empty(((item.get("caller") or {}).get("signature")))
             if signature:
                 callers.append(signature)
         return self._dedupe_preserve_order(callers)
-
-    def _api_call_method_name(self, item: dict[str, Any]) -> str:
-        callee = item.get("callee") or {}
-        return self._first_non_empty(callee.get("method_name"))
 
     def _api_call_signature(self, item: dict[str, Any]) -> str:
         callee = item.get("callee") or {}
