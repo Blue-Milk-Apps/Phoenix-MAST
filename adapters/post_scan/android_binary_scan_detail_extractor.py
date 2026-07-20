@@ -13,6 +13,7 @@ from domain.post_scan.android.app_component_builder import AppComponentBuilder
 from domain.post_scan.android.app_info_builder import AndroidAppInfoBuilder
 from domain.post_scan.android.application_builder import ApplicationBuilder
 from domain.post_scan.android.code_evidence_builder import CodeEvidenceBuilder
+from domain.post_scan.android.file_info_builder import FileInfoBuilder
 from domain.post_scan.utilities import build_hardcoded_values
 from ports.scan_detail_extractor_port import ScanDetailExtractorPort
 
@@ -314,13 +315,14 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         app_components = AppComponentBuilder(loaded_outputs)
         certificate = AppCertificateBuilder(loaded_outputs)
         code_evidence = CodeEvidenceBuilder(loaded_outputs, app_components, application, app_info)
+        file_info = FileInfoBuilder(loaded_outputs)
         return {
             "app_info": asdict(app_info),
             "application": asdict(application),
             "app_components": asdict(app_components),
             "certificate": asdict(certificate),
             "code_evidence": asdict(code_evidence),
-            "file_info": self._build_file_info(loaded_outputs),
+            "file_info": asdict(file_info),
             "permissions": self._build_permissions(loaded_outputs),
             "functionality": self._build_functionality(loaded_outputs),
             "network_evidence": self._build_network_evidence(loaded_outputs),
