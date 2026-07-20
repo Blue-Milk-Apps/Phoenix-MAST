@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import hashlib
 import re
 from dataclasses import asdict
-from pathlib import Path
 from typing import Any
 
 from domain.post_scan.android.app_certificate_builder import AppCertificateBuilder
@@ -13,7 +11,9 @@ from domain.post_scan.android.app_component_builder import AppComponentBuilder
 from domain.post_scan.android.app_info_builder import AndroidAppInfoBuilder
 from domain.post_scan.android.application_builder import ApplicationBuilder
 from domain.post_scan.android.code_evidence_builder import CodeEvidenceBuilder
+from domain.post_scan.android.endpoints_builder import EndpointsBuilder
 from domain.post_scan.android.file_info_builder import FileInfoBuilder
+from domain.post_scan.android.functionality_builder import FunctionalityBuilder
 from domain.post_scan.android.permissions_builder import PermissionsBuilder
 from domain.post_scan.utilities import build_hardcoded_values
 from ports.scan_detail_extractor_port import ScanDetailExtractorPort
@@ -279,6 +279,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         code_evidence = CodeEvidenceBuilder(loaded_outputs, app_components, application, app_info)
         file_info = FileInfoBuilder(loaded_outputs)
         permissions = PermissionsBuilder(loaded_outputs).items
+        functionality = FunctionalityBuilder(loaded_outputs).items
         return {
             "app_info": asdict(app_info),
             "application": asdict(application),
@@ -287,79 +288,17 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "code_evidence": asdict(code_evidence),
             "file_info": asdict(file_info),
             "permissions": permissions,
-            "functionality": self._build_functionality(loaded_outputs),
+            "functionality": functionality,
             "network_evidence": self._build_network_evidence(loaded_outputs),
             "resilience_evidence": self._build_resilience_evidence(loaded_outputs),
             "storage_evidence": self._build_storage_evidence(loaded_outputs),
             "deep_links": self._build_deep_links(loaded_outputs),
             "hardcoded_values": self._build_hardcoded_values(loaded_outputs),
-            "endpoints": self._build_endpoints(loaded_outputs),
-        }
-
-    def _build_file_info(self, loaded_outputs: dict[str, Any]) -> dict[str, str]:
-        scan_metadata = loaded_outputs.get("scan_metadata") or {}
-        androguard_metadata = loaded_outputs.get("androguard_metadata") or {}
-        apksigner_signing_evidence = loaded_outputs.get("apksigner_signing_evidence") or {}
-        apk_details = apksigner_signing_evidence.get("apk") or {}
-
-        file_path = self._existing_file_path(
-            scan_metadata.get("project_path"),
-            androguard_metadata.get("apk_path"),
-        )
-        file_hashes = self._hash_file(file_path) if file_path else {}
-        size_bytes = apk_details.get("size_bytes")
-        if size_bytes in (None, "") and file_path is not None:
-            size_bytes = file_path.stat().st_size
-
-        return {
-            "filename": self._first_non_empty(
-                apk_details.get("file_name"),
-                androguard_metadata.get("file_name"),
-                Path(str(scan_metadata.get("project_path", ""))).name,
-            ),
-            "size": self._first_non_empty(size_bytes),
-            "md5": self._first_non_empty(file_hashes.get("md5")),
-            "sha1": self._first_non_empty(file_hashes.get("sha1")),
-            "sha256": self._first_non_empty(
-                file_hashes.get("sha256"),
-                apk_details.get("sha256"),
-            ),
+            "endpoints": EndpointsBuilder(loaded_outputs).items,
         }
 
     def _build_hardcoded_values(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
         return build_hardcoded_values(self, loaded_outputs)
-
-    def _build_endpoints(self, loaded_outputs: dict[str, Any]) -> list[dict[str, str]]:
-        apktool_secrets_endpoints = loaded_outputs.get("apktool_secrets_endpoints") or {}
-
-        endpoints: list[dict[str, str]] = []
-        seen: set[str] = set()
-
-        for item in apktool_secrets_endpoints.get("items") or []:
-            context = item.get("context") or {}
-            category = str(context.get("category", "")).strip().lower()
-            value = self._first_non_empty(item.get("value"))
-            if not value:
-                continue
-
-            if category not in {"url", "domain"}:
-                continue
-
-            dedupe_key = f"{category}:{value}"
-            if dedupe_key in seen:
-                continue
-            seen.add(dedupe_key)
-
-            endpoints.append(
-                {
-                    "endpoint": value,
-                    "tags": category,
-                    "ip_address": "",
-                    "country": "",
-                }
-            )
-
-        return endpoints
 
     def _build_network_evidence(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
         network_security = loaded_outputs.get("apktool_network_security_config") or {}
@@ -888,35 +827,6 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         return ""
 
     @staticmethod
-    def _existing_file_path(*candidates: object) -> Path | None:
-        for candidate in candidates:
-            text = str(candidate or "").strip()
-            if not text:
-                continue
-            path = Path(text)
-            if path.is_file():
-                return path
-        return None
-
-    @staticmethod
-    def _hash_file(path: Path) -> dict[str, str]:
-        md5 = hashlib.md5()  # noqa: S324 - used for report metadata, not security decisions
-        sha1 = hashlib.sha1()  # noqa: S324 - used for report metadata, not security decisions
-        sha256 = hashlib.sha256()
-
-        with path.open("rb") as handle:
-            for chunk in iter(lambda: handle.read(8192), b""):
-                md5.update(chunk)
-                sha1.update(chunk)
-                sha256.update(chunk)
-
-        return {
-            "md5": md5.hexdigest(),
-            "sha1": sha1.hexdigest(),
-            "sha256": sha256.hexdigest(),
-        }
-
-    @staticmethod
     def _first_non_empty(*values: object) -> str:
         for value in values:
             if value is None:
@@ -1013,7 +923,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         return f"permissions {', '.join(permission_names)}, which may indicate {capability_label} functionality."
 
     def _functionality_present(self, loaded_outputs: dict[str, Any], capability: str) -> bool:
-        functionality = self._build_functionality(loaded_outputs)
+        functionality = FunctionalityBuilder(loaded_outputs).items
         details = functionality.get(capability) or {}
         return bool(details.get("present"))
 
