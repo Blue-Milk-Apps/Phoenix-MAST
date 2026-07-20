@@ -11,11 +11,13 @@ from domain.post_scan.android.app_component_builder import AppComponentBuilder
 from domain.post_scan.android.app_info_builder import AndroidAppInfoBuilder
 from domain.post_scan.android.application_builder import ApplicationBuilder
 from domain.post_scan.android.code_evidence_builder import CodeEvidenceBuilder
+from domain.post_scan.android.deep_links_builder import DeepLinksBuilder
 from domain.post_scan.android.endpoints_builder import EndpointsBuilder
 from domain.post_scan.android.file_info_builder import FileInfoBuilder
 from domain.post_scan.android.functionality_builder import FunctionalityBuilder
+from domain.post_scan.android.hardcoded_values_builder import HardcodedValuesBuilder
 from domain.post_scan.android.permissions_builder import PermissionsBuilder
-from domain.post_scan.utilities import build_hardcoded_values
+from domain.post_scan.android.resilience_evidence_builder import ResilienceEvidenceBuilder
 from ports.scan_detail_extractor_port import ScanDetailExtractorPort
 
 
@@ -280,6 +282,10 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         file_info = FileInfoBuilder(loaded_outputs)
         permissions = PermissionsBuilder(loaded_outputs).items
         functionality = FunctionalityBuilder(loaded_outputs).items
+        deeplink_builder = DeepLinksBuilder(loaded_outputs)
+        hardcoded_values = HardcodedValuesBuilder(loaded_outputs)
+        endpoints = EndpointsBuilder(loaded_outputs).items
+
         return {
             "app_info": asdict(app_info),
             "application": asdict(application),
@@ -289,23 +295,21 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "file_info": asdict(file_info),
             "permissions": permissions,
             "functionality": functionality,
-            "network_evidence": self._build_network_evidence(loaded_outputs),
-            "resilience_evidence": self._build_resilience_evidence(loaded_outputs),
-            "storage_evidence": self._build_storage_evidence(loaded_outputs),
-            "deep_links": self._build_deep_links(loaded_outputs),
-            "hardcoded_values": self._build_hardcoded_values(loaded_outputs),
-            "endpoints": EndpointsBuilder(loaded_outputs).items,
+            "network_evidence": self._build_network_evidence(loaded_outputs, hardcoded_values),
+            "resilience_evidence": asdict(ResilienceEvidenceBuilder(loaded_outputs)),
+            "storage_evidence": self._build_storage_evidence(loaded_outputs, hardcoded_values),
+            "deep_links": asdict(deeplink_builder),
+            "hardcoded_values": asdict(hardcoded_values),
+            "endpoints": endpoints,
         }
 
-    def _build_hardcoded_values(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
-        return build_hardcoded_values(self, loaded_outputs)
-
-    def _build_network_evidence(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
+    def _build_network_evidence(
+        self, loaded_outputs: dict[str, Any], hardcoded_values: HardcodedValuesBuilder
+    ) -> dict[str, Any]:
         network_security = loaded_outputs.get("apktool_network_security_config") or {}
         aapt2_application = loaded_outputs.get("aapt2_application") or {}
         aapt2_posture = loaded_outputs.get("aapt2_manifest_security_posture") or {}
         androguard_api_calls = loaded_outputs.get("androguard_api_calls") or {}
-        hardcoded_values = self._build_hardcoded_values(loaded_outputs)
         package_prefix = self._app_package_prefix(loaded_outputs)
 
         domains = network_security.get("domains") or []
@@ -411,14 +415,9 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             else self._coerce_bool_like(aapt2_application.get("uses_cleartext_traffic")),
         }
 
-    def _build_deep_links(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
-        apktool_deep_links = loaded_outputs.get("apktool_deep_links") or {}
-        deep_links = apktool_deep_links.get("deep_links")
-        if isinstance(deep_links, list):
-            return {"deep_links": deep_links}
-        return {"deep_links": []}
-
-    def _build_storage_evidence(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
+    def _build_storage_evidence(
+        self, loaded_outputs: dict[str, Any], hardcoded_values: HardcodedValuesBuilder
+    ) -> dict[str, Any]:
         aapt2_permissions = loaded_outputs.get("aapt2_permissions") or {}
         androguard_api_calls = loaded_outputs.get("androguard_api_calls") or {}
 
@@ -457,7 +456,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         world_readable_internal = self._detect_world_readable_internal_storage(api_call_items)
         sensitive_external_storage = self._detect_sensitive_external_storage(
             external_storage_callers,
-            hardcoded_values=self._build_hardcoded_values(loaded_outputs),
+            hardcoded_values=hardcoded_values,
         )
 
         return {
@@ -474,31 +473,6 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             ),
             "sensitive_information_stored_in_external_storage": sensitive_external_storage,
             "does_not_prevent_screen_capture_of_sensitive_information": screen_capture_protection,
-        }
-
-    def _build_resilience_evidence(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
-        package_prefix = self._app_package_prefix(loaded_outputs)
-        api_calls = list(((loaded_outputs.get("androguard_api_calls") or {}).get("items") or []))
-        root_detection_hits = self._detect_root_detection_signals(
-            loaded_outputs,
-            package_prefix,
-            api_calls,
-        )
-        biometric_bypass = self._detect_biometric_bypass_possible(
-            loaded_outputs,
-            package_prefix,
-            api_calls,
-        )
-
-        return {
-            "root_detection_missing": {
-                "present": not bool(root_detection_hits),
-                "evidence": (
-                    "no_root_detection_signals_found" if not root_detection_hits else ", ".join(root_detection_hits[:5])
-                ),
-                "details": root_detection_hits[:10] if root_detection_hits else [],
-            },
-            "biometric_local_authentication_bypass_possible": biometric_bypass,
         }
 
     def _readable_app_class_names(
@@ -1075,12 +1049,12 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     def _detect_unencrypted_transit_issue(
         self,
         loaded_outputs: dict[str, Any],
-        hardcoded_values: dict[str, Any],
+        hardcoded_values: HardcodedValuesBuilder,
         *,
         cleartext_present: bool,
         password_not_hashed_in_transit: dict[str, Any],
     ) -> dict[str, Any]:
-        urls = [str(item.get("url", "")).strip() for item in hardcoded_values.get("urls") or []]
+        urls = [str(item.get("url", "")).strip() for item in hardcoded_values.urls]
         insecure_urls = [
             url
             for url in urls
@@ -1115,7 +1089,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         self,
         external_storage_callers: list[str],
         *,
-        hardcoded_values: dict[str, Any],
+        hardcoded_values: HardcodedValuesBuilder,
     ) -> dict[str, Any]:
         sensitive_callers = [
             caller
@@ -1124,7 +1098,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         ]
         if sensitive_callers:
             return {"present": True, "evidence": sensitive_callers[0], "details": sensitive_callers[:10]}
-        secrets = hardcoded_values.get("secrets") or []
+        secrets = hardcoded_values.secrets
         external_secret_hits = [secret for secret in secrets if "external" in str(secret.get("location", "")).lower()]
         if external_secret_hits:
             evidence = self._first_non_empty(
@@ -1135,103 +1109,6 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         if not external_storage_callers:
             return {"present": False, "evidence": "no_external_storage_sensitive_hits"}
         return {"present": None, "evidence": ""}
-
-    def _detect_root_detection_signals(
-        self,
-        loaded_outputs: dict[str, Any],
-        package_prefix: str,
-        api_calls: list[dict[str, Any]],
-    ) -> list[str]:
-        api_hits = self._matching_api_call_sites(
-            api_calls,
-            lambda item: (
-                self._caller_matches_package(item, package_prefix)
-                and self.ROOT_DETECTION_PATTERN.search(
-                    f"{self._api_call_signature(item)} {self._api_call_caller_signature(item)}"
-                )
-                is not None
-            ),
-        )
-        string_hits = self._matching_string_xrefs(
-            loaded_outputs=loaded_outputs,
-            value_predicate=lambda value: self.ROOT_DETECTION_PATTERN.search(value) is not None,
-            xref_predicate=lambda signature: package_prefix in signature.replace(".", "/") if package_prefix else False,
-        )
-        return self._dedupe_preserve_order([*api_hits, *string_hits])
-
-    def _detect_biometric_bypass_possible(
-        self,
-        loaded_outputs: dict[str, Any],
-        package_prefix: str,
-        api_calls: list[dict[str, Any]],
-    ) -> dict[str, Any]:
-        biometric_callers = self._matching_api_call_sites(
-            api_calls,
-            lambda item: (
-                self._caller_matches_package(item, package_prefix)
-                and any(
-                    token in self._api_call_signature(item).lower()
-                    for token in ("biometricprompt", "fingerprintmanager", "fingerprint")
-                )
-            ),
-        )
-        hardening_callers = self._matching_api_call_sites(
-            api_calls,
-            lambda item: (
-                self._caller_matches_package(item, package_prefix)
-                and any(
-                    token in self._api_call_signature(item).lower()
-                    for token in (
-                        "cryptoobject",
-                        "setuserauthenticationrequired",
-                        "keygenparameterspec",
-                    )
-                )
-            ),
-        )
-        if biometric_callers and not hardening_callers:
-            return {"present": True, "evidence": biometric_callers[0], "details": biometric_callers[:10]}
-        if biometric_callers and hardening_callers:
-            return {"present": False, "evidence": hardening_callers[0], "details": hardening_callers[:10]}
-        return {"present": False, "evidence": "no_biometric_authentication_flow_detected"}
-
-    def _detect_sha1_usage(
-        self,
-        loaded_outputs: dict[str, Any],
-        package_prefix: str,
-        api_calls: list[dict[str, Any]],
-        code_indicator_items: list[dict[str, Any]],
-    ) -> dict[str, Any]:
-        crypto_callers = self._matching_api_call_sites(
-            api_calls,
-            lambda item: (
-                self._caller_matches_package(item, package_prefix)
-                and (
-                    self._is_hash_api_call(item)
-                    or any(
-                        token in self._api_call_signature(item).lower()
-                        for token in ("messagedigest", "signature;", "mac;")
-                    )
-                )
-            ),
-        )
-        sha1_xrefs = self._matching_string_xrefs(
-            loaded_outputs=loaded_outputs,
-            value_predicate=lambda value: self.SHA1_PATTERN.search(value) is not None,
-            xref_predicate=lambda signature: package_prefix in signature.replace(".", "/") if package_prefix else False,
-        )
-        sha1_indicator_locations = self._matching_code_indicator_locations(
-            code_indicator_items,
-            package_prefix=package_prefix,
-            value_predicate=lambda value: self.SHA1_PATTERN.search(value) is not None,
-        )
-        overlapping = [caller for caller in crypto_callers if caller in set(sha1_xrefs)]
-        evidence_hits = self._dedupe_preserve_order([*overlapping, *sha1_indicator_locations, *sha1_xrefs])
-        if evidence_hits:
-            return {"present": True, "evidence": evidence_hits[0], "details": evidence_hits[:10]}
-        if crypto_callers:
-            return {"present": False, "evidence": "no_sha1_hits", "details": crypto_callers[:10]}
-        return {"present": False, "evidence": "no_sha1_hits"}
 
     def _detect_weak_blowfish_key_length(
         self,

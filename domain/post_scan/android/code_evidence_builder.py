@@ -348,6 +348,47 @@ class CodeEvidenceBuilder:
             entry["details"] = details
         return entry
 
+    def _detect_sha1_usage(
+        self,
+        loaded_outputs: dict[str, Any],
+        package_prefix: str,
+        api_calls: list[dict[str, Any]],
+        code_indicator_items: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        crypto_callers = self._matching_api_call_sites(
+            api_calls,
+            lambda item: (
+                self._caller_matches_package(item, package_prefix)
+                and (
+                    self._is_hash_api_call(item)
+                    or any(
+                        token in self._api_call_signature(item).lower()
+                        for token in ("messagedigest", "signature;", "mac;")
+                    )
+                )
+            ),
+        )
+        sha1_xrefs = self._matching_string_xrefs(
+            loaded_outputs=loaded_outputs,
+            value_predicate=lambda value: self.SHA1_PATTERN.search(value) is not None,
+            xref_predicate=lambda signature: package_prefix in signature.replace(".", "/") if package_prefix else False,
+        )
+        locations = self._matching_code_indicator_locations(
+            code_indicator_items,
+            package_prefix=package_prefix,
+            value_predicate=lambda value: self.SHA1_PATTERN.search(value) is not None,
+        )
+        hits = self._dedupe_preserve_order(
+            [*[caller for caller in crypto_callers if caller in set(sha1_xrefs)], *locations, *sha1_xrefs]
+        )
+        if hits:
+            return {"present": True, "evidence": hits[0], "details": hits[:10]}
+        return {
+            "present": False,
+            "evidence": "no_sha1_hits",
+            **({"details": crypto_callers[:10]} if crypto_callers else {}),
+        }
+
     def component_access_evidence(
         self,
         app_components: AppComponentBuilder,
