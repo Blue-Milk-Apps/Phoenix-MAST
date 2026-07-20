@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Callable
 
 
 def first_non_empty(*values: object) -> str:
@@ -10,20 +10,61 @@ def first_non_empty(*values: object) -> str:
     return ""
 
 
-def matching_api_call_sites(
-    self,
-    api_calls: list[dict[str, Any]],
-    predicate: Any,
+def coerce_bool_like(value: object) -> bool | None:
+    text = str(value or "").strip().lower()
+    if text in {"true", "1", "yes"}:
+        return True
+    if text in {"false", "0", "no"}:
+        return False
+    return None
+
+
+def app_package_prefix(loaded_outputs: dict[str, Any]) -> str:
+    return first_non_empty(
+        (loaded_outputs.get("aapt2_identity") or {}).get("package_name"),
+        (loaded_outputs.get("androguard_metadata") or {}).get("package"),
+    ).replace(".", "/")
+
+
+def api_call_signature(item: dict[str, Any]) -> str:
+    callee = item.get("callee") or {}
+    return first_non_empty(callee.get("signature"), callee.get("class_name"), callee.get("method_name"))
+
+
+def api_call_caller_signature(item: dict[str, Any]) -> str:
+    caller = item.get("caller") or {}
+    return first_non_empty(caller.get("signature"), caller.get("class_name"), caller.get("method_name"))
+
+
+def caller_matches_package(item: dict[str, Any], package_prefix: str) -> bool:
+    return bool(package_prefix and package_prefix in api_call_caller_signature(item).replace(".", "/"))
+
+
+def dedupe_preserve_order(values: list[str]) -> list[str]:
+    return list(dict.fromkeys(value for value in values if value))
+
+
+def matching_api_call_sites(api_calls: list[dict[str, Any]], predicate: Callable[[dict[str, Any]], bool]) -> list[str]:
+    return dedupe_preserve_order(
+        [api_call_caller_signature(item) for item in api_calls if isinstance(item, dict) and predicate(item)]
+    )
+
+
+def matching_string_xrefs(
+    loaded_outputs: dict[str, Any],
+    value_predicate: Callable[[str], bool],
+    xref_predicate: Callable[[str], bool],
 ) -> list[str]:
-    callers: list[str] = []
-    for item in api_calls:
-        if not isinstance(item, dict) or not predicate(item):
+    matches: list[str] = []
+    for item in (loaded_outputs.get("androguard_strings") or {}).get("items") or []:
+        if not isinstance(item, dict) or not value_predicate(first_non_empty(item.get("value"))):
             continue
-        caller = item.get("caller") or {}
-        signature = self._first_non_empty(caller.get("signature"))
-        if signature:
-            callers.append(signature)
-    return self._dedupe_preserve_order(callers)
+        for xref in item.get("xrefs") or []:
+            if isinstance(xref, dict):
+                signature = first_non_empty(xref.get("signature"))
+                if signature and xref_predicate(signature):
+                    matches.append(signature)
+    return dedupe_preserve_order(matches)
 
 
 def build_hardcoded_values(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:

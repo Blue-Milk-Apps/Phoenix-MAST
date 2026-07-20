@@ -18,6 +18,7 @@ from domain.post_scan.android.functionality_builder import FunctionalityBuilder
 from domain.post_scan.android.hardcoded_values_builder import HardcodedValuesBuilder
 from domain.post_scan.android.permissions_builder import PermissionsBuilder
 from domain.post_scan.android.resilience_evidence_builder import ResilienceEvidenceBuilder
+from domain.post_scan.utilities import coerce_bool_like
 from ports.scan_detail_extractor_port import ScanDetailExtractorPort
 
 
@@ -282,6 +283,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         file_info = FileInfoBuilder(loaded_outputs)
         permissions = PermissionsBuilder(loaded_outputs).items
         functionality = FunctionalityBuilder(loaded_outputs).items
+        resilience_evidence = ResilienceEvidenceBuilder(loaded_outputs)
         deeplink_builder = DeepLinksBuilder(loaded_outputs)
         hardcoded_values = HardcodedValuesBuilder(loaded_outputs)
         endpoints = EndpointsBuilder(loaded_outputs).items
@@ -296,7 +298,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "permissions": permissions,
             "functionality": functionality,
             "network_evidence": self._build_network_evidence(loaded_outputs, hardcoded_values),
-            "resilience_evidence": asdict(ResilienceEvidenceBuilder(loaded_outputs)),
+            "resilience_evidence": asdict(resilience_evidence),
             "storage_evidence": self._build_storage_evidence(loaded_outputs, hardcoded_values),
             "deep_links": asdict(deeplink_builder),
             "hardcoded_values": asdict(hardcoded_values),
@@ -412,7 +414,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             },
             "manifest_cleartext_traffic_permitted": self._coerce_true(aapt2_posture.get("cleartext_traffic_permitted"))
             if aapt2_posture
-            else self._coerce_bool_like(aapt2_application.get("uses_cleartext_traffic")),
+            else coerce_bool_like(aapt2_application.get("uses_cleartext_traffic")),
         }
 
     def _build_storage_evidence(
@@ -672,15 +674,6 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
     @staticmethod
     def _coerce_true(value: object) -> bool:
         return str(value or "").strip().lower() == "true"
-
-    @staticmethod
-    def _coerce_bool_like(value: object) -> bool | None:
-        text = str(value or "").strip().lower()
-        if text in {"true", "1", "yes"}:
-            return True
-        if text in {"false", "0", "no"}:
-            return False
-        return None
 
     def _build_functionality(self, loaded_outputs: dict[str, Any]) -> dict[str, dict[str, Any]]:
         opengrep = loaded_outputs.get("opengrep") or {}

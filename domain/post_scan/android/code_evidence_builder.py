@@ -4,7 +4,7 @@ from typing import Any
 from domain.post_scan.android.app_component_builder import AppComponentBuilder
 from domain.post_scan.android.app_info_builder import AndroidAppInfoBuilder
 from domain.post_scan.android.application_builder import ApplicationBuilder
-from domain.post_scan.utilities import build_hardcoded_values, matching_api_call_sites
+from domain.post_scan.utilities import build_hardcoded_values, coerce_bool_like, matching_api_call_sites
 
 
 @dataclass
@@ -60,17 +60,14 @@ class CodeEvidenceBuilder:
         package_prefix = self._app_package_prefix(loaded_outputs)
 
         reflection_callers = matching_api_call_sites(
-            self,
             api_calls,
             lambda item: "reflect" in self._api_call_signature(item).lower(),
         )
         runtime_exec_callers = matching_api_call_sites(
-            self,
             api_calls,
             lambda item: "runtime; exec" in self._api_call_signature(item).lower(),
         )
         provider_update_callers = matching_api_call_sites(
-            self,
             api_calls,
             lambda item: (
                 "providerinstaller" in self._api_call_caller_signature(item).lower()
@@ -79,7 +76,6 @@ class CodeEvidenceBuilder:
         )
 
         identifier_callers = matching_api_call_sites(
-            self,
             api_calls,
             lambda item: any(
                 token in self._api_call_signature(item).lower()
@@ -96,7 +92,6 @@ class CodeEvidenceBuilder:
         )
 
         sql_callers = matching_api_call_sites(
-            self,
             api_calls,
             lambda item: any(
                 token in self._api_call_signature(item).lower()
@@ -109,7 +104,6 @@ class CodeEvidenceBuilder:
         )
 
         clipboard_callers = matching_api_call_sites(
-            self,
             api_calls,
             lambda item: (
                 "clipboard" in self._api_call_signature(item).lower()
@@ -145,7 +139,7 @@ class CodeEvidenceBuilder:
         )
 
         native_abis = list(aapt2_identity.get("native_abis") or [])
-        native_abi_presence = self._coerce_bool_like(aapt2_posture.get("native_abi_presence"))
+        native_abi_presence = coerce_bool_like(aapt2_posture.get("native_abi_presence"))
 
         reflection_present = (
             bool(reflection_callers)
@@ -162,7 +156,7 @@ class CodeEvidenceBuilder:
         )
         uses_provider_update = bool(provider_update_callers)
         root_access_present = bool(runtime_exec_callers)
-        app_debuggable = self._coerce_bool_like(application.debuggable)
+        app_debuggable = coerce_bool_like(application.debuggable)
         sms_permission_present = "android.permission.SEND_SMS" in declared_permissions
         accesses_unique_identifiers = bool(identifier_callers)
         source_not_obfuscated = len(readable_app_classes) >= 3
