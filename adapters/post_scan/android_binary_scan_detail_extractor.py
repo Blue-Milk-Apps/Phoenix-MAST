@@ -14,6 +14,7 @@ from domain.post_scan.android.app_info_builder import AndroidAppInfoBuilder
 from domain.post_scan.android.application_builder import ApplicationBuilder
 from domain.post_scan.android.code_evidence_builder import CodeEvidenceBuilder
 from domain.post_scan.android.file_info_builder import FileInfoBuilder
+from domain.post_scan.android.permissions_builder import PermissionsBuilder
 from domain.post_scan.utilities import build_hardcoded_values
 from ports.scan_detail_extractor_port import ScanDetailExtractorPort
 
@@ -63,45 +64,6 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
-    }
-    ANDROID_PERMISSION_DESCRIPTIONS = {
-        "android.permission.ACCESS_COARSE_LOCATION": "Allows the app to access approximate location derived from network-based sources such as Wi-Fi and cell towers.",
-        "android.permission.ACCESS_FINE_LOCATION": "Allows the app to access precise location from GPS and other location providers.",
-        "android.permission.ACCESS_NETWORK_STATE": "Allows the app to view network connections and determine whether connectivity is available.",
-        "android.permission.ACCESS_WIFI_STATE": "Allows the app to view information about Wi-Fi networking.",
-        "android.permission.BLUETOOTH": "Allows the app to connect to paired Bluetooth devices.",
-        "android.permission.BLUETOOTH_ADMIN": "Allows the app to configure local Bluetooth settings and discover remote devices.",
-        "android.permission.BLUETOOTH_CONNECT": "Allows the app to connect to nearby Bluetooth devices.",
-        "android.permission.BLUETOOTH_SCAN": "Allows the app to discover and scan for nearby Bluetooth devices.",
-        "android.permission.CALL_PHONE": "Allows the app to initiate phone calls without going through the dialer.",
-        "android.permission.CAMERA": "Allows the app to access the device camera.",
-        "android.permission.GET_ACCOUNTS": "Allows the app to access the list of accounts registered on the device.",
-        "android.permission.INTERNET": "Allows the app to open network sockets and communicate over the internet.",
-        "android.permission.NFC": "Allows the app to communicate using Near Field Communication.",
-        "android.permission.POST_NOTIFICATIONS": "Allows the app to send notifications to the user.",
-        "android.permission.READ_CALENDAR": "Allows the app to read calendar events and related details stored on the device.",
-        "android.permission.READ_CALL_LOG": "Allows the app to read the device call log.",
-        "android.permission.READ_CONTACTS": "Allows the app to read the user's contacts data.",
-        "android.permission.READ_EXTERNAL_STORAGE": "Allows the app to read files from shared external storage.",
-        "android.permission.READ_MEDIA_AUDIO": "Allows the app to read audio files from shared storage.",
-        "android.permission.READ_MEDIA_IMAGES": "Allows the app to read image files from shared storage.",
-        "android.permission.READ_MEDIA_VIDEO": "Allows the app to read video files from shared storage.",
-        "android.permission.READ_PHONE_STATE": "Allows the app to access phone state information such as the current cellular network and ongoing call status.",
-        "android.permission.READ_PROFILE": "Allows the app to read the user's personal profile data stored on the device.",
-        "android.permission.READ_SMS": "Allows the app to read SMS messages stored on the device.",
-        "android.permission.READ_SYNC_SETTINGS": "Allows the app to read the sync settings for an account.",
-        "android.permission.RECEIVE_BOOT_COMPLETED": "Allows the app to start automatically after the device finishes booting.",
-        "android.permission.RECEIVE_SMS": "Allows the app to receive and process incoming SMS messages.",
-        "android.permission.RECORD_AUDIO": "Allows the app to capture audio using the microphone.",
-        "android.permission.SEND_SMS": "Allows the app to send SMS messages.",
-        "android.permission.USE_BIOMETRIC": "Allows the app to use biometric authentication such as fingerprint or face recognition.",
-        "android.permission.USE_CREDENTIALS": "Allows the app to request authentication tokens from the account manager.",
-        "android.permission.USE_FINGERPRINT": "Allows the app to use fingerprint hardware for authentication.",
-        "android.permission.WRITE_CALENDAR": "Allows the app to create or modify calendar events.",
-        "android.permission.WRITE_CONTACTS": "Allows the app to create or modify the user's contacts data.",
-        "android.permission.WRITE_EXTERNAL_STORAGE": "Allows the app to write files to shared external storage.",
-        "android.permission.WRITE_SETTINGS": "Allows the app to modify system settings.",
-        "android.permission.WRITE_SMS": "Allows the app to create or modify SMS messages stored on the device.",
     }
     NETWORK_API_HINTS = (
         "httpurlconnection",
@@ -316,6 +278,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         certificate = AppCertificateBuilder(loaded_outputs)
         code_evidence = CodeEvidenceBuilder(loaded_outputs, app_components, application, app_info)
         file_info = FileInfoBuilder(loaded_outputs)
+        permissions = PermissionsBuilder(loaded_outputs).items
         return {
             "app_info": asdict(app_info),
             "application": asdict(application),
@@ -323,7 +286,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "certificate": asdict(certificate),
             "code_evidence": asdict(code_evidence),
             "file_info": asdict(file_info),
-            "permissions": self._build_permissions(loaded_outputs),
+            "permissions": permissions,
             "functionality": self._build_functionality(loaded_outputs),
             "network_evidence": self._build_network_evidence(loaded_outputs),
             "resilience_evidence": self._build_resilience_evidence(loaded_outputs),
@@ -331,47 +294,6 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "deep_links": self._build_deep_links(loaded_outputs),
             "hardcoded_values": self._build_hardcoded_values(loaded_outputs),
             "endpoints": self._build_endpoints(loaded_outputs),
-        }
-
-        androguard_metadata = loaded_outputs.get("androguard_metadata") or {}
-        aapt2_identity = loaded_outputs.get("aapt2_identity") or {}
-        apktool_manifest_summary = loaded_outputs.get("apktool_manifest_summary") or {}
-        manifest_application = apktool_manifest_summary.get("application") or {}
-
-        return {
-            "icon_path": "",
-            "name": self._first_non_empty(
-                androguard_metadata.get("app_name"),
-                aapt2_identity.get("application_label"),
-            ),
-            "package_name": self._first_non_empty(
-                androguard_metadata.get("package"),
-                aapt2_identity.get("package_name"),
-            ),
-            "main_activity": self._first_non_empty(aapt2_identity.get("launchable_activity")),
-            "target_sdk": self._first_non_empty(
-                androguard_metadata.get("target_sdk"),
-                aapt2_identity.get("target_sdk_version"),
-            ),
-            "min_sdk": self._first_non_empty(
-                androguard_metadata.get("min_sdk"),
-                aapt2_identity.get("min_sdk_version"),
-            ),
-            "max_sdk": "",
-            "version_name": self._first_non_empty(
-                androguard_metadata.get("version_name"),
-                aapt2_identity.get("version_name"),
-            ),
-            "debuggable": self._first_non_empty(
-                manifest_application.get("debuggable"),
-            ),
-            "allow_backup": self._first_non_empty(
-                manifest_application.get("allow_backup"),
-            ),
-            "app_store_id": "",
-            "developer": "",
-            "categories": "",
-            "trackers_detected": "",
         }
 
     def _build_file_info(self, loaded_outputs: dict[str, Any]) -> dict[str, str]:
@@ -406,31 +328,6 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
 
     def _build_hardcoded_values(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
         return build_hardcoded_values(self, loaded_outputs)
-
-    def _build_permissions(self, loaded_outputs: dict[str, Any]) -> list[dict[str, str]]:
-        aapt2_permissions = loaded_outputs.get("aapt2_permissions") or {}
-        apktool_permissions = loaded_outputs.get("apktool_permissions") or {}
-
-        declared_permissions = self._declared_permission_map(apktool_permissions)
-        permissions: list[dict[str, str]] = []
-
-        for permission in aapt2_permissions.get("permissions") or []:
-            name = self._first_non_empty(permission.get("name"))
-            if not name:
-                continue
-
-            protection_level = self._first_non_empty(permission.get("protection_level_hint"))
-            permissions.append(
-                {
-                    "permission": name,
-                    "status": self._normalize_permission_status(protection_level),
-                    "info": self._permission_info(protection_level),
-                    "usage_description": "",
-                    "general_description": self._permission_description(name, declared_permissions),
-                }
-            )
-
-        return permissions
 
     def _build_endpoints(self, loaded_outputs: dict[str, Any]) -> list[dict[str, str]]:
         apktool_secrets_endpoints = loaded_outputs.get("apktool_secrets_endpoints") or {}
@@ -1018,57 +915,6 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "sha1": sha1.hexdigest(),
             "sha256": sha256.hexdigest(),
         }
-
-    @staticmethod
-    def _declared_permission_map(apktool_permissions: dict[str, Any]) -> dict[str, str]:
-        result: dict[str, str] = {}
-        for permission in apktool_permissions.get("declared") or []:
-            name = str(permission.get("value", "")).strip()
-            if not name:
-                continue
-            protection_level = str((permission.get("context") or {}).get("protection_level", "")).strip()
-            if protection_level:
-                result[name] = f"Declared permission ({protection_level})"
-            else:
-                result[name] = "Declared permission"
-        return result
-
-    def _permission_description(
-        self,
-        permission_name: str,
-        declared_permissions: dict[str, str],
-    ) -> str:
-        description = self.ANDROID_PERMISSION_DESCRIPTIONS.get(permission_name)
-        if description:
-            return description
-
-        declared_description = declared_permissions.get(permission_name, "")
-        if declared_description:
-            return declared_description
-
-        suffix = permission_name.rsplit(".", 1)[-1].strip()
-        if not suffix:
-            return ""
-        readable = suffix.replace("_", " ").lower()
-        return readable[:1].upper() + readable[1:] + "."
-
-    @staticmethod
-    def _normalize_permission_status(protection_level: str) -> str:
-        normalized = protection_level.strip().lower()
-        if normalized == "dangerous":
-            return "dangerous"
-        return "normal"
-
-    @staticmethod
-    def _permission_info(protection_level: str) -> str:
-        normalized = protection_level.strip().lower()
-        if normalized == "dangerous":
-            return "dangerous"
-        if normalized == "signature":
-            return "signature"
-        if normalized:
-            return normalized.replace("_", " ")
-        return ""
 
     @staticmethod
     def _first_non_empty(*values: object) -> str:
