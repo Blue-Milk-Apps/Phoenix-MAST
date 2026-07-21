@@ -1,7 +1,11 @@
 import argparse
 import json
+import re
 from pathlib import Path
 
+import yaml
+
+from adapters.source_code_scanners import opengrep_scanner
 from application import mobile_analysis_workflow_service as workflow
 from domain.models import ScanConfig, ScanResult, ScanType
 from entrypoints import cli
@@ -622,6 +626,179 @@ def test_get_opengrep_scan_paths_for_binary_returns_output_only(tmp_path: Path) 
     paths = workflow.MobileScannerFactory()._get_opengrep_scan_paths(config)
 
     assert paths == [config.output_path]
+
+
+def test_binary_workflow_runs_opengrep_after_scanner_artifacts_are_written(
+    tmp_path: Path, monkeypatch
+) -> None:
+    events: list[str] = []
+    output_path = tmp_path / "scan-results"
+    config = ScanConfig(
+        project_path=tmp_path / "app.apk",
+        output_path=output_path,
+        mode="binary",
+        platform="ANDROID",
+        stack="ANY",
+        opengrep_rules_path=tmp_path / "rules",
+    )
+
+    class ArtifactScanner:
+        scan_type = ScanType.STRINGS
+        name = "Strings"
+
+        def is_available(self) -> bool:
+            return True
+
+        def scan(self, scan_config: ScanConfig) -> list[ScanResult]:
+            events.append("strings")
+            return [
+                ScanResult(
+                    scanner_name=self.name,
+                    scan_type=self.scan_type,
+                    success=True,
+                    raw_output="OkHttpClient",
+                    relative_target_path="Runner.txt",
+                )
+            ]
+
+    class RecordingOpenGrepScanner:
+        def __init__(self, rules_path: Path, scan_paths: list[Path]) -> None:
+            assert rules_path == config.opengrep_rules_path
+            assert scan_paths == [output_path]
+
+        def scan(self, scan_config: ScanConfig) -> list[ScanResult]:
+            strings_artifact = output_path / "strings" / "Runner.txt"
+            assert strings_artifact.read_text(encoding="utf-8") == "OkHttpClient"
+            events.append("opengrep")
+            return [
+                ScanResult(
+                    scanner_name="OpenGrep",
+                    scan_type=ScanType.OPENGREP_SOURCE,
+                    success=True,
+                    raw_output=json.dumps({"results": []}),
+                    relative_target_path="opengrep_results.json",
+                )
+            ]
+
+    monkeypatch.setattr(
+        workflow.MobileScannerFactory,
+        "build_scanner_list",
+        lambda self, scan_config: [ArtifactScanner()],
+    )
+    monkeypatch.setattr(workflow, "OpenGrepScanner", RecordingOpenGrepScanner)
+    monkeypatch.setattr(
+        workflow.MobileAnalysisWorkflowService,
+        "_run_post_scan_processing",
+        lambda self, output_path, scan_config: {},
+    )
+
+    workflow.MobileAnalysisWorkflowService().run(config)
+
+    assert events == ["strings", "opengrep"]
+
+
+def test_opengrep_report_preserves_findings_from_plist_and_strings_artifacts(
+    tmp_path: Path, monkeypatch
+) -> None:
+    rules_path = tmp_path / "rules"
+    rules_path.mkdir()
+    (rules_path / "rules.yml").write_text(
+        "rules:\n"
+        "  - id: test\n"
+        "    pattern-regex: OkHttpClient\n"
+        "    languages: [generic]\n"
+        "    message: test\n"
+        "    severity: INFO\n",
+        encoding="utf-8",
+    )
+    artifacts_path = tmp_path / "scan-results"
+    (artifacts_path / "strings").mkdir(parents=True)
+    (artifacts_path / "plist_binary").mkdir()
+    (artifacts_path / "strings" / "Runner.txt").write_text("OkHttpClient", encoding="utf-8")
+    (artifacts_path / "plist_binary" / "Info.json").write_text(
+        '{"plist": {"NSAppTransportSecurity": {"NSAllowsArbitraryLoads": true}}}',
+        encoding="utf-8",
+    )
+    config = ScanConfig(
+        project_path=tmp_path / "app.ipa",
+        output_path=artifacts_path,
+        mode="binary",
+        platform="IOS",
+        stack="ANY",
+    )
+    opengrep_payload = {
+        "results": [
+            {
+                "check_id": "ios.ats.arbitrary-loads.present",
+                "path": str(artifacts_path / "plist_binary" / "Info.json"),
+                "start": {"line": 1, "col": 1},
+                "end": {"line": 1, "col": 80},
+                "extra": {"message": "ATS allows arbitrary loads"},
+            },
+            {
+                "check_id": "android.networking.usage.present",
+                "path": str(artifacts_path / "strings" / "Runner.txt"),
+                "start": {"line": 1, "col": 1},
+                "end": {"line": 1, "col": 13},
+                "extra": {"message": "Networking usage present"},
+            },
+        ]
+    }
+
+    class FakeProcess:
+        returncode = 1
+
+        def communicate(self, timeout: int) -> tuple[str, str]:
+            return json.dumps(opengrep_payload), ""
+
+    def fake_popen(cmd, text, stdout, stderr, env):
+        assert str(artifacts_path) in cmd
+        return FakeProcess()
+
+    monkeypatch.setattr(opengrep_scanner.shutil, "which", lambda executable: f"/usr/bin/{executable}")
+    monkeypatch.setattr(opengrep_scanner.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(
+        opengrep_scanner.OpenGrepScanner,
+        "_opengrep_version",
+        lambda self: "test-version",
+    )
+
+    results = opengrep_scanner.OpenGrepScanner(
+        rules_path=rules_path,
+        scan_paths=[artifacts_path],
+    ).scan(config)
+
+    assert len(results) == 1
+    assert results[0].success
+    report = json.loads(results[0].raw_output)
+    finding_paths = {Path(result["path"]).relative_to(artifacts_path).as_posix() for result in report["results"]}
+    assert finding_paths == {
+        "plist_binary/Info.json",
+        "strings/Runner.txt",
+    }
+    assert report["scan_metadata"]["scan_paths"] == [str(artifacts_path.resolve())]
+
+
+def test_representative_android_opengrep_rules_match_artifact_text() -> None:
+    rules_path = Path(__file__).parent.parent / "rules" / "android" / "android_rules.yml"
+    rules = {
+        rule["id"]: rule
+        for rule in yaml.safe_load(rules_path.read_text(encoding="utf-8"))["rules"]
+    }
+    samples = {
+        "android.location.services.present": "android.permission.ACCESS_FINE_LOCATION",
+        "android.networking.usage.present": "val client = OkHttpClient()",
+        "android.camera.usage.present": "CameraManager.openCamera(cameraId, callback, handler)",
+        "android.secure.rng.usage.present": "val rng = SecureRandom()",
+        "android.keystore.usage.present": "KeyStore.getInstance(\"AndroidKeyStore\")",
+    }
+
+    for rule_id, artifact_text in samples.items():
+        patterns = [
+            item["pattern-regex"]
+            for item in rules[rule_id]["pattern-either"]
+        ]
+        assert any(re.search(pattern, artifact_text) for pattern in patterns)
 
 
 def test_cli_version_exits_successfully(capsys) -> None:
