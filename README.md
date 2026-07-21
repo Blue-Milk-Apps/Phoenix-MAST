@@ -50,7 +50,7 @@ Source scans run Gitleaks, TruffleHog, Dependency-Check, and Syft, with plist ex
 
 Binary scans run Strings, with LIEF, ipsw, and plist extraction for iOS binaries and Androguard, Apktool, Apksigner, and APKiD for Android binaries. MobSF runs for binary scans only when `MOBSF_URL` is configured.
 
-OpenGrep runs only when a rules path is available. For source targets, OpenGrep scans the project directory directly. For binary targets, phoenix first generates `strings` output from the IPA or APK contents and then runs OpenGrep over those generated text artifacts.
+OpenGrep runs only when a rules path is available. For source targets, OpenGrep scans the project directory directly. For binary targets, phoenix first generates scanner artifacts in the configured scan output directory, including `strings` output from the IPA or APK contents, and then runs OpenGrep over that artifacts directory. This lets OpenGrep match rules against generated files such as `strings/*.txt` and normalized plist output.
 
 By default, phoenix looks for OpenGrep rules in these folders:
 
