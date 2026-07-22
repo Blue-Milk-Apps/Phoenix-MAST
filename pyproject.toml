@@ -39,6 +39,8 @@ packages = [
     "adapters.source_code_scanners",
     "application",
     "domain",
+    "domain.post_scan",
+    "domain.post_scan.android",
     "entrypoints",
     "ports",
     "utilities",
