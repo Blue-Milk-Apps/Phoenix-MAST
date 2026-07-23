@@ -60,7 +60,10 @@ class MobileScannerFactory:
             case ("BINARY", "IOS", _):
                 return [
                     IpswScanner(),
+                    SyftScanner(output_format=config.syft_output_format),
                     LIEFScanner(),
+                    TrufflehogScanner(),
+                    GitleaksScanner(),
                     StringsScanner(),
                     PlistBinaryScanner(),
                 ]
