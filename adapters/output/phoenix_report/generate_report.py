@@ -25,6 +25,7 @@ from typing import Any
 BASE_DIR = Path(__file__).parent
 TEMPLATES_DIR = BASE_DIR / "templates"
 BLANK_TEMPLATE_PATH = BASE_DIR / "data" / "blank_template.json"
+IOS_BLANK_TEMPLATE_PATH = BASE_DIR / "data" / "ios_blank_template.json"
 
 RISK_LEVEL_ORDER = {"low": 1, "medium": 2, "high": 3}
 RISK_LEVEL_COLOR = {"low": "#2980b9", "medium": "#e08e0b", "high": "#c0392b"}
@@ -35,6 +36,17 @@ SECTION_TO_AREA = {
     "network": ("Networking", "networking"),
     "resilience": ("Resilience", "resilience"),
 }
+# iOS uses "Data" (not "Data Storage") as both the section name and the risk
+# summary/polar-chart key -- make_overall_risk_polar_chart() derives its axis
+# label straight from the risk_summary key, so keying this as "data" (one
+# word) is what makes the chart print "Data" instead of an auto title-cased
+# "Data Storage".
+IOS_SECTION_TO_AREA = {
+    "code": ("Code Vulnerability", "code_vulnerability"),
+    "data": ("Data", "data"),
+    "network": ("Networking", "networking"),
+    "resilience": ("Resilience", "resilience"),
+}
 SECTION_SEVERITY_ORDER = {
     "critical": 5,
     "high": 4,
@@ -42,6 +54,86 @@ SECTION_SEVERITY_ORDER = {
     "low": 2,
     "info": 1,
     "secure": 0,
+}
+
+# iOS evidence-key mappings -- the same shape/precedence as Android's
+# CODE_EVIDENCE_KEY_BY_CHECK / NETWORK_EVIDENCE_KEY_BY_CHECK /
+# STORAGE_EVIDENCE_KEY_BY_CHECK / RESILIENCE_EVIDENCE_KEY_BY_CHECK. A
+# post-scan-processing pipeline (ipsw/LIEF/plist/opengrep) is expected to
+# emit `code_evidence` / `network_evidence` / `data_evidence` /
+# `resilience_evidence` dicts keyed by these snake_case names, each holding
+# {"present": bool, "evidence": str}. iOS's 4th section is `data_evidence`
+# (not `storage_evidence`) to match the "Data" section rename.
+IOS_CODE_EVIDENCE_KEY_BY_CHECK = {
+    "deprecated api - uiwebview": "uses_uiwebview",
+    "insecure nanopb library": "insecure_nanopb_library",
+    "insecure serialization api - nskeyedunarchiver": "insecure_nskeyedunarchiver_usage",
+    "missing arc binary protections": "missing_arc",
+    "position-independent code (pic) not enabled": "pic_not_enabled",
+    "stack canaries not enabled": "stack_canaries_not_enabled",
+    "insecure api usage in binary": "insecure_api_usage_in_binary",
+    "usage of malloc instead of calloc in binary": "malloc_instead_of_calloc",
+    "application encodes data using insecure cryptography": "encodes_data_using_insecure_cryptography",
+    "application utilizes insecure cryptography": "utilizes_insecure_cryptography",
+    "pbkdf2 iteration count <10k": "pbkdf2_iteration_count_below_10k",
+    "hardcoded api keys within the application bundle": "hardcoded_api_keys_in_bundle",
+    "potentially insecure ios entitlements": "insecure_entitlements",
+}
+IOS_NETWORK_EVIDENCE_KEY_BY_CHECK = {
+    "app transport security (ats) disabled": "ats_disabled",
+    "change cipher spec injection vulnerable openssl version": "vulnerable_openssl_ccs_injection",
+    "application contains deprecated ftp functionality": "uses_ftp",
+    "application contains heartbleed vulnerable openssl version": "vulnerable_openssl_heartbleed",
+    "application contains insecure http traffic": "insecure_http_traffic",
+    "application selectively disabled app transport security protections": "ats_exceptions_configured",
+    "cookie missing 'httponly' flag": "cookie_missing_httponly",
+    "cookie missing 'secure' flag": "cookie_missing_secure",
+    "http cleartext transmission of advertiser id": "cleartext_http_advertiser_id",
+    "http cleartext transmission of device imei": "cleartext_http_imei",
+    "http cleartext transmission of gps latitude coordinates": "cleartext_http_gps_latitude",
+    "http cleartext transmission of gps longitude coordinates": "cleartext_http_gps_longitude",
+    "http cleartext transmission of sensitive data": "cleartext_http_sensitive_data",
+    "http cleartext transmission of wifi mac address": "cleartext_http_wifi_mac",
+    "https traffic url contains device imei": "https_url_contains_imei",
+    "https traffic url contains device's gps latitude": "https_url_contains_gps_latitude",
+    "https traffic url contains device's gps longitude": "https_url_contains_gps_longitude",
+    "https traffic url contains sensitive data": "https_url_contains_sensitive_data",
+    "https traffic url contains wifi mac address": "https_url_contains_wifi_mac",
+    "insecure tls configuration": "insecure_tls_configuration",
+    "certificate pinning not implemented": "certificate_pinning_not_implemented",
+}
+IOS_DATA_EVIDENCE_KEY_BY_CHECK = {
+    "application utilizes deprecated keychain attributes": "deprecated_keychain_attributes",
+    "local data exposure: advertiser id stored insecurely": "advertiser_id_stored_insecurely",
+    "local data exposure: device imei stored insecurely": "imei_stored_insecurely",
+    "local data exposure: global write permissions": "global_write_permissions",
+    "local data exposure: gps latitude stored insecurely": "gps_latitude_stored_insecurely",
+    "local data exposure: gps longitude stored insecurely": "gps_longitude_stored_insecurely",
+    "local data exposure: insecure hardcoded api keys": "hardcoded_api_keys_stored_insecurely",
+    "local data exposure: insecure hardcoded passwords": "hardcoded_passwords_stored_insecurely",  # pragma: allowlist secret
+    "local data exposure: sensitive values stored insecurely": "sensitive_values_stored_insecurely",
+    "local data exposure: wifi ip address stored insecurely": "wifi_ip_stored_insecurely",
+    "local data exposure: wifi mac address stored insecurely": "wifi_mac_stored_insecurely",
+    "sensitive values stored in plaintext within the keychain": "keychain_plaintext_values",
+    "sensitive values stored insecurely within nsuserdefaults": "nsuserdefaults_sensitive_values",
+    "local data exposure: advertiser id logged insecurely": "advertiser_id_logged_insecurely",
+    "local data exposure: device imei logged insecurely": "imei_logged_insecurely",
+    "local data exposure: gps latitude logged insecurely": "gps_latitude_logged_insecurely",
+    "local data exposure: gps longitude logged insecurely": "gps_longitude_logged_insecurely",
+    "local data exposure: sensitive data logged insecurely": "sensitive_data_logged_insecurely",
+    "local data exposure: sensitive values stored in memory": "sensitive_values_in_memory",
+    "local data exposure: wifi mac address logged insecurely": "wifi_mac_logged_insecurely",
+    "sensitive data exposed through device keyboard cache": "keyboard_cache_exposure",
+}
+IOS_RESILIENCE_EVIDENCE_KEY_BY_CHECK = {
+    "biometric / local authentication bypass possible": "biometric_bypass_possible",
+    "components contain debug symbols": "debug_symbols_present",
+}
+IOS_SECTION_EVIDENCE = {
+    "code": ("code_evidence", IOS_CODE_EVIDENCE_KEY_BY_CHECK),
+    "network": ("network_evidence", IOS_NETWORK_EVIDENCE_KEY_BY_CHECK),
+    "data": ("data_evidence", IOS_DATA_EVIDENCE_KEY_BY_CHECK),
+    "resilience": ("resilience_evidence", IOS_RESILIENCE_EVIDENCE_KEY_BY_CHECK),
 }
 
 DERIVED_CHECK_ALIAS_TO_COMPONENT_KEY = {
@@ -537,6 +629,746 @@ NETWORK_CHECK_SPECS = (
     },
 )
 
+IOS_CODE_CHECK_SPECS = (
+    {
+        "check": "Deprecated API - UIWebView",
+        "severity": "Medium",
+        "compliance": "MASVS-PLATFORM-2; MASTG-TEST-0076, -0078; MASTG-BEST-0032; legacy MSTG-CODE-3 (as observed)",
+        "present_explanation": "Binary references the deprecated UIWebView component rather than WKWebView.",
+        "not_present_explanation": "No references to the deprecated UIWebView component were found; the app uses WKWebView.",
+        "confidence_caveat": None,
+        "aliases": (),
+    },
+    {
+        "check": "Insecure Nanopb Library",
+        "severity": "High",
+        "compliance": "MASVS-CODE-3; legacy MSTG-CODE-3 (as observed)",
+        "present_explanation": "App bundles a known-vulnerable version of the Nanopb protobuf library.",
+        "not_present_explanation": "App does not bundle a known-vulnerable version of the Nanopb protobuf library.",
+        "confidence_caveat": None,
+        "aliases": (),
+    },
+    {
+        "check": "Insecure Serialization API - NSKeyedUnarchiver",
+        "severity": "High",
+        "compliance": (
+            "MASVS-CODE-4; no confirmed v2 MASTG-TEST ID for NSKeyedUnarchiver specifically; "
+            "legacy MSTG-CODE-4 (as observed)"
+        ),
+        "present_explanation": (
+            "App uses NSKeyedUnarchiver's unsecure decoding path on untrusted data (i.e. decodeObject "
+            "without a class allowlist, instead of decodeObjectOfClasses:forKey: or NSSecureCoding)."
+        ),
+        "not_present_explanation": (
+            "App does not use NSKeyedUnarchiver's unsecure decoding path on untrusted data (i.e. "
+            "decodeObject without a class allowlist, instead of decodeObjectOfClasses:forKey: or "
+            "NSSecureCoding)."
+        ),
+        "confidence_caveat": (
+            "Detected via symbol/selector-name presence; can't fully distinguish safe from unsafe usage "
+            "without deeper analysis."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "Missing ARC Binary Protections",
+        "severity": "Medium",
+        "compliance": (
+            "MASVS-CODE-4; no confirmed v2 replacement for ARC specifically (MASTG-TEST-0087 deprecated -- "
+            "its split successors 0228/0229 cover PIE/Stack Canary only); legacy MSTG-CODE-4"
+        ),
+        "present_explanation": (
+            "ARC is not enabled -- the binary lacks Automatic Reference Counting, an exploit-mitigation "
+            "mechanism against memory-corruption bugs."
+        ),
+        "not_present_explanation": (
+            "ARC is enabled -- the binary is compiled with Automatic Reference Counting, an "
+            "exploit-mitigation mechanism against memory-corruption bugs."
+        ),
+        "confidence_caveat": (
+            "Inferred from ARC runtime symbol presence (_objc_release/_objc_retain), not a single "
+            "compiler flag like PIE/NX."
+        ),
+        "aliases": ("arc binary protections", "application utilizes arc binary protections"),
+    },
+    {
+        "check": "Position-Independent Code (PIC) Not Enabled",
+        "severity": "Medium",
+        "compliance": "MASVS-CODE-4; MASTG-TEST-0228 (active -- supersedes deprecated 0087); legacy MSTG-CODE-4",
+        "present_explanation": (
+            "PIE is not enabled -- the binary is not position-independent, making ROP attacks easier to "
+            "execute reliably."
+        ),
+        "not_present_explanation": (
+            "PIE is enabled -- the binary is position-independent, making ROP attacks harder to execute reliably."
+        ),
+        "confidence_caveat": None,
+        "aliases": ("pic binary protections", "application utilizes pic binary protections"),
+    },
+    {
+        "check": "Stack Canaries Not Enabled",
+        "severity": "Medium",
+        "compliance": "MASVS-CODE-4; MASTG-TEST-0229 (active -- supersedes deprecated 0087); legacy MSTG-CODE-4",
+        "present_explanation": (
+            "A stack canary is not present -- stack buffer overflows overwriting the return address "
+            "would not be caught before the function returns."
+        ),
+        "not_present_explanation": (
+            "A stack canary is present -- stack buffer overflows overwriting the return address would "
+            "be caught before the function returns."
+        ),
+        "confidence_caveat": None,
+        "aliases": ("stack smashing protections", "application utilizes stack smashing protections"),
+    },
+    {
+        "check": "Insecure API Usage in Binary",
+        "severity": "Medium",
+        "compliance": "MASVS-CODE-4; no confirmed v2 replacement (MASTG-TEST-0086 deprecated); legacy MSTG-CODE-8",
+        "present_explanation": (
+            "Binary references potentially dangerous C functions (e.g. fopen, memcpy, strcpy, strncpy, sscanf)."
+        ),
+        "not_present_explanation": (
+            "No potentially dangerous C function references (e.g. fopen, memcpy, strcpy, strncpy, sscanf) were found."
+        ),
+        "confidence_caveat": (
+            "Symbol presence confirms the function is linked, not necessarily invoked at runtime; "
+            "confidence drops further if Symbols Stripped is true."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "Usage of malloc Instead of calloc in Binary",
+        "severity": "Medium",
+        "compliance": (
+            "MASVS-CODE-4; no confirmed v2 replacement (subsumed under deprecated MASTG-TEST-0086); legacy MSTG-CODE-8"
+        ),
+        "present_explanation": (
+            "Binary uses malloc rather than calloc, which does not zero-initialize allocated memory."
+        ),
+        "not_present_explanation": "No use of malloc (in place of calloc) was found in the binary.",
+        "confidence_caveat": "Same symbol-presence caveat as Insecure API Usage in Binary above.",
+        "aliases": (),
+    },
+    {
+        "check": "Application Encodes Data Using Insecure Cryptography",
+        "severity": "High",
+        "compliance": "MASVS-CRYPTO-1; legacy MSTG-CRYPTO-1",
+        "present_explanation": "App encodes data using a weak or deprecated cryptographic algorithm.",
+        "not_present_explanation": "App does not encode data using a weak or deprecated cryptographic algorithm.",
+        "confidence_caveat": None,
+        "aliases": (),
+    },
+    {
+        "check": "Application Utilizes Insecure Cryptography",
+        "severity": "High",
+        "compliance": "MASVS-CRYPTO-1; legacy MSTG-CRYPTO-1",
+        "present_explanation": "App uses a known-weak cryptographic primitive (e.g. DES, RC4, ECB mode).",
+        "not_present_explanation": "App does not use a known-weak cryptographic primitive (e.g. DES, RC4, ECB mode).",
+        "confidence_caveat": None,
+        "aliases": (),
+    },
+    {
+        "check": "PBKDF2 Iteration Count <10k",
+        "severity": "Medium",
+        "compliance": "MASVS-CRYPTO-1; legacy MSTG-CRYPTO-1",
+        "present_explanation": ("Where PBKDF2 is used, the iteration count falls below the recommended minimum."),
+        "not_present_explanation": (
+            "Where PBKDF2 is used, the iteration count meets or exceeds the recommended minimum."
+        ),
+        "confidence_caveat": (
+            "Not detectable via symbol/string scanning alone -- the iteration count is a constant "
+            "argument that requires disassembly (e.g. radare2/Ghidra) to read; currently unverified."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "Hardcoded API Keys within the Application Bundle",
+        "severity": "High",
+        "compliance": "MASVS-CRYPTO-2, MASVS-STORAGE-1; legacy MSTG-CRYPTO-2",
+        "present_explanation": "A hardcoded API key was found bundled in the app package.",
+        "not_present_explanation": "No hardcoded API keys were found bundled in the app package.",
+        "confidence_caveat": None,
+        "aliases": (),
+    },
+    {
+        "check": "Potentially Insecure iOS Entitlements",
+        "severity": "Medium",
+        "compliance": "MASVS-PLATFORM-1, MASVS-RESILIENCE-2; legacy MSTG-PLATFORM-1",
+        "present_explanation": (
+            "One or more entitlements are flagged as risky (e.g. broadly-shared "
+            "keychain-access-groups, get-task-allow enabled in a production build)."
+        ),
+        "not_present_explanation": (
+            "No entitlements flagged as risky (e.g. broadly-shared keychain-access-groups, "
+            "get-task-allow enabled in a production build) were found."
+        ),
+        "confidence_caveat": None,
+        "aliases": (),
+    },
+)
+IOS_NETWORK_CHECK_SPECS = (
+    {
+        "check": "App Transport Security (ATS) Disabled",
+        "severity": "High",
+        "compliance": "MASVS-NETWORK-1; MASTG-TEST-0322; legacy MSTG-NETWORK-1",
+        "present_explanation": (
+            "ATS is globally disabled via NSAllowsArbitraryLoads, allowing unsecured HTTP connections "
+            "and skipping extended TLS checks even on HTTPS connections."
+        ),
+        "not_present_explanation": "ATS is not globally disabled; no NSAllowsArbitraryLoads override was found.",
+        "confidence_caveat": None,
+        "aliases": ("application transport security disabled",),
+    },
+    {
+        "check": "Change Cipher Spec Injection Vulnerable OpenSSL Version",
+        "severity": "High",
+        "compliance": "MASVS-NETWORK-1, MASVS-CODE-3; legacy MSTG-NETWORK-1",
+        "present_explanation": "App bundles an OpenSSL version vulnerable to CVE-2014-0224.",
+        "not_present_explanation": "App does not bundle an OpenSSL version vulnerable to CVE-2014-0224.",
+        "confidence_caveat": None,
+        "aliases": (),
+    },
+    {
+        "check": "Application Contains Deprecated FTP Functionality",
+        "severity": "Medium",
+        "compliance": "MASVS-NETWORK-1; MASTG-TEST-0323; legacy MSTG-NETWORK-1",
+        "present_explanation": "App uses FTP for network transfers.",
+        "not_present_explanation": "App does not use FTP for network transfers.",
+        "confidence_caveat": None,
+        "aliases": (),
+    },
+    {
+        "check": "Application Contains Heartbleed Vulnerable OpenSSL Version",
+        "severity": "High",
+        "compliance": "MASVS-NETWORK-1, MASVS-CODE-3; legacy MSTG-NETWORK-1",
+        "present_explanation": "App bundles an OpenSSL version vulnerable to Heartbleed (CVE-2014-0160).",
+        "not_present_explanation": "App does not bundle an OpenSSL version vulnerable to Heartbleed (CVE-2014-0160).",
+        "confidence_caveat": None,
+        "aliases": (),
+    },
+    {
+        "check": "Application Contains Insecure HTTP Traffic",
+        "severity": "High",
+        "compliance": "MASVS-NETWORK-1; MASTG-TEST-0321, -0322, -0323; legacy MSTG-NETWORK-1",
+        "present_explanation": "App makes plaintext HTTP requests.",
+        "not_present_explanation": "App does not make plaintext HTTP requests.",
+        "confidence_caveat": None,
+        "aliases": (),
+    },
+    {
+        "check": "Application Selectively Disabled App Transport Security Protections",
+        "severity": "Medium",
+        "compliance": "MASVS-NETWORK-1; MASTG-TEST-0322; legacy MSTG-NETWORK-1",
+        "present_explanation": (
+            "App carves out per-domain ATS exceptions (NSExceptionDomains) that weaken transport security."
+        ),
+        "not_present_explanation": (
+            "App does not carve out per-domain ATS exceptions (NSExceptionDomains) that weaken transport security."
+        ),
+        "confidence_caveat": None,
+        "aliases": (),
+    },
+    {
+        "check": "Cookie missing 'httpOnly' flag",
+        "severity": "Medium",
+        "compliance": "MASVS-NETWORK-1 (WebView cookies -> MASVS-PLATFORM-2); legacy MSTG-NETWORK-1",
+        "present_explanation": "A cookie was set without the httpOnly attribute, allowing script access to its value.",
+        "not_present_explanation": "No cookies were found set without the httpOnly attribute.",
+        "confidence_caveat": (
+            "No static artifact exists for WKWebView cookie attributes -- this requires dynamic analysis "
+            "to confirm; treat as informational until verified at runtime."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "Cookie missing 'Secure' flag",
+        "severity": "Medium",
+        "compliance": "MASVS-NETWORK-1; legacy MSTG-NETWORK-1",
+        "present_explanation": (
+            "A cookie was set without the Secure attribute, allowing transmission over an unencrypted channel."
+        ),
+        "not_present_explanation": "No cookies were found set without the Secure attribute.",
+        "confidence_caveat": (
+            "No static artifact exists for WKWebView cookie attributes -- this requires dynamic analysis "
+            "to confirm; treat as informational until verified at runtime."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "HTTP Cleartext Transmission of Advertiser ID",
+        "severity": "High",
+        "compliance": "MASVS-NETWORK-1, MASVS-PRIVACY-1; MASTG-TEST-0321; legacy MSTG-NETWORK-1",
+        "present_explanation": "Advertiser ID is sent over an unencrypted HTTP connection.",
+        "not_present_explanation": "Advertiser ID is not sent over an unencrypted HTTP connection.",
+        "confidence_caveat": "Approximated via string/URL pattern matching with keyword proximity, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "HTTP Cleartext Transmission of Device IMEI",
+        "severity": "High",
+        "compliance": "MASVS-NETWORK-1, MASVS-PRIVACY-1; MASTG-TEST-0321; legacy MSTG-NETWORK-1",
+        "present_explanation": "Device identifier is sent over an unencrypted HTTP connection.",
+        "not_present_explanation": "Device identifier is not sent over an unencrypted HTTP connection.",
+        "confidence_caveat": "Approximated via string/URL pattern matching with keyword proximity, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "HTTP Cleartext Transmission of GPS Latitude Coordinates",
+        "severity": "High",
+        "compliance": "MASVS-NETWORK-1, MASVS-PRIVACY-1; MASTG-TEST-0321; legacy MSTG-NETWORK-1",
+        "present_explanation": "GPS latitude is sent over an unencrypted HTTP connection.",
+        "not_present_explanation": "GPS latitude is not sent over an unencrypted HTTP connection.",
+        "confidence_caveat": "Approximated via string/URL pattern matching with keyword proximity, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "HTTP Cleartext Transmission of GPS Longitude Coordinates",
+        "severity": "High",
+        "compliance": "MASVS-NETWORK-1, MASVS-PRIVACY-1; MASTG-TEST-0321; legacy MSTG-NETWORK-1",
+        "present_explanation": "GPS longitude is sent over an unencrypted HTTP connection.",
+        "not_present_explanation": "GPS longitude is not sent over an unencrypted HTTP connection.",
+        "confidence_caveat": "Approximated via string/URL pattern matching with keyword proximity, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "HTTP Cleartext Transmission of Sensitive Data",
+        "severity": "High",
+        "compliance": "MASVS-NETWORK-1, MASVS-PRIVACY-1; MASTG-TEST-0321; legacy MSTG-NETWORK-1",
+        "present_explanation": "Other sensitive data was found sent over an unencrypted HTTP connection.",
+        "not_present_explanation": "No other sensitive data was found sent over an unencrypted HTTP connection.",
+        "confidence_caveat": "Approximated via string/URL pattern matching with keyword proximity, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "HTTP Cleartext Transmission of WiFi MAC Address",
+        "severity": "High",
+        "compliance": "MASVS-NETWORK-1, MASVS-PRIVACY-1; MASTG-TEST-0321; legacy MSTG-NETWORK-1",
+        "present_explanation": "WiFi MAC address is sent over an unencrypted HTTP connection.",
+        "not_present_explanation": "WiFi MAC address is not sent over an unencrypted HTTP connection.",
+        "confidence_caveat": "Approximated via string/URL pattern matching with keyword proximity, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "HTTPS Traffic URL Contains Device IMEI",
+        "severity": "Medium",
+        "compliance": "MASVS-PRIVACY-1, MASVS-NETWORK-1; legacy MSTG-NETWORK-1",
+        "present_explanation": "Device IMEI is embedded in an HTTPS request URL.",
+        "not_present_explanation": "Device IMEI is not embedded in an HTTPS request URL.",
+        "confidence_caveat": "Approximated via string/URL pattern matching with keyword proximity, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "HTTPS Traffic URL Contains Device's GPS Latitude",
+        "severity": "Medium",
+        "compliance": "MASVS-PRIVACY-1, MASVS-NETWORK-1; legacy MSTG-NETWORK-1",
+        "present_explanation": "GPS latitude is embedded in an HTTPS request URL.",
+        "not_present_explanation": "GPS latitude is not embedded in an HTTPS request URL.",
+        "confidence_caveat": "Approximated via string/URL pattern matching with keyword proximity, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "HTTPS Traffic URL Contains Device's GPS Longitude",
+        "severity": "Medium",
+        "compliance": "MASVS-PRIVACY-1, MASVS-NETWORK-1; legacy MSTG-NETWORK-1",
+        "present_explanation": "GPS longitude is embedded in an HTTPS request URL.",
+        "not_present_explanation": "GPS longitude is not embedded in an HTTPS request URL.",
+        "confidence_caveat": "Approximated via string/URL pattern matching with keyword proximity, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "HTTPS Traffic URL Contains Sensitive Data",
+        "severity": "Medium",
+        "compliance": "MASVS-PRIVACY-1, MASVS-NETWORK-1; legacy MSTG-NETWORK-1",
+        "present_explanation": "Other sensitive data was found embedded in an HTTPS request URL.",
+        "not_present_explanation": "No other sensitive data was found embedded in an HTTPS request URL.",
+        "confidence_caveat": "Approximated via string/URL pattern matching with keyword proximity, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "HTTPS Traffic URL Contains WiFi MAC Address",
+        "severity": "Medium",
+        "compliance": "MASVS-PRIVACY-1, MASVS-NETWORK-1; legacy MSTG-NETWORK-1",
+        "present_explanation": "WiFi MAC address is embedded in an HTTPS request URL.",
+        "not_present_explanation": "WiFi MAC address is not embedded in an HTTPS request URL.",
+        "confidence_caveat": "Approximated via string/URL pattern matching with keyword proximity, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "Insecure TLS configuration",
+        "severity": "High",
+        "compliance": "MASVS-NETWORK-1; MASTG-TEST-0065-0067; legacy MSTG-NETWORK-1",
+        "present_explanation": "One or more weak TLS protocol versions or cipher suites were configured.",
+        "not_present_explanation": "No weak TLS protocol versions or cipher suites were configured.",
+        "confidence_caveat": (
+            "Detected via string scan for TLS version constants; may miss configuration set "
+            "programmatically through other means."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "Certificate Pinning Not Implemented",
+        "severity": "Medium",
+        "compliance": (
+            "MASVS-NETWORK-2; no confirmed v2 replacement (MASTG-TEST-0068 deprecated); legacy "
+            "MSTG-NETWORK-2 (as observed)"
+        ),
+        "present_explanation": (
+            "App does not implement certificate or public-key pinning. Without pinning, a rogue "
+            "CA-issued certificate could be used to intercept traffic."
+        ),
+        "not_present_explanation": "App implements certificate or public-key pinning.",
+        "confidence_caveat": None,
+        "aliases": ("application utilizes certificate pinning protections",),
+    },
+)
+IOS_DATA_CHECK_SPECS = (
+    {
+        "check": "Application Utilizes Deprecated Keychain Attributes",
+        "severity": "Medium",
+        "compliance": "MASVS-STORAGE-1; MASTG-TEST-0052; MASTG-KNOW-0057; legacy MSTG-STORAGE-1",
+        "present_explanation": "App uses a deprecated Keychain accessibility attribute.",
+        "not_present_explanation": "App does not use a deprecated Keychain accessibility attribute.",
+        "confidence_caveat": "Detected via constant-symbol presence; confidence drops if Symbols Stripped is true.",
+        "aliases": (),
+    },
+    {
+        "check": "Local Data Exposure: Advertiser ID Stored Insecurely",
+        "severity": "High",
+        "compliance": "MASVS-STORAGE-1; MASTG-TEST-0052, -0300-0302; legacy MSTG-STORAGE-1",
+        "present_explanation": "Advertiser ID is written to an unprotected on-device storage location.",
+        "not_present_explanation": "Advertiser ID is not written to an unprotected on-device storage location.",
+        "confidence_caveat": "Approximated via storage-API symbol presence near PII-keyword strings, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "Local Data Exposure: Device IMEI Stored Insecurely",
+        "severity": "High",
+        "compliance": "MASVS-STORAGE-1; MASTG-TEST-0052, -0300-0302; legacy MSTG-STORAGE-1",
+        "present_explanation": "Device IMEI is written to an unprotected on-device storage location.",
+        "not_present_explanation": "Device IMEI is not written to an unprotected on-device storage location.",
+        "confidence_caveat": "Approximated via storage-API symbol presence near PII-keyword strings, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "Local Data Exposure: Global Write Permissions",
+        "severity": "High",
+        "compliance": "MASVS-STORAGE-1, MASVS-PLATFORM-1; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
+        "present_explanation": "An app-created file has world-writable permissions.",
+        "not_present_explanation": "No app-created file has world-writable permissions.",
+        "confidence_caveat": "Approximated via storage-API symbol presence near PII-keyword strings, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "Local Data Exposure: GPS Latitude Stored Insecurely",
+        "severity": "High",
+        "compliance": "MASVS-STORAGE-1; MASTG-TEST-0052, -0300-0302; legacy MSTG-STORAGE-1",
+        "present_explanation": "GPS latitude is written to an unprotected on-device storage location.",
+        "not_present_explanation": "GPS latitude is not written to an unprotected on-device storage location.",
+        "confidence_caveat": "Approximated via storage-API symbol presence near PII-keyword strings, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "Local Data Exposure: GPS Longitude Stored Insecurely",
+        "severity": "High",
+        "compliance": "MASVS-STORAGE-1; MASTG-TEST-0052, -0300-0302; legacy MSTG-STORAGE-1",
+        "present_explanation": "GPS longitude is written to an unprotected on-device storage location.",
+        "not_present_explanation": "GPS longitude is not written to an unprotected on-device storage location.",
+        "confidence_caveat": "Approximated via storage-API symbol presence near PII-keyword strings, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "Local Data Exposure: Insecure Hardcoded API Keys",
+        "severity": "High",
+        "compliance": "MASVS-STORAGE-1, MASVS-CRYPTO-2; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
+        "present_explanation": "A hardcoded API key was found persisted to unprotected on-device storage.",
+        "not_present_explanation": "No hardcoded API key was found persisted to unprotected on-device storage.",
+        "confidence_caveat": "Approximated via storage-API symbol presence near PII-keyword strings, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "Local Data Exposure: Insecure Hardcoded Passwords",
+        "severity": "High",
+        "compliance": "MASVS-STORAGE-1; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
+        "present_explanation": "A hardcoded password was found persisted to unprotected on-device storage.",
+        "not_present_explanation": "No hardcoded password was found persisted to unprotected on-device storage.",
+        "confidence_caveat": "Approximated via storage-API symbol presence near PII-keyword strings, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "Local Data Exposure: Sensitive Values Stored Insecurely",
+        "severity": "High",
+        "compliance": "MASVS-STORAGE-1; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
+        "present_explanation": "Another sensitive value was found persisted to unprotected on-device storage.",
+        "not_present_explanation": "No other sensitive value was found persisted to unprotected on-device storage.",
+        "confidence_caveat": "Approximated via storage-API symbol presence near PII-keyword strings, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "Local Data Exposure: WiFi IP Address Stored Insecurely",
+        "severity": "High",
+        "compliance": "MASVS-STORAGE-1; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
+        "present_explanation": "WiFi IP address is written to an unprotected on-device storage location.",
+        "not_present_explanation": "WiFi IP address is not written to an unprotected on-device storage location.",
+        "confidence_caveat": "Approximated via storage-API symbol presence near PII-keyword strings, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "Local Data Exposure: WiFi MAC Address Stored Insecurely",
+        "severity": "High",
+        "compliance": "MASVS-STORAGE-1; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
+        "present_explanation": "WiFi MAC address is written to an unprotected on-device storage location.",
+        "not_present_explanation": "WiFi MAC address is not written to an unprotected on-device storage location.",
+        "confidence_caveat": "Approximated via storage-API symbol presence near PII-keyword strings, not confirmed data flow.",
+        "aliases": (),
+    },
+    {
+        "check": "Sensitive Values Stored in Plaintext Within the Keychain",
+        "severity": "High",
+        "compliance": "MASVS-STORAGE-1; MASTG-TEST-0052; MASTG-KNOW-0057; legacy MSTG-STORAGE-1",
+        "present_explanation": "A Keychain item stores a sensitive value without additional protection.",
+        "not_present_explanation": "No Keychain item stores a sensitive value without additional protection.",
+        "confidence_caveat": "Detected via Keychain API usage pattern, not a direct read of stored values.",
+        "aliases": (),
+    },
+    {
+        "check": "Sensitive Values Stored Insecurely Within NSUserDefaults",
+        "severity": "High",
+        "compliance": "MASVS-STORAGE-1; MASTG-TEST-0300-0302; MASTG-KNOW-0093; legacy MSTG-STORAGE-1",
+        "present_explanation": "A sensitive-looking key/value pair was found in the app's NSUserDefaults (UserDefaults) plist.",
+        "not_present_explanation": (
+            "No sensitive-looking key/value pair was found in the app's NSUserDefaults (UserDefaults) plist."
+        ),
+        "confidence_caveat": (
+            "Reliable where the actual preferences plist is extracted and inspected directly; otherwise "
+            "approximated via API-usage pattern."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "Local Data Exposure: Advertiser ID Logged Insecurely",
+        "severity": "Medium",
+        "compliance": "MASVS-STORAGE-2; legacy MSTG-STORAGE-2 (as observed)",
+        "present_explanation": (
+            "Advertiser ID is written to the device console/log, which other apps or a connected debugger can read."
+        ),
+        "not_present_explanation": "Advertiser ID is not written to the device console/log.",
+        "confidence_caveat": (
+            "Detected via logging-API symbol presence near PII-keyword strings, not a confirmed log-output capture."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "Local Data Exposure: Device IMEI Logged Insecurely",
+        "severity": "Medium",
+        "compliance": "MASVS-STORAGE-2; legacy MSTG-STORAGE-2",
+        "present_explanation": "Device IMEI is written to the device console/log.",
+        "not_present_explanation": "Device IMEI is not written to the device console/log.",
+        "confidence_caveat": (
+            "Detected via logging-API symbol presence near PII-keyword strings, not a confirmed log-output capture."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "Local Data Exposure: GPS Latitude Logged Insecurely",
+        "severity": "Medium",
+        "compliance": "MASVS-STORAGE-2; legacy MSTG-STORAGE-2",
+        "present_explanation": "GPS latitude is written to the device console/log.",
+        "not_present_explanation": "GPS latitude is not written to the device console/log.",
+        "confidence_caveat": (
+            "Detected via logging-API symbol presence near PII-keyword strings, not a confirmed log-output capture."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "Local Data Exposure: GPS Longitude Logged Insecurely",
+        "severity": "Medium",
+        "compliance": "MASVS-STORAGE-2; legacy MSTG-STORAGE-2",
+        "present_explanation": "GPS longitude is written to the device console/log.",
+        "not_present_explanation": "GPS longitude is not written to the device console/log.",
+        "confidence_caveat": (
+            "Detected via logging-API symbol presence near PII-keyword strings, not a confirmed log-output capture."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "Local Data Exposure: Sensitive Data Logged Insecurely",
+        "severity": "Medium",
+        "compliance": "MASVS-STORAGE-2; legacy MSTG-STORAGE-2",
+        "present_explanation": "Other sensitive data is written to the device console/log.",
+        "not_present_explanation": "No other sensitive data is written to the device console/log.",
+        "confidence_caveat": (
+            "Detected via logging-API symbol presence near PII-keyword strings, not a confirmed log-output capture."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "Local Data Exposure: Sensitive Values Stored in Memory",
+        "severity": "Medium",
+        "compliance": "MASVS-STORAGE-2; legacy MSTG-STORAGE-2",
+        "present_explanation": (
+            "A sensitive value was found retained in memory longer than necessary (e.g. not zeroed after use)."
+        ),
+        "not_present_explanation": (
+            "No sensitive value was found retained in memory longer than necessary (e.g. not zeroed after use)."
+        ),
+        "confidence_caveat": (
+            "Detected via logging-API symbol presence near PII-keyword strings, not a confirmed log-output capture."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "Local Data Exposure: WiFi MAC Address Logged Insecurely",
+        "severity": "Medium",
+        "compliance": "MASVS-STORAGE-2; legacy MSTG-STORAGE-2",
+        "present_explanation": "WiFi MAC address is written to the device console/log.",
+        "not_present_explanation": "WiFi MAC address is not written to the device console/log.",
+        "confidence_caveat": (
+            "Detected via logging-API symbol presence near PII-keyword strings, not a confirmed log-output capture."
+        ),
+        "aliases": (),
+    },
+    {
+        "check": "Sensitive Data Exposed Through Device Keyboard Cache",
+        "severity": "Medium",
+        "compliance": "MASVS-STORAGE-2; legacy MSTG-STORAGE-2",
+        "present_explanation": (
+            "One or more sensitive input fields do not disable the keyboard's autocorrect/predictive-text "
+            "cache (e.g. via isSecureTextEntry or UITextAutocorrectionTypeNo)."
+        ),
+        "not_present_explanation": (
+            "Sensitive input fields disable the keyboard's autocorrect/predictive-text cache (e.g. via "
+            "isSecureTextEntry or UITextAutocorrectionTypeNo)."
+        ),
+        "confidence_caveat": "Low-confidence static heuristic -- absence of a security attribute is inferred, not directly observed.",
+        "aliases": (),
+    },
+)
+IOS_RESILIENCE_CHECK_SPECS = (
+    {
+        "check": "Biometric / Local Authentication Bypass Possible",
+        "severity": "Medium",
+        "compliance": (
+            "MASVS-AUTH-2; MASTG-TEST-0266-0271 (active -- supersede deprecated 0064); legacy MSTG-AUTH-2 (as observed)"
+        ),
+        "present_explanation": (
+            "A biometric/local authentication flow was identified without strong evidence of "
+            "crypto-backed binding (Secure Enclave/kSecAccessControl) or equivalent hardening."
+        ),
+        "not_present_explanation": (
+            "No biometric/local authentication flow was identified, or the flow present is backed by "
+            "the Secure Enclave (LAContext + kSecAccessControl) rather than a spoofable boolean check."
+        ),
+        "confidence_caveat": "Detected via API-usage pattern, not a confirmed bypass test.",
+        "aliases": (),
+    },
+    {
+        "check": "Components Contain Debug Symbols",
+        "severity": "Medium",
+        "compliance": "MASVS-RESILIENCE-3; MASTG-TEST-0219 (active -- supersedes deprecated 0083); legacy MSTG-RESILIENCE-3",
+        "present_explanation": (
+            "Debug symbols were not stripped from the shipped binary, making static analysis and "
+            "reverse engineering easier."
+        ),
+        "not_present_explanation": "Debug symbols were stripped from the shipped binary.",
+        "confidence_caveat": None,
+        "aliases": (),
+    },
+)
+IPA_BINARY_PROTECTION_SPECS = (
+    {
+        "protection": "NX",
+        "true_severity": "Info",
+        "true_description": (
+            "The binary has the NX bit set. This marks a memory page non-executable, making "
+            "attacker-injected shellcode non-executable."
+        ),
+        "false_severity": "High",
+        "false_description": (
+            "The binary has the NX bit unset. This marks a memory page executable, allowing an "
+            "attacker to point to shellcode in memory and exposing the binary to code-execution attacks."
+        ),
+    },
+    {
+        "protection": "PIE",
+        "true_severity": "Info",
+        "true_description": (
+            "The binary is built with -fPIC, enabling position-independent code. This makes ROP "
+            "attacks much harder to execute reliably."
+        ),
+        "false_severity": "High",
+        "false_description": (
+            "The binary is built without the Position Independent Executable (PIE) flag. This makes "
+            "ROP attacks easier to execute reliably."
+        ),
+    },
+    {
+        "protection": "Stack Canary",
+        "true_severity": "Info",
+        "true_description": (
+            "A stack canary value is added so that a stack buffer overflow overwriting the return "
+            "address is detected before the function returns."
+        ),
+        "false_severity": "High",
+        "false_description": (
+            "No stack canary value is added to the stack. This binary may be susceptible to a stack "
+            "buffer overflow attack overwriting the return address undetected."
+        ),
+    },
+    {
+        "protection": "ARC",
+        "true_severity": "Info",
+        "true_description": (
+            "The binary is compiled with Automatic Reference Counting, an exploit-mitigation "
+            "mechanism against memory-corruption vulnerabilities."
+        ),
+        "false_severity": "Medium",
+        "false_description": (
+            "The binary is not compiled with Automatic Reference Counting. ARC is a compiler feature "
+            "that provides automatic memory management of Objective-C objects and helps prevent "
+            "memory-corruption vulnerabilities."
+        ),
+    },
+    {
+        "protection": "RPATH",
+        "true_severity": "Medium",
+        "true_description": (
+            "The binary has a Runpath Search Path (@rpath) set. In certain cases an attacker can "
+            "abuse this to run an arbitrary executable for code execution or privilege escalation."
+        ),
+        "false_severity": "Info",
+        "false_description": "The binary does not have a Runpath Search Path (@rpath) set.",
+    },
+    {
+        "protection": "Code Signature",
+        "true_severity": "Info",
+        "true_description": "This binary has a code signature.",
+        "false_severity": "High",
+        "false_description": "This binary does not have a valid code signature.",
+    },
+    {
+        "protection": "Encrypted",
+        "true_severity": "Info",
+        "true_description": "This binary is encrypted (FairPlay).",
+        "false_severity": "Medium",
+        "false_description": (
+            "This binary is not encrypted (FairPlay). An unencrypted binary is easier to statically "
+            "analyze and reverse-engineer."
+        ),
+    },
+    {
+        "protection": "Symbols Stripped",
+        "true_severity": "Info",
+        "true_description": (
+            "Debug symbols are stripped from the binary, making static analysis and reverse engineering more difficult."
+        ),
+        "false_severity": "Medium",
+        "false_description": (
+            "Debug symbols are available. Strip them in build settings (Strip Debug Symbols During "
+            "Copy / Deployment Postprocessing / Strip Linked Product, all set to Yes) before shipping."
+        ),
+    },
+)
+
 # Vulnerability categories excluded from the report entirely (per request:
 # Authentication, Cryptography, and Platform are dropped from the output
 # regardless of what's present in the source data file).
@@ -689,7 +1521,11 @@ def load_report_data(input_data: dict[str, Any] | Path | str) -> dict[str, Any]:
     return _normalize_report_data(data)
 
 
-def generate_report(input_data: dict[str, Any] | Path | str, output_path: Path | str) -> Path:
+def generate_report(
+    input_data: dict[str, Any] | Path | str,
+    output_path: Path | str,
+    show_confidence_caveats: bool = False,
+) -> Path:
     _configure_weasyprint_library_path()
     from jinja2 import Environment, FileSystemLoader
     from weasyprint import HTML
@@ -713,6 +1549,7 @@ def generate_report(input_data: dict[str, Any] | Path | str, output_path: Path |
         charts=charts,
         app_icon_uri=app_icon_uri,
         phoenix_brand_icon_uri=phoenix_brand_icon_uri,
+        show_confidence_caveats=show_confidence_caveats,
     )
 
     resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -739,14 +1576,33 @@ def _configure_weasyprint_library_path() -> None:
     os.environ["DYLD_FALLBACK_LIBRARY_PATH"] = ":".join(merged_parts)
 
 
-def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
-    report_data = _merge_nested(_blank_template(), data)
+def _is_ios_platform(data: dict[str, Any]) -> bool:
+    meta = data.get("meta") if isinstance(data.get("meta"), dict) else {}
+    return str(meta.get("platform") or "").strip().lower() == "ios"
 
-    _canonicalize_code_section(report_data)
-    _canonicalize_storage_section(report_data)
-    _canonicalize_network_section(report_data)
-    _canonicalize_resilience_section(report_data)
-    _apply_derived_vulnerability_checks(report_data)
+
+def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
+    is_ios = _is_ios_platform(data)
+    base_template = _ios_blank_template() if is_ios else _blank_template()
+    report_data = _merge_nested(base_template, data)
+
+    if is_ios:
+        _canonicalize_ios_code_section(report_data)
+        _canonicalize_ios_network_section(report_data)
+        _canonicalize_ios_data_section(report_data)
+        _canonicalize_ios_resilience_section(report_data)
+        _apply_ios_derived_checks(report_data)
+        _canonicalize_ios_binary_protections(report_data)
+        _normalize_ios_url_schemes(report_data)
+        section_to_area = IOS_SECTION_TO_AREA
+    else:
+        _canonicalize_code_section(report_data)
+        _canonicalize_storage_section(report_data)
+        _canonicalize_network_section(report_data)
+        _canonicalize_resilience_section(report_data)
+        _apply_derived_vulnerability_checks(report_data)
+        section_to_area = SECTION_TO_AREA
+
     _add_permission_display_names(report_data)
     _ensure_functionality_details(report_data)
     _order_functionality_section(report_data)
@@ -755,8 +1611,8 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
         for s in report_data.get("vulnerability_sections", [])
         if (s.get("section_name") or "").strip().lower() not in EXCLUDED_VULN_SECTIONS
     ]
-    report_data["overall_evaluation"] = _build_overall_evaluation(report_data)
-    report_data["risk_summary"] = _build_risk_summary(report_data)
+    report_data["overall_evaluation"] = _build_overall_evaluation(report_data, section_to_area)
+    report_data["risk_summary"] = _build_risk_summary(report_data, section_to_area)
     report_data["findings_severity"] = _build_findings_severity(report_data)
 
     return _prune_placeholder_rows(report_data)
@@ -911,6 +1767,241 @@ def _canonicalize_resilience_section(report_data: dict[str, Any]) -> None:
     resilience_section["checks"] = [
         _canonical_resilience_check(report_data, spec, lookup) for spec in RESILIENCE_CHECK_SPECS
     ]
+
+
+def _canonicalize_ios_code_section(report_data: dict[str, Any]) -> None:
+    _canonicalize_ios_section(report_data, "code", IOS_CODE_CHECK_SPECS)
+
+
+def _canonicalize_ios_network_section(report_data: dict[str, Any]) -> None:
+    _canonicalize_ios_section(report_data, "network", IOS_NETWORK_CHECK_SPECS)
+
+
+def _canonicalize_ios_data_section(report_data: dict[str, Any]) -> None:
+    _canonicalize_ios_section(report_data, "data", IOS_DATA_CHECK_SPECS)
+
+
+def _canonicalize_ios_resilience_section(report_data: dict[str, Any]) -> None:
+    _canonicalize_ios_section(report_data, "resilience", IOS_RESILIENCE_CHECK_SPECS)
+
+
+def _canonicalize_ios_section(
+    report_data: dict[str, Any],
+    section_name: str,
+    specs: tuple[dict[str, Any], ...],
+) -> None:
+    """Shared iOS canonicalizer for the Code/Network/Data/Resilience sections.
+
+    Mirrors the Android canonicalizers' precedence: (1) an evidence-dict
+    entry (`code_evidence` / `network_evidence` / `data_evidence` /
+    `resilience_evidence`, keyed via IOS_SECTION_EVIDENCE) with a non-null
+    "present" wins first, since that's the structured, machine-generated
+    scan output; (2) a check already present in the incoming
+    vulnerability_sections data under its canonical name; (3) one of the
+    spec's aliases (covering the legacy seed-list category-code names).
+    Anything not found defaults to "Not Present" with the spec's default
+    explanation.
+    """
+    sections = report_data.get("vulnerability_sections")
+    if not isinstance(sections, list):
+        return
+
+    section = None
+    for candidate in sections:
+        if str(candidate.get("section_name", "")).strip().lower() == section_name:
+            section = candidate
+            break
+    if section is None:
+        return
+
+    incoming_checks = list(section.get("checks") or [])
+    lookup = {
+        _normalized_check_name(check.get("check")): check
+        for check in incoming_checks
+        if isinstance(check, dict) and str(check.get("check", "")).strip()
+    }
+
+    evidence_top_key, evidence_map = IOS_SECTION_EVIDENCE.get(section_name, (None, {}))
+    evidence_dict = report_data.get(evidence_top_key) if evidence_top_key else None
+    evidence_dict = evidence_dict if isinstance(evidence_dict, dict) else {}
+
+    section["checks"] = [_canonical_ios_check(spec, lookup, evidence_dict, evidence_map) for spec in specs]
+
+
+def _canonical_ios_check(
+    spec: dict[str, Any],
+    lookup: dict[str, dict[str, Any]],
+    evidence_dict: dict[str, Any],
+    evidence_map: dict[str, str],
+) -> dict[str, Any]:
+    result = "Not Present"
+    explanation = spec["not_present_explanation"]
+    compliance = spec["compliance"]
+    evidence = ""
+    remediation_link = ""
+
+    canonical_name = _normalized_check_name(spec["check"])
+    evidence_key = evidence_map.get(canonical_name)
+    evidence_entry = evidence_dict.get(evidence_key) if evidence_key else None
+    evidence_entry = evidence_entry if isinstance(evidence_entry, dict) else None
+
+    source = lookup.get(canonical_name) or _first_matching_alias(spec, lookup)
+
+    if evidence_entry is not None and evidence_entry.get("present") is not None:
+        result = "Present" if evidence_entry.get("present") else "Not Present"
+        explanation = spec["present_explanation"] if result == "Present" else spec["not_present_explanation"]
+        evidence = _non_empty_string(evidence_entry.get("evidence"))
+        if source is not None:
+            compliance = _non_empty_string(source.get("compliance")) or compliance
+            remediation_link = _non_empty_string(source.get("remediation_link"))
+    elif source is not None:
+        result = _present_not_present(source.get("result")) or result
+        explanation = _non_empty_string(source.get("explanation")) or (
+            spec["present_explanation"] if result == "Present" else spec["not_present_explanation"]
+        )
+        compliance = _non_empty_string(source.get("compliance")) or compliance
+        evidence = _non_empty_string(source.get("evidence"))
+        remediation_link = _non_empty_string(source.get("remediation_link"))
+
+    return {
+        "check": spec["check"],
+        "result": result,
+        "explanation": explanation,
+        "compliance": compliance,
+        "remediation_link": remediation_link,
+        "evidence": evidence,
+        "severity": spec["severity"],
+        "confidence_caveat": spec.get("confidence_caveat"),
+    }
+
+
+def _canonicalize_ios_binary_protections(report_data: dict[str, Any]) -> None:
+    """Build the IPA Binary Code Analysis rows from a plain protection-name ->
+    bool evidence dict (`ipa_binary_evidence`), so descriptions/severities stay
+    consistent regardless of what the upstream scan JSON provides. Falls back
+    to whatever `ipa_binary_protections` rows were already supplied (e.g. a
+    hand-authored mockup) for any protection missing from the evidence dict.
+    """
+    evidence = report_data.get("ipa_binary_evidence")
+    evidence = evidence if isinstance(evidence, dict) else {}
+
+    existing_rows = report_data.get("ipa_binary_protections")
+    existing_by_name = {
+        _normalized_check_name(row.get("protection")): row
+        for row in (existing_rows if isinstance(existing_rows, list) else [])
+        if isinstance(row, dict)
+    }
+
+    rows: list[dict[str, Any]] = []
+    for spec in IPA_BINARY_PROTECTION_SPECS:
+        key = _normalized_check_name(spec["protection"])
+        flag = _coerce_bool(evidence.get(key)) if key in evidence else None
+        if flag is None:
+            # fall back to snake_case key variants (e.g. "stack_canary")
+            snake_key = key.replace(" ", "_")
+            flag = _coerce_bool(evidence.get(snake_key)) if snake_key in evidence else None
+
+        if flag is None and key in existing_by_name:
+            rows.append(existing_by_name[key])
+            continue
+
+        if flag is None:
+            continue
+
+        rows.append(
+            {
+                "protection": spec["protection"],
+                "status": "True" if flag else "False",
+                "severity": spec["true_severity"] if flag else spec["false_severity"],
+                "description": spec["true_description"] if flag else spec["false_description"],
+            }
+        )
+
+    report_data["ipa_binary_protections"] = rows
+
+
+def _apply_ios_derived_checks(report_data: dict[str, Any]) -> None:
+    """A handful of iOS checks describe the same structural Mach-O facts as
+    the IPA Binary Code Analysis protection flags (ARC / PIE / Stack Canary /
+    Symbols Stripped). Rather than requiring these to be entered twice,
+    derive them straight from `ipa_binary_evidence` so the checks-conducted
+    table and the binary-protections table can never disagree."""
+    evidence = report_data.get("ipa_binary_evidence")
+    evidence = evidence if isinstance(evidence, dict) else {}
+
+    def flag(key: str) -> bool | None:
+        value = evidence.get(key)
+        if value is None:
+            value = evidence.get(key.replace(" ", "_"))
+        return _coerce_bool(value)
+
+    derived_by_check_name = {
+        "missing arc binary protections": flag("arc"),
+        "position-independent code (pic) not enabled": flag("pie"),
+        "stack canaries not enabled": flag("stack canary"),
+    }
+    derived_by_check_name_resilience = {
+        "components contain debug symbols": flag("symbols stripped"),
+    }
+    spec_by_name = {
+        _normalized_check_name(spec["check"]): spec for spec in (*IOS_CODE_CHECK_SPECS, *IOS_RESILIENCE_CHECK_SPECS)
+    }
+
+    for section in report_data.get("vulnerability_sections") or []:
+        section_name = str(section.get("section_name", "")).strip().lower()
+        if section_name == "code":
+            derived = derived_by_check_name
+        elif section_name == "resilience":
+            derived = derived_by_check_name_resilience
+        else:
+            continue
+
+        for check in section.get("checks") or []:
+            canonical_name = _normalized_check_name(check.get("check"))
+            if canonical_name not in derived:
+                continue
+            protection_present = derived[canonical_name]
+            if protection_present is None:
+                continue
+            # All four checks are framed negatively (e.g. "Missing ARC...",
+            # "...Not Enabled", "...Contain Debug Symbols" where the
+            # underlying flag being true -- ARC on, PIE on, canary on,
+            # symbols stripped -- is the protected/good state), so the
+            # protection being present always maps to "Not Present" here.
+            result = "Not Present" if protection_present else "Present"
+            check["result"] = result
+            spec = spec_by_name.get(canonical_name)
+            if spec is not None:
+                check["explanation"] = (
+                    spec["present_explanation"] if result == "Present" else spec["not_present_explanation"]
+                )
+            if not _non_empty_string(check.get("evidence")):
+                check["evidence"] = "Derived from IPA Binary Code Analysis evidence"
+
+
+def _normalize_ios_url_schemes(report_data: dict[str, Any]) -> None:
+    schemes = report_data.get("url_schemes")
+    if not isinstance(schemes, list):
+        report_data["url_schemes"] = []
+        return
+
+    normalized: list[dict[str, Any]] = []
+    for entry in schemes:
+        if not isinstance(entry, dict):
+            continue
+        url_name = _non_empty_string(entry.get("url_name"))
+        raw_schemes = entry.get("schemes")
+        if isinstance(raw_schemes, str):
+            scheme_list = [s.strip() for s in raw_schemes.split(",") if s.strip()]
+        elif isinstance(raw_schemes, list):
+            scheme_list = [str(s).strip() for s in raw_schemes if str(s).strip()]
+        else:
+            scheme_list = []
+        if not url_name and not scheme_list:
+            continue
+        normalized.append({"url_name": url_name, "schemes": scheme_list})
+
+    report_data["url_schemes"] = normalized
 
 
 def _canonical_storage_check(
@@ -1471,6 +2562,10 @@ def _blank_template() -> dict[str, Any]:
     return json.loads(BLANK_TEMPLATE_PATH.read_text(encoding="utf-8"))
 
 
+def _ios_blank_template() -> dict[str, Any]:
+    return json.loads(IOS_BLANK_TEMPLATE_PATH.read_text(encoding="utf-8"))
+
+
 def _merge_nested(base: Any, override: Any) -> Any:
     if isinstance(base, dict) and isinstance(override, dict):
         merged = {key: copy.deepcopy(value) for key, value in base.items()}
@@ -1501,12 +2596,15 @@ def _build_findings_severity(report_data: dict[str, Any]) -> dict[str, int]:
     return counts
 
 
-def _build_overall_evaluation(report_data: dict[str, Any]) -> list[dict[str, Any]]:
+def _build_overall_evaluation(
+    report_data: dict[str, Any],
+    section_to_area: dict[str, tuple[str, str]] = SECTION_TO_AREA,
+) -> list[dict[str, Any]]:
     rows_by_area: dict[str, dict[str, Any]] = {}
 
     for section in report_data.get("vulnerability_sections") or []:
         section_name = str(section.get("section_name", "")).strip().lower()
-        area_details = SECTION_TO_AREA.get(section_name)
+        area_details = section_to_area.get(section_name)
         if area_details is None:
             continue
 
@@ -1533,7 +2631,7 @@ def _build_overall_evaluation(report_data: dict[str, Any]) -> list[dict[str, Any
         }
 
     ordered_rows: list[dict[str, Any]] = []
-    for area_label, _risk_key in SECTION_TO_AREA.values():
+    for area_label, _risk_key in section_to_area.values():
         row = rows_by_area.get(area_label)
         if row is not None:
             ordered_rows.append(row)
@@ -1541,12 +2639,15 @@ def _build_overall_evaluation(report_data: dict[str, Any]) -> list[dict[str, Any
     return ordered_rows
 
 
-def _build_risk_summary(report_data: dict[str, Any]) -> dict[str, str]:
-    summary = {risk_key: "Low" for _area_label, risk_key in SECTION_TO_AREA.values()}
+def _build_risk_summary(
+    report_data: dict[str, Any],
+    section_to_area: dict[str, tuple[str, str]] = SECTION_TO_AREA,
+) -> dict[str, str]:
+    summary = {risk_key: "Low" for _area_label, risk_key in section_to_area.values()}
 
     for row in report_data.get("overall_evaluation") or []:
         area_name = str(row.get("area_of_concern", "")).strip().lower()
-        for section_name, (area_label, risk_key) in SECTION_TO_AREA.items():
+        for section_name, (area_label, risk_key) in section_to_area.items():
             if area_label.lower() == area_name:
                 summary[risk_key] = _normalize_risk_level(row.get("risk_rating"))
                 break
@@ -1645,13 +2746,14 @@ def _prune_placeholder_rows(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: python3 generate_report.py <data.json> <output.pdf>")
+    if len(sys.argv) not in (3, 4):
+        print("Usage: python3 generate_report.py <data.json> <output.pdf> [--show-confidence-caveats]")
         sys.exit(1)
 
     data_path = Path(sys.argv[1])
     output_path = Path(sys.argv[2])
-    generate_report(data_path, output_path)
+    show_confidence_caveats = len(sys.argv) == 4 and sys.argv[3] == "--show-confidence-caveats"
+    generate_report(data_path, output_path, show_confidence_caveats=show_confidence_caveats)
 
 
 if __name__ == "__main__":
