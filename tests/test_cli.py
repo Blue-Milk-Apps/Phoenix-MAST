@@ -223,6 +223,9 @@ def test_create_scan_config_for_ios_binary(tmp_path: Path, monkeypatch) -> None:
             ScanType.LIEF,
             ScanType.STRINGS,
             ScanType.PLIST_BINARY,
+            ScanType.TRUFFLEHOG,
+            ScanType.GITLEAKS,
+            ScanType.SYFT,
         },
     )
 
@@ -245,8 +248,11 @@ def test_create_scan_config_for_ios_binary_includes_opengrep_when_rules_path_is_
     assert {scanner.scan_type for scanner in _build_scanners(config)} == {
         ScanType.IPSW,
         ScanType.LIEF,
+        ScanType.TRUFFLEHOG,
+        ScanType.GITLEAKS,
         ScanType.STRINGS,
         ScanType.PLIST_BINARY,
+        ScanType.SYFT,
     }
 
 
@@ -278,8 +284,11 @@ def test_create_scan_config_for_ios_binary_includes_mobsf_when_url_is_configured
             ScanType.MOBSF_SCANNER,
             ScanType.IPSW,
             ScanType.LIEF,
+            ScanType.TRUFFLEHOG,
+            ScanType.GITLEAKS,
             ScanType.STRINGS,
             ScanType.PLIST_BINARY,
+            ScanType.SYFT,
         },
     )
 
