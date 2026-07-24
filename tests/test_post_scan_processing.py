@@ -639,7 +639,7 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
         "icon_path": "",
         "name": "DVIA-v2",
         "package_name": "com.highaltitudehacks.DVIAswiftv2",
-        "main_activity": "",
+        "main_activity": "DVIA",
         "version_name": "2.0 (1)",
         "app_store_id": "",
         "developer": "",
