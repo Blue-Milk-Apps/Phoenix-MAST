@@ -544,19 +544,62 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
             "project_path": str(ipa_path),
             "scan_date": "2026-07-22 10:51:49",
         },
-        "plist_outputs": {
-            "Info.json": {
-                "app_meta": {
-                    "bundle_identifier": "com.highaltitudehacks.DVIAswiftv2",
+        "ipsw_outputs": {
+            "DVIA-v2.json": {
+                "app_info": {
+                    "bundle_id": "com.highaltitudehacks.DVIAswiftv2",
                     "bundle_name": "DVIA-v2",
-                    "display_name": "DVIA-v2",
-                    "version": "2.0",
-                    "build": "1",
+                    "short_version": "2.0",
+                    "bundle_version": "1",
+                    "executable_name": "DVIA",
+                    "minimum_os": "15.0",
                 },
-                "plist": {
-                    "CFBundleExecutable": "DVIA-v2.ipa",
+                "binary": {
+                    "kind": "main",
+                    "name": "DVIA",
+                    "path": "DVIA",
+                },
+                "analysis": {
+                    "macho": {"rpaths": ["@rpath"]},
+                    "code_signature": {"present": True},
                 },
             }
+        },
+        "lief_outputs": {
+            "DVIA-v2.json": {
+                "binary": {
+                    "kind": "main",
+                    "slices": [
+                        {
+                            "architecture": "ARM64",
+                            "file_type": "EXECUTE",
+                            "imported_functions": [
+                                "___stack_chk_fail",
+                                "___stack_chk_guard",
+                                "_objc_release",
+                            ],
+                            "libraries": ["libSystem.B.dylib"],
+                            "has_rpath": True,
+                        }
+                    ],
+                    "name": "DVIA-LIEF",
+                    "path": "DVIA-LIEF",
+                }
+            },
+            "Frameworks/Some.framework/Some.json": {
+                "binary": {
+                    "kind": "framework",
+                    "slices": [
+                        {
+                            "imported_functions": [
+                                "___stack_chk_fail",
+                                "___stack_chk_guard",
+                                "_swift_release",
+                            ]
+                        }
+                    ],
+                }
+            },
         },
     }
 
@@ -606,10 +649,10 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
     assert result["ipa_binary_evidence"] == {
         "nx": False,
         "pie": False,
-        "stack canary": False,
-        "arc": False,
-        "rpath": False,
-        "code signature": False,
+        "stack canary": True,
+        "arc": True,
+        "rpath": True,
+        "code signature": True,
         "encrypted": False,
         "symbols stripped": False,
     }
@@ -717,9 +760,144 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
     ]
 
 
+def test_ios_meta_uses_lief_when_ipsw_is_partial() -> None:
+    loaded_outputs = {
+        "scan_metadata": {
+            "platform": "IOS",
+            "project_path": "/tmp/Unknown.ipa",
+        },
+        "ipsw_outputs": {
+            "App.json": {
+                "app_info": {
+                    "bundle_id": "",
+                    "bundle_name": "",
+                    "short_version": "",
+                    "bundle_version": "",
+                },
+                "binary": {
+                    "kind": "main",
+                    "name": "AppFromIpsw",
+                    "path": "AppFromIpsw",
+                },
+            }
+        },
+        "lief_outputs": {
+            "App.json": {
+                "binary": {
+                    "kind": "main",
+                    "name": "AppFromLief",
+                    "path": "AppFromLief",
+                    "slices": [{"architecture": "ARM64", "file_type": "EXECUTE"}],
+                }
+            }
+        },
+    }
+
+    result = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert result["meta"]["app_display_name"] == "AppFromLief"
+    assert result["meta"]["file_name"] == "Unknown.ipa"
+    assert result["meta"]["package_name"] == ""
+    assert result["meta"]["version_name"] == ""
+    assert result["meta"]["version_code"] == ""
+
+
+def test_ios_meta_uses_strings_as_narrow_fallback() -> None:
+    loaded_outputs = {
+        "scan_metadata": {
+            "platform": "IOS",
+            "project_path": "",
+        },
+        "strings_outputs": {
+            "Payload/FallbackApp.txt": "hello\nworld\n",
+            "Frameworks/Foo.framework/Foo.txt": "framework\n",
+        },
+    }
+
+    result = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert result["meta"]["app_display_name"] == "FallbackApp"
+    assert result["meta"]["file_name"] == ""
+    assert result["meta"]["package_name"] == ""
+
+
+def test_ios_meta_derives_scan_date_from_output_directory_name() -> None:
+    scan_dir = Path("/tmp/SAST_ios_binary_2026-07-23_10-00-00")
+    loaded_outputs = {
+        "scan_output_path": str(scan_dir),
+        "scan_metadata": {
+            "platform": "IOS",
+            "project_path": "/tmp/App.ipa",
+        },
+        "ipsw_outputs": {
+            "App.json": {
+                "app_info": {
+                    "bundle_id": "com.example.app",
+                    "bundle_name": "ExampleApp",
+                },
+                "binary": {"kind": "main", "name": "App", "path": "App"},
+            }
+        },
+    }
+
+    result = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert result["meta"]["scan_date"] == "2026-07-23 10:00:00"
+
+
+def test_ios_ipa_binary_evidence_requires_both_canary_imports() -> None:
+    loaded_outputs = {
+        "lief_outputs": {
+            "App.json": {
+                "binary": {
+                    "kind": "main",
+                    "slices": [{"imported_functions": ["___stack_chk_fail"]}],
+                }
+            }
+        }
+    }
+
+    result = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert result["ipa_binary_evidence"]["stack canary"] is False
+    assert result["ipa_binary_evidence"]["arc"] is False
+
+
+def test_ios_ipa_binary_evidence_ignores_framework_only_imports() -> None:
+    loaded_outputs = {
+        "lief_outputs": {
+            "App.json": {
+                "binary": {
+                    "kind": "main",
+                    "slices": [{"imported_functions": []}],
+                }
+            },
+            "Frameworks/Foo.framework/Foo.json": {
+                "binary": {
+                    "kind": "framework",
+                    "slices": [
+                        {
+                            "imported_functions": [
+                                "___stack_chk_fail",
+                                "___stack_chk_guard",
+                                "_objc_release",
+                            ]
+                        }
+                    ],
+                }
+            },
+        }
+    }
+
+    result = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert result["ipa_binary_evidence"]["stack canary"] is False
+    assert result["ipa_binary_evidence"]["arc"] is False
+
+
 def test_post_scan_processing_service_returns_direct_ios_contract(tmp_path: Path) -> None:
     scan_dir = tmp_path / "SAST_ios_binary_2026-07-23_10-00-00"
-    (scan_dir / "plist_binary").mkdir(parents=True)
+    (scan_dir / "ipsw" / "Payload" / "ExampleApp.app").mkdir(parents=True)
     _write_json(
         scan_dir / "scan_metadata.json",
         {
@@ -729,16 +907,15 @@ def test_post_scan_processing_service_returns_direct_ios_contract(tmp_path: Path
         },
     )
     _write_json(
-        scan_dir / "plist_binary" / "Info.json",
+        scan_dir / "ipsw" / "Payload" / "ExampleApp.app" / "ExampleApp.json",
         {
-            "app_meta": {
-                "bundle_identifier": "com.example.app",
+            "app_info": {
+                "bundle_id": "com.example.app",
                 "bundle_name": "ExampleApp",
-                "display_name": "ExampleApp",
-                "version": "1.0",
-                "build": "3",
+                "short_version": "1.0",
+                "bundle_version": "3",
             },
-            "plist": {"CFBundleExecutable": "ExampleApp"},
+            "binary": {"kind": "main", "name": "ExampleApp", "path": "ExampleApp"},
         },
     )
 
@@ -751,6 +928,165 @@ def test_post_scan_processing_service_returns_direct_ios_contract(tmp_path: Path
     assert result["meta"]["app_display_name"] == "ExampleApp"
     assert result["code_evidence"]["uses_uiwebview"]["present"] is False
     assert result["network_evidence"]["ats_disabled"]["present"] is False
+
+
+def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
+    loaded_outputs = {
+        "plist_outputs": {
+            "Info.json": {
+                "app_meta": {
+                    "required_device_capabilities": ["arm64", "nfc"],
+                },
+                "ats": {
+                    "allows_arbitrary_loads": False,
+                    "exception_domains": [],
+                },
+                "background_modes": ["remote-notification"],
+                "privacy": {
+                    "permissions": [
+                        {"key": "NSCameraUsageDescription", "purpose": "Take photos"},
+                        {"key": "NSFaceIDUsageDescription", "purpose": "Sign in"},
+                        {"key": "NSMicrophoneUsageDescription", "purpose": "Record audio"},
+                        {"key": "NSContactsUsageDescription", "purpose": "Find friends"},
+                        {"key": "NSCalendarsUsageDescription", "purpose": "Show events"},
+                        {"key": "NSLocationWhenInUseUsageDescription", "purpose": "Find nearby stores"},
+                        {"key": "NSBluetoothAlwaysUsageDescription", "purpose": "Connect accessories"},
+                        {"key": "NSPhotoLibraryUsageDescription", "purpose": "Pick photos"},
+                        {"key": "NSNearbyInteractionUsageDescription", "purpose": "Nearby devices"},
+                    ]
+                },
+                "url_schemes": {
+                    "declared_schemes": ["myapp"],
+                    "queried_schemes": ["maps", "tel"],
+                },
+                "plist": {
+                    "UISupportedExternalAccessoryProtocols": ["com.example.reader"],
+                },
+            },
+            "Entitlements.json": {
+                "entitlements": {
+                    "aps_environment": "development",
+                    "keychain_access_groups": ["ABC123.com.example.shared"],
+                }
+            },
+        },
+        "ipsw_outputs": {
+            "Payload/App.app/App.json": {
+                "analysis": {
+                    "entitlements": {
+                        "values": {
+                            "aps-environment": "development",
+                            "keychain-access-groups": ["ABC123.com.example.shared"],
+                        }
+                    }
+                }
+            }
+        },
+        "opengrep": {
+            "results": [
+                {
+                    "check_id": "ios.secure.rng.usage.present",
+                    "extra": {
+                        "metadata": {
+                            "phoenix": {
+                                "description": "Secure RNG usage detected.",
+                            }
+                        }
+                    },
+                },
+                {
+                    "check_id": "ios.networking.usage.present",
+                    "extra": {
+                        "metadata": {
+                            "phoenix": {
+                                "description": "Networking usage detected.",
+                            }
+                        }
+                    },
+                },
+                {
+                    "check_id": "ios.telephony.usage.present",
+                    "extra": {
+                        "metadata": {
+                            "phoenix": {
+                                "description": "Telephony usage detected.",
+                            }
+                        }
+                    },
+                },
+                {
+                    "check_id": "ios.usb.devices.usage.present",
+                    "extra": {
+                        "metadata": {
+                            "phoenix": {
+                                "description": "USB devices usage detected.",
+                            }
+                        }
+                    },
+                },
+            ]
+        },
+        "strings_outputs": {
+            "main.txt": "https://api.example.com\nCoreTelephony\nExternalAccessory\n",
+        },
+    }
+
+    sections = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert sections["functionality"]["Camera"] == {
+        "present": True,
+        "explanation": "plist key NSCameraUsageDescription present.",
+    }
+    assert sections["functionality"]["Biometric Authentication"] == {
+        "present": True,
+        "explanation": "plist key NSFaceIDUsageDescription present.",
+    }
+    assert sections["functionality"]["Networking"] == {
+        "present": True,
+        "explanation": "Info.plist declares NSAppTransportSecurity. Info.plist declares URL scheme handling. Networking usage detected.",
+    }
+    assert sections["functionality"]["Secure RNG"] == {
+        "present": True,
+        "explanation": "Secure RNG usage detected.",
+    }
+    assert sections["functionality"]["Push Notifications"] == {
+        "present": True,
+        "explanation": "entitlement aps_environment present. background mode remote-notification declared.",
+    }
+    assert sections["functionality"]["Contacts"]["present"] is True
+    assert sections["functionality"]["Calendar"]["present"] is True
+    assert sections["functionality"]["Location"]["present"] is True
+    assert sections["functionality"]["Bluetooth"]["present"] is True
+    assert sections["functionality"]["Microphone"]["present"] is True
+    assert sections["functionality"]["NFC"] == {
+        "present": True,
+        "explanation": "required device capabilities include nfc.",
+    }
+    assert sections["functionality"]["Photos"]["present"] is True
+    assert sections["functionality"]["Maps"] == {
+        "present": True,
+        "explanation": "queried URL schemes maps declared.",
+    }
+    assert sections["functionality"]["Keychain"] == {
+        "present": True,
+        "explanation": "entitlement keychain_access_groups present.",
+    }
+    assert sections["functionality"]["Nearby Interaction"] == {
+        "present": True,
+        "explanation": "plist key NSNearbyInteractionUsageDescription present.",
+    }
+    assert sections["functionality"]["Audio"] == {
+        "present": False,
+        "explanation": "",
+    }
+    assert sections["functionality"]["Telephony"] == {
+        "present": True,
+        "explanation": "URL schemes tel declared or queried. Telephony usage detected.",
+    }
+    assert sections["functionality"]["USB Devices"] == {
+        "present": True,
+        "explanation": "external accessory protocols declared: com.example.reader. USB devices usage detected.",
+    }
 
 
 def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks() -> None:

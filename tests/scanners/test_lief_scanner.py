@@ -79,9 +79,7 @@ def test_lief_scan_returns_raw_output(monkeypatch, tmp_path: Path) -> None:
             EXECUTE = "EXECUTE"
             DYLIB = "DYLIB"
 
-        def __init__(
-            self, cpu_type: CpuType, file_type: FileType, flags: list[str]
-        ) -> None:
+        def __init__(self, cpu_type: CpuType, file_type: FileType, flags: list[str]) -> None:
             self.cpu_type = cpu_type
             self.file_type = file_type
             self.flags_list = flags
@@ -90,9 +88,15 @@ def test_lief_scan_returns_raw_output(monkeypatch, tmp_path: Path) -> None:
         cpu_type: FakeHeader.CpuType,
         file_type: FakeHeader.FileType,
         library_name: str,
+        imported_functions: list[str],
     ) -> types.SimpleNamespace:
         return types.SimpleNamespace(
             header=FakeHeader(cpu_type, file_type, ["PIE", "NO_HEAP_EXECUTION"]),
+            has_nx=True,
+            has_nx_heap=True,
+            has_nx_stack=True,
+            has_rpath=False,
+            imported_functions=imported_functions,
             libraries=[types.SimpleNamespace(name=library_name)],
             segments=[
                 FakeSegment(
@@ -120,11 +124,13 @@ def test_lief_scan_returns_raw_output(monkeypatch, tmp_path: Path) -> None:
                         FakeHeader.CpuType.ARM64,
                         FakeHeader.FileType.EXECUTE,
                         "libSystem.B.dylib",
+                        ["___stack_chk_fail", "___stack_chk_guard", "_objc_release"],
                     ),
                     make_macho(
                         FakeHeader.CpuType.ARM64E,
                         FakeHeader.FileType.EXECUTE,
                         "libobjc.A.dylib",
+                        ["_swift_release"],
                     ),
                 ]
             )
@@ -134,6 +140,7 @@ def test_lief_scan_returns_raw_output(monkeypatch, tmp_path: Path) -> None:
                     FakeHeader.CpuType.ARM64,
                     FakeHeader.FileType.DYLIB,
                     "Foo.framework/Foo",
+                    ["_objc_release"],
                 ),
             ]
         )
@@ -147,9 +154,7 @@ def test_lief_scan_returns_raw_output(monkeypatch, tmp_path: Path) -> None:
     assert all(result.success for result in results)
     assert not (config.output_path / "lief").exists()
 
-    results_by_path = {
-        result.relative_target_path: json.loads(result.raw_output) for result in results
-    }
+    results_by_path = {result.relative_target_path: json.loads(result.raw_output) for result in results}
     assert set(results_by_path) == {
         "TestApp.json",
         "Frameworks/Foo.framework/Foo.json",
@@ -170,6 +175,15 @@ def test_lief_scan_returns_raw_output(monkeypatch, tmp_path: Path) -> None:
     assert len(main_binary["slices"]) == 2
     assert main_binary["slices"][0]["architecture"] == "ARM64"
     assert main_binary["slices"][0]["file_type"] == "EXECUTE"
+    assert main_binary["slices"][0]["has_nx"] is True
+    assert main_binary["slices"][0]["has_nx_heap"] is True
+    assert main_binary["slices"][0]["has_nx_stack"] is True
+    assert main_binary["slices"][0]["has_rpath"] is False
+    assert main_binary["slices"][0]["imported_functions"] == [
+        "___stack_chk_fail",
+        "___stack_chk_guard",
+        "_objc_release",
+    ]
     assert "libSystem.B.dylib" in main_binary["slices"][0]["libraries"]
 
     assert framework_binary["kind"] == "framework"
