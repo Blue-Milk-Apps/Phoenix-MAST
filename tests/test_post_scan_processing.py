@@ -1087,6 +1087,112 @@ def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
         "present": True,
         "explanation": "external accessory protocols declared: com.example.reader. USB devices usage detected.",
     }
+    assert sections["permissions"] == [
+        {
+            "permission": "NSBluetoothAlwaysUsageDescription",
+            "status": "dangerous",
+            "info": "Access Bluetooth",
+            "usage_description": "Connect accessories",
+            "general_description": "Permits scanning for and connecting to nearby Bluetooth devices.",
+        },
+        {
+            "permission": "NSCalendarsUsageDescription",
+            "status": "dangerous",
+            "info": "Access Calendar",
+            "usage_description": "Show events",
+            "general_description": "Permits access to the user's calendar data.",
+        },
+        {
+            "permission": "NSCameraUsageDescription",
+            "status": "dangerous",
+            "info": "Access Camera",
+            "usage_description": "Take photos",
+            "general_description": "Permits access to the device's camera hardware.",
+        },
+        {
+            "permission": "NSContactsUsageDescription",
+            "status": "dangerous",
+            "info": "Access Contacts",
+            "usage_description": "Find friends",
+            "general_description": "Permits access to the user's contacts database.",
+        },
+        {
+            "permission": "NSFaceIDUsageDescription",
+            "status": "normal",
+            "info": "Use Face ID",
+            "usage_description": "Sign in",
+            "general_description": "Permits use of Face ID for biometric authentication.",
+        },
+        {
+            "permission": "NSLocationWhenInUseUsageDescription",
+            "status": "dangerous",
+            "info": "Access Location While Using App",
+            "usage_description": "Find nearby stores",
+            "general_description": "Permits access to the device's location while the app is in use.",
+        },
+        {
+            "permission": "NSMicrophoneUsageDescription",
+            "status": "dangerous",
+            "info": "Access Microphone",
+            "usage_description": "Record audio",
+            "general_description": "Permits recording audio with the device microphone.",
+        },
+        {
+            "permission": "NSNearbyInteractionUsageDescription",
+            "status": "normal",
+            "info": "Nearby Interaction",
+            "usage_description": "Nearby devices",
+            "general_description": "Permits use of nearby interaction features with supported devices.",
+        },
+        {
+            "permission": "NSPhotoLibraryUsageDescription",
+            "status": "dangerous",
+            "info": "Access Photos",
+            "usage_description": "Pick photos",
+            "general_description": "Permits reading from the user's photo library.",
+        },
+    ]
+
+
+def test_ios_permissions_deduplicate_and_keep_first_non_empty_usage_description() -> None:
+    loaded_outputs = {
+        "plist_outputs": {
+            "Info.json": {
+                "privacy": {
+                    "permissions": [
+                        {"key": "NSCameraUsageDescription", "purpose": ""},
+                        {"key": "NSExampleCustomUsageDescription", "purpose": "Custom access"},
+                    ]
+                }
+            },
+            "Info-2.json": {
+                "privacy": {
+                    "permissions": [
+                        {"key": "NSCameraUsageDescription", "purpose": "Take photos"},
+                    ]
+                }
+            },
+        }
+    }
+
+    sections = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert sections["permissions"] == [
+        {
+            "permission": "NSCameraUsageDescription",
+            "status": "dangerous",
+            "info": "Access Camera",
+            "usage_description": "Take photos",
+            "general_description": "Permits access to the device's camera hardware.",
+        },
+        {
+            "permission": "NSExampleCustomUsageDescription",
+            "status": "normal",
+            "info": "",
+            "usage_description": "Custom access",
+            "general_description": "",
+        },
+    ]
 
 
 def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks() -> None:
