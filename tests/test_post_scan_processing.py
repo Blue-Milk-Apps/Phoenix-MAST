@@ -753,6 +753,134 @@ def test_post_scan_processing_service_returns_direct_ios_contract(tmp_path: Path
     assert result["network_evidence"]["ats_disabled"]["present"] is False
 
 
+def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
+    loaded_outputs = {
+        "plist_outputs": {
+            "Info.json": {
+                "app_meta": {
+                    "required_device_capabilities": ["arm64", "nfc"],
+                },
+                "ats": {
+                    "allows_arbitrary_loads": False,
+                    "exception_domains": [],
+                },
+                "background_modes": ["remote-notification"],
+                "privacy": {
+                    "permissions": [
+                        {"key": "NSCameraUsageDescription", "purpose": "Take photos"},
+                        {"key": "NSFaceIDUsageDescription", "purpose": "Sign in"},
+                        {"key": "NSMicrophoneUsageDescription", "purpose": "Record audio"},
+                        {"key": "NSContactsUsageDescription", "purpose": "Find friends"},
+                        {"key": "NSCalendarsUsageDescription", "purpose": "Show events"},
+                        {"key": "NSLocationWhenInUseUsageDescription", "purpose": "Find nearby stores"},
+                        {"key": "NSBluetoothAlwaysUsageDescription", "purpose": "Connect accessories"},
+                        {"key": "NSPhotoLibraryUsageDescription", "purpose": "Pick photos"},
+                        {"key": "NSNearbyInteractionUsageDescription", "purpose": "Nearby devices"},
+                    ]
+                },
+                "url_schemes": {
+                    "declared_schemes": ["myapp"],
+                    "queried_schemes": ["maps"],
+                },
+            },
+            "Entitlements.json": {
+                "entitlements": {
+                    "aps_environment": "development",
+                    "keychain_access_groups": ["ABC123.com.example.shared"],
+                }
+            },
+        },
+        "ipsw_outputs": {
+            "Payload/App.app/App.json": {
+                "analysis": {
+                    "entitlements": {
+                        "values": {
+                            "aps-environment": "development",
+                            "keychain-access-groups": ["ABC123.com.example.shared"],
+                        }
+                    }
+                }
+            }
+        },
+        "opengrep": {
+            "results": [
+                {
+                    "check_id": "ios.secure.rng.usage.present",
+                    "extra": {
+                        "metadata": {
+                            "phoenix": {
+                                "description": "Secure RNG usage detected.",
+                            }
+                        }
+                    },
+                },
+                {
+                    "check_id": "ios.networking.usage.present",
+                    "extra": {
+                        "metadata": {
+                            "phoenix": {
+                                "description": "Networking usage detected.",
+                            }
+                        }
+                    },
+                },
+            ]
+        },
+        "strings_outputs": {
+            "main.txt": "https://api.example.com\n",
+        },
+    }
+
+    sections = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert sections["functionality"]["Camera"] == {
+        "present": True,
+        "explanation": "plist key NSCameraUsageDescription present.",
+    }
+    assert sections["functionality"]["Biometric Authentication"] == {
+        "present": True,
+        "explanation": "plist key NSFaceIDUsageDescription present.",
+    }
+    assert sections["functionality"]["Networking"] == {
+        "present": True,
+        "explanation": "Info.plist declares NSAppTransportSecurity. Info.plist declares URL scheme handling. Networking usage detected.",
+    }
+    assert sections["functionality"]["Secure RNG"] == {
+        "present": True,
+        "explanation": "Secure RNG usage detected.",
+    }
+    assert sections["functionality"]["Push Notifications"] == {
+        "present": True,
+        "explanation": "entitlement aps_environment present. background mode remote-notification declared.",
+    }
+    assert sections["functionality"]["Contacts"]["present"] is True
+    assert sections["functionality"]["Calendar"]["present"] is True
+    assert sections["functionality"]["Location"]["present"] is True
+    assert sections["functionality"]["Bluetooth"]["present"] is True
+    assert sections["functionality"]["Microphone"]["present"] is True
+    assert sections["functionality"]["NFC"] == {
+        "present": True,
+        "explanation": "required device capabilities include nfc.",
+    }
+    assert sections["functionality"]["Photos"]["present"] is True
+    assert sections["functionality"]["Maps"] == {
+        "present": True,
+        "explanation": "queried URL schemes maps declared.",
+    }
+    assert sections["functionality"]["Keychain"] == {
+        "present": True,
+        "explanation": "entitlement keychain_access_groups present.",
+    }
+    assert sections["functionality"]["Nearby Interaction"] == {
+        "present": True,
+        "explanation": "plist key NSNearbyInteractionUsageDescription present.",
+    }
+    assert sections["functionality"]["Audio"] == {
+        "present": False,
+        "explanation": "",
+    }
+
+
 def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks() -> None:
     loaded_outputs = {
         "aapt2_permissions": {"permissions": []},
