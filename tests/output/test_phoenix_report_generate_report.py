@@ -257,3 +257,35 @@ def test_load_report_data_adds_display_permission_names() -> None:
     assert report["permissions"][0]["display_permission"] == "ACCESS_COARSE_LOCATION"
     assert report["permissions"][1]["permission"] == "com.example.app.permission.C2D_MESSAGE"
     assert report["permissions"][1]["display_permission"] == "com.example.app.permission.C2D_MESSAGE"
+
+
+def test_load_report_data_uses_imported_function_confidence_caveats_for_ios_arc_and_stack_canary() -> None:
+    report = load_report_data(
+        {
+            "meta": {"platform": "iOS"},
+            "ipa_binary_evidence": {
+                "arc": True,
+                "stack canary": True,
+            },
+            "vulnerability_sections": [
+                {"section_name": "Code", "findings_text": "", "checks": []},
+                {"section_name": "Network", "findings_text": "", "checks": []},
+                {"section_name": "Data", "findings_text": "", "checks": []},
+                {"section_name": "Resilience", "findings_text": "", "checks": []},
+            ],
+        }
+    )
+
+    code_section = next(section for section in report["vulnerability_sections"] if section["section_name"] == "Code")
+    check_map = _check_map(code_section["checks"])
+
+    assert (
+        check_map["Missing ARC Binary Protections"]["confidence_caveat"]
+        == "Inferred from Mach-O imported-function presence (_objc_release/_swift_release), not a direct "
+        "compiler flag; absence is less reliable if imports are stripped or unavailable."
+    )
+    assert (
+        check_map["Stack Canaries Not Enabled"]["confidence_caveat"]
+        == "Inferred from Mach-O imported-function presence (___stack_chk_fail and ___stack_chk_guard); "
+        "absence is less reliable if imports are stripped or unavailable."
+    )

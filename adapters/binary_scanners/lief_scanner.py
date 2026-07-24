@@ -96,9 +96,7 @@ class LIEFScanner(ScannerPort):
                         success=True,
                         raw_output=raw_output,
                         description=self.description,
-                        relative_target_path=Path(
-                            relative_result_path(extracted.app_bundle, binary_path)
-                        )
+                        relative_target_path=Path(relative_result_path(extracted.app_bundle, binary_path))
                         .with_suffix(".json")
                         .as_posix(),
                     )
@@ -141,9 +139,7 @@ class LIEFScanner(ScannerPort):
             "executable_name": extracted.info_plist.get("CFBundleExecutable", ""),
         }
 
-    def _analyze_binary(
-        self, lief_module: Any, extracted: ExtractedIPA, binary_path: Path
-    ) -> dict[str, Any]:
+    def _analyze_binary(self, lief_module: Any, extracted: ExtractedIPA, binary_path: Path) -> dict[str, Any]:
         try:
             binary = lief_module.MachO.parse(str(binary_path))
             slices = self._collect_slices(binary)
@@ -165,11 +161,7 @@ class LIEFScanner(ScannerPort):
 
     def _collect_slices(self, binary: Any) -> list[dict[str, Any]]:
         macho_items = self._collect_macho_objects(binary)
-        return [
-            self._build_macho_slice_analysis(macho)
-            for macho in macho_items
-            if macho is not None
-        ]
+        return [self._build_macho_slice_analysis(macho) for macho in macho_items if macho is not None]
 
     def _collect_macho_objects(self, binary: Any) -> list[Any]:
         if binary is None:
@@ -219,29 +211,21 @@ class LIEFScanner(ScannerPort):
 
     def _build_macho_slice_analysis(self, macho: Any) -> dict[str, Any]:
         header = getattr(macho, "header", None)
-        flags = (
-            [self._enum_text(flag) for flag in getattr(header, "flags_list", [])]
-            if header
-            else []
-        )
-        libraries = [
-            self._enum_text(getattr(lib, "name", lib))
-            for lib in getattr(macho, "libraries", [])
-        ]
+        flags = [self._enum_text(flag) for flag in getattr(header, "flags_list", [])] if header else []
+        libraries = [self._enum_text(getattr(lib, "name", lib)) for lib in getattr(macho, "libraries", [])]
         interesting_sections = self._collect_interesting_sections(macho)
 
-        architecture = (
-            self._enum_text(getattr(header, "cpu_type", "unknown"))
-            if header
-            else "unknown"
-        )
+        architecture = self._enum_text(getattr(header, "cpu_type", "unknown")) if header else "unknown"
 
         return {
             "architecture": architecture,
             "cpu_type": architecture,
-            "file_type": self._enum_text(getattr(header, "file_type", "unknown"))
-            if header
-            else "unknown",
+            "file_type": self._enum_text(getattr(header, "file_type", "unknown")) if header else "unknown",
+            "has_nx": self._bool_property(macho, "has_nx"),
+            "has_nx_heap": self._bool_property(macho, "has_nx_heap"),
+            "has_nx_stack": self._bool_property(macho, "has_nx_stack"),
+            "has_rpath": self._bool_property(macho, "has_rpath"),
+            "imported_functions": self._imported_function_names(macho),
             "flags": flags,
             "libraries": libraries,
             "interesting_sections": interesting_sections,
@@ -254,10 +238,7 @@ class LIEFScanner(ScannerPort):
             segment_name = getattr(segment, "name", "")
             for section in getattr(segment, "sections", []):
                 section_name = getattr(section, "name", "")
-                if not any(
-                    token in section_name.lower()
-                    for token in ("objc", "swift", "cstring")
-                ):
+                if not any(token in section_name.lower() for token in ("objc", "swift", "cstring")):
                     continue
                 interesting.append(
                     {
@@ -278,3 +259,30 @@ class LIEFScanner(ScannerPort):
         if value is None:
             return "unknown"
         return str(value)
+
+    @staticmethod
+    def _bool_property(value: Any, attribute: str) -> bool | None:
+        candidate = getattr(value, attribute, None)
+        if candidate is None:
+            return None
+        try:
+            resolved = candidate() if callable(candidate) else candidate
+        except Exception:
+            return None
+        if isinstance(resolved, bool):
+            return resolved
+        return None
+
+    @staticmethod
+    def _imported_function_names(macho: Any) -> list[str]:
+        imported_functions = getattr(macho, "imported_functions", None)
+        if imported_functions is None:
+            return []
+
+        names: list[str] = []
+        for item in imported_functions:
+            name = getattr(item, "name", item)
+            text = str(name).strip()
+            if text:
+                names.append(text)
+        return names
