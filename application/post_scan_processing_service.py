@@ -28,6 +28,8 @@ class PostScanProcessingService:
 
         scanner_outputs = self._scan_output_loader.load(scan_output_path)
         findings_from_scanners = self._scan_detail_extractor.extract_sections(scanner_outputs)
+        if "meta" in findings_from_scanners:
+            return findings_from_scanners
         return {
             "meta": self._build_meta(scanner_outputs),
             **findings_from_scanners,
