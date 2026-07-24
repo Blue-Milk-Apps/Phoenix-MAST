@@ -125,8 +125,16 @@ class IOSFunctionality:
             permission_keys=permission_keys,
         )
         self.Sensors = self._entry_from_sources()
-        self.Telephony = self._entry_from_sources()
-        self.USB_Devices = self._entry_from_sources()
+        self.Telephony = self._telephony_entry(
+            url_schemes,
+            opengrep_hits.get("Telephony", []),
+            strings_outputs,
+        )
+        self.USB_Devices = self._usb_devices_entry(
+            loaded_outputs,
+            opengrep_hits.get("USB Devices", []),
+            strings_outputs,
+        )
         self.Nearby_Interaction = self._entry_from_sources(
             plist_keys={"NSNearbyInteractionUsageDescription"},
             permission_keys=permission_keys,
@@ -200,6 +208,44 @@ class IOSFunctionality:
         if matched_caps:
             return self._entry(True, [f"required device capabilities include {', '.join(matched_caps)}."])
         return self._entry(False, [])
+
+    def _telephony_entry(
+        self,
+        url_schemes: dict[str, set[str]],
+        opengrep_hits: list[str],
+        strings_outputs: dict[str, str],
+    ) -> FunctionalityEntry:
+        explanation_parts: list[str] = []
+        matched = sorted(
+            scheme
+            for scheme in url_schemes.get("queried_schemes", set()) | url_schemes.get("declared_schemes", set())
+            if str(scheme).lower() in {"tel", "telprompt", "sms"}
+        )
+        if matched:
+            explanation_parts.append(f"URL schemes {', '.join(matched)} declared or queried.")
+        for description in opengrep_hits:
+            if description and description not in explanation_parts:
+                explanation_parts.append(description)
+        if not explanation_parts and self._strings_indicate_telephony(strings_outputs):
+            explanation_parts.append("strings output references telephony APIs or URL schemes.")
+        return self._entry(bool(explanation_parts), explanation_parts)
+
+    def _usb_devices_entry(
+        self,
+        loaded_outputs: dict[str, Any],
+        opengrep_hits: list[str],
+        strings_outputs: dict[str, str],
+    ) -> FunctionalityEntry:
+        explanation_parts: list[str] = []
+        protocols = self._external_accessory_protocols(loaded_outputs)
+        if protocols:
+            explanation_parts.append(f"external accessory protocols declared: {', '.join(protocols)}.")
+        for description in opengrep_hits:
+            if description and description not in explanation_parts:
+                explanation_parts.append(description)
+        if not explanation_parts and self._strings_indicate_usb(strings_outputs):
+            explanation_parts.append("strings output references external accessory APIs.")
+        return self._entry(bool(explanation_parts), explanation_parts)
 
     @staticmethod
     def _entry(present: bool, explanation_parts: list[str]) -> FunctionalityEntry:
@@ -281,6 +327,18 @@ class IOSFunctionality:
                     caps.add(text)
         return caps
 
+    def _external_accessory_protocols(self, loaded_outputs: dict[str, Any]) -> list[str]:
+        protocols: list[str] = []
+        for document in self._plist_documents(loaded_outputs):
+            plist = document.get("plist") or {}
+            if not isinstance(plist, dict):
+                continue
+            for item in plist.get("UISupportedExternalAccessoryProtocols", []) or []:
+                text = str(item).strip()
+                if text:
+                    protocols.append(text)
+        return list(dict.fromkeys(protocols))
+
     @staticmethod
     def _opengrep_descriptions_by_capability(loaded_outputs: dict[str, Any]) -> dict[str, list[str]]:
         mapping: dict[str, list[str]] = {
@@ -288,6 +346,8 @@ class IOSFunctionality:
             "Networking": [],
             "Secure RNG": [],
             "Push Notifications": [],
+            "Telephony": [],
+            "USB Devices": [],
         }
         for result in (loaded_outputs.get("opengrep") or {}).get("results") or []:
             extra = result.get("extra") if isinstance(result, dict) else {}
@@ -309,6 +369,10 @@ class IOSFunctionality:
                 mapping["Push Notifications"].append(description)
             if any(token in haystack for token in ("network", "urlsession", "cfnetwork", "http", "https")):
                 mapping["Networking"].append(description)
+            if any(token in haystack for token in ("telephony", "coretelephony", "tel:", "sms:")):
+                mapping["Telephony"].append(description)
+            if any(token in haystack for token in ("usb", "external accessory", "eaaccessory", "accessory protocol")):
+                mapping["USB Devices"].append(description)
         return {key: list(dict.fromkeys(values)) for key, values in mapping.items()}
 
     @staticmethod
@@ -324,6 +388,16 @@ class IOSFunctionality:
     @staticmethod
     def _strings_indicate_networking(strings_outputs: dict[str, str]) -> bool:
         pattern = re.compile(r"https?://", re.IGNORECASE)
+        return any(pattern.search(content or "") for content in strings_outputs.values())
+
+    @staticmethod
+    def _strings_indicate_telephony(strings_outputs: dict[str, str]) -> bool:
+        pattern = re.compile(r"(coretelephony|cttelephony|tel:|sms:)", re.IGNORECASE)
+        return any(pattern.search(content or "") for content in strings_outputs.values())
+
+    @staticmethod
+    def _strings_indicate_usb(strings_outputs: dict[str, str]) -> bool:
+        pattern = re.compile(r"(externalaccessory|eaaccessory|uisupportedexternalaccessoryprotocols)", re.IGNORECASE)
         return any(pattern.search(content or "") for content in strings_outputs.values())
 
     @staticmethod

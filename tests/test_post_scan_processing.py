@@ -780,7 +780,10 @@ def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
                 },
                 "url_schemes": {
                     "declared_schemes": ["myapp"],
-                    "queried_schemes": ["maps"],
+                    "queried_schemes": ["maps", "tel"],
+                },
+                "plist": {
+                    "UISupportedExternalAccessoryProtocols": ["com.example.reader"],
                 },
             },
             "Entitlements.json": {
@@ -824,10 +827,30 @@ def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
                         }
                     },
                 },
+                {
+                    "check_id": "ios.telephony.usage.present",
+                    "extra": {
+                        "metadata": {
+                            "phoenix": {
+                                "description": "Telephony usage detected.",
+                            }
+                        }
+                    },
+                },
+                {
+                    "check_id": "ios.usb.devices.usage.present",
+                    "extra": {
+                        "metadata": {
+                            "phoenix": {
+                                "description": "USB devices usage detected.",
+                            }
+                        }
+                    },
+                },
             ]
         },
         "strings_outputs": {
-            "main.txt": "https://api.example.com\n",
+            "main.txt": "https://api.example.com\nCoreTelephony\nExternalAccessory\n",
         },
     }
 
@@ -878,6 +901,14 @@ def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
     assert sections["functionality"]["Audio"] == {
         "present": False,
         "explanation": "",
+    }
+    assert sections["functionality"]["Telephony"] == {
+        "present": True,
+        "explanation": "URL schemes tel declared or queried. Telephony usage detected.",
+    }
+    assert sections["functionality"]["USB Devices"] == {
+        "present": True,
+        "explanation": "external accessory protocols declared: com.example.reader. USB devices usage detected.",
     }
 
 
