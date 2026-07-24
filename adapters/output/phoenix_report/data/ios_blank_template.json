@@ -1,0 +1,137 @@
+{
+  "meta": {
+    "app_display_name": "",
+    "file_name": "",
+    "package_name": "",
+    "scan_date": "",
+    "platform": "iOS",
+    "version_name": "",
+    "version_code": "",
+    "reviewer_org": "Phoenix Security Report"
+  },
+  "findings_severity": {
+    "critical": 0,
+    "high": 0,
+    "medium": 0,
+    "low": 0,
+    "info": 0,
+    "secure": 0
+  },
+  "risk_summary": {
+    "code_vulnerability": "Low",
+    "data": "Low",
+    "networking": "Low",
+    "resilience": "Low"
+  },
+  "overall_evaluation": [],
+  "file_info": {
+    "filename": "",
+    "size": "",
+    "md5": "",
+    "sha1": "",
+    "sha256": ""
+  },
+  "app_info": {
+    "icon_path": "",
+    "name": "",
+    "package_name": "",
+    "main_activity": "",
+    "target_sdk": "",
+    "min_sdk": "",
+    "max_sdk": "",
+    "version_name": "",
+    "app_store_id": "",
+    "developer": "",
+    "categories": "",
+    "trackers_detected": ""
+  },
+  "ipa_binary_evidence": {},
+  "ipa_binary_protections": [],
+  "url_schemes": [],
+  "code_evidence": {},
+  "network_evidence": {},
+  "data_evidence": {},
+  "resilience_evidence": {},
+  "functionality": {
+    "Camera": { "present": false, "explanation": "" },
+    "Biometric Authentication": { "present": false, "explanation": "" },
+    "Networking": { "present": false, "explanation": "" },
+    "Secure RNG": { "present": false, "explanation": "" },
+    "Push Notifications": { "present": false, "explanation": "" },
+    "Audio": { "present": false, "explanation": "" },
+    "Contacts": { "present": false, "explanation": "" },
+    "Geofencing": { "present": false, "explanation": "" },
+    "Health Data": { "present": false, "explanation": "" },
+    "Location": { "present": false, "explanation": "" },
+    "Maps": { "present": false, "explanation": "" },
+    "Payment Services": { "present": false, "explanation": "" },
+    "SMS": { "present": false, "explanation": "" },
+    "Bluetooth": { "present": false, "explanation": "" },
+    "Camera Delegation": { "present": false, "explanation": "" },
+    "Calendar": { "present": false, "explanation": "" },
+    "In-App Purchases": { "present": false, "explanation": "" },
+    "Keychain": { "present": false, "explanation": "" },
+    "Microphone": { "present": false, "explanation": "" },
+    "NFC": { "present": false, "explanation": "" },
+    "Photos": { "present": false, "explanation": "" },
+    "Sensors": { "present": false, "explanation": "" },
+    "Telephony": { "present": false, "explanation": "" },
+    "USB Devices": { "present": false, "explanation": "" },
+    "Nearby Interaction": { "present": false, "explanation": "" }
+  },
+  "third_party_sdks": {
+    "Analytics": {
+      "GoogleAnalytics": false,
+      "Flurry": false,
+      "Amplitude": false,
+      "Mixpanel": false,
+      "NewRelic": false
+    },
+    "Advertising": {
+      "Admob": false,
+      "DoubleClick": false,
+      "Chartboost": false,
+      "AppLovin": false
+    },
+    "Cloud Storage": {
+      "GoogleDrive": false,
+      "Dropbox": false,
+      "OneDrive": false,
+      "Box": false
+    },
+    "Developer Tools": {
+      "Stripe": false,
+      "Paypal": false,
+      "Alamofire": false,
+      "Fabric": false,
+      "Parse": false,
+      "Realm": false,
+      "Bolts": false
+    }
+  },
+  "permissions": [
+    {
+      "permission": "",
+      "status": "dangerous",
+      "info": "",
+      "usage_description": "",
+      "general_description": ""
+    }
+  ],
+  "vulnerability_sections": [
+    { "section_name": "Code", "findings_text": "", "checks": [] },
+    { "section_name": "Network", "findings_text": "", "checks": [] },
+    { "section_name": "Data", "findings_text": "", "checks": [] },
+    { "section_name": "Resilience", "findings_text": "", "checks": [] }
+  ],
+  "hardcoded_values": {
+    "urls": [
+      { "url": "", "country": "" }
+    ],
+    "emails": [],
+    "secrets": []
+  },
+  "endpoints": [
+    { "endpoint": "", "tags": "", "ip_address": "", "country": "" }
+  ]
+}

@@ -30,7 +30,7 @@
     <tr><td class="label">Scan Date</td><td class="value">{{ data.meta.scan_date }}</td></tr>
     <tr><td class="label">Platform</td><td class="value">{{ data.meta.platform }}</td></tr>
     <tr><td class="label">Version</td><td class="value">{{ data.meta.version_name }} ({{ data.meta.version_code }})</td></tr>
-    <tr><td class="label">App Store</td><td class="value">{{ data.app_info.app_store_id }}</td></tr>
+    <tr><td class="label">{{ 'App Store' if data.meta.platform == 'iOS' else 'Play Store' }}</td><td class="value">{{ data.app_info.app_store_id }}</td></tr>
     <tr><td class="label">Developer</td><td class="value">{{ data.app_info.developer }}</td></tr>
     <tr><td class="label">Categories</td><td class="value">{{ data.app_info.categories }}</td></tr>
     <tr><td class="label">Trackers Detected</td><td class="value">{{ data.app_info.trackers_detected }}</td></tr>
@@ -76,6 +76,7 @@
 
 <!-- ===================== CERTIFICATE / FILE / APP INFO ===================== -->
 <div class="section">
+  {% if data.meta.platform != 'iOS' %}
   <h2>Certificate Information</h2>
   <table class="kv-table">
     <tr><td class="k">Owner Name</td><td class="v">{{ data.certificate.owner_name }}</td></tr>
@@ -95,6 +96,7 @@
     <tr><td class="k">Fingerprint</td><td class="v mono">{{ data.certificate.fingerprint }}</td></tr>
     <tr><td class="k">Unique Certs</td><td class="v">{{ data.certificate.unique_certs }}</td></tr>
   </table>
+  {% endif %}
 
   <h2>File Information</h2>
   <table class="kv-table">
@@ -110,12 +112,40 @@
     <tr><td class="k">Name</td><td class="v">{{ data.app_info.name }}</td></tr>
     <tr><td class="k">Package Name</td><td class="v">{{ data.app_info.package_name }}</td></tr>
     <tr><td class="k">Main Activity</td><td class="v">{{ data.app_info.main_activity }}</td></tr>
+    {% if data.meta.platform != 'iOS' %}
     <tr><td class="k">Target SDK</td><td class="v">{{ data.app_info.target_sdk }}</td></tr>
     <tr><td class="k">Min SDK</td><td class="v">{{ data.app_info.min_sdk }}</td></tr>
     <tr><td class="k">Max SDK</td><td class="v">{{ data.app_info.max_sdk }}</td></tr>
+    {% endif %}
     <tr><td class="k">Version Name</td><td class="v">{{ data.app_info.version_name }}</td></tr>
   </table>
 
+  {% if data.meta.platform == 'iOS' %}
+  <h2>IPA Binary Code Analysis</h2>
+  <table>
+    <tr><th class="col-check">Protection</th><th class="col-result">Status</th><th class="col-severity">Severity</th><th>Description</th></tr>
+    {% for p in data.ipa_binary_protections %}
+    <tr>
+      <td>{{ p.protection }}</td>
+      <td><span class="badge badge-{{ p.severity | lower }}">{{ p.status }}</span></td>
+      <td><span class="badge badge-{{ p.severity | lower }}">{{ p.severity }}</span></td>
+      <td>{{ p.description }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <h3>Custom URL Schemes</h3>
+  {% if data.url_schemes %}
+  <table class="compact">
+    <tr><th>URL Name</th><th>Schemes</th></tr>
+    {% for u in data.url_schemes %}
+    <tr><td class="mono">{{ u.url_name }}</td><td class="mono">{{ u.schemes | join(', ') }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="small">No custom URL schemes were declared by this app.</p>
+  {% endif %}
+  {% else %}
   <h2>App Components</h2>
   <div class="components-bars">
     {% set component_rows = [
@@ -144,6 +174,7 @@
       <span class="legend-swatch legend-safe"></span> Not Exported
     </div>
   </div>
+  {% endif %}
 </div>
 
 <!-- ===================== FUNCTIONALITY ===================== -->
@@ -217,7 +248,7 @@
       <td>{{ c.check }}</td>
       <td>{{ result_badge(c.result) }}</td>
       <td>{{ risk_badge(c.severity) }}</td>
-      <td>{{ c.explanation }}{% if c.remediation_link %}<br><span class="small">Remediation: {{ c.remediation_link }}</span>{% endif %}</td>
+      <td>{{ c.explanation }}{% if c.remediation_link %}<br><span class="small">Remediation: {{ c.remediation_link }}</span>{% endif %}{% if c.confidence_caveat and show_confidence_caveats %}<br><span class="small confidence-caveat">⚠ {{ c.confidence_caveat }}</span>{% endif %}</td>
       <td class="small">{{ c.compliance }}</td>
       <td class="small">{{ c.evidence }}</td>
     </tr>
@@ -233,12 +264,16 @@
 <div class="section">
   <h2>Hard-Coded Values Found</h2>
   <h3>URLs</h3>
+  {% if data.hardcoded_values.urls %}
   <table class="compact">
     <tr><th>URL</th><th>Country</th></tr>
     {% for u in data.hardcoded_values.urls %}
     <tr><td class="mono">{{ u.url }}</td><td>{{ u.country }}</td></tr>
     {% endfor %}
   </table>
+  {% else %}
+  <p class="small">No hardcoded URL strings were found.</p>
+  {% endif %}
 
   <h3>Emails</h3>
   {% if data.hardcoded_values.emails %}

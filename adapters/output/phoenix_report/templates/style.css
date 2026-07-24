@@ -174,4 +174,5 @@ table.compact th, table.compact td { font-size: 8pt; padding: 4px 6px; }
 .kv-table td.v { font-weight: bold; }
 
 .small { font-size: 8pt; color: #666; }
+.confidence-caveat { color: #8a6d1a; }
 .mono { font-family: "DejaVu Sans Mono", monospace; font-size: 8pt; word-break: break-all; }

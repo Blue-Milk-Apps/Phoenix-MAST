@@ -7,7 +7,8 @@ __pycache__/
 owasp-data/
 scan-results/
 phoenix/
-rules/
+rules/ios/*
+rules/android/*
 
 sample-project/
 nvd-owasp-data/

@@ -4,6 +4,8 @@ from pathlib import Path
 from adapters.post_scan import (
     AndroidBinaryScanDetailExtractor,
     AndroidBinaryScanOutputLoader,
+    IOSBinaryScanDetailExtractor,
+    IOSBinaryScanOutputLoader,
 )
 from application.post_scan_processing_service import PostScanProcessingService
 
@@ -259,6 +261,16 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
 
     sections = AndroidBinaryScanDetailExtractor().extract_sections(loaded_outputs)
 
+    assert sections["meta"] == {
+        "app_display_name": "APKPure",
+        "file_name": "APKPure.apk",
+        "package_name": "com.apkpure.aegon",
+        "scan_date": "",
+        "platform": "",
+        "version_name": "3.20.70",
+        "version_code": "",
+        "reviewer_org": "Phoenix Security Report",
+    }
     assert sections["app_info"] == {
         "icon_path": "",
         "name": "APKPure",
@@ -429,6 +441,316 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
             "country": "",
         },
     ]
+
+
+def test_ios_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Path) -> None:
+    scan_dir = tmp_path / "SAST_ios_binary_2026-07-23_10-00-00"
+    (scan_dir / "opengrep_source").mkdir(parents=True)
+    (scan_dir / "ipsw" / "Payload" / "App.app").mkdir(parents=True)
+    (scan_dir / "lief" / "Payload" / "App.app").mkdir(parents=True)
+    (scan_dir / "plist_binary").mkdir()
+    (scan_dir / "strings").mkdir()
+    (scan_dir / "trufflehog").mkdir()
+    (scan_dir / "gitleaks").mkdir()
+    (scan_dir / "syft").mkdir()
+
+    _write_json(
+        scan_dir / "scan_metadata.json",
+        {
+            "platform": "IOS",
+            "project_path": str(tmp_path / "Demo.ipa"),
+        },
+    )
+    _write_json(scan_dir / "opengrep_source" / "opengrep_results.json", {"results": []})
+    _write_json(
+        scan_dir / "ipsw" / "Payload" / "App.app" / "App.json",
+        {"app_info": {"bundle_id": "com.example.app"}},
+    )
+    _write_json(
+        scan_dir / "lief" / "Payload" / "App.app" / "App.json",
+        {"binary": {"name": "App"}},
+    )
+    _write_json(
+        scan_dir / "plist_binary" / "Info.json",
+        {
+            "app_meta": {
+                "bundle_identifier": "com.example.app",
+                "bundle_name": "ExampleApp",
+                "display_name": "ExampleApp",
+                "version": "1.2.3",
+                "build": "7",
+            },
+            "plist": {"CFBundleExecutable": "ExampleApp"},
+        },
+    )
+    _write_json(scan_dir / "plist_binary" / "scan_index.json", {"plists": []})
+    (scan_dir / "strings" / "main.txt").write_text("hello\n", encoding="utf-8")
+    (scan_dir / "trufflehog" / "report.json").write_text("{}", encoding="utf-8")
+    (scan_dir / "gitleaks" / "report.json").write_text("{}", encoding="utf-8")
+    (scan_dir / "syft" / "sbom.json").write_text("{}", encoding="utf-8")
+
+    loaded = IOSBinaryScanOutputLoader().load(scan_dir)
+
+    assert loaded["scan_output_path"] == str(scan_dir)
+    assert loaded["scan_metadata"] == {"platform": "IOS", "project_path": str(tmp_path / "Demo.ipa")}
+    assert loaded["opengrep"] == {"results": []}
+    assert loaded["ipsw_outputs"] == {"Payload/App.app/App.json": {"app_info": {"bundle_id": "com.example.app"}}}
+    assert loaded["lief_outputs"] == {"Payload/App.app/App.json": {"binary": {"name": "App"}}}
+    assert loaded["plist_outputs"] == {
+        "Info.json": {
+            "app_meta": {
+                "bundle_identifier": "com.example.app",
+                "bundle_name": "ExampleApp",
+                "display_name": "ExampleApp",
+                "version": "1.2.3",
+                "build": "7",
+            },
+            "plist": {"CFBundleExecutable": "ExampleApp"},
+        }
+    }
+    assert loaded["plist_index"] == {"plists": []}
+    assert loaded["strings_outputs"] == {"main.txt": "hello\n"}
+    assert loaded["trufflehog_outputs"] == {"report.json": "{}"}
+    assert loaded["gitleaks_outputs"] == {"report.json": "{}"}
+    assert loaded["syft_outputs"] == {"sbom.json": "{}"}
+
+
+def test_ios_binary_scan_output_loader_tolerates_missing_optional_artifacts(tmp_path: Path) -> None:
+    scan_dir = tmp_path / "SAST_ios_binary_2026-07-23_10-00-00"
+    scan_dir.mkdir()
+    _write_json(scan_dir / "scan_metadata.json", {"platform": "IOS"})
+
+    loaded = IOSBinaryScanOutputLoader().load(scan_dir)
+
+    assert loaded["scan_metadata"] == {"platform": "IOS"}
+    assert loaded["opengrep"] is None
+    assert loaded["ipsw_outputs"] == {}
+    assert loaded["lief_outputs"] == {}
+    assert loaded["plist_outputs"] == {}
+    assert loaded["plist_index"] is None
+    assert loaded["strings_outputs"] == {}
+    assert loaded["trufflehog_outputs"] == {}
+    assert loaded["gitleaks_outputs"] == {}
+    assert loaded["syft_outputs"] == {}
+
+
+def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: Path) -> None:
+    ipa_path = tmp_path / "DVIA-v2.ipa"
+    ipa_path.write_bytes(b"ios-binary")
+    loaded_outputs = {
+        "scan_output_path": str(tmp_path),
+        "scan_metadata": {
+            "platform": "IOS",
+            "project_path": str(ipa_path),
+            "scan_date": "2026-07-22 10:51:49",
+        },
+        "plist_outputs": {
+            "Info.json": {
+                "app_meta": {
+                    "bundle_identifier": "com.highaltitudehacks.DVIAswiftv2",
+                    "bundle_name": "DVIA-v2",
+                    "display_name": "DVIA-v2",
+                    "version": "2.0",
+                    "build": "1",
+                },
+                "plist": {
+                    "CFBundleExecutable": "DVIA-v2.ipa",
+                },
+            }
+        },
+    }
+
+    result = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert set(result) == {
+        "meta",
+        "file_info",
+        "app_info",
+        "ipa_binary_evidence",
+        "url_schemes",
+        "functionality",
+        "third_party_sdks",
+        "permissions",
+        "code_evidence",
+        "network_evidence",
+        "data_evidence",
+        "resilience_evidence",
+        "hardcoded_values",
+        "endpoints",
+    }
+    assert result["meta"] == {
+        "app_display_name": "DVIA-v2",
+        "file_name": "DVIA-v2.ipa",
+        "package_name": "com.highaltitudehacks.DVIAswiftv2",
+        "scan_date": "2026-07-22 10:51:49",
+        "platform": "iOS",
+        "version_name": "2.0",
+        "version_code": "1",
+        "reviewer_org": "Phoenix Security Report",
+    }
+    assert result["file_info"]["filename"] == "DVIA-v2.ipa"
+    assert result["file_info"]["md5"] != ""
+    assert result["file_info"]["sha1"] != ""
+    assert result["file_info"]["sha256"] != ""
+    assert result["app_info"] == {
+        "icon_path": "",
+        "name": "DVIA-v2",
+        "package_name": "com.highaltitudehacks.DVIAswiftv2",
+        "main_activity": "",
+        "version_name": "2.0 (1)",
+        "app_store_id": "",
+        "developer": "",
+        "categories": "",
+        "trackers_detected": "",
+    }
+    assert result["ipa_binary_evidence"] == {
+        "nx": False,
+        "pie": False,
+        "stack canary": False,
+        "arc": False,
+        "rpath": False,
+        "code signature": False,
+        "encrypted": False,
+        "symbols stripped": False,
+    }
+    assert result["url_schemes"] == []
+    assert result["permissions"] == []
+    assert result["endpoints"] == []
+    assert result["hardcoded_values"] == {"urls": [], "emails": [], "secrets": []}
+    assert set(result["code_evidence"]) == {
+        "uses_uiwebview",
+        "insecure_nanopb_library",
+        "insecure_nskeyedunarchiver_usage",
+        "missing_arc",
+        "pic_not_enabled",
+        "stack_canaries_not_enabled",
+        "insecure_api_usage_in_binary",
+        "malloc_instead_of_calloc",
+        "encodes_data_using_insecure_cryptography",
+        "utilizes_insecure_cryptography",
+        "pbkdf2_iteration_count_below_10k",
+        "hardcoded_api_keys_in_bundle",
+        "insecure_entitlements",
+    }
+    assert set(result["network_evidence"]) == {
+        "ats_disabled",
+        "vulnerable_openssl_ccs_injection",
+        "uses_ftp",
+        "vulnerable_openssl_heartbleed",
+        "insecure_http_traffic",
+        "ats_exceptions_configured",
+        "cookie_missing_httponly",
+        "cookie_missing_secure",
+        "cleartext_http_advertiser_id",
+        "cleartext_http_imei",
+        "cleartext_http_gps_latitude",
+        "cleartext_http_gps_longitude",
+        "cleartext_http_sensitive_data",
+        "cleartext_http_wifi_mac",
+        "https_url_contains_imei",
+        "https_url_contains_gps_latitude",
+        "https_url_contains_gps_longitude",
+        "https_url_contains_sensitive_data",
+        "https_url_contains_wifi_mac",
+        "insecure_tls_configuration",
+        "certificate_pinning_not_implemented",
+    }
+    assert set(result["data_evidence"]) == {
+        "deprecated_keychain_attributes",
+        "advertiser_id_stored_insecurely",
+        "imei_stored_insecurely",
+        "global_write_permissions",
+        "gps_latitude_stored_insecurely",
+        "gps_longitude_stored_insecurely",
+        "hardcoded_api_keys_stored_insecurely",
+        "hardcoded_passwords_stored_insecurely",
+        "sensitive_values_stored_insecurely",
+        "wifi_ip_stored_insecurely",
+        "wifi_mac_stored_insecurely",
+        "keychain_plaintext_values",
+        "nsuserdefaults_sensitive_values",
+        "advertiser_id_logged_insecurely",
+        "imei_logged_insecurely",
+        "gps_latitude_logged_insecurely",
+        "gps_longitude_logged_insecurely",
+        "sensitive_data_logged_insecurely",
+        "sensitive_values_in_memory",
+        "wifi_mac_logged_insecurely",
+        "keyboard_cache_exposure",
+    }
+    assert result["resilience_evidence"] == {
+        "biometric_bypass_possible": {
+            "present": False,
+            "evidence": "no_biometric_bypass_possible_hits",
+        },
+        "debug_symbols_present": {
+            "present": False,
+            "evidence": "no_debug_symbols_present_hits",
+        },
+    }
+    assert list(result["functionality"]) == [
+        "Camera",
+        "Biometric Authentication",
+        "Networking",
+        "Secure RNG",
+        "Push Notifications",
+        "Audio",
+        "Contacts",
+        "Geofencing",
+        "Health Data",
+        "Location",
+        "Maps",
+        "Payment Services",
+        "SMS",
+        "Bluetooth",
+        "Camera Delegation",
+        "Calendar",
+        "In-App Purchases",
+        "Keychain",
+        "Microphone",
+        "NFC",
+        "Photos",
+        "Sensors",
+        "Telephony",
+        "USB Devices",
+        "Nearby Interaction",
+    ]
+
+
+def test_post_scan_processing_service_returns_direct_ios_contract(tmp_path: Path) -> None:
+    scan_dir = tmp_path / "SAST_ios_binary_2026-07-23_10-00-00"
+    (scan_dir / "plist_binary").mkdir(parents=True)
+    _write_json(
+        scan_dir / "scan_metadata.json",
+        {
+            "platform": "IOS",
+            "project_path": str(tmp_path / "Demo.ipa"),
+            "scan_date": "2026-07-23 10:00:00",
+        },
+    )
+    _write_json(
+        scan_dir / "plist_binary" / "Info.json",
+        {
+            "app_meta": {
+                "bundle_identifier": "com.example.app",
+                "bundle_name": "ExampleApp",
+                "display_name": "ExampleApp",
+                "version": "1.0",
+                "build": "3",
+            },
+            "plist": {"CFBundleExecutable": "ExampleApp"},
+        },
+    )
+
+    result = PostScanProcessingService(
+        scan_output_loader=IOSBinaryScanOutputLoader(),
+        scan_detail_extractor=IOSBinaryScanDetailExtractor(),
+    ).process(scan_dir)
+
+    assert result["meta"]["platform"] == "iOS"
+    assert result["meta"]["app_display_name"] == "ExampleApp"
+    assert result["code_evidence"]["uses_uiwebview"]["present"] is False
+    assert result["network_evidence"]["ats_disabled"]["present"] is False
 
 
 def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks() -> None:

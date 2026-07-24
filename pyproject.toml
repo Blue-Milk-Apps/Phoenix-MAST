@@ -41,6 +41,7 @@ packages = [
     "domain",
     "domain.post_scan",
     "domain.post_scan.android",
+    "domain.post_scan.ios",
     "entrypoints",
     "ports",
     "utilities",
