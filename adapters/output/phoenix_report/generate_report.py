@@ -686,8 +686,8 @@ IOS_CODE_CHECK_SPECS = (
             "exploit-mitigation mechanism against memory-corruption bugs."
         ),
         "confidence_caveat": (
-            "Inferred from ARC runtime symbol presence (_objc_release/_objc_retain), not a single "
-            "compiler flag like PIE/NX."
+            "Inferred from Mach-O imported-function presence (_objc_release/_swift_release), not a direct "
+            "compiler flag; absence is less reliable if imports are stripped or unavailable."
         ),
         "aliases": ("arc binary protections", "application utilizes arc binary protections"),
     },
@@ -717,7 +717,10 @@ IOS_CODE_CHECK_SPECS = (
             "A stack canary is present -- stack buffer overflows overwriting the return address would "
             "be caught before the function returns."
         ),
-        "confidence_caveat": None,
+        "confidence_caveat": (
+            "Inferred from Mach-O imported-function presence (___stack_chk_fail and ___stack_chk_guard); "
+            "absence is less reliable if imports are stripped or unavailable."
+        ),
         "aliases": ("stack smashing protections", "application utilizes stack smashing protections"),
     },
     {

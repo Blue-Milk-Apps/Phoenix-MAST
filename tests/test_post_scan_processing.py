@@ -558,6 +558,36 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
                 },
             }
         },
+        "lief_outputs": {
+            "DVIA-v2.json": {
+                "binary": {
+                    "kind": "main",
+                    "slices": [
+                        {
+                            "imported_functions": [
+                                "___stack_chk_fail",
+                                "___stack_chk_guard",
+                                "_objc_release",
+                            ]
+                        }
+                    ],
+                }
+            },
+            "Frameworks/Some.framework/Some.json": {
+                "binary": {
+                    "kind": "framework",
+                    "slices": [
+                        {
+                            "imported_functions": [
+                                "___stack_chk_fail",
+                                "___stack_chk_guard",
+                                "_swift_release",
+                            ]
+                        }
+                    ],
+                }
+            },
+        },
     }
 
     result = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
@@ -606,8 +636,8 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
     assert result["ipa_binary_evidence"] == {
         "nx": False,
         "pie": False,
-        "stack canary": False,
-        "arc": False,
+        "stack canary": True,
+        "arc": True,
         "rpath": False,
         "code signature": False,
         "encrypted": False,
@@ -715,6 +745,56 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
         "USB Devices",
         "Nearby Interaction",
     ]
+
+
+def test_ios_ipa_binary_evidence_requires_both_canary_imports() -> None:
+    loaded_outputs = {
+        "lief_outputs": {
+            "App.json": {
+                "binary": {
+                    "kind": "main",
+                    "slices": [{"imported_functions": ["___stack_chk_fail"]}],
+                }
+            }
+        }
+    }
+
+    result = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert result["ipa_binary_evidence"]["stack canary"] is False
+    assert result["ipa_binary_evidence"]["arc"] is False
+
+
+def test_ios_ipa_binary_evidence_ignores_framework_only_imports() -> None:
+    loaded_outputs = {
+        "lief_outputs": {
+            "App.json": {
+                "binary": {
+                    "kind": "main",
+                    "slices": [{"imported_functions": []}],
+                }
+            },
+            "Frameworks/Foo.framework/Foo.json": {
+                "binary": {
+                    "kind": "framework",
+                    "slices": [
+                        {
+                            "imported_functions": [
+                                "___stack_chk_fail",
+                                "___stack_chk_guard",
+                                "_objc_release",
+                            ]
+                        }
+                    ],
+                }
+            },
+        }
+    }
+
+    result = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert result["ipa_binary_evidence"]["stack canary"] is False
+    assert result["ipa_binary_evidence"]["arc"] is False
 
 
 def test_post_scan_processing_service_returns_direct_ios_contract(tmp_path: Path) -> None:
