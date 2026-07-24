@@ -544,17 +544,24 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
             "project_path": str(ipa_path),
             "scan_date": "2026-07-22 10:51:49",
         },
-        "plist_outputs": {
-            "Info.json": {
-                "app_meta": {
-                    "bundle_identifier": "com.highaltitudehacks.DVIAswiftv2",
+        "ipsw_outputs": {
+            "DVIA-v2.json": {
+                "app_info": {
+                    "bundle_id": "com.highaltitudehacks.DVIAswiftv2",
                     "bundle_name": "DVIA-v2",
-                    "display_name": "DVIA-v2",
-                    "version": "2.0",
-                    "build": "1",
+                    "short_version": "2.0",
+                    "bundle_version": "1",
+                    "executable_name": "DVIA",
+                    "minimum_os": "15.0",
                 },
-                "plist": {
-                    "CFBundleExecutable": "DVIA-v2.ipa",
+                "binary": {
+                    "kind": "main",
+                    "name": "DVIA",
+                    "path": "DVIA",
+                },
+                "analysis": {
+                    "macho": {"rpaths": ["@rpath"]},
+                    "code_signature": {"present": True},
                 },
             }
         },
@@ -564,13 +571,19 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
                     "kind": "main",
                     "slices": [
                         {
+                            "architecture": "ARM64",
+                            "file_type": "EXECUTE",
                             "imported_functions": [
                                 "___stack_chk_fail",
                                 "___stack_chk_guard",
                                 "_objc_release",
-                            ]
+                            ],
+                            "libraries": ["libSystem.B.dylib"],
+                            "has_rpath": True,
                         }
                     ],
+                    "name": "DVIA-LIEF",
+                    "path": "DVIA-LIEF",
                 }
             },
             "Frameworks/Some.framework/Some.json": {
@@ -638,8 +651,8 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
         "pie": False,
         "stack canary": True,
         "arc": True,
-        "rpath": False,
-        "code signature": False,
+        "rpath": True,
+        "code signature": True,
         "encrypted": False,
         "symbols stripped": False,
     }
@@ -747,6 +760,91 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
     ]
 
 
+def test_ios_meta_uses_lief_when_ipsw_is_partial() -> None:
+    loaded_outputs = {
+        "scan_metadata": {
+            "platform": "IOS",
+            "project_path": "/tmp/Unknown.ipa",
+        },
+        "ipsw_outputs": {
+            "App.json": {
+                "app_info": {
+                    "bundle_id": "",
+                    "bundle_name": "",
+                    "short_version": "",
+                    "bundle_version": "",
+                },
+                "binary": {
+                    "kind": "main",
+                    "name": "AppFromIpsw",
+                    "path": "AppFromIpsw",
+                },
+            }
+        },
+        "lief_outputs": {
+            "App.json": {
+                "binary": {
+                    "kind": "main",
+                    "name": "AppFromLief",
+                    "path": "AppFromLief",
+                    "slices": [{"architecture": "ARM64", "file_type": "EXECUTE"}],
+                }
+            }
+        },
+    }
+
+    result = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert result["meta"]["app_display_name"] == "AppFromLief"
+    assert result["meta"]["file_name"] == "Unknown.ipa"
+    assert result["meta"]["package_name"] == ""
+    assert result["meta"]["version_name"] == ""
+    assert result["meta"]["version_code"] == ""
+
+
+def test_ios_meta_uses_strings_as_narrow_fallback() -> None:
+    loaded_outputs = {
+        "scan_metadata": {
+            "platform": "IOS",
+            "project_path": "",
+        },
+        "strings_outputs": {
+            "Payload/FallbackApp.txt": "hello\nworld\n",
+            "Frameworks/Foo.framework/Foo.txt": "framework\n",
+        },
+    }
+
+    result = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert result["meta"]["app_display_name"] == "FallbackApp"
+    assert result["meta"]["file_name"] == ""
+    assert result["meta"]["package_name"] == ""
+
+
+def test_ios_meta_derives_scan_date_from_output_directory_name() -> None:
+    scan_dir = Path("/tmp/SAST_ios_binary_2026-07-23_10-00-00")
+    loaded_outputs = {
+        "scan_output_path": str(scan_dir),
+        "scan_metadata": {
+            "platform": "IOS",
+            "project_path": "/tmp/App.ipa",
+        },
+        "ipsw_outputs": {
+            "App.json": {
+                "app_info": {
+                    "bundle_id": "com.example.app",
+                    "bundle_name": "ExampleApp",
+                },
+                "binary": {"kind": "main", "name": "App", "path": "App"},
+            }
+        },
+    }
+
+    result = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert result["meta"]["scan_date"] == "2026-07-23 10:00:00"
+
+
 def test_ios_ipa_binary_evidence_requires_both_canary_imports() -> None:
     loaded_outputs = {
         "lief_outputs": {
@@ -799,7 +897,7 @@ def test_ios_ipa_binary_evidence_ignores_framework_only_imports() -> None:
 
 def test_post_scan_processing_service_returns_direct_ios_contract(tmp_path: Path) -> None:
     scan_dir = tmp_path / "SAST_ios_binary_2026-07-23_10-00-00"
-    (scan_dir / "plist_binary").mkdir(parents=True)
+    (scan_dir / "ipsw" / "Payload" / "ExampleApp.app").mkdir(parents=True)
     _write_json(
         scan_dir / "scan_metadata.json",
         {
@@ -809,16 +907,15 @@ def test_post_scan_processing_service_returns_direct_ios_contract(tmp_path: Path
         },
     )
     _write_json(
-        scan_dir / "plist_binary" / "Info.json",
+        scan_dir / "ipsw" / "Payload" / "ExampleApp.app" / "ExampleApp.json",
         {
-            "app_meta": {
-                "bundle_identifier": "com.example.app",
+            "app_info": {
+                "bundle_id": "com.example.app",
                 "bundle_name": "ExampleApp",
-                "display_name": "ExampleApp",
-                "version": "1.0",
-                "build": "3",
+                "short_version": "1.0",
+                "bundle_version": "3",
             },
-            "plist": {"CFBundleExecutable": "ExampleApp"},
+            "binary": {"kind": "main", "name": "ExampleApp", "path": "ExampleApp"},
         },
     )
 
