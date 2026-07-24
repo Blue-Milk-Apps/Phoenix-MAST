@@ -261,6 +261,16 @@ def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() 
 
     sections = AndroidBinaryScanDetailExtractor().extract_sections(loaded_outputs)
 
+    assert sections["meta"] == {
+        "app_display_name": "APKPure",
+        "file_name": "APKPure.apk",
+        "package_name": "com.apkpure.aegon",
+        "scan_date": "",
+        "platform": "",
+        "version_name": "3.20.70",
+        "version_code": "",
+        "reviewer_org": "Phoenix Security Report",
+    }
     assert sections["app_info"] == {
         "icon_path": "",
         "name": "APKPure",
