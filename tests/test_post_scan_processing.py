@@ -1262,15 +1262,30 @@ def test_ios_code_evidence_uses_imports_and_opengrep_heuristics() -> None:
                 {
                     "check_id": "ios.pbkdf2.rule",
                     "extra": {
+                        "message": "PBKDF2 iteration count 5000 detected.",
                         "metadata": {
                             "phoenix": {
                                 "title": "PBKDF2 Iteration Count <10k",
                                 "description": "PBKDF2 iteration count <10k detected.",
                             }
+                        },
+                    },
+                },
+                {
+                    "check_id": "ios.crypto.encoding.md5",
+                    "extra": {
+                        "metadata": {
+                            "phoenix": {
+                                "title": "Weak Hash Usage",
+                                "description": "MD5 hashing detected during encoding flow.",
+                            }
                         }
                     },
-                }
+                },
             ]
+        },
+        "strings_outputs": {
+            "main.txt": "CCCrypt using DES\n",
         },
         "syft_outputs": {
             "sbom.json": {
@@ -1308,7 +1323,15 @@ def test_ios_code_evidence_uses_imports_and_opengrep_heuristics() -> None:
     }
     assert sections["code_evidence"]["pbkdf2_iteration_count_below_10k"] == {
         "present": True,
-        "evidence": "PBKDF2 iteration count <10k detected.",
+        "evidence": "PBKDF2 iteration count 5000 detected.",
+    }
+    assert sections["code_evidence"]["encodes_data_using_insecure_cryptography"] == {
+        "present": True,
+        "evidence": "MD5 hashing detected during encoding flow.",
+    }
+    assert sections["code_evidence"]["utilizes_insecure_cryptography"] == {
+        "present": True,
+        "evidence": "des",
     }
     assert sections["code_evidence"]["hardcoded_api_keys_in_bundle"] == {
         "present": True,
