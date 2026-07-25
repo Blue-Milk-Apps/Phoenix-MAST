@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -49,6 +50,7 @@ class IOSCodeEvidence:
         "com.apple.security.cs.allow-dyld-environment-variables",
         "com.apple.security.cs.disable-executable-page-protection",
     )
+    NANOPB_VULNERABLE_VERSION_PATTERN = re.compile(r"^(0\.|1\.)")
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
         opengrep_results = (loaded_outputs.get("opengrep") or {}).get("results") or []
@@ -61,8 +63,6 @@ class IOSCodeEvidence:
             "no_uses_uiwebview_hits",
             "uiwebview",
         )
-        # TODO: enhance insecure_nanopb_library with stronger SBOM/dependency-version evidence instead of
-        # relying on name-based heuristics only.
         self.insecure_nanopb_library = self._name_heuristic_entry(
             loaded_outputs,
             "no_insecure_nanopb_library_hits",
@@ -120,8 +120,6 @@ class IOSCodeEvidence:
             "pbkdf2",
             "<10k",
         )
-        # TODO: replace raw text scanning with structured gitleaks/trufflehog parsing once those loaders return
-        # normalized JSON instead of plain text blobs.
         self.hardcoded_api_keys_in_bundle = self._hardcoded_api_keys_entry(
             loaded_outputs,
             "no_hardcoded_api_keys_in_bundle_hits",
@@ -226,6 +224,11 @@ class IOSCodeEvidence:
             if not isinstance(outputs, dict):
                 continue
             for path, content in outputs.items():
+                if isinstance(content, list):
+                    structured = cls._secret_findings_from_list(path, content)
+                    if structured:
+                        candidates.extend(structured)
+                        continue
                 text = str(content or "")
                 for line in text.splitlines():
                     lowered = line.lower()
@@ -257,6 +260,10 @@ class IOSCodeEvidence:
 
     @classmethod
     def _name_heuristic_entry(cls, loaded_outputs: dict[str, Any], absent_evidence: str, needle: str) -> EvidenceEntry:
+        syft_entry = cls._syft_package_entry(loaded_outputs, absent_evidence, needle)
+        if syft_entry.present:
+            return syft_entry
+
         lowered_needle = needle.lower()
         for document in (loaded_outputs.get("lief_outputs") or {}).values():
             if not isinstance(document, dict):
@@ -273,6 +280,75 @@ class IOSCodeEvidence:
                 if lowered_needle in name.lower():
                     return cls._entry(True, name, absent_evidence)
         return cls._entry(False, "", absent_evidence)
+
+    @classmethod
+    def _syft_package_entry(cls, loaded_outputs: dict[str, Any], absent_evidence: str, needle: str) -> EvidenceEntry:
+        packages = cls._syft_packages(loaded_outputs)
+        lowered_needle = needle.lower()
+        matches: list[str] = []
+        for package_name, version in packages:
+            if lowered_needle not in package_name.lower():
+                continue
+            if version and cls.NANOPB_VULNERABLE_VERSION_PATTERN.match(version):
+                matches.append(f"{package_name}@{version}")
+            elif not version:
+                matches.append(package_name)
+        return cls._entry(bool(matches), ", ".join(matches), absent_evidence)
+
+    @classmethod
+    def _syft_packages(cls, loaded_outputs: dict[str, Any]) -> list[tuple[str, str]]:
+        outputs = loaded_outputs.get("syft_outputs") or {}
+        if not isinstance(outputs, dict):
+            return []
+
+        packages: list[tuple[str, str]] = []
+        for content in outputs.values():
+            if not isinstance(content, dict):
+                continue
+            components = content.get("components")
+            if isinstance(components, list):
+                for component in components:
+                    if not isinstance(component, dict):
+                        continue
+                    name = str(component.get("name", "")).strip()
+                    version = str(component.get("version", "")).strip()
+                    if name:
+                        packages.append((name, version))
+            artifacts = content.get("artifacts")
+            if isinstance(artifacts, list):
+                for artifact in artifacts:
+                    if not isinstance(artifact, dict):
+                        continue
+                    name = str(artifact.get("name", "")).strip()
+                    version = str(artifact.get("version", "")).strip()
+                    if name:
+                        packages.append((name, version))
+        return packages
+
+    @staticmethod
+    def _secret_findings_from_list(path: str, findings: list[Any]) -> list[str]:
+        matches: list[str] = []
+        for finding in findings:
+            if not isinstance(finding, dict):
+                continue
+            detector = str(finding.get("DetectorName", "")).strip()
+            rule = str(finding.get("RuleID", "")).strip()
+            description = str(finding.get("Description", "")).strip()
+            title = first_non_empty(detector, rule, description)
+            lowered = f"{detector} {rule} {description}".lower()
+            if "api key" not in lowered and "apikey" not in lowered and "secret keyword" not in lowered:
+                continue
+            location = first_non_empty(
+                (finding.get("SourceMetadata") or {}).get("Data", {}).get("Filesystem", {}).get("file"),
+                finding.get("File"),
+            )
+            line = first_non_empty(
+                (finding.get("SourceMetadata") or {}).get("Data", {}).get("Filesystem", {}).get("line"),
+                finding.get("StartLine"),
+            )
+            suffix = f"{location}:{line}" if location and line else first_non_empty(location)
+            matches.append(f"{path}: {title}" + (f" ({suffix})" if suffix else ""))
+        return matches
 
     @staticmethod
     def _main_imported_functions(loaded_outputs: dict[str, Any]) -> set[str]:

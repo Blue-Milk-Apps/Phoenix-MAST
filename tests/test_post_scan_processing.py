@@ -510,9 +510,9 @@ def test_ios_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Path) 
     }
     assert loaded["plist_index"] == {"plists": []}
     assert loaded["strings_outputs"] == {"main.txt": "hello\n"}
-    assert loaded["trufflehog_outputs"] == {"report.json": "{}"}
-    assert loaded["gitleaks_outputs"] == {"report.json": "{}"}
-    assert loaded["syft_outputs"] == {"sbom.json": "{}"}
+    assert loaded["trufflehog_outputs"] == {"report.json": {}}
+    assert loaded["gitleaks_outputs"] == {"report.json": {}}
+    assert loaded["syft_outputs"] == {"sbom.json": {}}
 
 
 def test_ios_binary_scan_output_loader_tolerates_missing_optional_artifacts(tmp_path: Path) -> None:
@@ -1246,6 +1246,16 @@ def test_ios_code_evidence_uses_imports_and_opengrep_heuristics() -> None:
                 }
             }
         },
+        "gitleaks_outputs": {
+            "report.json": [
+                {
+                    "RuleID": "generic-api-key",
+                    "Description": "API Key",
+                    "File": "Config.swift",
+                    "StartLine": 12,
+                }
+            ]
+        },
         "opengrep": {
             "results": [
                 {
@@ -1261,10 +1271,24 @@ def test_ios_code_evidence_uses_imports_and_opengrep_heuristics() -> None:
                 }
             ]
         },
+        "syft_outputs": {
+            "sbom.json": {
+                "artifacts": [
+                    {
+                        "name": "nanopb",
+                        "version": "1.0.0",
+                    }
+                ]
+            }
+        },
     }
 
     sections = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
 
+    assert sections["code_evidence"]["insecure_nanopb_library"] == {
+        "present": True,
+        "evidence": "nanopb@1.0.0",
+    }
     assert sections["code_evidence"]["missing_arc"] == {
         "present": False,
         "evidence": "no_missing_arc_hits",
@@ -1284,6 +1308,10 @@ def test_ios_code_evidence_uses_imports_and_opengrep_heuristics() -> None:
     assert sections["code_evidence"]["pbkdf2_iteration_count_below_10k"] == {
         "present": True,
         "evidence": "PBKDF2 iteration count <10k detected.",
+    }
+    assert sections["code_evidence"]["hardcoded_api_keys_in_bundle"] == {
+        "present": True,
+        "evidence": "report.json: generic-api-key (Config.swift:12)",
     }
 
 
