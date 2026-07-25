@@ -1253,6 +1253,7 @@ def test_ios_code_evidence_uses_imports_and_opengrep_heuristics() -> None:
                     "Description": "API Key",
                     "File": "Config.swift",
                     "StartLine": 12,
+                    "EndLine": 14,
                 }
             ]
         },
@@ -1311,7 +1312,7 @@ def test_ios_code_evidence_uses_imports_and_opengrep_heuristics() -> None:
     }
     assert sections["code_evidence"]["hardcoded_api_keys_in_bundle"] == {
         "present": True,
-        "evidence": "report.json: generic-api-key (Config.swift:12)",
+        "evidence": "report.json: generic-api-key (Config.swift:12-14)",
     }
 
 

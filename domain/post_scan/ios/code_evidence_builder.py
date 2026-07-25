@@ -342,11 +342,18 @@ class IOSCodeEvidence:
                 (finding.get("SourceMetadata") or {}).get("Data", {}).get("Filesystem", {}).get("file"),
                 finding.get("File"),
             )
-            line = first_non_empty(
+            start_line = first_non_empty(
                 (finding.get("SourceMetadata") or {}).get("Data", {}).get("Filesystem", {}).get("line"),
                 finding.get("StartLine"),
+                finding.get("Line"),
             )
-            suffix = f"{location}:{line}" if location and line else first_non_empty(location)
+            end_line = first_non_empty(finding.get("EndLine"))
+            line_suffix = ""
+            if start_line and end_line and str(start_line) != str(end_line):
+                line_suffix = f"{start_line}-{end_line}"
+            elif start_line:
+                line_suffix = str(start_line)
+            suffix = f"{location}:{line_suffix}" if location and line_suffix else first_non_empty(location)
             matches.append(f"{path}: {title}" + (f" ({suffix})" if suffix else ""))
         return matches
 
