@@ -1339,6 +1339,25 @@ def test_ios_code_evidence_uses_imports_and_opengrep_heuristics() -> None:
     }
 
 
+def test_ios_code_evidence_does_not_treat_strings_only_crypto_hints_as_confirmed_encoding() -> None:
+    loaded_outputs = {
+        "strings_outputs": {
+            "main.txt": "CCCrypt using DES\n",
+        }
+    }
+
+    sections = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert sections["code_evidence"]["encodes_data_using_insecure_cryptography"] == {
+        "present": False,
+        "evidence": "no_encodes_data_using_insecure_cryptography_hits",
+    }
+    assert sections["code_evidence"]["utilizes_insecure_cryptography"] == {
+        "present": True,
+        "evidence": "des",
+    }
+
+
 def test_ios_permissions_deduplicate_and_keep_first_non_empty_usage_description() -> None:
     loaded_outputs = {
         "plist_outputs": {

@@ -33,9 +33,29 @@ class IOSCodeEvidence:
     insecure_entitlements: EvidenceEntry
 
     DANGEROUS_C_IMPORTS = ("_fopen", "_memcpy", "_strcpy", "_strncpy", "_sscanf")
-    ENCODING_CRYPTO_TERMS = (
+    CONFIRMED_WEAK_CRYPTO_TERMS = (
         "md5",
         "sha1",
+        "des",
+        "3des",
+        "tripledes",
+        "rc2",
+        "rc4",
+        "ecb",
+    )
+    CONFIRMED_CRYPTO_OPERATION_TERMS = (
+        "encode",
+        "encoding",
+        "encrypt",
+        "encryption",
+        "decrypt",
+        "decryption",
+        "hash",
+        "hashing",
+        "digest",
+        "cccrypt",
+        "pbkdf2",
+        "insecure operation",
     )
     OPERATIONAL_WEAK_CRYPTO_TERMS = (
         "kccalgdes",
@@ -101,15 +121,14 @@ class IOSCodeEvidence:
             ("_malloc",),
             "no_malloc_instead_of_calloc_hits",
         )
-        self.encodes_data_using_insecure_cryptography = self._crypto_entry(
+        # TODO: enrich this with stronger rule-specific evidence extraction once dedicated crypto
+        # operation rules land in OpenGrep and/or structured binary call-site evidence exists.
+        self.encodes_data_using_insecure_cryptography = self._confirmed_insecure_crypto_entry(
             opengrep_results,
-            imported_functions,
-            strings_outputs,
             "no_encodes_data_using_insecure_cryptography_hits",
-            opengrep_needles=("encode", "hash", "digest"),
-            term_candidates=self.ENCODING_CRYPTO_TERMS,
         )
-        # TODO: split passive crypto references from confirmed insecure crypto usage once stronger rules exist.
+        # TODO: refine heuristic evidence ranking for weak-crypto references once more dedicated
+        # OpenGrep reference rules and binary metadata signals are available.
         self.utilizes_insecure_cryptography = self._crypto_entry(
             opengrep_results,
             imported_functions,
@@ -217,6 +236,51 @@ class IOSCodeEvidence:
     ) -> EvidenceEntry:
         matches = sorted(symbol for symbol in candidates if symbol in imported_functions)
         return cls._entry(bool(matches), ", ".join(matches), absent_evidence)
+
+    @classmethod
+    def _confirmed_insecure_crypto_entry(
+        cls,
+        opengrep_results: list[Any],
+        absent_evidence: str,
+    ) -> EvidenceEntry:
+        for result in opengrep_results:
+            if not isinstance(result, dict):
+                continue
+            if not cls._is_confirmed_insecure_crypto_result(result):
+                continue
+            extra = result.get("extra") or {}
+            metadata = (extra.get("metadata") or {}).get("phoenix") or {}
+            evidence = first_non_empty(
+                metadata.get("description"),
+                metadata.get("title"),
+                extra.get("message"),
+                result.get("check_id"),
+            )
+            return cls._entry(True, str(evidence), absent_evidence)
+        return cls._entry(False, "", absent_evidence)
+
+    @classmethod
+    def _is_confirmed_insecure_crypto_result(cls, result: dict[str, Any]) -> bool:
+        extra = result.get("extra") or {}
+        metadata = (extra.get("metadata") or {}).get("phoenix") or {}
+        haystack = " ".join(
+            [
+                str(result.get("check_id", "")).strip().lower(),
+                str(metadata.get("title", "")).strip().lower(),
+                str(metadata.get("description", "")).strip().lower(),
+                str(extra.get("message", "")).strip().lower(),
+            ]
+        )
+        if not haystack:
+            return False
+
+        has_weak_crypto_term = any(term in haystack for term in cls.CONFIRMED_WEAK_CRYPTO_TERMS)
+        has_operation_term = any(term in haystack for term in cls.CONFIRMED_CRYPTO_OPERATION_TERMS)
+        has_operation_style_rule_id = any(
+            token in str(result.get("check_id", "")).strip().lower()
+            for token in (".encoding.", ".insecure_operation.", ".operation.", ".pbkdf2.")
+        )
+        return has_weak_crypto_term and (has_operation_term or has_operation_style_rule_id)
 
     @classmethod
     def _crypto_entry(
