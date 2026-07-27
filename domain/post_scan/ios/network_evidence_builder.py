@@ -33,8 +33,7 @@ class IOSNetworkEvidence:
     certificate_pinning_not_implemented: EvidenceEntry
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
-        _ = loaded_outputs
-        self.ats_disabled = EvidenceEntry(False, "no_ats_disabled_hits")
+        self.ats_disabled = self._ats_disabled_entry(loaded_outputs)
         self.vulnerable_openssl_ccs_injection = EvidenceEntry(False, "no_vulnerable_openssl_ccs_injection_hits")
         self.uses_ftp = EvidenceEntry(False, "no_uses_ftp_hits")
         self.vulnerable_openssl_heartbleed = EvidenceEntry(False, "no_vulnerable_openssl_heartbleed_hits")
@@ -55,3 +54,16 @@ class IOSNetworkEvidence:
         self.https_url_contains_wifi_mac = EvidenceEntry(False, "no_https_url_contains_wifi_mac_hits")
         self.insecure_tls_configuration = EvidenceEntry(False, "no_insecure_tls_configuration_hits")
         self.certificate_pinning_not_implemented = EvidenceEntry(False, "no_certificate_pinning_not_implemented_hits")
+
+    @staticmethod
+    def _ats_disabled_entry(loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        for artifact_path, document in (loaded_outputs.get("plist_outputs") or {}).items():
+            if not isinstance(document, dict) or not isinstance(document.get("app_meta"), dict):
+                continue
+            ats = document.get("ats")
+            if isinstance(ats, dict) and ats.get("allows_arbitrary_loads") is True:
+                return EvidenceEntry(
+                    True,
+                    f"{artifact_path}: NSAllowsArbitraryLoads=true",
+                )
+        return EvidenceEntry(False, "no_ats_disabled_hits")

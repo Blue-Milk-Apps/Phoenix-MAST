@@ -8,6 +8,7 @@ from adapters.post_scan import (
     IOSBinaryScanOutputLoader,
 )
 from application.post_scan_processing_service import PostScanProcessingService
+from domain.post_scan.ios.network_evidence_builder import IOSNetworkEvidence
 
 
 def test_android_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Path) -> None:
@@ -1001,6 +1002,42 @@ def test_post_scan_processing_service_returns_direct_ios_contract(tmp_path: Path
     assert result["meta"]["app_display_name"] == "ExampleApp"
     assert result["code_evidence"]["uses_uiwebview"]["present"] is False
     assert result["network_evidence"]["ats_disabled"]["present"] is False
+
+
+def test_ios_network_evidence_derives_ats_disabled_from_app_plist_only() -> None:
+    enabled = IOSNetworkEvidence(
+        {
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "ats": {"allows_arbitrary_loads": True},
+                },
+                "Frameworks/SDK.framework/Info.json": {
+                    "framework_meta": {"bundle_identifier": "com.example.sdk"},
+                    "ats": {"allows_arbitrary_loads": True},
+                },
+            }
+        }
+    )
+    assert enabled.ats_disabled.present is True
+    assert enabled.ats_disabled.evidence == "Info.json: NSAllowsArbitraryLoads=true"
+
+    not_enabled = IOSNetworkEvidence(
+        {
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "ats": {"allows_arbitrary_loads": False},
+                },
+                "Frameworks/SDK.framework/Info.json": {
+                    "framework_meta": {"bundle_identifier": "com.example.sdk"},
+                    "ats": {"allows_arbitrary_loads": True},
+                },
+            }
+        }
+    )
+    assert not_enabled.ats_disabled.present is False
+    assert not_enabled.ats_disabled.evidence == "no_ats_disabled_hits"
 
 
 def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
