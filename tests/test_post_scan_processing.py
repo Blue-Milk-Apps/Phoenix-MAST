@@ -1040,6 +1040,36 @@ def test_ios_network_evidence_derives_ats_disabled_from_app_plist_only() -> None
     assert not_enabled.ats_disabled.evidence == "no_ats_disabled_hits"
 
 
+def test_ios_network_evidence_detects_vulnerable_openssl_ccs_versions() -> None:
+    from_sbom = IOSNetworkEvidence(
+        {
+            "syft_outputs": {
+                "sbom.json": {
+                    "artifacts": [
+                        {"name": "openssl", "version": "1.0.1g"},
+                        {"name": "libssl", "version": "1.0.1h"},
+                    ]
+                }
+            }
+        }
+    )
+    assert from_sbom.vulnerable_openssl_ccs_injection.present is True
+    assert from_sbom.vulnerable_openssl_ccs_injection.evidence == "sbom.json: openssl@1.0.1g"
+
+    from_strings = IOSNetworkEvidence({"strings_outputs": {"Frameworks/SDK.txt": "OpenSSL 0.9.8z\n"}})
+    assert from_strings.vulnerable_openssl_ccs_injection.present is True
+    assert from_strings.vulnerable_openssl_ccs_injection.evidence == "Frameworks/SDK.txt: OpenSSL 0.9.8z"
+
+    fixed_or_unversioned = IOSNetworkEvidence(
+        {
+            "syft_outputs": {"sbom.json": {"components": [{"name": "openssl", "version": "1.0.1h"}]}},
+            "strings_outputs": {"main.txt": "OpenSSL\nlibssl 1.0.1g\n"},
+        }
+    )
+    assert fixed_or_unversioned.vulnerable_openssl_ccs_injection.present is False
+    assert fixed_or_unversioned.vulnerable_openssl_ccs_injection.evidence == "no_vulnerable_openssl_ccs_injection_hits"
+
+
 def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
     loaded_outputs = {
         "plist_outputs": {
