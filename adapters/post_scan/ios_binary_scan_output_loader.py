@@ -23,9 +23,9 @@ class IOSBinaryScanOutputLoader(ScanOutputLoaderPort):
             "plist_outputs": self._load_json_documents(root / "plist_binary", exclude={"scan_index.json"}),
             "plist_index": self._load_json(root / "plist_binary" / "scan_index.json"),
             "strings_outputs": self._load_text_outputs(root / "strings", "*.txt"),
-            "trufflehog_outputs": self._load_text_outputs(root / "trufflehog"),
-            "gitleaks_outputs": self._load_text_outputs(root / "gitleaks"),
-            "syft_outputs": self._load_text_outputs(root / "syft"),
+            "trufflehog_outputs": self._load_optional_outputs(root / "trufflehog"),
+            "gitleaks_outputs": self._load_optional_outputs(root / "gitleaks"),
+            "syft_outputs": self._load_optional_outputs(root / "syft"),
         }
 
     @staticmethod
@@ -70,4 +70,23 @@ class IOSBinaryScanOutputLoader(ScanOutputLoaderPort):
                 encoding="utf-8",
                 errors="ignore",
             )
+        return outputs
+
+    @classmethod
+    def _load_optional_outputs(cls, root: Path, pattern: str = "*") -> dict[str, Any]:
+        if not root.is_dir():
+            return {}
+
+        outputs: dict[str, Any] = {}
+        for path in sorted(root.rglob(pattern)):
+            if not path.is_file():
+                continue
+            relative = path.relative_to(root).as_posix()
+            if path.suffix.lower() == ".json":
+                outputs[relative] = cls._load_json(path)
+            else:
+                outputs[relative] = path.read_text(
+                    encoding="utf-8",
+                    errors="ignore",
+                )
         return outputs
