@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from domain.post_scan.ios.meta_builder import IOSMeta
+from domain.post_scan.ios.meta_builder import IOSMeta, IOSProjectMetadata
 from domain.post_scan.utilities import first_non_empty
 
 
@@ -23,10 +23,11 @@ class IOSAppInfo:
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
         meta = IOSMeta(loaded_outputs)
+        project_metadata = IOSProjectMetadata.from_loaded_outputs(loaded_outputs)
         self.icon_path = ""
         self.name = first_non_empty(meta.app_display_name)
         self.package_name = first_non_empty(meta.package_name)
-        self.main_activity = ""
+        self.main_activity = first_non_empty(project_metadata.main_executable_name)
         self.version_name = self._display_version(
             first_non_empty(meta.version_name),
             first_non_empty(meta.version_code),

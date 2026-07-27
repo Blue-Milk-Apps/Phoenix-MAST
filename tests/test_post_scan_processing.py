@@ -510,9 +510,9 @@ def test_ios_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Path) 
     }
     assert loaded["plist_index"] == {"plists": []}
     assert loaded["strings_outputs"] == {"main.txt": "hello\n"}
-    assert loaded["trufflehog_outputs"] == {"report.json": "{}"}
-    assert loaded["gitleaks_outputs"] == {"report.json": "{}"}
-    assert loaded["syft_outputs"] == {"sbom.json": "{}"}
+    assert loaded["trufflehog_outputs"] == {"report.json": {}}
+    assert loaded["gitleaks_outputs"] == {"report.json": {}}
+    assert loaded["syft_outputs"] == {"sbom.json": {}}
 
 
 def test_ios_binary_scan_output_loader_tolerates_missing_optional_artifacts(tmp_path: Path) -> None:
@@ -562,6 +562,11 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
                 "analysis": {
                     "macho": {"rpaths": ["@rpath"]},
                     "code_signature": {"present": True},
+                    "entitlements": {
+                        "values": {
+                            "get-task-allow": True,
+                        }
+                    },
                 },
             }
         },
@@ -601,6 +606,35 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
                 }
             },
         },
+        "opengrep": {
+            "results": [
+                {
+                    "check_id": "ios.deprecated.api.uiwebview",
+                    "extra": {
+                        "metadata": {
+                            "phoenix": {
+                                "title": "Deprecated API - UIWebView",
+                                "description": "UIWebView reference detected.",
+                            }
+                        }
+                    },
+                },
+                {
+                    "check_id": "ios.insecure.serialization.nskeyedunarchiver",
+                    "extra": {
+                        "metadata": {
+                            "phoenix": {
+                                "title": "Insecure Serialization API - NSKeyedUnarchiver",
+                                "description": "decodeObject usage detected.",
+                            }
+                        }
+                    },
+                },
+            ]
+        },
+        "gitleaks_outputs": {
+            "report.json": "Secret Type: API Key\nLocation: Config.swift:12",
+        },
     }
 
     result = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
@@ -639,7 +673,7 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
         "icon_path": "",
         "name": "DVIA-v2",
         "package_name": "com.highaltitudehacks.DVIAswiftv2",
-        "main_activity": "",
+        "main_activity": "DVIA",
         "version_name": "2.0 (1)",
         "app_store_id": "",
         "developer": "",
@@ -660,20 +694,59 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
     assert result["permissions"] == []
     assert result["endpoints"] == []
     assert result["hardcoded_values"] == {"urls": [], "emails": [], "secrets": []}
-    assert set(result["code_evidence"]) == {
-        "uses_uiwebview",
-        "insecure_nanopb_library",
-        "insecure_nskeyedunarchiver_usage",
-        "missing_arc",
-        "pic_not_enabled",
-        "stack_canaries_not_enabled",
-        "insecure_api_usage_in_binary",
-        "malloc_instead_of_calloc",
-        "encodes_data_using_insecure_cryptography",
-        "utilizes_insecure_cryptography",
-        "pbkdf2_iteration_count_below_10k",
-        "hardcoded_api_keys_in_bundle",
-        "insecure_entitlements",
+    assert result["code_evidence"] == {
+        "uses_uiwebview": {
+            "present": True,
+            "evidence": "UIWebView reference detected.",
+        },
+        "insecure_nanopb_library": {
+            "present": False,
+            "evidence": "no_insecure_nanopb_library_hits",
+        },
+        "insecure_nskeyedunarchiver_usage": {
+            "present": True,
+            "evidence": "decodeObject usage detected.",
+        },
+        "missing_arc": {
+            "present": False,
+            "evidence": "no_missing_arc_hits",
+        },
+        "pic_not_enabled": {
+            "present": True,
+            "evidence": "PIE flag not detected in main Mach-O metadata",
+        },
+        "stack_canaries_not_enabled": {
+            "present": False,
+            "evidence": "no_stack_canaries_not_enabled_hits",
+        },
+        "insecure_api_usage_in_binary": {
+            "present": False,
+            "evidence": "no_insecure_api_usage_in_binary_hits",
+        },
+        "malloc_instead_of_calloc": {
+            "present": False,
+            "evidence": "no_malloc_instead_of_calloc_hits",
+        },
+        "encodes_data_using_insecure_cryptography": {
+            "present": False,
+            "evidence": "no_encodes_data_using_insecure_cryptography_hits",
+        },
+        "utilizes_insecure_cryptography": {
+            "present": False,
+            "evidence": "no_utilizes_insecure_cryptography_hits",
+        },
+        "pbkdf2_iteration_count_below_10k": {
+            "present": False,
+            "evidence": "no_pbkdf2_iteration_count_below_10k_hits",
+        },
+        "hardcoded_api_keys_in_bundle": {
+            "present": True,
+            "evidence": "report.json: Secret Type: API Key",
+        },
+        "insecure_entitlements": {
+            "present": True,
+            "evidence": "get-task-allow",
+        },
     }
     assert set(result["network_evidence"]) == {
         "ats_disabled",
@@ -1087,6 +1160,243 @@ def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
         "present": True,
         "explanation": "external accessory protocols declared: com.example.reader. USB devices usage detected.",
     }
+    assert sections["permissions"] == [
+        {
+            "permission": "NSBluetoothAlwaysUsageDescription",
+            "status": "dangerous",
+            "info": "Access Bluetooth",
+            "usage_description": "Connect accessories",
+            "general_description": "Permits scanning for and connecting to nearby Bluetooth devices.",
+        },
+        {
+            "permission": "NSCalendarsUsageDescription",
+            "status": "dangerous",
+            "info": "Access Calendar",
+            "usage_description": "Show events",
+            "general_description": "Permits access to the user's calendar data.",
+        },
+        {
+            "permission": "NSCameraUsageDescription",
+            "status": "dangerous",
+            "info": "Access Camera",
+            "usage_description": "Take photos",
+            "general_description": "Permits access to the device's camera hardware.",
+        },
+        {
+            "permission": "NSContactsUsageDescription",
+            "status": "dangerous",
+            "info": "Access Contacts",
+            "usage_description": "Find friends",
+            "general_description": "Permits access to the user's contacts database.",
+        },
+        {
+            "permission": "NSFaceIDUsageDescription",
+            "status": "normal",
+            "info": "Use Face ID",
+            "usage_description": "Sign in",
+            "general_description": "Permits use of Face ID for biometric authentication.",
+        },
+        {
+            "permission": "NSLocationWhenInUseUsageDescription",
+            "status": "dangerous",
+            "info": "Access Location While Using App",
+            "usage_description": "Find nearby stores",
+            "general_description": "Permits access to the device's location while the app is in use.",
+        },
+        {
+            "permission": "NSMicrophoneUsageDescription",
+            "status": "dangerous",
+            "info": "Access Microphone",
+            "usage_description": "Record audio",
+            "general_description": "Permits recording audio with the device microphone.",
+        },
+        {
+            "permission": "NSNearbyInteractionUsageDescription",
+            "status": "normal",
+            "info": "Nearby Interaction",
+            "usage_description": "Nearby devices",
+            "general_description": "Permits use of nearby interaction features with supported devices.",
+        },
+        {
+            "permission": "NSPhotoLibraryUsageDescription",
+            "status": "dangerous",
+            "info": "Access Photos",
+            "usage_description": "Pick photos",
+            "general_description": "Permits reading from the user's photo library.",
+        },
+    ]
+
+
+def test_ios_code_evidence_uses_imports_and_opengrep_heuristics() -> None:
+    loaded_outputs = {
+        "lief_outputs": {
+            "App.json": {
+                "binary": {
+                    "kind": "main",
+                    "slices": [
+                        {
+                            "imported_functions": [
+                                "_fopen",
+                                "_malloc",
+                                "_objc_release",
+                            ],
+                            "libraries": [],
+                        }
+                    ],
+                }
+            }
+        },
+        "gitleaks_outputs": {
+            "report.json": [
+                {
+                    "RuleID": "generic-api-key",
+                    "Description": "API Key",
+                    "File": "Config.swift",
+                    "StartLine": 12,
+                    "EndLine": 14,
+                }
+            ]
+        },
+        "opengrep": {
+            "results": [
+                {
+                    "check_id": "ios.pbkdf2.rule",
+                    "extra": {
+                        "message": "PBKDF2 iteration count 5000 detected.",
+                        "metadata": {
+                            "phoenix": {
+                                "title": "PBKDF2 Iteration Count <10k",
+                                "description": "PBKDF2 iteration count <10k detected.",
+                            }
+                        },
+                    },
+                },
+                {
+                    "check_id": "ios.crypto.encoding.md5",
+                    "extra": {
+                        "metadata": {
+                            "phoenix": {
+                                "title": "Weak Hash Usage",
+                                "description": "MD5 hashing detected during encoding flow.",
+                            }
+                        }
+                    },
+                },
+            ]
+        },
+        "strings_outputs": {
+            "main.txt": "CCCrypt using DES\n",
+        },
+        "syft_outputs": {
+            "sbom.json": {
+                "artifacts": [
+                    {
+                        "name": "nanopb",
+                        "version": "1.0.0",
+                    }
+                ]
+            }
+        },
+    }
+
+    sections = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert sections["code_evidence"]["insecure_nanopb_library"] == {
+        "present": True,
+        "evidence": "nanopb@1.0.0",
+    }
+    assert sections["code_evidence"]["missing_arc"] == {
+        "present": False,
+        "evidence": "no_missing_arc_hits",
+    }
+    assert sections["code_evidence"]["stack_canaries_not_enabled"] == {
+        "present": True,
+        "evidence": "main Mach-O imports do not expose ___stack_chk_fail and ___stack_chk_guard",
+    }
+    assert sections["code_evidence"]["insecure_api_usage_in_binary"] == {
+        "present": True,
+        "evidence": "_fopen",
+    }
+    assert sections["code_evidence"]["malloc_instead_of_calloc"] == {
+        "present": True,
+        "evidence": "_malloc",
+    }
+    assert sections["code_evidence"]["pbkdf2_iteration_count_below_10k"] == {
+        "present": True,
+        "evidence": "PBKDF2 iteration count 5000 detected.",
+    }
+    assert sections["code_evidence"]["encodes_data_using_insecure_cryptography"] == {
+        "present": True,
+        "evidence": "MD5 hashing detected during encoding flow.",
+    }
+    assert sections["code_evidence"]["utilizes_insecure_cryptography"] == {
+        "present": True,
+        "evidence": "des",
+    }
+    assert sections["code_evidence"]["hardcoded_api_keys_in_bundle"] == {
+        "present": True,
+        "evidence": "report.json: generic-api-key (Config.swift:12-14)",
+    }
+
+
+def test_ios_code_evidence_does_not_treat_strings_only_crypto_hints_as_confirmed_encoding() -> None:
+    loaded_outputs = {
+        "strings_outputs": {
+            "main.txt": "CCCrypt using DES\n",
+        }
+    }
+
+    sections = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert sections["code_evidence"]["encodes_data_using_insecure_cryptography"] == {
+        "present": False,
+        "evidence": "no_encodes_data_using_insecure_cryptography_hits",
+    }
+    assert sections["code_evidence"]["utilizes_insecure_cryptography"] == {
+        "present": True,
+        "evidence": "des",
+    }
+
+
+def test_ios_permissions_deduplicate_and_keep_first_non_empty_usage_description() -> None:
+    loaded_outputs = {
+        "plist_outputs": {
+            "Info.json": {
+                "privacy": {
+                    "permissions": [
+                        {"key": "NSCameraUsageDescription", "purpose": ""},
+                        {"key": "NSExampleCustomUsageDescription", "purpose": "Custom access"},
+                    ]
+                }
+            },
+            "Info-2.json": {
+                "privacy": {
+                    "permissions": [
+                        {"key": "NSCameraUsageDescription", "purpose": "Take photos"},
+                    ]
+                }
+            },
+        }
+    }
+
+    sections = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
+
+    assert sections["permissions"] == [
+        {
+            "permission": "NSCameraUsageDescription",
+            "status": "dangerous",
+            "info": "Access Camera",
+            "usage_description": "Take photos",
+            "general_description": "Permits access to the device's camera hardware.",
+        },
+        {
+            "permission": "NSExampleCustomUsageDescription",
+            "status": "normal",
+            "info": "",
+            "usage_description": "Custom access",
+            "general_description": "",
+        },
+    ]
 
 
 def test_android_binary_scan_detail_extractor_maps_opengrep_functionality_checks() -> None:

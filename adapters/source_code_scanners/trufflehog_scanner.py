@@ -6,6 +6,7 @@ import subprocess
 
 from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
+from utilities.scan_target_utils import ResolvedScanTarget, resolve_scan_target
 
 REPORT_PATH = "trufflehog_results.json"
 
@@ -24,26 +25,27 @@ class TrufflehogScanner(ScannerPort):
     @property
     def description(self) -> str:
         return (
-            "Verified secrets and credentials detected in the codebase. "
-            "These results represent API keys, tokens, passwords, and other sensitive values "
-            "that have been confirmed as active and should be revoked immediately."
+            "Detected secrets and credentials in the codebase, including API keys, tokens, "
+            "passwords, and other sensitive values surfaced by Trufflehog."
         )
 
     def is_available(self) -> bool:
         return shutil.which("trufflehog") is not None
 
     def scan(self, config: ScanConfig) -> list[ScanResult]:
-        cmd = [
-            "trufflehog",
-            "filesystem",
-            str(config.project_path),
-            "--log-level=-1",  # Any level above -1 is too verbose for our purposes
-            "--json",
-            "--no-update",
-            "--only-verified",  # Only shows things that matter
-        ]
-
+        resolved_target: ResolvedScanTarget | None = None
         try:
+            resolved_target = resolve_scan_target(config)
+            print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}Resolved scan target: {resolved_target.path}")
+            cmd = [
+                "trufflehog",
+                "filesystem",
+                str(resolved_target.path),
+                "--log-level=-1",  # Any level above -1 is too verbose for our purposes
+                "--json",
+                "--no-update",
+            ]
+
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,  # JSON output (newline-delimited)
@@ -93,6 +95,9 @@ class TrufflehogScanner(ScannerPort):
                     relative_target_path=REPORT_PATH,
                 )
             ]
+        finally:
+            if resolved_target is not None:
+                resolved_target.cleanup()
 
     @staticmethod
     def _json_report(raw_output: str) -> str:

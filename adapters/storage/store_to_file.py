@@ -30,6 +30,14 @@ class StoreToFile(ArtifactStorePort):
         target.parent.mkdir(parents=True, exist_ok=True)
         content = result.raw_output or result.error_message
         target.write_text(content, encoding="utf-8")
+        for relative_path, artifact_content in result.artifact_files.items():
+            artifact_target = self._artifact_target_path(
+                output_dir,
+                result,
+                relative_path,
+            )
+            artifact_target.parent.mkdir(parents=True, exist_ok=True)
+            artifact_target.write_text(artifact_content, encoding="utf-8")
         return target
 
     def persist_scan_metadata(
@@ -69,4 +77,16 @@ class StoreToFile(ArtifactStorePort):
         if not relative_target.suffix:
             relative_target = relative_target.with_suffix(".txt")
 
+        return output_dir / result.scan_type.value / relative_target
+
+    @classmethod
+    def _artifact_target_path(
+        cls,
+        output_dir: Path,
+        result: ScanResult,
+        relative_path: str,
+    ) -> Path:
+        relative_target = Path(relative_path)
+        if relative_target.is_absolute() or ".." in relative_target.parts:
+            relative_target = Path(relative_target.name)
         return output_dir / result.scan_type.value / relative_target

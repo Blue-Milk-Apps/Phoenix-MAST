@@ -42,7 +42,7 @@ class ScanResult:
     relative_target_path: str = ""
 
 
-@dataclass
+@dataclass(frozen=True)
 class ScanConfig:
     """Configuration for a scanning session."""
 
