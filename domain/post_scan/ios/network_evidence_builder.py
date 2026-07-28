@@ -37,11 +37,12 @@ class IOSNetworkEvidence:
         r"\bOpenSSL[\s_-]+(?:v)?((?:0\.9\.8|1\.0\.[01])[a-z]*)\b",
         re.IGNORECASE,
     )
+    FTP_URL_PATTERN = re.compile(r"\bftps?://[^\s'\"<>]+", re.IGNORECASE)
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
         self.ats_disabled = self._ats_disabled_entry(loaded_outputs)
         self.vulnerable_openssl_ccs_injection = self._vulnerable_openssl_ccs_injection_entry(loaded_outputs)
-        self.uses_ftp = EvidenceEntry(False, "no_uses_ftp_hits")
+        self.uses_ftp = self._uses_ftp_entry(loaded_outputs)
         self.vulnerable_openssl_heartbleed = EvidenceEntry(False, "no_vulnerable_openssl_heartbleed_hits")
         self.insecure_http_traffic = EvidenceEntry(False, "no_insecure_http_traffic_hits")
         self.ats_exceptions_configured = EvidenceEntry(False, "no_ats_exceptions_configured_hits")
@@ -91,6 +92,36 @@ class IOSNetworkEvidence:
                         return EvidenceEntry(True, f"{path}: OpenSSL {version}")
 
         return EvidenceEntry(False, "no_vulnerable_openssl_ccs_injection_hits")
+
+    @classmethod
+    def _uses_ftp_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        strings_outputs = loaded_outputs.get("strings_outputs") or {}
+        if isinstance(strings_outputs, dict):
+            for path, content in strings_outputs.items():
+                for line in str(content or "").splitlines():
+                    match = cls.FTP_URL_PATTERN.search(line)
+                    if match:
+                        return EvidenceEntry(True, f"{path}: {match.group(0)}")
+
+        for path, document in (loaded_outputs.get("plist_outputs") or {}).items():
+            if not isinstance(document, dict) or not isinstance(document.get("app_meta"), dict):
+                continue
+            for value in cls._string_values(document.get("plist")):
+                match = cls.FTP_URL_PATTERN.search(value)
+                if match:
+                    return EvidenceEntry(True, f"{path}: {match.group(0)}")
+
+        return EvidenceEntry(False, "no_uses_ftp_hits")
+
+    @classmethod
+    def _string_values(cls, value: Any) -> list[str]:
+        if isinstance(value, str):
+            return [value]
+        if isinstance(value, dict):
+            return [item for nested_value in value.values() for item in cls._string_values(nested_value)]
+        if isinstance(value, list):
+            return [item for nested_value in value for item in cls._string_values(nested_value)]
+        return []
 
     @staticmethod
     def _is_openssl_package(package_name: str) -> bool:

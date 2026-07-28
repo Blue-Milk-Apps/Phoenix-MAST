@@ -1070,6 +1070,41 @@ def test_ios_network_evidence_detects_vulnerable_openssl_ccs_versions() -> None:
     assert fixed_or_unversioned.vulnerable_openssl_ccs_injection.evidence == "no_vulnerable_openssl_ccs_injection_hits"
 
 
+def test_ios_network_evidence_detects_ftp_endpoints() -> None:
+    from_strings = IOSNetworkEvidence(
+        {"strings_outputs": {"main.txt": "download ftp://files.example.com/update.zip\n"}}
+    )
+    assert from_strings.uses_ftp.present is True
+    assert from_strings.uses_ftp.evidence == "main.txt: ftp://files.example.com/update.zip"
+
+    from_plist = IOSNetworkEvidence(
+        {
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "plist": {"Download": {"URL": "ftps://files.example.com/update.zip"}},
+                }
+            }
+        }
+    )
+    assert from_plist.uses_ftp.present is True
+    assert from_plist.uses_ftp.evidence == "Info.json: ftps://files.example.com/update.zip"
+
+    no_endpoint = IOSNetworkEvidence(
+        {
+            "strings_outputs": {"main.txt": "FTP support via libcurl\n"},
+            "plist_outputs": {
+                "Frameworks/SDK.framework/Info.json": {
+                    "framework_meta": {"bundle_identifier": "com.example.sdk"},
+                    "plist": {"Description": "FTP integration"},
+                }
+            },
+        }
+    )
+    assert no_endpoint.uses_ftp.present is False
+    assert no_endpoint.uses_ftp.evidence == "no_uses_ftp_hits"
+
+
 def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
     loaded_outputs = {
         "plist_outputs": {
