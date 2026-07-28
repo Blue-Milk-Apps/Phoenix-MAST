@@ -1105,6 +1105,46 @@ def test_ios_network_evidence_detects_ftp_endpoints() -> None:
     assert no_endpoint.uses_ftp.evidence == "no_uses_ftp_hits"
 
 
+def test_ios_network_evidence_detects_public_http_endpoints() -> None:
+    from_strings = IOSNetworkEvidence({"strings_outputs": {"main.txt": "http://api.example.com/v1\n"}})
+    assert from_strings.insecure_http_traffic.present is True
+    assert from_strings.insecure_http_traffic.evidence == "main.txt: http://api.example.com/v1"
+
+    from_plist = IOSNetworkEvidence(
+        {
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "plist": {"API": "http://api.example.com/v1"},
+                }
+            }
+        }
+    )
+    assert from_plist.insecure_http_traffic.present is True
+    assert from_plist.insecure_http_traffic.evidence == "Info.json: http://api.example.com/v1"
+
+    no_public_endpoint = IOSNetworkEvidence(
+        {
+            "strings_outputs": {
+                "main.txt": (
+                    "https://api.example.com/v1\n"
+                    "http://localhost:8080\n"
+                    "http://127.0.0.1:8080\n"
+                    "http://www.apple.com/DTDs/PropertyList-1.0.dtd\n"
+                )
+            },
+            "plist_outputs": {
+                "Frameworks/SDK.framework/Info.json": {
+                    "framework_meta": {"bundle_identifier": "com.example.sdk"},
+                    "plist": {"API": "http://api.example.com/v1"},
+                }
+            },
+        }
+    )
+    assert no_public_endpoint.insecure_http_traffic.present is False
+    assert no_public_endpoint.insecure_http_traffic.evidence == "no_insecure_http_traffic_hits"
+
+
 def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
     loaded_outputs = {
         "plist_outputs": {

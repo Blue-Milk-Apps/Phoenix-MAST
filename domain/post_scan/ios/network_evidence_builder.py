@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlsplit
 
 from domain.post_scan.ios.code_evidence_builder import EvidenceEntry
 
@@ -38,13 +39,14 @@ class IOSNetworkEvidence:
         re.IGNORECASE,
     )
     FTP_URL_PATTERN = re.compile(r"\bftps?://[^\s'\"<>]+", re.IGNORECASE)
+    HTTP_URL_PATTERN = re.compile(r"\bhttp://[^\s'\"<>]+", re.IGNORECASE)
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
         self.ats_disabled = self._ats_disabled_entry(loaded_outputs)
         self.vulnerable_openssl_ccs_injection = self._vulnerable_openssl_ccs_injection_entry(loaded_outputs)
         self.uses_ftp = self._uses_ftp_entry(loaded_outputs)
         self.vulnerable_openssl_heartbleed = EvidenceEntry(False, "no_vulnerable_openssl_heartbleed_hits")
-        self.insecure_http_traffic = EvidenceEntry(False, "no_insecure_http_traffic_hits")
+        self.insecure_http_traffic = self._insecure_http_traffic_entry(loaded_outputs)
         self.ats_exceptions_configured = EvidenceEntry(False, "no_ats_exceptions_configured_hits")
         self.cookie_missing_httponly = EvidenceEntry(False, "no_cookie_missing_httponly_hits")
         self.cookie_missing_secure = EvidenceEntry(False, "no_cookie_missing_secure_hits")
@@ -112,6 +114,39 @@ class IOSNetworkEvidence:
                     return EvidenceEntry(True, f"{path}: {match.group(0)}")
 
         return EvidenceEntry(False, "no_uses_ftp_hits")
+
+    @classmethod
+    def _insecure_http_traffic_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        strings_outputs = loaded_outputs.get("strings_outputs") or {}
+        if isinstance(strings_outputs, dict):
+            for path, content in strings_outputs.items():
+                for line in str(content or "").splitlines():
+                    for url in cls.HTTP_URL_PATTERN.findall(line):
+                        if cls._is_public_http_url(url):
+                            return EvidenceEntry(True, f"{path}: {url}")
+
+        for path, document in (loaded_outputs.get("plist_outputs") or {}).items():
+            if not isinstance(document, dict) or not isinstance(document.get("app_meta"), dict):
+                continue
+            for value in cls._string_values(document.get("plist")):
+                for url in cls.HTTP_URL_PATTERN.findall(value):
+                    if cls._is_public_http_url(url):
+                        return EvidenceEntry(True, f"{path}: {url}")
+
+        return EvidenceEntry(False, "no_insecure_http_traffic_hits")
+
+    @staticmethod
+    def _is_public_http_url(url: str) -> bool:
+        try:
+            parsed = urlsplit(url)
+        except ValueError:
+            return False
+        hostname = (parsed.hostname or "").lower()
+        if not hostname:
+            return False
+        if hostname in {"localhost", "127.0.0.1", "::1"}:
+            return False
+        return not (hostname == "www.apple.com" and parsed.path.lower().startswith("/dtds/"))
 
     @classmethod
     def _string_values(cls, value: Any) -> list[str]:
