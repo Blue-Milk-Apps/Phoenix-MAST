@@ -39,11 +39,14 @@ class SyftScanner(ScannerPort):
 
     def scan(self, config: ScanConfig) -> list[ScanResult]:
         try:
+            scan_target = (
+                config.extracted_binary.scan_root_path if config.extracted_binary is not None else config.project_path
+            )
             output_format = self._stdout_output_format()
             cmd = [
                 "syft",
                 "scan",
-                str(config.project_path),
+                str(scan_target),
                 "-o",
                 output_format,
             ]

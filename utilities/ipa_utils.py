@@ -25,6 +25,16 @@ class ExtractedIPA:
         if self.temp_dir.exists():
             shutil.rmtree(self.temp_dir)
 
+    @property
+    def scan_root_path(self) -> Path:
+        """Return the extracted app bundle for filesystem scanners."""
+        return self.app_bundle
+
+    @property
+    def analysis_targets(self) -> list[Path]:
+        """Return the Mach-O binaries relevant to binary analysis."""
+        return get_scanable_binary_paths(self)
+
 
 def get_scanable_binary_paths(extracted: ExtractedIPA) -> list[Path]:
     """Return the IPA binary targets that should be scanned by analysis tools."""
@@ -98,10 +108,7 @@ def is_ipa_file(path: Path) -> bool:
     # any file path that lives inside a Payload/*.app/ bundle instead.
     try:
         with zipfile.ZipFile(path, "r") as zf:
-            return any(
-                name.startswith("Payload/") and ".app/" in name
-                for name in zf.namelist()
-            )
+            return any(name.startswith("Payload/") and ".app/" in name for name in zf.namelist())
     except Exception:
         return False
 
@@ -154,15 +161,11 @@ def extract_ipa(ipa_path: Path) -> ExtractedIPA:
         executable_name = None
 
         if info_plist_path.exists():
-            with open(info_plist_path, "rb") as f:
-                info_plist = plistlib.load(f)
+            with info_plist_path.open("rb") as handle:
+                info_plist = plistlib.load(handle)
                 executable_name = info_plist.get("CFBundleExecutable")
 
-        if executable_name:
-            binary_path = app_bundle / executable_name
-        else:
-            binary_path = app_bundle / app_bundle.stem
-
+        binary_path = app_bundle / (executable_name or app_bundle.stem)
         if not binary_path.exists():
             for item in app_bundle.iterdir():
                 if item.is_file() and not item.suffix:
@@ -170,9 +173,7 @@ def extract_ipa(ipa_path: Path) -> ExtractedIPA:
                     break
 
         if not binary_path.exists():
-            raise ValueError(
-                f"Could not find Mach-O binary in app bundle: {app_bundle}"
-            )
+            raise ValueError(f"Could not find Mach-O binary in app bundle: {app_bundle}")
 
         return ExtractedIPA(
             temp_dir=temp_dir,

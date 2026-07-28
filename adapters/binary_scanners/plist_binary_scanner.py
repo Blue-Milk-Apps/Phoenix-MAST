@@ -37,8 +37,10 @@ class PlistBinaryScanner(ScannerPort):
         return True
 
     def scan(self, config: ScanConfig) -> list[ScanResult]:
-        ipa_path = self._resolve_ipa_path(config.project_path)
-        if ipa_path is None:
+        extracted = config.extracted_binary if isinstance(config.extracted_binary, ExtractedIPA) else None
+        owns_extraction = extracted is None
+        target_path = self._resolve_ipa_path(config.project_path) if extracted is None else None
+        if extracted is None and target_path is None:
             return [
                 ScanResult(
                     scanner_name=self.name,
@@ -49,9 +51,9 @@ class PlistBinaryScanner(ScannerPort):
                 )
             ]
 
-        extracted: ExtractedIPA | None = None
         try:
-            extracted = extract_ipa(ipa_path)
+            if extracted is None:
+                extracted = extract_ipa(target_path)
             plist_files = self._collect_plist_files(extracted.app_bundle)
             if not plist_files:
                 return [
@@ -81,7 +83,7 @@ class PlistBinaryScanner(ScannerPort):
                 )
             ]
         finally:
-            if extracted:
+            if owns_extraction and extracted:
                 extracted.cleanup()
 
     def _resolve_ipa_path(self, project_path: Path) -> Path | None:
@@ -93,11 +95,7 @@ class PlistBinaryScanner(ScannerPort):
         return find_ipa_in_directory(project_path)
 
     def _collect_plist_files(self, app_bundle: Path) -> list[Path]:
-        return sorted(
-            path
-            for path in app_bundle.rglob("*")
-            if path.is_file() and path.suffix.lower() == ".plist"
-        )
+        return sorted(path for path in app_bundle.rglob("*") if path.is_file() and path.suffix.lower() == ".plist")
 
     @staticmethod
     def _normalize_output_format(output_format: str) -> str:
