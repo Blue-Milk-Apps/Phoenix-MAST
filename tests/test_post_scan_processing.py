@@ -1242,6 +1242,38 @@ def test_ios_network_evidence_detects_weak_ats_exceptions() -> None:
     assert no_weakening.ats_exceptions_configured.evidence == "no_ats_exceptions_configured_hits"
 
 
+def test_ios_network_evidence_detects_cookies_missing_httponly() -> None:
+    from_opengrep = IOSNetworkEvidence(
+        {
+            "opengrep": {
+                "results": [
+                    {
+                        "check_id": "ios.network.cookie-missing-httponly",
+                        "path": "Sources/Network.swift",
+                        "extra": {"lines": "Set-Cookie: session=abc; Path=/"},
+                    }
+                ]
+            }
+        }
+    )
+    assert from_opengrep.cookie_missing_httponly.present is True
+    assert from_opengrep.cookie_missing_httponly.evidence == "Sources/Network.swift: Set-Cookie: session=abc; Path=/"
+
+    from_strings = IOSNetworkEvidence({"strings_outputs": {"main.txt": "Set-Cookie: session=abc; Path=/\n"}})
+    assert from_strings.cookie_missing_httponly.present is True
+    assert from_strings.cookie_missing_httponly.evidence == "main.txt: Set-Cookie: session=abc; Path=/"
+
+    protected_or_non_cookie = IOSNetworkEvidence(
+        {
+            "strings_outputs": {
+                "main.txt": ("Set-Cookie: session=abc; Path=/; HttpOnly\nCookie: session=abc\nWKHTTPCookieStore\n")
+            }
+        }
+    )
+    assert protected_or_non_cookie.cookie_missing_httponly.present is False
+    assert protected_or_non_cookie.cookie_missing_httponly.evidence == "no_cookie_missing_httponly_hits"
+
+
 def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
     loaded_outputs = {
         "plist_outputs": {
