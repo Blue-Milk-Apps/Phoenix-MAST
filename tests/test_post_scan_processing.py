@@ -1220,6 +1220,41 @@ def test_ios_network_evidence_detects_cleartext_http_imei() -> None:
     assert not_detected.cleartext_http_imei.evidence == "no_cleartext_http_imei_hits"
 
 
+def test_ios_network_evidence_detects_cleartext_http_gps_coordinates() -> None:
+    detected = IOSNetworkEvidence(
+        {"strings_outputs": {"main.txt": "http://metrics.example.com/collect?gps_latitude=%@&gps_longitude=%@\n"}}
+    )
+    expected_evidence = "main.txt: http://metrics.example.com/collect?gps_latitude=%@&gps_longitude=%@"
+    assert detected.cleartext_http_gps_latitude.present is True
+    assert detected.cleartext_http_gps_latitude.evidence == expected_evidence
+    assert detected.cleartext_http_gps_longitude.present is True
+    assert detected.cleartext_http_gps_longitude.evidence == expected_evidence
+
+    latitude_only = IOSNetworkEvidence({"strings_outputs": {"main.txt": "http://metrics.example.com/collect?lat=%@\n"}})
+    assert latitude_only.cleartext_http_gps_latitude.present is True
+    assert latitude_only.cleartext_http_gps_longitude.present is False
+
+    longitude_only = IOSNetworkEvidence(
+        {"strings_outputs": {"main.txt": "http://metrics.example.com/collect?lng=%@\n"}}
+    )
+    assert longitude_only.cleartext_http_gps_latitude.present is False
+    assert longitude_only.cleartext_http_gps_longitude.present is True
+
+    excluded = IOSNetworkEvidence(
+        {
+            "strings_outputs": {
+                "main.txt": (
+                    "https://metrics.example.com/collect?latitude=%@&longitude=%@\n"
+                    "http://localhost:8080/collect?latitude=%@&longitude=%@\n"
+                    "http://metrics.example.com/collect?location=%@\n"
+                )
+            }
+        }
+    )
+    assert excluded.cleartext_http_gps_latitude.present is False
+    assert excluded.cleartext_http_gps_longitude.present is False
+
+
 def test_ios_network_evidence_detects_weak_ats_exceptions() -> None:
     media_override = IOSNetworkEvidence(
         {

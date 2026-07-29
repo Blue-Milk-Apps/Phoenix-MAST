@@ -50,6 +50,8 @@ class IOSNetworkEvidence:
         "advertisingidentifier",
     }
     IMEI_PARAMETER_NAMES = {"imei", "deviceimei"}
+    GPS_LATITUDE_PARAMETER_NAMES = {"latitude", "lat", "gpslatitude"}
+    GPS_LONGITUDE_PARAMETER_NAMES = {"longitude", "lon", "lng", "gpslongitude"}
     WEAK_TLS_VERSIONS = {"tlsv1", "tlsv1.0", "tlsv1.1"}
     COOKIE_MISSING_HTTPONLY_RULE_ID = "ios.network.cookie-missing-httponly"
     COOKIE_MISSING_SECURE_FLAG_RULE_ID = "ios.network.cookie-missing-secure-flag"
@@ -65,8 +67,8 @@ class IOSNetworkEvidence:
         self.cookie_missing_secure_flag = self._cookie_missing_secure_flag_entry(loaded_outputs)
         self.cleartext_http_advertiser_id = self._cleartext_http_advertiser_id_entry(loaded_outputs)
         self.cleartext_http_imei = self._cleartext_http_imei_entry(loaded_outputs)
-        self.cleartext_http_gps_latitude = EvidenceEntry(False, "no_cleartext_http_gps_latitude_hits")
-        self.cleartext_http_gps_longitude = EvidenceEntry(False, "no_cleartext_http_gps_longitude_hits")
+        self.cleartext_http_gps_latitude = self._cleartext_http_gps_latitude_entry(loaded_outputs)
+        self.cleartext_http_gps_longitude = self._cleartext_http_gps_longitude_entry(loaded_outputs)
         self.cleartext_http_sensitive_data = EvidenceEntry(False, "no_cleartext_http_sensitive_data_hits")
         self.cleartext_http_wifi_mac = EvidenceEntry(False, "no_cleartext_http_wifi_mac_hits")
         self.https_url_contains_imei = EvidenceEntry(False, "no_https_url_contains_imei_hits")
@@ -168,27 +170,52 @@ class IOSNetworkEvidence:
 
     @classmethod
     def _cleartext_http_advertiser_id_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
-        strings_outputs = loaded_outputs.get("strings_outputs") or {}
-        if isinstance(strings_outputs, dict):
-            for path, content in strings_outputs.items():
-                for line in str(content or "").splitlines():
-                    for url in cls.HTTP_URL_PATTERN.findall(line):
-                        if cls._is_public_http_url(url) and cls._contains_advertiser_id_parameter(url):
-                            return EvidenceEntry(True, f"{path}: {url}")
-
-        return EvidenceEntry(False, "no_cleartext_http_advertiser_id_hits")
+        return cls._cleartext_http_query_parameter_entry(
+            loaded_outputs,
+            cls.ADVERTISER_ID_PARAMETER_NAMES,
+            "no_cleartext_http_advertiser_id_hits",
+        )
 
     @classmethod
     def _cleartext_http_imei_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        return cls._cleartext_http_query_parameter_entry(
+            loaded_outputs,
+            cls.IMEI_PARAMETER_NAMES,
+            "no_cleartext_http_imei_hits",
+        )
+
+    @classmethod
+    def _cleartext_http_gps_latitude_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        return cls._cleartext_http_query_parameter_entry(
+            loaded_outputs,
+            cls.GPS_LATITUDE_PARAMETER_NAMES,
+            "no_cleartext_http_gps_latitude_hits",
+        )
+
+    @classmethod
+    def _cleartext_http_gps_longitude_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        return cls._cleartext_http_query_parameter_entry(
+            loaded_outputs,
+            cls.GPS_LONGITUDE_PARAMETER_NAMES,
+            "no_cleartext_http_gps_longitude_hits",
+        )
+
+    @classmethod
+    def _cleartext_http_query_parameter_entry(
+        cls,
+        loaded_outputs: dict[str, Any],
+        parameter_names: set[str],
+        no_hits_evidence: str,
+    ) -> EvidenceEntry:
         strings_outputs = loaded_outputs.get("strings_outputs") or {}
         if isinstance(strings_outputs, dict):
             for path, content in strings_outputs.items():
                 for line in str(content or "").splitlines():
                     for url in cls.HTTP_URL_PATTERN.findall(line):
-                        if cls._is_public_http_url(url) and cls._contains_imei_parameter(url):
+                        if cls._is_public_http_url(url) and cls._contains_query_parameter(url, parameter_names):
                             return EvidenceEntry(True, f"{path}: {url}")
 
-        return EvidenceEntry(False, "no_cleartext_http_imei_hits")
+        return EvidenceEntry(False, no_hits_evidence)
 
     @classmethod
     def _ats_exceptions_configured_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
@@ -274,14 +301,6 @@ class IOSNetworkEvidence:
         if hostname in {"localhost", "127.0.0.1", "::1"}:
             return False
         return not (hostname == "www.apple.com" and parsed.path.lower().startswith("/dtds/"))
-
-    @classmethod
-    def _contains_advertiser_id_parameter(cls, url: str) -> bool:
-        return cls._contains_query_parameter(url, cls.ADVERTISER_ID_PARAMETER_NAMES)
-
-    @classmethod
-    def _contains_imei_parameter(cls, url: str) -> bool:
-        return cls._contains_query_parameter(url, cls.IMEI_PARAMETER_NAMES)
 
     @staticmethod
     def _contains_query_parameter(url: str, parameter_names: set[str]) -> bool:
