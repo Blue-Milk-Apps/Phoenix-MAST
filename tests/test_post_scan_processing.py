@@ -1070,6 +1070,34 @@ def test_ios_network_evidence_detects_vulnerable_openssl_ccs_versions() -> None:
     assert fixed_or_unversioned.vulnerable_openssl_ccs_injection.evidence == "no_vulnerable_openssl_ccs_injection_hits"
 
 
+def test_ios_network_evidence_detects_heartbleed_vulnerable_openssl_versions() -> None:
+    from_sbom = IOSNetworkEvidence(
+        {"syft_outputs": {"sbom.json": {"components": [{"name": "openssl", "version": "1.0.1f"}]}}}
+    )
+    assert from_sbom.vulnerable_openssl_heartbleed.present is True
+    assert from_sbom.vulnerable_openssl_heartbleed.evidence == "sbom.json: openssl@1.0.1f"
+
+    from_strings = IOSNetworkEvidence({"strings_outputs": {"Frameworks/SDK.txt": "OpenSSL 1.0.1e\n"}})
+    assert from_strings.vulnerable_openssl_heartbleed.present is True
+    assert from_strings.vulnerable_openssl_heartbleed.evidence == "Frameworks/SDK.txt: OpenSSL 1.0.1e"
+
+    fixed_or_non_affected = IOSNetworkEvidence(
+        {
+            "syft_outputs": {
+                "sbom.json": {
+                    "artifacts": [
+                        {"name": "openssl", "version": "1.0.1g"},
+                        {"name": "openssl", "version": "1.0.0m"},
+                    ]
+                }
+            },
+            "strings_outputs": {"main.txt": "OpenSSL\n"},
+        }
+    )
+    assert fixed_or_non_affected.vulnerable_openssl_heartbleed.present is False
+    assert fixed_or_non_affected.vulnerable_openssl_heartbleed.evidence == "no_vulnerable_openssl_heartbleed_hits"
+
+
 def test_ios_network_evidence_detects_ftp_endpoints() -> None:
     from_strings = IOSNetworkEvidence(
         {"strings_outputs": {"main.txt": "download ftp://files.example.com/update.zip\n"}}

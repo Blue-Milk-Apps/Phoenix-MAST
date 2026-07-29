@@ -45,7 +45,7 @@ class IOSNetworkEvidence:
         self.ats_disabled = self._ats_disabled_entry(loaded_outputs)
         self.vulnerable_openssl_ccs_injection = self._vulnerable_openssl_ccs_injection_entry(loaded_outputs)
         self.uses_ftp = self._uses_ftp_entry(loaded_outputs)
-        self.vulnerable_openssl_heartbleed = EvidenceEntry(False, "no_vulnerable_openssl_heartbleed_hits")
+        self.vulnerable_openssl_heartbleed = self._vulnerable_openssl_heartbleed_entry(loaded_outputs)
         self.insecure_http_traffic = self._insecure_http_traffic_entry(loaded_outputs)
         self.ats_exceptions_configured = EvidenceEntry(False, "no_ats_exceptions_configured_hits")
         self.cookie_missing_httponly = EvidenceEntry(False, "no_cookie_missing_httponly_hits")
@@ -94,6 +94,24 @@ class IOSNetworkEvidence:
                         return EvidenceEntry(True, f"{path}: OpenSSL {version}")
 
         return EvidenceEntry(False, "no_vulnerable_openssl_ccs_injection_hits")
+
+    @classmethod
+    def _vulnerable_openssl_heartbleed_entry(
+        cls,
+        loaded_outputs: dict[str, Any],
+    ) -> EvidenceEntry:
+        for path, package_name, version in cls._syft_packages(loaded_outputs):
+            if cls._is_openssl_package(package_name) and cls._is_heartbleed_vulnerable_openssl_version(version):
+                return EvidenceEntry(True, f"{path}: {package_name}@{version}")
+
+        strings_outputs = loaded_outputs.get("strings_outputs") or {}
+        if isinstance(strings_outputs, dict):
+            for path, content in strings_outputs.items():
+                for version in cls.OPENSSL_VERSION_PATTERN.findall(str(content or "")):
+                    if cls._is_heartbleed_vulnerable_openssl_version(version):
+                        return EvidenceEntry(True, f"{path}: OpenSSL {version}")
+
+        return EvidenceEntry(False, "no_vulnerable_openssl_heartbleed_hits")
 
     @classmethod
     def _uses_ftp_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
@@ -172,6 +190,11 @@ class IOSNetworkEvidence:
         series, suffix = match.groups()
         fixed_suffix = {"0.9.8": "za", "1.0.0": "m", "1.0.1": "h"}[series]
         return suffix < fixed_suffix
+
+    @staticmethod
+    def _is_heartbleed_vulnerable_openssl_version(version: str) -> bool:
+        match = re.fullmatch(r"1\.0\.1([a-z]*)", version.strip().lower())
+        return match is not None and match.group(1) < "g"
 
     @staticmethod
     def _syft_packages(loaded_outputs: dict[str, Any]) -> list[tuple[str, str, str]]:
