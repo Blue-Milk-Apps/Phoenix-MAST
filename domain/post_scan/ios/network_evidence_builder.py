@@ -19,7 +19,7 @@ class IOSNetworkEvidence:
     insecure_http_traffic: EvidenceEntry
     ats_exceptions_configured: EvidenceEntry
     cookie_missing_httponly: EvidenceEntry
-    cookie_missing_secure: EvidenceEntry
+    cookie_missing_secure_flag: EvidenceEntry
     cleartext_http_advertiser_id: EvidenceEntry
     cleartext_http_imei: EvidenceEntry
     cleartext_http_gps_latitude: EvidenceEntry
@@ -42,8 +42,10 @@ class IOSNetworkEvidence:
     HTTP_URL_PATTERN = re.compile(r"\bhttp://[^\s'\"<>]+", re.IGNORECASE)
     SET_COOKIE_PATTERN = re.compile(r"\bset-cookie\s*:\s*([^\r\n]+)", re.IGNORECASE)
     HTTPONLY_ATTRIBUTE_PATTERN = re.compile(r"\bhttponly\b", re.IGNORECASE)
+    SECURE_ATTRIBUTE_PATTERN = re.compile(r"\bsecure\b", re.IGNORECASE)
     WEAK_TLS_VERSIONS = {"tlsv1", "tlsv1.0", "tlsv1.1"}
     COOKIE_MISSING_HTTPONLY_RULE_ID = "ios.network.cookie-missing-httponly"
+    COOKIE_MISSING_SECURE_FLAG_RULE_ID = "ios.network.cookie-missing-secure-flag"
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
         self.ats_disabled = self._ats_disabled_entry(loaded_outputs)
@@ -53,7 +55,7 @@ class IOSNetworkEvidence:
         self.insecure_http_traffic = self._insecure_http_traffic_entry(loaded_outputs)
         self.ats_exceptions_configured = self._ats_exceptions_configured_entry(loaded_outputs)
         self.cookie_missing_httponly = self._cookie_missing_httponly_entry(loaded_outputs)
-        self.cookie_missing_secure = EvidenceEntry(False, "no_cookie_missing_secure_hits")
+        self.cookie_missing_secure_flag = self._cookie_missing_secure_flag_entry(loaded_outputs)
         self.cleartext_http_advertiser_id = EvidenceEntry(False, "no_cleartext_http_advertiser_id_hits")
         self.cleartext_http_imei = EvidenceEntry(False, "no_cleartext_http_imei_hits")
         self.cleartext_http_gps_latitude = EvidenceEntry(False, "no_cleartext_http_gps_latitude_hits")
@@ -209,6 +211,25 @@ class IOSNetworkEvidence:
                         return EvidenceEntry(True, f"{path}: Set-Cookie: {cookie_value}")
 
         return EvidenceEntry(False, "no_cookie_missing_httponly_hits")
+
+    @classmethod
+    def _cookie_missing_secure_flag_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        for result in (loaded_outputs.get("opengrep") or {}).get("results") or []:
+            if not isinstance(result, dict) or result.get("check_id") != cls.COOKIE_MISSING_SECURE_FLAG_RULE_ID:
+                continue
+            extra = result.get("extra") or {}
+            evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
+            path = str(result.get("path", "")).strip()
+            return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
+
+        strings_outputs = loaded_outputs.get("strings_outputs") or {}
+        if isinstance(strings_outputs, dict):
+            for path, content in strings_outputs.items():
+                for cookie_value in cls.SET_COOKIE_PATTERN.findall(str(content or "")):
+                    if not cls.SECURE_ATTRIBUTE_PATTERN.search(cookie_value):
+                        return EvidenceEntry(True, f"{path}: Set-Cookie: {cookie_value}")
+
+        return EvidenceEntry(False, "no_cookie_missing_secure_flag_hits")
 
     @staticmethod
     def _is_public_http_url(url: str) -> bool:

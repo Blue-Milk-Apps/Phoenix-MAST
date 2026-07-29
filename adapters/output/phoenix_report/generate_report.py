@@ -87,7 +87,7 @@ IOS_NETWORK_EVIDENCE_KEY_BY_CHECK = {
     "application contains insecure http traffic": "insecure_http_traffic",
     "application selectively disabled app transport security protections": "ats_exceptions_configured",
     "cookie missing 'httponly' flag": "cookie_missing_httponly",
-    "cookie missing 'secure' flag": "cookie_missing_secure",
+    "cookie missing 'secure' flag": "cookie_missing_secure_flag",
     "http cleartext transmission of advertiser id": "cleartext_http_advertiser_id",
     "http cleartext transmission of device imei": "cleartext_http_imei",
     "http cleartext transmission of gps latitude coordinates": "cleartext_http_gps_latitude",

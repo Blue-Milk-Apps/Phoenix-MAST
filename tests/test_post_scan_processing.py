@@ -757,7 +757,7 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
         "insecure_http_traffic",
         "ats_exceptions_configured",
         "cookie_missing_httponly",
-        "cookie_missing_secure",
+        "cookie_missing_secure_flag",
         "cleartext_http_advertiser_id",
         "cleartext_http_imei",
         "cleartext_http_gps_latitude",
@@ -1272,6 +1272,41 @@ def test_ios_network_evidence_detects_cookies_missing_httponly() -> None:
     )
     assert protected_or_non_cookie.cookie_missing_httponly.present is False
     assert protected_or_non_cookie.cookie_missing_httponly.evidence == "no_cookie_missing_httponly_hits"
+
+
+def test_ios_network_evidence_detects_cookies_missing_secure_flag() -> None:
+    from_opengrep = IOSNetworkEvidence(
+        {
+            "opengrep": {
+                "results": [
+                    {
+                        "check_id": "ios.network.cookie-missing-secure-flag",
+                        "path": "Sources/Network.swift",
+                        "extra": {"lines": "Set-Cookie: session=abc; Path=/; HttpOnly"},
+                    }
+                ]
+            }
+        }
+    )
+    assert from_opengrep.cookie_missing_secure_flag.present is True
+    assert (
+        from_opengrep.cookie_missing_secure_flag.evidence
+        == "Sources/Network.swift: Set-Cookie: session=abc; Path=/; HttpOnly"
+    )
+
+    from_strings = IOSNetworkEvidence({"strings_outputs": {"main.txt": "Set-Cookie: session=abc; Path=/; HttpOnly\n"}})
+    assert from_strings.cookie_missing_secure_flag.present is True
+    assert from_strings.cookie_missing_secure_flag.evidence == "main.txt: Set-Cookie: session=abc; Path=/; HttpOnly"
+
+    protected_or_non_cookie = IOSNetworkEvidence(
+        {
+            "strings_outputs": {
+                "main.txt": ("Set-Cookie: session=abc; Path=/; Secure\nCookie: session=abc\nNSHTTPCookieSecure\n")
+            }
+        }
+    )
+    assert protected_or_non_cookie.cookie_missing_secure_flag.present is False
+    assert protected_or_non_cookie.cookie_missing_secure_flag.evidence == "no_cookie_missing_secure_flag_hits"
 
 
 def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
