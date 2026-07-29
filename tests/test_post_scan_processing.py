@@ -1198,6 +1198,28 @@ def test_ios_network_evidence_detects_cleartext_http_advertiser_id() -> None:
     assert not_detected.cleartext_http_advertiser_id.evidence == "no_cleartext_http_advertiser_id_hits"
 
 
+def test_ios_network_evidence_detects_cleartext_http_imei() -> None:
+    detected = IOSNetworkEvidence(
+        {"strings_outputs": {"main.txt": "http://metrics.example.com/collect?imei=%@&event=launch\n"}}
+    )
+    assert detected.cleartext_http_imei.present is True
+    assert detected.cleartext_http_imei.evidence == "main.txt: http://metrics.example.com/collect?imei=%@&event=launch"
+
+    not_detected = IOSNetworkEvidence(
+        {
+            "strings_outputs": {
+                "main.txt": (
+                    "https://metrics.example.com/collect?imei=%@\n"
+                    "http://localhost:8080/collect?device_imei=%@\n"
+                    "http://metrics.example.com/collect?device_id=%@\n"
+                )
+            }
+        }
+    )
+    assert not_detected.cleartext_http_imei.present is False
+    assert not_detected.cleartext_http_imei.evidence == "no_cleartext_http_imei_hits"
+
+
 def test_ios_network_evidence_detects_weak_ats_exceptions() -> None:
     media_override = IOSNetworkEvidence(
         {
