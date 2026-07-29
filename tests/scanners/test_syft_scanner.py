@@ -41,7 +41,7 @@ def test_syft_scan_success_loads_raw_output(monkeypatch, tmp_path: Path, scan_co
     assert results[0].success
     assert results[0].raw_output == '{"components": []}'
     assert results[0].relative_target_path == "sbom.json"
-    assert captured_cmd[captured_cmd.index("-o") + 1] == "cyclonedx-json"
+    assert captured_cmd[captured_cmd.index("-o") + 1] == "syft-json"
 
 
 def test_syft_scan_uses_configured_stdout_format(monkeypatch, tmp_path, scan_config) -> None:
@@ -94,7 +94,7 @@ def test_syft_scans_shared_extracted_binary_root(monkeypatch, tmp_path: Path, sc
 def test_syft_scan_rejects_file_output_format(tmp_path, scan_config) -> None:
     config = scan_config(tmp_path)
 
-    results = SyftScanner(output_format="cyclonedx-json=sbom.json").scan(config)
+    results = SyftScanner(output_format="syft-json=sbom.json").scan(config)
 
     assert not results[0].success
     assert "must not include a file path" in results[0].error_message

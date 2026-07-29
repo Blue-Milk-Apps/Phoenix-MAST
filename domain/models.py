@@ -71,7 +71,7 @@ class ScanConfig:
     display_project_path: str = ""
     platform: str = "ANY"
     stack: str = "ANY"
-    syft_output_format: str = "cyclonedx-json"
+    syft_output_format: str = "syft-json"
     extracted_binary: ExtractedBinary | None = None
 
     @property
