@@ -1173,6 +1173,31 @@ def test_ios_network_evidence_detects_public_http_endpoints() -> None:
     assert no_public_endpoint.insecure_http_traffic.evidence == "no_insecure_http_traffic_hits"
 
 
+def test_ios_network_evidence_detects_cleartext_http_advertiser_id() -> None:
+    detected = IOSNetworkEvidence(
+        {"strings_outputs": {"main.txt": "http://metrics.example.com/collect?advertising_id=%@&event=launch\n"}}
+    )
+    assert detected.cleartext_http_advertiser_id.present is True
+    assert (
+        detected.cleartext_http_advertiser_id.evidence
+        == "main.txt: http://metrics.example.com/collect?advertising_id=%@&event=launch"
+    )
+
+    not_detected = IOSNetworkEvidence(
+        {
+            "strings_outputs": {
+                "main.txt": (
+                    "https://metrics.example.com/collect?idfa=%@\n"
+                    "http://localhost:8080/collect?idfa=%@\n"
+                    "http://metrics.example.com/collect?device_id=%@\n"
+                )
+            }
+        }
+    )
+    assert not_detected.cleartext_http_advertiser_id.present is False
+    assert not_detected.cleartext_http_advertiser_id.evidence == "no_cleartext_http_advertiser_id_hits"
+
+
 def test_ios_network_evidence_detects_weak_ats_exceptions() -> None:
     media_override = IOSNetworkEvidence(
         {

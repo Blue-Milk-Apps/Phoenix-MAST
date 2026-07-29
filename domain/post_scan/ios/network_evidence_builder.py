@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlsplit
 
 from domain.post_scan.ios.code_evidence_builder import EvidenceEntry
 
@@ -43,6 +43,12 @@ class IOSNetworkEvidence:
     SET_COOKIE_PATTERN = re.compile(r"\bset-cookie\s*:\s*([^\r\n]+)", re.IGNORECASE)
     HTTPONLY_ATTRIBUTE_PATTERN = re.compile(r"\bhttponly\b", re.IGNORECASE)
     SECURE_ATTRIBUTE_PATTERN = re.compile(r"\bsecure\b", re.IGNORECASE)
+    ADVERTISER_ID_PARAMETER_NAMES = {
+        "idfa",
+        "advertisingid",
+        "advertiserid",
+        "advertisingidentifier",
+    }
     WEAK_TLS_VERSIONS = {"tlsv1", "tlsv1.0", "tlsv1.1"}
     COOKIE_MISSING_HTTPONLY_RULE_ID = "ios.network.cookie-missing-httponly"
     COOKIE_MISSING_SECURE_FLAG_RULE_ID = "ios.network.cookie-missing-secure-flag"
@@ -56,7 +62,7 @@ class IOSNetworkEvidence:
         self.ats_exceptions_configured = self._ats_exceptions_configured_entry(loaded_outputs)
         self.cookie_missing_httponly = self._cookie_missing_httponly_entry(loaded_outputs)
         self.cookie_missing_secure_flag = self._cookie_missing_secure_flag_entry(loaded_outputs)
-        self.cleartext_http_advertiser_id = EvidenceEntry(False, "no_cleartext_http_advertiser_id_hits")
+        self.cleartext_http_advertiser_id = self._cleartext_http_advertiser_id_entry(loaded_outputs)
         self.cleartext_http_imei = EvidenceEntry(False, "no_cleartext_http_imei_hits")
         self.cleartext_http_gps_latitude = EvidenceEntry(False, "no_cleartext_http_gps_latitude_hits")
         self.cleartext_http_gps_longitude = EvidenceEntry(False, "no_cleartext_http_gps_longitude_hits")
@@ -160,6 +166,18 @@ class IOSNetworkEvidence:
         return EvidenceEntry(False, "no_insecure_http_traffic_hits")
 
     @classmethod
+    def _cleartext_http_advertiser_id_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        strings_outputs = loaded_outputs.get("strings_outputs") or {}
+        if isinstance(strings_outputs, dict):
+            for path, content in strings_outputs.items():
+                for line in str(content or "").splitlines():
+                    for url in cls.HTTP_URL_PATTERN.findall(line):
+                        if cls._is_public_http_url(url) and cls._contains_advertiser_id_parameter(url):
+                            return EvidenceEntry(True, f"{path}: {url}")
+
+        return EvidenceEntry(False, "no_cleartext_http_advertiser_id_hits")
+
+    @classmethod
     def _ats_exceptions_configured_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
         for path, document in (loaded_outputs.get("plist_outputs") or {}).items():
             if not isinstance(document, dict) or not isinstance(document.get("app_meta"), dict):
@@ -243,6 +261,17 @@ class IOSNetworkEvidence:
         if hostname in {"localhost", "127.0.0.1", "::1"}:
             return False
         return not (hostname == "www.apple.com" and parsed.path.lower().startswith("/dtds/"))
+
+    @classmethod
+    def _contains_advertiser_id_parameter(cls, url: str) -> bool:
+        try:
+            query_parameters = parse_qsl(urlsplit(url).query, keep_blank_values=True)
+        except ValueError:
+            return False
+        return any(
+            parameter_name.lower().replace("_", "").replace("-", "") in cls.ADVERTISER_ID_PARAMETER_NAMES
+            for parameter_name, _ in query_parameters
+        )
 
     @classmethod
     def _string_values(cls, value: Any) -> list[str]:
