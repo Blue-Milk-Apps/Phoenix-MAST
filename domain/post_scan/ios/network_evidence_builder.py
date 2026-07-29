@@ -52,6 +52,21 @@ class IOSNetworkEvidence:
     IMEI_PARAMETER_NAMES = {"imei", "deviceimei"}
     GPS_LATITUDE_PARAMETER_NAMES = {"latitude", "lat", "gpslatitude"}
     GPS_LONGITUDE_PARAMETER_NAMES = {"longitude", "lon", "lng", "gpslongitude"}
+    SENSITIVE_DATA_PARAMETER_NAMES = {
+        "password",
+        "passwd",
+        "pwd",
+        "token",
+        "accesstoken",
+        "authtoken",
+        "authorization",
+        "session",
+        "sessionid",
+        "email",
+        "phone",
+        "ssn",
+        "creditcard",
+    }
     WEAK_TLS_VERSIONS = {"tlsv1", "tlsv1.0", "tlsv1.1"}
     COOKIE_MISSING_HTTPONLY_RULE_ID = "ios.network.cookie-missing-httponly"
     COOKIE_MISSING_SECURE_FLAG_RULE_ID = "ios.network.cookie-missing-secure-flag"
@@ -69,7 +84,7 @@ class IOSNetworkEvidence:
         self.cleartext_http_imei = self._cleartext_http_imei_entry(loaded_outputs)
         self.cleartext_http_gps_latitude = self._cleartext_http_gps_latitude_entry(loaded_outputs)
         self.cleartext_http_gps_longitude = self._cleartext_http_gps_longitude_entry(loaded_outputs)
-        self.cleartext_http_sensitive_data = EvidenceEntry(False, "no_cleartext_http_sensitive_data_hits")
+        self.cleartext_http_sensitive_data = self._cleartext_http_sensitive_data_entry(loaded_outputs)
         self.cleartext_http_wifi_mac = EvidenceEntry(False, "no_cleartext_http_wifi_mac_hits")
         self.https_url_contains_imei = EvidenceEntry(False, "no_https_url_contains_imei_hits")
         self.https_url_contains_gps_latitude = EvidenceEntry(False, "no_https_url_contains_gps_latitude_hits")
@@ -198,6 +213,14 @@ class IOSNetworkEvidence:
             loaded_outputs,
             cls.GPS_LONGITUDE_PARAMETER_NAMES,
             "no_cleartext_http_gps_longitude_hits",
+        )
+
+    @classmethod
+    def _cleartext_http_sensitive_data_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        return cls._cleartext_http_query_parameter_entry(
+            loaded_outputs,
+            cls.SENSITIVE_DATA_PARAMETER_NAMES,
+            "no_cleartext_http_sensitive_data_hits",
         )
 
     @classmethod

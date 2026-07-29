@@ -1255,6 +1255,34 @@ def test_ios_network_evidence_detects_cleartext_http_gps_coordinates() -> None:
     assert excluded.cleartext_http_gps_longitude.present is False
 
 
+def test_ios_network_evidence_detects_cleartext_http_sensitive_data() -> None:
+    credential = IOSNetworkEvidence(
+        {"strings_outputs": {"main.txt": "http://api.example.com/login?password=%@&username=%@\n"}}
+    )
+    assert credential.cleartext_http_sensitive_data.present is True
+    assert (
+        credential.cleartext_http_sensitive_data.evidence
+        == "main.txt: http://api.example.com/login?password=%@&username=%@"
+    )
+
+    personal_data = IOSNetworkEvidence({"strings_outputs": {"main.txt": "http://api.example.com/profile?email=%@\n"}})
+    assert personal_data.cleartext_http_sensitive_data.present is True
+
+    excluded = IOSNetworkEvidence(
+        {
+            "strings_outputs": {
+                "main.txt": (
+                    "https://api.example.com/login?token=%@\n"
+                    "http://localhost:8080/login?password=%@\n"
+                    "http://api.example.com/collect?data=%@\n"
+                )
+            }
+        }
+    )
+    assert excluded.cleartext_http_sensitive_data.present is False
+    assert excluded.cleartext_http_sensitive_data.evidence == "no_cleartext_http_sensitive_data_hits"
+
+
 def test_ios_network_evidence_detects_weak_ats_exceptions() -> None:
     media_override = IOSNetworkEvidence(
         {
