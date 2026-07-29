@@ -74,6 +74,14 @@ class IOSNetworkEvidence:
         "wlanmac",
         "devicemac",
     }
+    INSECURE_TLS_STRING_PATTERNS = (
+        re.compile(r"\bSSL_VERIFY_NONE\b", re.IGNORECASE),
+        re.compile(r"\bkCFStreamSSLAllowsAnyRoot\b", re.IGNORECASE),
+        re.compile(r"\bkCFStreamSSLValidatesCertificateChain\s*=\s*(?:false|0)\b", re.IGNORECASE),
+        re.compile(r"\ballowsInvalidSSLCertificate\s*=\s*(?:true|1)\b", re.IGNORECASE),
+        re.compile(r"\bTLSv1(?:\.0|\.1)?(?!\.)\b", re.IGNORECASE),
+        re.compile(r"\bkCFStreamSocketSecurityLevelTLSv1\b", re.IGNORECASE),
+    )
     WEAK_TLS_VERSIONS = {"tlsv1", "tlsv1.0", "tlsv1.1"}
     COOKIE_MISSING_HTTPONLY_RULE_ID = "ios.network.cookie-missing-httponly"
     COOKIE_MISSING_SECURE_FLAG_RULE_ID = "ios.network.cookie-missing-secure-flag"
@@ -98,7 +106,7 @@ class IOSNetworkEvidence:
         self.https_url_contains_gps_longitude = self._https_url_contains_gps_longitude_entry(loaded_outputs)
         self.https_url_contains_sensitive_data = self._https_url_contains_sensitive_data_entry(loaded_outputs)
         self.https_url_contains_wifi_mac = self._https_url_contains_wifi_mac_entry(loaded_outputs)
-        self.insecure_tls_configuration = EvidenceEntry(False, "no_insecure_tls_configuration_hits")
+        self.insecure_tls_configuration = self._insecure_tls_configuration_entry(loaded_outputs)
         self.certificate_pinning_not_implemented = EvidenceEntry(False, "no_certificate_pinning_not_implemented_hits")
 
     @staticmethod
@@ -306,6 +314,41 @@ class IOSNetworkEvidence:
                             return EvidenceEntry(True, f"{path}: {url}")
 
         return EvidenceEntry(False, no_hits_evidence)
+
+    @classmethod
+    def _insecure_tls_configuration_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        for path, document in (loaded_outputs.get("plist_outputs") or {}).items():
+            if not isinstance(document, dict) or not isinstance(document.get("app_meta"), dict):
+                continue
+            ats = document.get("ats")
+            if not isinstance(ats, dict):
+                continue
+            for exception in ats.get("exception_domains") or []:
+                if not isinstance(exception, dict):
+                    continue
+                domain = str(exception.get("domain", "")).strip() or "unknown domain"
+                minimum_tls_version = str(exception.get("minimum_tls_version", "")).strip().lower()
+                if minimum_tls_version in cls.WEAK_TLS_VERSIONS:
+                    return EvidenceEntry(
+                        True,
+                        f"{path}: {domain} (NSExceptionMinimumTLSVersion={exception['minimum_tls_version']})",
+                    )
+                if exception.get("requires_forward_secrecy") is False:
+                    return EvidenceEntry(
+                        True,
+                        f"{path}: {domain} (NSExceptionRequiresForwardSecrecy=false)",
+                    )
+
+        strings_outputs = loaded_outputs.get("strings_outputs") or {}
+        if isinstance(strings_outputs, dict):
+            for path, content in strings_outputs.items():
+                for line in str(content or "").splitlines():
+                    for pattern in cls.INSECURE_TLS_STRING_PATTERNS:
+                        match = pattern.search(line)
+                        if match:
+                            return EvidenceEntry(True, f"{path}: {match.group(0)}")
+
+        return EvidenceEntry(False, "no_insecure_tls_configuration_hits")
 
     @classmethod
     def _ats_exceptions_configured_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:

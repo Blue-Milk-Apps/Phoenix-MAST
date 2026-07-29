@@ -1340,6 +1340,57 @@ def test_ios_network_evidence_detects_sensitive_https_url_parameters() -> None:
     assert excluded.https_url_contains_wifi_mac.present is False
 
 
+def test_ios_network_evidence_detects_insecure_tls_configuration() -> None:
+    weak_ats = IOSNetworkEvidence(
+        {
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "ats": {"exception_domains": [{"domain": "api.example.com", "minimum_tls_version": "TLSv1.1"}]},
+                }
+            }
+        }
+    )
+    assert weak_ats.insecure_tls_configuration.present is True
+    assert (
+        weak_ats.insecure_tls_configuration.evidence
+        == "Info.json: api.example.com (NSExceptionMinimumTLSVersion=TLSv1.1)"
+    )
+
+    forward_secrecy_disabled = IOSNetworkEvidence(
+        {
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "ats": {"exception_domains": [{"domain": "api.example.com", "requires_forward_secrecy": False}]},
+                }
+            }
+        }
+    )
+    assert forward_secrecy_disabled.insecure_tls_configuration.present is True
+
+    verification_bypass = IOSNetworkEvidence({"strings_outputs": {"main.txt": "SSL_VERIFY_NONE\n"}})
+    assert verification_bypass.insecure_tls_configuration.present is True
+    assert verification_bypass.insecure_tls_configuration.evidence == "main.txt: SSL_VERIFY_NONE"
+
+    obsolete_tls = IOSNetworkEvidence({"strings_outputs": {"main.txt": "kCFStreamSocketSecurityLevelTLSv1\n"}})
+    assert obsolete_tls.insecure_tls_configuration.present is True
+
+    secure_configuration = IOSNetworkEvidence(
+        {
+            "strings_outputs": {"main.txt": "TLSv1.2\nkCFStreamSSLValidatesCertificateChain=true\n"},
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "ats": {"exception_domains": [{"domain": "api.example.com", "minimum_tls_version": "TLSv1.2"}]},
+                }
+            },
+        }
+    )
+    assert secure_configuration.insecure_tls_configuration.present is False
+    assert secure_configuration.insecure_tls_configuration.evidence == "no_insecure_tls_configuration_hits"
+
+
 def test_ios_network_evidence_detects_weak_ats_exceptions() -> None:
     media_override = IOSNetworkEvidence(
         {
