@@ -40,6 +40,7 @@ class IOSNetworkEvidence:
     )
     FTP_URL_PATTERN = re.compile(r"\bftps?://[^\s'\"<>]+", re.IGNORECASE)
     HTTP_URL_PATTERN = re.compile(r"\bhttp://[^\s'\"<>]+", re.IGNORECASE)
+    WEAK_TLS_VERSIONS = {"tlsv1", "tlsv1.0", "tlsv1.1"}
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
         self.ats_disabled = self._ats_disabled_entry(loaded_outputs)
@@ -47,7 +48,7 @@ class IOSNetworkEvidence:
         self.uses_ftp = self._uses_ftp_entry(loaded_outputs)
         self.vulnerable_openssl_heartbleed = self._vulnerable_openssl_heartbleed_entry(loaded_outputs)
         self.insecure_http_traffic = self._insecure_http_traffic_entry(loaded_outputs)
-        self.ats_exceptions_configured = EvidenceEntry(False, "no_ats_exceptions_configured_hits")
+        self.ats_exceptions_configured = self._ats_exceptions_configured_entry(loaded_outputs)
         self.cookie_missing_httponly = EvidenceEntry(False, "no_cookie_missing_httponly_hits")
         self.cookie_missing_secure = EvidenceEntry(False, "no_cookie_missing_secure_hits")
         self.cleartext_http_advertiser_id = EvidenceEntry(False, "no_cleartext_http_advertiser_id_hits")
@@ -152,6 +153,40 @@ class IOSNetworkEvidence:
                         return EvidenceEntry(True, f"{path}: {url}")
 
         return EvidenceEntry(False, "no_insecure_http_traffic_hits")
+
+    @classmethod
+    def _ats_exceptions_configured_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        for path, document in (loaded_outputs.get("plist_outputs") or {}).items():
+            if not isinstance(document, dict) or not isinstance(document.get("app_meta"), dict):
+                continue
+            ats = document.get("ats")
+            if not isinstance(ats, dict):
+                continue
+            if ats.get("allows_arbitrary_loads_for_media") is True:
+                return EvidenceEntry(True, f"{path}: NSAllowsArbitraryLoadsForMedia=true")
+            if ats.get("allows_arbitrary_loads_in_web_content") is True:
+                return EvidenceEntry(True, f"{path}: NSAllowsArbitraryLoadsInWebContent=true")
+            for exception in ats.get("exception_domains") or []:
+                if not isinstance(exception, dict):
+                    continue
+                domain = str(exception.get("domain", "")).strip() or "unknown domain"
+                if exception.get("allows_insecure_http_loads") is True:
+                    return EvidenceEntry(
+                        True,
+                        f"{path}: {domain} (NSExceptionAllowsInsecureHTTPLoads=true)",
+                    )
+                minimum_tls_version = str(exception.get("minimum_tls_version", "")).strip().lower()
+                if minimum_tls_version in cls.WEAK_TLS_VERSIONS:
+                    return EvidenceEntry(
+                        True,
+                        f"{path}: {domain} (NSExceptionMinimumTLSVersion={exception['minimum_tls_version']})",
+                    )
+                if exception.get("requires_forward_secrecy") is False:
+                    return EvidenceEntry(
+                        True,
+                        f"{path}: {domain} (NSExceptionRequiresForwardSecrecy=false)",
+                    )
+        return EvidenceEntry(False, "no_ats_exceptions_configured_hits")
 
     @staticmethod
     def _is_public_http_url(url: str) -> bool:

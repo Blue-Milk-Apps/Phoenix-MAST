@@ -1173,6 +1173,75 @@ def test_ios_network_evidence_detects_public_http_endpoints() -> None:
     assert no_public_endpoint.insecure_http_traffic.evidence == "no_insecure_http_traffic_hits"
 
 
+def test_ios_network_evidence_detects_weak_ats_exceptions() -> None:
+    media_override = IOSNetworkEvidence(
+        {
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "ats": {"allows_arbitrary_loads_for_media": True},
+                }
+            }
+        }
+    )
+    assert media_override.ats_exceptions_configured.present is True
+    assert media_override.ats_exceptions_configured.evidence == "Info.json: NSAllowsArbitraryLoadsForMedia=true"
+
+    insecure_http_exception = IOSNetworkEvidence(
+        {
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "ats": {"exception_domains": [{"domain": "api.example.com", "allows_insecure_http_loads": True}]},
+                }
+            }
+        }
+    )
+    assert insecure_http_exception.ats_exceptions_configured.present is True
+    assert (
+        insecure_http_exception.ats_exceptions_configured.evidence
+        == "Info.json: api.example.com (NSExceptionAllowsInsecureHTTPLoads=true)"
+    )
+
+    weak_tls_and_forward_secrecy = IOSNetworkEvidence(
+        {
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "ats": {
+                        "exception_domains": [
+                            {"domain": "tls.example.com", "minimum_tls_version": "TLSv1.1"},
+                            {"domain": "pfs.example.com", "requires_forward_secrecy": False},
+                        ]
+                    },
+                }
+            }
+        }
+    )
+    assert weak_tls_and_forward_secrecy.ats_exceptions_configured.present is True
+    assert (
+        weak_tls_and_forward_secrecy.ats_exceptions_configured.evidence
+        == "Info.json: tls.example.com (NSExceptionMinimumTLSVersion=TLSv1.1)"
+    )
+
+    no_weakening = IOSNetworkEvidence(
+        {
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "ats": {"exception_domains": [{"domain": "api.example.com"}]},
+                },
+                "Frameworks/SDK.framework/Info.json": {
+                    "framework_meta": {"bundle_identifier": "com.example.sdk"},
+                    "ats": {"allows_arbitrary_loads_in_web_content": True},
+                },
+            }
+        }
+    )
+    assert no_weakening.ats_exceptions_configured.present is False
+    assert no_weakening.ats_exceptions_configured.evidence == "no_ats_exceptions_configured_hits"
+
+
 def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
     loaded_outputs = {
         "plist_outputs": {
