@@ -1391,6 +1391,29 @@ def test_ios_network_evidence_detects_insecure_tls_configuration() -> None:
     assert secure_configuration.insecure_tls_configuration.evidence == "no_insecure_tls_configuration_hits"
 
 
+def test_ios_network_evidence_assesses_certificate_pinning() -> None:
+    pinning_detected = IOSNetworkEvidence({"strings_outputs": {"main.txt": "TrustKit\nkTSKPublicKeyHashes\n"}})
+    assert pinning_detected.certificate_pinning_not_implemented.present is False
+    assert (
+        pinning_detected.certificate_pinning_not_implemented.evidence
+        == "main.txt: certificate pinning marker detected (TrustKit)"
+    )
+
+    no_pinning_marker = IOSNetworkEvidence({"strings_outputs": {"main.txt": "URLSession\nSecTrustEvaluate\n"}})
+    assert no_pinning_marker.certificate_pinning_not_implemented.present is True
+    assert (
+        no_pinning_marker.certificate_pinning_not_implemented.evidence
+        == "no_certificate_pinning_implementation_detected"
+    )
+
+    not_assessed = IOSNetworkEvidence({"strings_outputs": {"main.txt": ""}})
+    assert not_assessed.certificate_pinning_not_implemented.present is False
+    assert (
+        not_assessed.certificate_pinning_not_implemented.evidence
+        == "certificate_pinning_not_assessed_no_strings_output"
+    )
+
+
 def test_ios_network_evidence_detects_weak_ats_exceptions() -> None:
     media_override = IOSNetworkEvidence(
         {

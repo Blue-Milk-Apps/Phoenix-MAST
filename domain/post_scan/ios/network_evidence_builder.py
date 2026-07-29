@@ -82,6 +82,16 @@ class IOSNetworkEvidence:
         re.compile(r"\bTLSv1(?:\.0|\.1)?(?!\.)\b", re.IGNORECASE),
         re.compile(r"\bkCFStreamSocketSecurityLevelTLSv1\b", re.IGNORECASE),
     )
+    CERTIFICATE_PINNING_MARKERS = (
+        "TrustKit",
+        "TSKPinningValidator",
+        "kTSKPublicKeyHashes",
+        "AFSSLPinningModeCertificate",
+        "AFSSLPinningModePublicKey",
+        "PinnedCertificatesTrustEvaluator",
+        "PublicKeysTrustEvaluator",
+        "SecTrustSetAnchorCertificates",
+    )
     WEAK_TLS_VERSIONS = {"tlsv1", "tlsv1.0", "tlsv1.1"}
     COOKIE_MISSING_HTTPONLY_RULE_ID = "ios.network.cookie-missing-httponly"
     COOKIE_MISSING_SECURE_FLAG_RULE_ID = "ios.network.cookie-missing-secure-flag"
@@ -107,7 +117,7 @@ class IOSNetworkEvidence:
         self.https_url_contains_sensitive_data = self._https_url_contains_sensitive_data_entry(loaded_outputs)
         self.https_url_contains_wifi_mac = self._https_url_contains_wifi_mac_entry(loaded_outputs)
         self.insecure_tls_configuration = self._insecure_tls_configuration_entry(loaded_outputs)
-        self.certificate_pinning_not_implemented = EvidenceEntry(False, "no_certificate_pinning_not_implemented_hits")
+        self.certificate_pinning_not_implemented = self._certificate_pinning_not_implemented_entry(loaded_outputs)
 
     @staticmethod
     def _ats_disabled_entry(loaded_outputs: dict[str, Any]) -> EvidenceEntry:
@@ -349,6 +359,22 @@ class IOSNetworkEvidence:
                             return EvidenceEntry(True, f"{path}: {match.group(0)}")
 
         return EvidenceEntry(False, "no_insecure_tls_configuration_hits")
+
+    @classmethod
+    def _certificate_pinning_not_implemented_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        strings_outputs = loaded_outputs.get("strings_outputs")
+        if not isinstance(strings_outputs, dict) or not any(
+            str(content or "").strip() for content in strings_outputs.values()
+        ):
+            return EvidenceEntry(False, "certificate_pinning_not_assessed_no_strings_output")
+
+        for path, content in strings_outputs.items():
+            normalized_content = str(content or "").lower()
+            for marker in cls.CERTIFICATE_PINNING_MARKERS:
+                if marker.lower() in normalized_content:
+                    return EvidenceEntry(False, f"{path}: certificate pinning marker detected ({marker})")
+
+        return EvidenceEntry(True, "no_certificate_pinning_implementation_detected")
 
     @classmethod
     def _ats_exceptions_configured_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
