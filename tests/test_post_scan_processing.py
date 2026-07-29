@@ -1283,6 +1283,63 @@ def test_ios_network_evidence_detects_cleartext_http_sensitive_data() -> None:
     assert excluded.cleartext_http_sensitive_data.evidence == "no_cleartext_http_sensitive_data_hits"
 
 
+def test_ios_network_evidence_detects_cleartext_http_wifi_mac() -> None:
+    detected = IOSNetworkEvidence(
+        {"strings_outputs": {"main.txt": "http://api.example.com/network?wifi_mac_address=%@\n"}}
+    )
+    assert detected.cleartext_http_wifi_mac.present is True
+    assert detected.cleartext_http_wifi_mac.evidence == "main.txt: http://api.example.com/network?wifi_mac_address=%@"
+
+    excluded = IOSNetworkEvidence(
+        {
+            "strings_outputs": {
+                "main.txt": (
+                    "https://api.example.com/network?wifi_mac=%@\n"
+                    "http://localhost:8080/network?wifi_mac=%@\n"
+                    "http://api.example.com/network?mac=%@\n"
+                )
+            }
+        }
+    )
+    assert excluded.cleartext_http_wifi_mac.present is False
+
+
+def test_ios_network_evidence_detects_sensitive_https_url_parameters() -> None:
+    detected = IOSNetworkEvidence(
+        {
+            "strings_outputs": {
+                "imei.txt": "https://api.example.com/collect?device_imei=%@\n",
+                "latitude.txt": "https://api.example.com/collect?gps_latitude=%@\n",
+                "longitude.txt": "https://api.example.com/collect?lng=%@\n",
+                "sensitive.txt": "https://api.example.com/collect?access_token=%@\n",
+                "wifi.txt": "https://api.example.com/collect?wlan_mac=%@\n",
+            }
+        }
+    )
+    assert detected.https_url_contains_imei.present is True
+    assert detected.https_url_contains_gps_latitude.present is True
+    assert detected.https_url_contains_gps_longitude.present is True
+    assert detected.https_url_contains_sensitive_data.present is True
+    assert detected.https_url_contains_wifi_mac.present is True
+
+    excluded = IOSNetworkEvidence(
+        {
+            "strings_outputs": {
+                "main.txt": (
+                    "http://api.example.com/collect?imei=%@&latitude=%@&longitude=%@&token=%@&wifi_mac=%@\n"
+                    "https://localhost:8080/collect?imei=%@&latitude=%@&longitude=%@&token=%@&wifi_mac=%@\n"
+                    "https://api.example.com/collect?device_id=%@&location=%@&data=%@&mac=%@\n"
+                )
+            }
+        }
+    )
+    assert excluded.https_url_contains_imei.present is False
+    assert excluded.https_url_contains_gps_latitude.present is False
+    assert excluded.https_url_contains_gps_longitude.present is False
+    assert excluded.https_url_contains_sensitive_data.present is False
+    assert excluded.https_url_contains_wifi_mac.present is False
+
+
 def test_ios_network_evidence_detects_weak_ats_exceptions() -> None:
     media_override = IOSNetworkEvidence(
         {

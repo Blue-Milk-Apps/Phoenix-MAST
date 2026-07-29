@@ -40,6 +40,7 @@ class IOSNetworkEvidence:
     )
     FTP_URL_PATTERN = re.compile(r"\bftps?://[^\s'\"<>]+", re.IGNORECASE)
     HTTP_URL_PATTERN = re.compile(r"\bhttp://[^\s'\"<>]+", re.IGNORECASE)
+    HTTPS_URL_PATTERN = re.compile(r"\bhttps://[^\s'\"<>]+", re.IGNORECASE)
     SET_COOKIE_PATTERN = re.compile(r"\bset-cookie\s*:\s*([^\r\n]+)", re.IGNORECASE)
     HTTPONLY_ATTRIBUTE_PATTERN = re.compile(r"\bhttponly\b", re.IGNORECASE)
     SECURE_ATTRIBUTE_PATTERN = re.compile(r"\bsecure\b", re.IGNORECASE)
@@ -67,6 +68,12 @@ class IOSNetworkEvidence:
         "ssn",
         "creditcard",
     }
+    WIFI_MAC_PARAMETER_NAMES = {
+        "wifimac",
+        "wifimacaddress",
+        "wlanmac",
+        "devicemac",
+    }
     WEAK_TLS_VERSIONS = {"tlsv1", "tlsv1.0", "tlsv1.1"}
     COOKIE_MISSING_HTTPONLY_RULE_ID = "ios.network.cookie-missing-httponly"
     COOKIE_MISSING_SECURE_FLAG_RULE_ID = "ios.network.cookie-missing-secure-flag"
@@ -85,12 +92,12 @@ class IOSNetworkEvidence:
         self.cleartext_http_gps_latitude = self._cleartext_http_gps_latitude_entry(loaded_outputs)
         self.cleartext_http_gps_longitude = self._cleartext_http_gps_longitude_entry(loaded_outputs)
         self.cleartext_http_sensitive_data = self._cleartext_http_sensitive_data_entry(loaded_outputs)
-        self.cleartext_http_wifi_mac = EvidenceEntry(False, "no_cleartext_http_wifi_mac_hits")
-        self.https_url_contains_imei = EvidenceEntry(False, "no_https_url_contains_imei_hits")
-        self.https_url_contains_gps_latitude = EvidenceEntry(False, "no_https_url_contains_gps_latitude_hits")
-        self.https_url_contains_gps_longitude = EvidenceEntry(False, "no_https_url_contains_gps_longitude_hits")
-        self.https_url_contains_sensitive_data = EvidenceEntry(False, "no_https_url_contains_sensitive_data_hits")
-        self.https_url_contains_wifi_mac = EvidenceEntry(False, "no_https_url_contains_wifi_mac_hits")
+        self.cleartext_http_wifi_mac = self._cleartext_http_wifi_mac_entry(loaded_outputs)
+        self.https_url_contains_imei = self._https_url_contains_imei_entry(loaded_outputs)
+        self.https_url_contains_gps_latitude = self._https_url_contains_gps_latitude_entry(loaded_outputs)
+        self.https_url_contains_gps_longitude = self._https_url_contains_gps_longitude_entry(loaded_outputs)
+        self.https_url_contains_sensitive_data = self._https_url_contains_sensitive_data_entry(loaded_outputs)
+        self.https_url_contains_wifi_mac = self._https_url_contains_wifi_mac_entry(loaded_outputs)
         self.insecure_tls_configuration = EvidenceEntry(False, "no_insecure_tls_configuration_hits")
         self.certificate_pinning_not_implemented = EvidenceEntry(False, "no_certificate_pinning_not_implemented_hits")
 
@@ -185,48 +192,108 @@ class IOSNetworkEvidence:
 
     @classmethod
     def _cleartext_http_advertiser_id_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
-        return cls._cleartext_http_query_parameter_entry(
+        return cls._url_query_parameter_entry(
             loaded_outputs,
+            cls.HTTP_URL_PATTERN,
             cls.ADVERTISER_ID_PARAMETER_NAMES,
             "no_cleartext_http_advertiser_id_hits",
         )
 
     @classmethod
     def _cleartext_http_imei_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
-        return cls._cleartext_http_query_parameter_entry(
+        return cls._url_query_parameter_entry(
             loaded_outputs,
+            cls.HTTP_URL_PATTERN,
             cls.IMEI_PARAMETER_NAMES,
             "no_cleartext_http_imei_hits",
         )
 
     @classmethod
     def _cleartext_http_gps_latitude_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
-        return cls._cleartext_http_query_parameter_entry(
+        return cls._url_query_parameter_entry(
             loaded_outputs,
+            cls.HTTP_URL_PATTERN,
             cls.GPS_LATITUDE_PARAMETER_NAMES,
             "no_cleartext_http_gps_latitude_hits",
         )
 
     @classmethod
     def _cleartext_http_gps_longitude_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
-        return cls._cleartext_http_query_parameter_entry(
+        return cls._url_query_parameter_entry(
             loaded_outputs,
+            cls.HTTP_URL_PATTERN,
             cls.GPS_LONGITUDE_PARAMETER_NAMES,
             "no_cleartext_http_gps_longitude_hits",
         )
 
     @classmethod
     def _cleartext_http_sensitive_data_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
-        return cls._cleartext_http_query_parameter_entry(
+        return cls._url_query_parameter_entry(
             loaded_outputs,
+            cls.HTTP_URL_PATTERN,
             cls.SENSITIVE_DATA_PARAMETER_NAMES,
             "no_cleartext_http_sensitive_data_hits",
         )
 
     @classmethod
-    def _cleartext_http_query_parameter_entry(
+    def _cleartext_http_wifi_mac_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        return cls._url_query_parameter_entry(
+            loaded_outputs,
+            cls.HTTP_URL_PATTERN,
+            cls.WIFI_MAC_PARAMETER_NAMES,
+            "no_cleartext_http_wifi_mac_hits",
+        )
+
+    @classmethod
+    def _https_url_contains_imei_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        return cls._url_query_parameter_entry(
+            loaded_outputs,
+            cls.HTTPS_URL_PATTERN,
+            cls.IMEI_PARAMETER_NAMES,
+            "no_https_url_contains_imei_hits",
+        )
+
+    @classmethod
+    def _https_url_contains_gps_latitude_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        return cls._url_query_parameter_entry(
+            loaded_outputs,
+            cls.HTTPS_URL_PATTERN,
+            cls.GPS_LATITUDE_PARAMETER_NAMES,
+            "no_https_url_contains_gps_latitude_hits",
+        )
+
+    @classmethod
+    def _https_url_contains_gps_longitude_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        return cls._url_query_parameter_entry(
+            loaded_outputs,
+            cls.HTTPS_URL_PATTERN,
+            cls.GPS_LONGITUDE_PARAMETER_NAMES,
+            "no_https_url_contains_gps_longitude_hits",
+        )
+
+    @classmethod
+    def _https_url_contains_sensitive_data_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        return cls._url_query_parameter_entry(
+            loaded_outputs,
+            cls.HTTPS_URL_PATTERN,
+            cls.SENSITIVE_DATA_PARAMETER_NAMES,
+            "no_https_url_contains_sensitive_data_hits",
+        )
+
+    @classmethod
+    def _https_url_contains_wifi_mac_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        return cls._url_query_parameter_entry(
+            loaded_outputs,
+            cls.HTTPS_URL_PATTERN,
+            cls.WIFI_MAC_PARAMETER_NAMES,
+            "no_https_url_contains_wifi_mac_hits",
+        )
+
+    @classmethod
+    def _url_query_parameter_entry(
         cls,
         loaded_outputs: dict[str, Any],
+        url_pattern: re.Pattern[str],
         parameter_names: set[str],
         no_hits_evidence: str,
     ) -> EvidenceEntry:
@@ -234,7 +301,7 @@ class IOSNetworkEvidence:
         if isinstance(strings_outputs, dict):
             for path, content in strings_outputs.items():
                 for line in str(content or "").splitlines():
-                    for url in cls.HTTP_URL_PATTERN.findall(line):
+                    for url in url_pattern.findall(line):
                         if cls._is_public_http_url(url) and cls._contains_query_parameter(url, parameter_names):
                             return EvidenceEntry(True, f"{path}: {url}")
 
