@@ -44,9 +44,11 @@ class LIEFScanner(ScannerPort):
         return lief is not None
 
     def scan(self, config: ScanConfig) -> list[ScanResult]:
+        extracted = config.extracted_binary if isinstance(config.extracted_binary, ExtractedIPA) else None
         target_path = config.project_path
+        owns_extraction = extracted is None
 
-        if not target_path.exists():
+        if extracted is None and not target_path.exists():
             return [
                 ScanResult(
                     scanner_name=self.name,
@@ -56,7 +58,7 @@ class LIEFScanner(ScannerPort):
                 )
             ]
 
-        if not target_path.is_file() or not is_ipa_file(target_path):
+        if extracted is None and (not target_path.is_file() or not is_ipa_file(target_path)):
             return [
                 ScanResult(
                     scanner_name=self.name,
@@ -67,9 +69,9 @@ class LIEFScanner(ScannerPort):
                 )
             ]
 
-        extracted: ExtractedIPA | None = None
         try:
-            extracted = extract_ipa(target_path)
+            if extracted is None:
+                extracted = extract_ipa(target_path)
             app_info = self._build_app_info(extracted)
             scan_results: list[ScanResult] = []
 
@@ -122,7 +124,7 @@ class LIEFScanner(ScannerPort):
                 )
             ]
         finally:
-            if extracted is not None:
+            if owns_extraction and extracted is not None:
                 extracted.cleanup()
 
     @staticmethod

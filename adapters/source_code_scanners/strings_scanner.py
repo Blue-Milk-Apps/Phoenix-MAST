@@ -74,8 +74,7 @@ class StringsScanner(ScannerPort):
                             scanner_name=self.name,
                             scan_type=self.scan_type,
                             success=False,
-                            error_message=error_text
-                            or f"strings failed for {file_path}",
+                            error_message=error_text or f"strings failed for {file_path}",
                             raw_output=result.stdout,
                             relative_target_path=relative_target_path,
                         )
@@ -108,11 +107,16 @@ class StringsScanner(ScannerPort):
             for cleanup_target in cleanup_targets:
                 cleanup_target.cleanup()
 
-    def _resolve_targets(
-        self, config: ScanConfig
-    ) -> tuple[list[Path], list[object], Path | None]:
+    def _resolve_targets(self, config: ScanConfig) -> tuple[list[Path], list[object], Path | None]:
         target = config.project_path
         cleanup_targets: list[object] = []
+
+        if config.extracted_binary is not None:
+            return (
+                list(config.extracted_binary.analysis_targets),
+                cleanup_targets,
+                config.extracted_binary.scan_root_path,
+            )
 
         if target.is_file():
             if is_ipa_file(target):

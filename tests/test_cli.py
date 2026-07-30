@@ -1,5 +1,7 @@
 import argparse
 import json
+import plistlib
+import zipfile
 from pathlib import Path
 
 from application import mobile_analysis_workflow_service as workflow
@@ -256,6 +258,54 @@ def test_create_scan_config_for_ios_binary_includes_opengrep_when_rules_path_is_
     }
 
 
+def test_ios_workflow_shares_and_cleans_extracted_binary(tmp_path: Path, monkeypatch) -> None:
+    ipa_path = tmp_path / "Example.ipa"
+    with zipfile.ZipFile(ipa_path, "w") as archive:
+        archive.writestr(
+            "Payload/Example.app/Info.plist",
+            plistlib.dumps({"CFBundleExecutable": "Example"}),
+        )
+        archive.writestr("Payload/Example.app/Example", b"binary")
+
+    config = ScanConfig(
+        project_path=ipa_path,
+        output_path=tmp_path / "results",
+        mode="binary",
+        platform="IOS",
+    )
+    captured = []
+
+    class RecordingScannerService:
+        def __init__(self, scanners):
+            _ = scanners
+
+        def scan_project(self, scan_config):
+            captured.append(scan_config.extracted_binary)
+            assert scan_config.project_path == ipa_path
+            assert scan_config.extracted_binary is not None
+            assert scan_config.extracted_binary.scan_root_path.name == "Example.app"
+            return []
+
+    monkeypatch.setattr(workflow.MobileScannerFactory, "build_scanner_list", lambda self, scan_config: [])
+    monkeypatch.setattr(workflow, "ScannerService", RecordingScannerService)
+    monkeypatch.setattr(
+        workflow.MobileAnalysisWorkflowService,
+        "_perform_opengrep_scan",
+        lambda self, scan_config, scan_output_method: [],
+    )
+    monkeypatch.setattr(
+        workflow.MobileAnalysisWorkflowService,
+        "_run_post_scan_processing",
+        lambda self, output_path, scan_config: {},
+    )
+
+    workflow.MobileAnalysisWorkflowService().run(config)
+
+    assert len(captured) == 1
+    assert not captured[0].temp_dir.exists()
+    assert config.extracted_binary is None
+
+
 def test_create_scan_config_for_ios_binary_uses_default_opengrep_rules_path_when_present(
     tmp_path: Path,
     monkeypatch,
@@ -303,7 +353,7 @@ def test_create_scan_config_for_flutter_source(tmp_path: Path) -> None:
     assert config.platform == "ANY"
     assert config.stack == "FLUTTER"
     assert config.opengrep_rules_path is None
-    assert config.syft_output_format == "cyclonedx-json"
+    assert config.syft_output_format == "syft-json"
     assert config.output_path.name.startswith("SAST_flutter_source_")
     _assert_scanner_types(
         config,

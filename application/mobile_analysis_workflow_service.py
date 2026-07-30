@@ -33,8 +33,10 @@ from adapters.source_code_scanners import (
 )
 from application.post_scan_processing_service import PostScanProcessingService
 from application.scanner_service import ScannerService
-from domain.models import ScanConfig
+from domain.models import ExtractedBinary, ScanConfig
 from ports.scanner_port import ScannerPort
+from utilities.apk_utils import extract_apk, is_apk_file
+from utilities.ipa_utils import extract_ipa, is_ipa_file
 
 
 class MobileScannerFactory:
@@ -124,29 +126,49 @@ class MobileAnalysisWorkflowService:
         scan_config.output_path.mkdir(parents=True, exist_ok=True)
         scan_output_method = FileScanOutput(scan_config.output_path)
         scan_output_method.write_scan_metadata(scan_config)
-        scanners = MobileScannerFactory().build_scanner_list(scan_config)
-        scanner_service = ScannerService(scanners)
+        extracted_binary = self._extract_binary(scan_config)
+        scan_config.extracted_binary = extracted_binary
+        try:
+            scanners = MobileScannerFactory().build_scanner_list(scan_config)
+            scanner_service = ScannerService(scanners)
 
-        wall_start = time.perf_counter()
-        scan_results = scanner_service.scan_project(scan_config)
-        for result in scan_results:
-            scan_output_method.write_result(result)
+            wall_start = time.perf_counter()
+            scan_results = scanner_service.scan_project(scan_config)
+            for result in scan_results:
+                scan_output_method.write_result(result)
 
-        opengrep_results = self._perform_opengrep_scan(scan_config, scan_output_method)
-        scan_results.extend(opengrep_results)
-        for result in opengrep_results:
-            scan_output_method.write_result(result)
+            opengrep_results = self._perform_opengrep_scan(scan_config, scan_output_method)
+            scan_results.extend(opengrep_results)
+            for result in opengrep_results:
+                scan_output_method.write_result(result)
 
-        post_scan_output = self._run_post_scan_processing(scan_config.output_path, scan_config)
-        target = scan_config.output_path / self.POST_SCAN_OUTPUT_FILE_NAME
-        target.write_text(
-            json.dumps(post_scan_output, indent=2, sort_keys=True),
-            encoding="utf-8",
-        )
-        if post_scan_output:
-            generate_report(post_scan_output, self._report_output_path(scan_config.output_path, post_scan_output))
-        print(f"Results: {len(scan_results)}")
-        print(f"Duration: {time.perf_counter() - wall_start:.2f} seconds")
+            post_scan_output = self._run_post_scan_processing(scan_config.output_path, scan_config)
+            target = scan_config.output_path / self.POST_SCAN_OUTPUT_FILE_NAME
+            target.write_text(
+                json.dumps(post_scan_output, indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+            if post_scan_output:
+                generate_report(
+                    post_scan_output,
+                    self._report_output_path(scan_config.output_path, post_scan_output),
+                )
+            print(f"Results: {len(scan_results)}")
+            print(f"Duration: {time.perf_counter() - wall_start:.2f} seconds")
+        finally:
+            if extracted_binary is not None:
+                extracted_binary.cleanup()
+            scan_config.extracted_binary = None
+
+    @staticmethod
+    def _extract_binary(scan_config: ScanConfig) -> ExtractedBinary | None:
+        if scan_config.target_type != "BINARY":
+            return None
+        if scan_config.platform == "IOS" and is_ipa_file(scan_config.project_path):
+            return extract_ipa(scan_config.project_path)
+        if scan_config.platform == "ANDROID" and is_apk_file(scan_config.project_path):
+            return extract_apk(scan_config.project_path)
+        return None
 
     def _perform_opengrep_scan(self, scan_config: ScanConfig, scan_output_method: FileScanOutput):
         open_grep_rules_path = self._get_opengrep_rules_path(scan_config)

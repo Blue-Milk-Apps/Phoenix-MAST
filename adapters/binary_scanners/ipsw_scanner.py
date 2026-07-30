@@ -63,8 +63,10 @@ class IpswScanner(ScannerPort):
         return shutil.which("ipsw") is not None
 
     def scan(self, config: ScanConfig) -> list[ScanResult]:
-        ipa_path = self._resolve_ipa_path(config.project_path)
-        if ipa_path is None:
+        extracted = config.extracted_binary if isinstance(config.extracted_binary, ExtractedIPA) else None
+        owns_extraction = extracted is None
+        target_path = self._resolve_ipa_path(config.project_path) if extracted is None else None
+        if extracted is None and target_path is None:
             return [
                 ScanResult(
                     scanner_name=self.name,
@@ -87,9 +89,9 @@ class IpswScanner(ScannerPort):
                 )
             ]
 
-        extracted: ExtractedIPA | None = None
         try:
-            extracted = extract_ipa(ipa_path)
+            if extracted is None:
+                extracted = extract_ipa(target_path)
             app_info = self._build_app_info(extracted)
             ipsw_version = self._ipsw_version(ipsw_executable)
             scan_results: list[ScanResult] = []
@@ -143,7 +145,7 @@ class IpswScanner(ScannerPort):
                 )
             ]
         finally:
-            if extracted is not None:
+            if owns_extraction and extracted is not None:
                 extracted.cleanup()
 
     def _resolve_ipa_path(self, project_path: Path) -> Path | None:

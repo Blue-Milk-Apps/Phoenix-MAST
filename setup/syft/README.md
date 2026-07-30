@@ -12,7 +12,7 @@ The adapter runs:
 
 ```bash
 syft scan <project> \
-  -o cyclonedx-json=<output>/sbom.json \
+  -o syft-json=<output>/sbom.json \
   -o cyclonedx-xml=<output>/sbom.xml
 ```
 
@@ -44,7 +44,7 @@ Phoenix local scans need the host binary. Docker-only Syft installs are useful f
 ## Run a manual check
 
 ```bash
-syft scan . -o cyclonedx-json=/tmp/phoenix-sbom.json
+syft scan . -o syft-json=/tmp/phoenix-sbom.json
 ```
 
 Then run Phoenix with the scan target flag that matches your app or source project. See the [`<scan-target-flag>` list](../README.md#scan-target-flags) for valid options.

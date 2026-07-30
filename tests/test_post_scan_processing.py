@@ -8,6 +8,7 @@ from adapters.post_scan import (
     IOSBinaryScanOutputLoader,
 )
 from application.post_scan_processing_service import PostScanProcessingService
+from domain.post_scan.ios.network_evidence_builder import IOSNetworkEvidence
 
 
 def test_android_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Path) -> None:
@@ -756,7 +757,7 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
         "insecure_http_traffic",
         "ats_exceptions_configured",
         "cookie_missing_httponly",
-        "cookie_missing_secure",
+        "cookie_missing_secure_flag",
         "cleartext_http_advertiser_id",
         "cleartext_http_imei",
         "cleartext_http_gps_latitude",
@@ -1001,6 +1002,552 @@ def test_post_scan_processing_service_returns_direct_ios_contract(tmp_path: Path
     assert result["meta"]["app_display_name"] == "ExampleApp"
     assert result["code_evidence"]["uses_uiwebview"]["present"] is False
     assert result["network_evidence"]["ats_disabled"]["present"] is False
+
+
+def test_ios_network_evidence_derives_ats_disabled_from_app_plist_only() -> None:
+    enabled = IOSNetworkEvidence(
+        {
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "ats": {"allows_arbitrary_loads": True},
+                },
+                "Frameworks/SDK.framework/Info.json": {
+                    "framework_meta": {"bundle_identifier": "com.example.sdk"},
+                    "ats": {"allows_arbitrary_loads": True},
+                },
+            }
+        }
+    )
+    assert enabled.ats_disabled.present is True
+    assert enabled.ats_disabled.evidence == "Info.json: NSAllowsArbitraryLoads=true"
+
+    not_enabled = IOSNetworkEvidence(
+        {
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "ats": {"allows_arbitrary_loads": False},
+                },
+                "Frameworks/SDK.framework/Info.json": {
+                    "framework_meta": {"bundle_identifier": "com.example.sdk"},
+                    "ats": {"allows_arbitrary_loads": True},
+                },
+            }
+        }
+    )
+    assert not_enabled.ats_disabled.present is False
+    assert not_enabled.ats_disabled.evidence == "no_ats_disabled_hits"
+
+
+def test_ios_network_evidence_detects_vulnerable_openssl_ccs_versions() -> None:
+    from_sbom = IOSNetworkEvidence(
+        {
+            "syft_outputs": {
+                "sbom.json": {
+                    "artifacts": [
+                        {"name": "openssl", "version": "1.0.1g"},
+                        {"name": "libssl", "version": "1.0.1h"},
+                    ]
+                }
+            }
+        }
+    )
+    assert from_sbom.vulnerable_openssl_ccs_injection.present is True
+    assert from_sbom.vulnerable_openssl_ccs_injection.evidence == "sbom.json: openssl@1.0.1g"
+
+    from_strings = IOSNetworkEvidence({"strings_outputs": {"Frameworks/SDK.txt": "OpenSSL 0.9.8z\n"}})
+    assert from_strings.vulnerable_openssl_ccs_injection.present is True
+    assert from_strings.vulnerable_openssl_ccs_injection.evidence == "Frameworks/SDK.txt: OpenSSL 0.9.8z"
+
+    fixed_or_unversioned = IOSNetworkEvidence(
+        {
+            "syft_outputs": {"sbom.json": {"components": [{"name": "openssl", "version": "1.0.1h"}]}},
+            "strings_outputs": {"main.txt": "OpenSSL\nlibssl 1.0.1g\n"},
+        }
+    )
+    assert fixed_or_unversioned.vulnerable_openssl_ccs_injection.present is False
+    assert fixed_or_unversioned.vulnerable_openssl_ccs_injection.evidence == "no_vulnerable_openssl_ccs_injection_hits"
+
+
+def test_ios_network_evidence_detects_heartbleed_vulnerable_openssl_versions() -> None:
+    from_sbom = IOSNetworkEvidence(
+        {"syft_outputs": {"sbom.json": {"components": [{"name": "openssl", "version": "1.0.1f"}]}}}
+    )
+    assert from_sbom.vulnerable_openssl_heartbleed.present is True
+    assert from_sbom.vulnerable_openssl_heartbleed.evidence == "sbom.json: openssl@1.0.1f"
+
+    from_strings = IOSNetworkEvidence({"strings_outputs": {"Frameworks/SDK.txt": "OpenSSL 1.0.1e\n"}})
+    assert from_strings.vulnerable_openssl_heartbleed.present is True
+    assert from_strings.vulnerable_openssl_heartbleed.evidence == "Frameworks/SDK.txt: OpenSSL 1.0.1e"
+
+    fixed_or_non_affected = IOSNetworkEvidence(
+        {
+            "syft_outputs": {
+                "sbom.json": {
+                    "artifacts": [
+                        {"name": "openssl", "version": "1.0.1g"},
+                        {"name": "openssl", "version": "1.0.0m"},
+                    ]
+                }
+            },
+            "strings_outputs": {"main.txt": "OpenSSL\n"},
+        }
+    )
+    assert fixed_or_non_affected.vulnerable_openssl_heartbleed.present is False
+    assert fixed_or_non_affected.vulnerable_openssl_heartbleed.evidence == "no_vulnerable_openssl_heartbleed_hits"
+
+
+def test_ios_network_evidence_detects_ftp_endpoints() -> None:
+    from_strings = IOSNetworkEvidence(
+        {"strings_outputs": {"main.txt": "download ftp://files.example.com/update.zip\n"}}
+    )
+    assert from_strings.uses_ftp.present is True
+    assert from_strings.uses_ftp.evidence == "main.txt: ftp://files.example.com/update.zip"
+
+    from_plist = IOSNetworkEvidence(
+        {
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "plist": {"Download": {"URL": "ftps://files.example.com/update.zip"}},
+                }
+            }
+        }
+    )
+    assert from_plist.uses_ftp.present is True
+    assert from_plist.uses_ftp.evidence == "Info.json: ftps://files.example.com/update.zip"
+
+    no_endpoint = IOSNetworkEvidence(
+        {
+            "strings_outputs": {"main.txt": "FTP support via libcurl\n"},
+            "plist_outputs": {
+                "Frameworks/SDK.framework/Info.json": {
+                    "framework_meta": {"bundle_identifier": "com.example.sdk"},
+                    "plist": {"Description": "FTP integration"},
+                }
+            },
+        }
+    )
+    assert no_endpoint.uses_ftp.present is False
+    assert no_endpoint.uses_ftp.evidence == "no_uses_ftp_hits"
+
+
+def test_ios_network_evidence_detects_public_http_endpoints() -> None:
+    from_strings = IOSNetworkEvidence({"strings_outputs": {"main.txt": "http://api.example.com/v1\n"}})
+    assert from_strings.insecure_http_traffic.present is True
+    assert from_strings.insecure_http_traffic.evidence == "main.txt: http://api.example.com/v1"
+
+    from_plist = IOSNetworkEvidence(
+        {
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "plist": {"API": "http://api.example.com/v1"},
+                }
+            }
+        }
+    )
+    assert from_plist.insecure_http_traffic.present is True
+    assert from_plist.insecure_http_traffic.evidence == "Info.json: http://api.example.com/v1"
+
+    no_public_endpoint = IOSNetworkEvidence(
+        {
+            "strings_outputs": {
+                "main.txt": (
+                    "https://api.example.com/v1\n"
+                    "http://localhost:8080\n"
+                    "http://127.0.0.1:8080\n"
+                    "http://www.apple.com/DTDs/PropertyList-1.0.dtd\n"
+                )
+            },
+            "plist_outputs": {
+                "Frameworks/SDK.framework/Info.json": {
+                    "framework_meta": {"bundle_identifier": "com.example.sdk"},
+                    "plist": {"API": "http://api.example.com/v1"},
+                }
+            },
+        }
+    )
+    assert no_public_endpoint.insecure_http_traffic.present is False
+    assert no_public_endpoint.insecure_http_traffic.evidence == "no_insecure_http_traffic_hits"
+
+
+def test_ios_network_evidence_detects_cleartext_http_advertiser_id() -> None:
+    detected = IOSNetworkEvidence(
+        {"strings_outputs": {"main.txt": "http://metrics.example.com/collect?advertising_id=%@&event=launch\n"}}
+    )
+    assert detected.cleartext_http_advertiser_id.present is True
+    assert (
+        detected.cleartext_http_advertiser_id.evidence
+        == "main.txt: http://metrics.example.com/collect?advertising_id=%@&event=launch"
+    )
+
+    not_detected = IOSNetworkEvidence(
+        {
+            "strings_outputs": {
+                "main.txt": (
+                    "https://metrics.example.com/collect?idfa=%@\n"
+                    "http://localhost:8080/collect?idfa=%@\n"
+                    "http://metrics.example.com/collect?device_id=%@\n"
+                )
+            }
+        }
+    )
+    assert not_detected.cleartext_http_advertiser_id.present is False
+    assert not_detected.cleartext_http_advertiser_id.evidence == "no_cleartext_http_advertiser_id_hits"
+
+
+def test_ios_network_evidence_detects_cleartext_http_imei() -> None:
+    detected = IOSNetworkEvidence(
+        {"strings_outputs": {"main.txt": "http://metrics.example.com/collect?imei=%@&event=launch\n"}}
+    )
+    assert detected.cleartext_http_imei.present is True
+    assert detected.cleartext_http_imei.evidence == "main.txt: http://metrics.example.com/collect?imei=%@&event=launch"
+
+    not_detected = IOSNetworkEvidence(
+        {
+            "strings_outputs": {
+                "main.txt": (
+                    "https://metrics.example.com/collect?imei=%@\n"
+                    "http://localhost:8080/collect?device_imei=%@\n"
+                    "http://metrics.example.com/collect?device_id=%@\n"
+                )
+            }
+        }
+    )
+    assert not_detected.cleartext_http_imei.present is False
+    assert not_detected.cleartext_http_imei.evidence == "no_cleartext_http_imei_hits"
+
+
+def test_ios_network_evidence_detects_cleartext_http_gps_coordinates() -> None:
+    detected = IOSNetworkEvidence(
+        {"strings_outputs": {"main.txt": "http://metrics.example.com/collect?gps_latitude=%@&gps_longitude=%@\n"}}
+    )
+    expected_evidence = "main.txt: http://metrics.example.com/collect?gps_latitude=%@&gps_longitude=%@"
+    assert detected.cleartext_http_gps_latitude.present is True
+    assert detected.cleartext_http_gps_latitude.evidence == expected_evidence
+    assert detected.cleartext_http_gps_longitude.present is True
+    assert detected.cleartext_http_gps_longitude.evidence == expected_evidence
+
+    latitude_only = IOSNetworkEvidence({"strings_outputs": {"main.txt": "http://metrics.example.com/collect?lat=%@\n"}})
+    assert latitude_only.cleartext_http_gps_latitude.present is True
+    assert latitude_only.cleartext_http_gps_longitude.present is False
+
+    longitude_only = IOSNetworkEvidence(
+        {"strings_outputs": {"main.txt": "http://metrics.example.com/collect?lng=%@\n"}}
+    )
+    assert longitude_only.cleartext_http_gps_latitude.present is False
+    assert longitude_only.cleartext_http_gps_longitude.present is True
+
+    excluded = IOSNetworkEvidence(
+        {
+            "strings_outputs": {
+                "main.txt": (
+                    "https://metrics.example.com/collect?latitude=%@&longitude=%@\n"
+                    "http://localhost:8080/collect?latitude=%@&longitude=%@\n"
+                    "http://metrics.example.com/collect?location=%@\n"
+                )
+            }
+        }
+    )
+    assert excluded.cleartext_http_gps_latitude.present is False
+    assert excluded.cleartext_http_gps_longitude.present is False
+
+
+def test_ios_network_evidence_detects_cleartext_http_sensitive_data() -> None:
+    credential = IOSNetworkEvidence(
+        {"strings_outputs": {"main.txt": "http://api.example.com/login?password=%@&username=%@\n"}}
+    )
+    assert credential.cleartext_http_sensitive_data.present is True
+    assert (
+        credential.cleartext_http_sensitive_data.evidence
+        == "main.txt: http://api.example.com/login?password=%@&username=%@"
+    )
+
+    personal_data = IOSNetworkEvidence({"strings_outputs": {"main.txt": "http://api.example.com/profile?email=%@\n"}})
+    assert personal_data.cleartext_http_sensitive_data.present is True
+
+    excluded = IOSNetworkEvidence(
+        {
+            "strings_outputs": {
+                "main.txt": (
+                    "https://api.example.com/login?token=%@\n"
+                    "http://localhost:8080/login?password=%@\n"
+                    "http://api.example.com/collect?data=%@\n"
+                )
+            }
+        }
+    )
+    assert excluded.cleartext_http_sensitive_data.present is False
+    assert excluded.cleartext_http_sensitive_data.evidence == "no_cleartext_http_sensitive_data_hits"
+
+
+def test_ios_network_evidence_detects_cleartext_http_wifi_mac() -> None:
+    detected = IOSNetworkEvidence(
+        {"strings_outputs": {"main.txt": "http://api.example.com/network?wifi_mac_address=%@\n"}}
+    )
+    assert detected.cleartext_http_wifi_mac.present is True
+    assert detected.cleartext_http_wifi_mac.evidence == "main.txt: http://api.example.com/network?wifi_mac_address=%@"
+
+    excluded = IOSNetworkEvidence(
+        {
+            "strings_outputs": {
+                "main.txt": (
+                    "https://api.example.com/network?wifi_mac=%@\n"
+                    "http://localhost:8080/network?wifi_mac=%@\n"
+                    "http://api.example.com/network?mac=%@\n"
+                )
+            }
+        }
+    )
+    assert excluded.cleartext_http_wifi_mac.present is False
+
+
+def test_ios_network_evidence_detects_sensitive_https_url_parameters() -> None:
+    detected = IOSNetworkEvidence(
+        {
+            "strings_outputs": {
+                "imei.txt": "https://api.example.com/collect?device_imei=%@\n",
+                "latitude.txt": "https://api.example.com/collect?gps_latitude=%@\n",
+                "longitude.txt": "https://api.example.com/collect?lng=%@\n",
+                "sensitive.txt": "https://api.example.com/collect?access_token=%@\n",
+                "wifi.txt": "https://api.example.com/collect?wlan_mac=%@\n",
+            }
+        }
+    )
+    assert detected.https_url_contains_imei.present is True
+    assert detected.https_url_contains_gps_latitude.present is True
+    assert detected.https_url_contains_gps_longitude.present is True
+    assert detected.https_url_contains_sensitive_data.present is True
+    assert detected.https_url_contains_wifi_mac.present is True
+
+    excluded = IOSNetworkEvidence(
+        {
+            "strings_outputs": {
+                "main.txt": (
+                    "http://api.example.com/collect?imei=%@&latitude=%@&longitude=%@&token=%@&wifi_mac=%@\n"
+                    "https://localhost:8080/collect?imei=%@&latitude=%@&longitude=%@&token=%@&wifi_mac=%@\n"
+                    "https://api.example.com/collect?device_id=%@&location=%@&data=%@&mac=%@\n"
+                )
+            }
+        }
+    )
+    assert excluded.https_url_contains_imei.present is False
+    assert excluded.https_url_contains_gps_latitude.present is False
+    assert excluded.https_url_contains_gps_longitude.present is False
+    assert excluded.https_url_contains_sensitive_data.present is False
+    assert excluded.https_url_contains_wifi_mac.present is False
+
+
+def test_ios_network_evidence_detects_insecure_tls_configuration() -> None:
+    weak_ats = IOSNetworkEvidence(
+        {
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "ats": {"exception_domains": [{"domain": "api.example.com", "minimum_tls_version": "TLSv1.1"}]},
+                }
+            }
+        }
+    )
+    assert weak_ats.insecure_tls_configuration.present is True
+    assert (
+        weak_ats.insecure_tls_configuration.evidence
+        == "Info.json: api.example.com (NSExceptionMinimumTLSVersion=TLSv1.1)"
+    )
+
+    forward_secrecy_disabled = IOSNetworkEvidence(
+        {
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "ats": {"exception_domains": [{"domain": "api.example.com", "requires_forward_secrecy": False}]},
+                }
+            }
+        }
+    )
+    assert forward_secrecy_disabled.insecure_tls_configuration.present is True
+
+    verification_bypass = IOSNetworkEvidence({"strings_outputs": {"main.txt": "SSL_VERIFY_NONE\n"}})
+    assert verification_bypass.insecure_tls_configuration.present is True
+    assert verification_bypass.insecure_tls_configuration.evidence == "main.txt: SSL_VERIFY_NONE"
+
+    obsolete_tls = IOSNetworkEvidence({"strings_outputs": {"main.txt": "kCFStreamSocketSecurityLevelTLSv1\n"}})
+    assert obsolete_tls.insecure_tls_configuration.present is True
+
+    secure_configuration = IOSNetworkEvidence(
+        {
+            "strings_outputs": {"main.txt": "TLSv1.2\nkCFStreamSSLValidatesCertificateChain=true\n"},
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "ats": {"exception_domains": [{"domain": "api.example.com", "minimum_tls_version": "TLSv1.2"}]},
+                }
+            },
+        }
+    )
+    assert secure_configuration.insecure_tls_configuration.present is False
+    assert secure_configuration.insecure_tls_configuration.evidence == "no_insecure_tls_configuration_hits"
+
+
+def test_ios_network_evidence_assesses_certificate_pinning() -> None:
+    pinning_detected = IOSNetworkEvidence({"strings_outputs": {"main.txt": "TrustKit\nkTSKPublicKeyHashes\n"}})
+    assert pinning_detected.certificate_pinning_not_implemented.present is False
+    assert (
+        pinning_detected.certificate_pinning_not_implemented.evidence
+        == "main.txt: certificate pinning marker detected (TrustKit)"
+    )
+
+    no_pinning_marker = IOSNetworkEvidence({"strings_outputs": {"main.txt": "URLSession\nSecTrustEvaluate\n"}})
+    assert no_pinning_marker.certificate_pinning_not_implemented.present is True
+    assert (
+        no_pinning_marker.certificate_pinning_not_implemented.evidence
+        == "no_certificate_pinning_implementation_detected"
+    )
+
+    not_assessed = IOSNetworkEvidence({"strings_outputs": {"main.txt": ""}})
+    assert not_assessed.certificate_pinning_not_implemented.present is False
+    assert (
+        not_assessed.certificate_pinning_not_implemented.evidence
+        == "certificate_pinning_not_assessed_no_strings_output"
+    )
+
+
+def test_ios_network_evidence_detects_weak_ats_exceptions() -> None:
+    media_override = IOSNetworkEvidence(
+        {
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "ats": {"allows_arbitrary_loads_for_media": True},
+                }
+            }
+        }
+    )
+    assert media_override.ats_exceptions_configured.present is True
+    assert media_override.ats_exceptions_configured.evidence == "Info.json: NSAllowsArbitraryLoadsForMedia=true"
+
+    insecure_http_exception = IOSNetworkEvidence(
+        {
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "ats": {"exception_domains": [{"domain": "api.example.com", "allows_insecure_http_loads": True}]},
+                }
+            }
+        }
+    )
+    assert insecure_http_exception.ats_exceptions_configured.present is True
+    assert (
+        insecure_http_exception.ats_exceptions_configured.evidence
+        == "Info.json: api.example.com (NSExceptionAllowsInsecureHTTPLoads=true)"
+    )
+
+    weak_tls_and_forward_secrecy = IOSNetworkEvidence(
+        {
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "ats": {
+                        "exception_domains": [
+                            {"domain": "tls.example.com", "minimum_tls_version": "TLSv1.1"},
+                            {"domain": "pfs.example.com", "requires_forward_secrecy": False},
+                        ]
+                    },
+                }
+            }
+        }
+    )
+    assert weak_tls_and_forward_secrecy.ats_exceptions_configured.present is True
+    assert (
+        weak_tls_and_forward_secrecy.ats_exceptions_configured.evidence
+        == "Info.json: tls.example.com (NSExceptionMinimumTLSVersion=TLSv1.1)"
+    )
+
+    no_weakening = IOSNetworkEvidence(
+        {
+            "plist_outputs": {
+                "Info.json": {
+                    "app_meta": {"bundle_identifier": "com.example.app"},
+                    "ats": {"exception_domains": [{"domain": "api.example.com"}]},
+                },
+                "Frameworks/SDK.framework/Info.json": {
+                    "framework_meta": {"bundle_identifier": "com.example.sdk"},
+                    "ats": {"allows_arbitrary_loads_in_web_content": True},
+                },
+            }
+        }
+    )
+    assert no_weakening.ats_exceptions_configured.present is False
+    assert no_weakening.ats_exceptions_configured.evidence == "no_ats_exceptions_configured_hits"
+
+
+def test_ios_network_evidence_detects_cookies_missing_httponly() -> None:
+    from_opengrep = IOSNetworkEvidence(
+        {
+            "opengrep": {
+                "results": [
+                    {
+                        "check_id": "ios.network.cookie-missing-httponly",
+                        "path": "Sources/Network.swift",
+                        "extra": {"lines": "Set-Cookie: session=abc; Path=/"},
+                    }
+                ]
+            }
+        }
+    )
+    assert from_opengrep.cookie_missing_httponly.present is True
+    assert from_opengrep.cookie_missing_httponly.evidence == "Sources/Network.swift: Set-Cookie: session=abc; Path=/"
+
+    from_strings = IOSNetworkEvidence({"strings_outputs": {"main.txt": "Set-Cookie: session=abc; Path=/\n"}})
+    assert from_strings.cookie_missing_httponly.present is True
+    assert from_strings.cookie_missing_httponly.evidence == "main.txt: Set-Cookie: session=abc; Path=/"
+
+    protected_or_non_cookie = IOSNetworkEvidence(
+        {
+            "strings_outputs": {
+                "main.txt": ("Set-Cookie: session=abc; Path=/; HttpOnly\nCookie: session=abc\nWKHTTPCookieStore\n")
+            }
+        }
+    )
+    assert protected_or_non_cookie.cookie_missing_httponly.present is False
+    assert protected_or_non_cookie.cookie_missing_httponly.evidence == "no_cookie_missing_httponly_hits"
+
+
+def test_ios_network_evidence_detects_cookies_missing_secure_flag() -> None:
+    from_opengrep = IOSNetworkEvidence(
+        {
+            "opengrep": {
+                "results": [
+                    {
+                        "check_id": "ios.network.cookie-missing-secure-flag",
+                        "path": "Sources/Network.swift",
+                        "extra": {"lines": "Set-Cookie: session=abc; Path=/; HttpOnly"},
+                    }
+                ]
+            }
+        }
+    )
+    assert from_opengrep.cookie_missing_secure_flag.present is True
+    assert (
+        from_opengrep.cookie_missing_secure_flag.evidence
+        == "Sources/Network.swift: Set-Cookie: session=abc; Path=/; HttpOnly"
+    )
+
+    from_strings = IOSNetworkEvidence({"strings_outputs": {"main.txt": "Set-Cookie: session=abc; Path=/; HttpOnly\n"}})
+    assert from_strings.cookie_missing_secure_flag.present is True
+    assert from_strings.cookie_missing_secure_flag.evidence == "main.txt: Set-Cookie: session=abc; Path=/; HttpOnly"
+
+    protected_or_non_cookie = IOSNetworkEvidence(
+        {
+            "strings_outputs": {
+                "main.txt": ("Set-Cookie: session=abc; Path=/; Secure\nCookie: session=abc\nNSHTTPCookieSecure\n")
+            }
+        }
+    )
+    assert protected_or_non_cookie.cookie_missing_secure_flag.present is False
+    assert protected_or_non_cookie.cookie_missing_secure_flag.evidence == "no_cookie_missing_secure_flag_hits"
 
 
 def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:

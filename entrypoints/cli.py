@@ -11,7 +11,7 @@ from typing import Sequence
 from application.mobile_analysis_workflow_service import MobileAnalysisWorkflowService
 from domain.models import ScanConfig
 
-DEFAULT_SYFT_OUTPUT_FORMAT = "cyclonedx-json"
+DEFAULT_SYFT_OUTPUT_FORMAT = "syft-json"
 DEFAULT_OPENGREP_RULES_DIRS = {
     "ios_binary": "ios",
     "android_binary": "android",
