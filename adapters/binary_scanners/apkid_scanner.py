@@ -140,12 +140,14 @@ class ApkidScanner(ScannerPort):
                 )
             ]
 
-        extracted: ExtractedAPK | None = None
+        extracted = config.extracted_binary if isinstance(config.extracted_binary, ExtractedAPK) else None
+        owns_extraction = extracted is None
         extraction_errors: list[str] = []
-        try:
-            extracted = extract_apk(apk_path)
-        except Exception as exc:
-            extraction_errors.append(str(exc))
+        if extracted is None:
+            try:
+                extracted = extract_apk(apk_path)
+            except Exception as exc:
+                extraction_errors.append(str(exc))
 
         try:
             artifacts = self._analysis_artifacts(apk_path, extracted)
@@ -160,7 +162,7 @@ class ApkidScanner(ScannerPort):
             )
             return self._scan_results(evidence, command_result)
         finally:
-            if extracted is not None:
+            if owns_extraction and extracted is not None:
                 extracted.cleanup()
 
     def _resolve_apk_path(self, project_path: Path) -> Path | None:

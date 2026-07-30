@@ -23,6 +23,11 @@ class ExtractedAPK:
         if self.temp_dir.exists():
             shutil.rmtree(self.temp_dir)
 
+    @property
+    def scan_root_path(self) -> Path:
+        """Return the extracted APK directory for filesystem scanners."""
+        return self.temp_dir
+
 
 def iter_apk_analysis_targets(extracted: ExtractedAPK) -> list[Path]:
     """Return the APK binary targets that should be scanned by analysis tools."""
@@ -106,9 +111,7 @@ def extract_apk(apk_path: Path) -> ExtractedAPK:
 
     try:
         with zipfile.ZipFile(apk_path, "r") as zf:
-            target_entries = [
-                n for n in zf.namelist() if _should_extract_for_analysis(n)
-            ]
+            target_entries = [n for n in zf.namelist() if _should_extract_for_analysis(n)]
             for entry in target_entries:
                 if entry.endswith("/"):
                     continue
@@ -119,8 +122,7 @@ def extract_apk(apk_path: Path) -> ExtractedAPK:
         analysis_targets = sorted(
             path
             for path in temp_dir.rglob("*")
-            if path.is_file()
-            and _should_scan_for_analysis(path.relative_to(temp_dir).as_posix())
+            if path.is_file() and _should_scan_for_analysis(path.relative_to(temp_dir).as_posix())
         )
 
         return ExtractedAPK(

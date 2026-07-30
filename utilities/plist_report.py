@@ -125,21 +125,15 @@ class PlistReportBuilder:
                 scanner_name=self.scanner_name,
                 scan_type=self.scan_type,
                 success=parse_failures == 0,
-                error_message=""
-                if parse_failures == 0
-                else "One or more plist files could not be parsed.",
+                error_message="" if parse_failures == 0 else "One or more plist files could not be parsed.",
                 raw_output=json.dumps(
                     {
-                        "emitted_plist_count": sum(
-                            1 for entry in index_entries if not entry.get("skipped")
-                        )
+                        "emitted_plist_count": sum(1 for entry in index_entries if not entry.get("skipped"))
                         - parse_failures,
                         "parse_failures": parse_failures,
                         "plist_count": len(index_entries),
                         "plists": index_entries,
-                        "skipped_plist_count": sum(
-                            1 for entry in index_entries if entry.get("skipped")
-                        ),
+                        "skipped_plist_count": sum(1 for entry in index_entries if entry.get("skipped")),
                     },
                     indent=2,
                     sort_keys=True,
@@ -161,9 +155,7 @@ class PlistReportBuilder:
                         scanner_name=self.scanner_name,
                         scan_type=self.scan_type,
                         success=True,
-                        raw_output=plistlib.dumps(
-                            data, fmt=plistlib.FMT_XML, sort_keys=True
-                        ).decode("utf-8"),
+                        raw_output=plistlib.dumps(data, fmt=plistlib.FMT_XML, sort_keys=True).decode("utf-8"),
                         relative_target_path=relative_target.as_posix(),
                         description=self.description,
                     )
@@ -238,37 +230,23 @@ class PlistReportBuilder:
         return json.dumps(payload, indent=2, sort_keys=True)
 
     def _classify_plist(self, plist_file: Path, data: object) -> str:
-        relative_parts = [
-            part.lower() for part in self._source_path(plist_file).split("/")
-        ]
+        relative_parts = [part.lower() for part in self._source_path(plist_file).split("/")]
         name = plist_file.name.lower()
         keys = set(data) if isinstance(data, dict) else set()
 
-        if (
-            name == "info.plist"
-            and {"CFBundleIdentifier", "CFBundlePackageType"} & keys
-        ):
+        if name == "info.plist" and {"CFBundleIdentifier", "CFBundlePackageType"} & keys:
             return "ios_info_plist"
-        if "entitlements" in name or any(
-            str(key).startswith("com.apple.developer.") for key in keys
-        ):
+        if "entitlements" in name or any(str(key).startswith("com.apple.developer.") for key in keys):
             return "entitlements_plist"
-        if any(
-            part.endswith((".xcodeproj", ".xcworkspace")) for part in relative_parts
-        ):
+        if any(part.endswith((".xcodeproj", ".xcworkspace")) for part in relative_parts):
             return "xcode_project_plist"
         if "xcassets" in relative_parts or name == "assets.plist":
             return "asset_catalog_plist"
-        if (
-            any(part in name for part in self.SENSITIVE_NAME_PARTS)
-            or "preferences" in relative_parts
-        ):
+        if any(part in name for part in self.SENSITIVE_NAME_PARTS) or "preferences" in relative_parts:
             return "credentials_or_preferences_plist"
         return "unknown_plist"
 
-    def _should_emit_plist(
-        self, plist_type: str, plist_file: Path, data: object
-    ) -> bool:
+    def _should_emit_plist(self, plist_type: str, plist_file: Path, data: object) -> bool:
         if plist_type in {"credentials_or_preferences_plist", "entitlements_plist"}:
             return True
         if plist_type == "ios_info_plist":
@@ -296,11 +274,7 @@ class PlistReportBuilder:
         source_path = self._source_path(plist_file).lower()
         if package_type == "APPL" or data.get("LSRequiresIPhoneOS") is True:
             return "app"
-        if (
-            package_type == "FMWK"
-            or ".framework/" in source_path
-            or source_path.endswith(".framework/info.plist")
-        ):
+        if package_type == "FMWK" or ".framework/" in source_path or source_path.endswith(".framework/info.plist"):
             return "framework"
         if plist_file.name.lower() == "info.plist":
             return "app"
@@ -319,13 +293,9 @@ class PlistReportBuilder:
                 "executable": data.get("CFBundleExecutable", ""),
                 "minimum_os": data.get("MinimumOSVersion", ""),
                 "package_type": data.get("CFBundlePackageType", ""),
-                "required_device_capabilities": data.get(
-                    "UIRequiredDeviceCapabilities", []
-                ),
+                "required_device_capabilities": data.get("UIRequiredDeviceCapabilities", []),
                 "requires_iphone_os": data.get("LSRequiresIPhoneOS", False),
-                "supported_interface_orientations": data.get(
-                    "UISupportedInterfaceOrientations", []
-                ),
+                "supported_interface_orientations": data.get("UISupportedInterfaceOrientations", []),
                 "supported_platforms": data.get("CFBundleSupportedPlatforms", []),
                 "version": data.get("CFBundleShortVersionString", ""),
             }
@@ -414,17 +384,11 @@ class PlistReportBuilder:
 
         return json_safe(
             {
-                "application_groups": data.get(
-                    "com.apple.security.application-groups", []
-                ),
+                "application_groups": data.get("com.apple.security.application-groups", []),
                 "application_identifier": data.get("application-identifier", ""),
                 "aps_environment": data.get("aps-environment", ""),
-                "associated_domains": data.get(
-                    "com.apple.developer.associated-domains", []
-                ),
-                "icloud_containers": data.get(
-                    "com.apple.developer.icloud-container-identifiers", []
-                ),
+                "associated_domains": data.get("com.apple.developer.associated-domains", []),
+                "icloud_containers": data.get("com.apple.developer.icloud-container-identifiers", []),
                 "keychain_access_groups": data.get("keychain-access-groups", []),
             }
         )
@@ -454,31 +418,41 @@ class PlistReportBuilder:
         exceptions = ats.get("NSExceptionDomains")
         if isinstance(exceptions, dict):
             for domain, settings in sorted(exceptions.items()):
+                settings = settings if isinstance(settings, dict) else {}
+                allows_insecure_http_loads = settings.get("NSExceptionAllowsInsecureHTTPLoads")
+                third_party_allows_insecure_http_loads = settings.get(
+                    "NSThirdPartyExceptionAllowsInsecureHTTPLoads"  # pragma: allowlist secret
+                )
+                minimum_tls_version = settings.get("NSExceptionMinimumTLSVersion")
+                third_party_minimum_tls_version = settings.get("NSThirdPartyExceptionMinimumTLSVersion")
+                requires_forward_secrecy = settings.get("NSExceptionRequiresForwardSecrecy")
+                third_party_requires_forward_secrecy = settings.get("NSThirdPartyExceptionRequiresForwardSecrecy")
+                forward_secrecy_values = [
+                    requires_forward_secrecy,
+                    third_party_requires_forward_secrecy,
+                ]
+                if any(value is False for value in forward_secrecy_values):
+                    requires_forward_secrecy = False
+                elif any(value is True for value in forward_secrecy_values):
+                    requires_forward_secrecy = True
+                else:
+                    requires_forward_secrecy = None
                 exception_domains.append(
                     {
                         "allows_insecure_http_loads": (
-                            isinstance(settings, dict)
-                            and settings.get("NSExceptionAllowsInsecureHTTPLoads")
-                            is True
+                            allows_insecure_http_loads is True or third_party_allows_insecure_http_loads is True
                         ),
                         "domain": domain,
-                        "minimum_tls_version": (
-                            settings.get("NSExceptionMinimumTLSVersion", "")
-                            if isinstance(settings, dict)
-                            else ""
-                        ),
+                        "minimum_tls_version": minimum_tls_version or third_party_minimum_tls_version or "",
+                        "requires_forward_secrecy": requires_forward_secrecy,
                     }
                 )
 
         return json_safe(
             {
                 "allows_arbitrary_loads": ats.get("NSAllowsArbitraryLoads") is True,
-                "allows_arbitrary_loads_for_media": (
-                    ats.get("NSAllowsArbitraryLoadsForMedia") is True
-                ),
-                "allows_arbitrary_loads_in_web_content": (
-                    ats.get("NSAllowsArbitraryLoadsInWebContent") is True
-                ),
+                "allows_arbitrary_loads_for_media": (ats.get("NSAllowsArbitraryLoadsForMedia") is True),
+                "allows_arbitrary_loads_in_web_content": (ats.get("NSAllowsArbitraryLoadsInWebContent") is True),
                 "exception_domains": exception_domains,
             }
         )

@@ -3,6 +3,21 @@
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+from typing import Protocol
+
+
+class ExtractedBinary(Protocol):
+    """Shared extracted-binary workspace for a scan."""
+
+    temp_dir: Path
+
+    @property
+    def scan_root_path(self) -> Path: ...
+
+    @property
+    def analysis_targets(self) -> list[Path]: ...
+
+    def cleanup(self) -> None: ...
 
 
 class ScanType(str, Enum):
@@ -42,7 +57,7 @@ class ScanResult:
     relative_target_path: str = ""
 
 
-@dataclass(frozen=True)
+@dataclass
 class ScanConfig:
     """Configuration for a scanning session."""
 
@@ -56,7 +71,8 @@ class ScanConfig:
     display_project_path: str = ""
     platform: str = "ANY"
     stack: str = "ANY"
-    syft_output_format: str = "cyclonedx-json"
+    syft_output_format: str = "syft-json"
+    extracted_binary: ExtractedBinary | None = None
 
     @property
     def target_type(self) -> str:

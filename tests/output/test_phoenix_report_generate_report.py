@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from adapters.output.phoenix_report.generate_report import load_report_data
+from adapters.output.phoenix_report.generate_report import _build_overall_evaluation, load_report_data
 
 BASE_DIR = Path(__file__).resolve().parents[2] / "adapters" / "output" / "phoenix_report" / "data"
 CANONICAL_NETWORK_CHECKS = [
@@ -43,6 +43,59 @@ def _storage_checks(path: Path) -> list[dict[str, str]]:
         if section["section_name"] == "Storage":
             return section["checks"]
     raise AssertionError("Storage section missing")
+
+
+def test_overall_evaluation_summarizes_only_the_highest_present_severity() -> None:
+    section_to_area = {"network": ("Networking", "networking")}
+
+    high_and_medium = _build_overall_evaluation(
+        {
+            "vulnerability_sections": [
+                {
+                    "section_name": "Network",
+                    "checks": [
+                        {"check": "High finding", "result": "Present", "severity": "High"},
+                        {"check": "Medium finding", "result": "Present", "severity": "Medium"},
+                        {"check": "Absent critical finding", "result": "Not Present", "severity": "Critical"},
+                    ],
+                }
+            ]
+        },
+        section_to_area,
+    )
+    assert high_and_medium[0]["risk_rating"] == "High"
+    assert high_and_medium[0]["summary_findings"] == ["High finding"]
+
+    medium_and_low = _build_overall_evaluation(
+        {
+            "vulnerability_sections": [
+                {
+                    "section_name": "Network",
+                    "checks": [
+                        {"check": "First medium finding", "result": "Present", "severity": "Medium"},
+                        {"check": "Second medium finding", "result": "Present", "severity": "Medium"},
+                        {"check": "Low finding", "result": "Present", "severity": "Low"},
+                    ],
+                }
+            ]
+        },
+        section_to_area,
+    )
+    assert medium_and_low[0]["risk_rating"] == "Medium"
+    assert medium_and_low[0]["summary_findings"] == ["First medium finding", "Second medium finding"]
+
+    no_present_findings = _build_overall_evaluation(
+        {
+            "vulnerability_sections": [
+                {
+                    "section_name": "Network",
+                    "checks": [{"check": "Absent finding", "result": "Not Present", "severity": "High"}],
+                }
+            ]
+        },
+        section_to_area,
+    )
+    assert no_present_findings[0]["summary_findings"] == ["No findings identified in this scan"]
 
 
 def test_load_report_data_preserves_legacy_network_checks_in_canonical_form() -> None:

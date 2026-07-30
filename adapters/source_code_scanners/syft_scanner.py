@@ -13,7 +13,7 @@ REPORT_PATH = "sbom.json"
 class SyftScanner(ScannerPort):
     """Scanner for generating Software Bill of Materials using Syft."""
 
-    DEFAULT_OUTPUT_FORMAT = "cyclonedx-json"
+    DEFAULT_OUTPUT_FORMAT = "syft-json"
 
     def __init__(self, output_format: str = DEFAULT_OUTPUT_FORMAT) -> None:
         self.output_format = output_format
@@ -39,11 +39,14 @@ class SyftScanner(ScannerPort):
 
     def scan(self, config: ScanConfig) -> list[ScanResult]:
         try:
+            scan_target = (
+                config.extracted_binary.scan_root_path if config.extracted_binary is not None else config.project_path
+            )
             output_format = self._stdout_output_format()
             cmd = [
                 "syft",
                 "scan",
-                str(config.project_path),
+                str(scan_target),
                 "-o",
                 output_format,
             ]
@@ -109,12 +112,12 @@ class SyftScanner(ScannerPort):
         if "=" in output_format:
             raise ValueError(
                 "Syft output format must not include a file path. "
-                "Use a format such as 'cyclonedx-json', 'spdx-json', or 'syft-json'."
+                "Use a format such as 'syft-json', 'spdx-json', or 'syft-json'."
             )
         if not output_format.endswith("-json"):
             raise ValueError(
                 "Syft output format must be JSON so phoenix can persist a .json report. "
-                "Use a format such as 'cyclonedx-json', 'spdx-json', or 'syft-json'."
+                "Use a format such as 'syft-json', 'spdx-json', or 'syft-json'."
             )
         return output_format
 

@@ -87,7 +87,7 @@ IOS_NETWORK_EVIDENCE_KEY_BY_CHECK = {
     "application contains insecure http traffic": "insecure_http_traffic",
     "application selectively disabled app transport security protections": "ats_exceptions_configured",
     "cookie missing 'httponly' flag": "cookie_missing_httponly",
-    "cookie missing 'secure' flag": "cookie_missing_secure",
+    "cookie missing 'secure' flag": "cookie_missing_secure_flag",
     "http cleartext transmission of advertiser id": "cleartext_http_advertiser_id",
     "http cleartext transmission of device imei": "cleartext_http_imei",
     "http cleartext transmission of gps latitude coordinates": "cleartext_http_gps_latitude",
@@ -2620,17 +2620,21 @@ def _build_overall_evaluation(
         summary_checks = [
             check
             for check in present_checks
-            if str(check.get("severity", "")).strip().lower() in {"critical", "high", "medium"}
-        ]
-        summary_findings = [
-            str(check.get("check", "")).strip() for check in summary_checks if str(check.get("check", "")).strip()
+            if str(check.get("severity", "")).strip().lower() in SECTION_SEVERITY_ORDER
         ]
         risk_rating = _highest_present_severity(summary_checks) if summary_checks else "Low"
+        highest_severity = risk_rating.lower()
+        summary_findings = [
+            str(check.get("check", "")).strip()
+            for check in summary_checks
+            if str(check.get("severity", "")).strip().lower() == highest_severity
+            and str(check.get("check", "")).strip()
+        ]
 
         rows_by_area[area_label] = {
             "area_of_concern": area_label,
             "risk_rating": risk_rating,
-            "summary_findings": summary_findings or ["No medium-or-higher findings identified in this scan"],
+            "summary_findings": summary_findings or ["No findings identified in this scan"],
         }
 
     ordered_rows: list[dict[str, Any]] = []

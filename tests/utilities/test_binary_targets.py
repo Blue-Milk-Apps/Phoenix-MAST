@@ -31,6 +31,8 @@ def test_iter_ipa_analysis_targets_returns_runner_and_framework_binary(
     targets = get_scanable_binary_paths(extracted)
 
     assert targets == [runner_binary, framework_binary]
+    assert extracted.scan_root_path == app_bundle
+    assert extracted.analysis_targets == targets
 
 
 def test_iter_apk_analysis_targets_returns_native_libs(tmp_path: Path) -> None:
@@ -50,6 +52,7 @@ def test_iter_apk_analysis_targets_returns_native_libs(tmp_path: Path) -> None:
     targets = iter_apk_analysis_targets(extracted)
 
     assert targets == [lib_one, lib_two]
+    assert extracted.scan_root_path == temp_dir
 
 
 def test_extract_apk_targets_include_dex_manifest_assets_and_libs(
@@ -68,10 +71,7 @@ def test_extract_apk_targets_include_dex_manifest_assets_and_libs(
 
     extracted = extract_apk(apk_path)
 
-    target_names = [
-        path.relative_to(extracted.temp_dir).as_posix()
-        for path in iter_apk_analysis_targets(extracted)
-    ]
+    target_names = [path.relative_to(extracted.temp_dir).as_posix() for path in iter_apk_analysis_targets(extracted)]
 
     assert target_names == [
         "AndroidManifest.xml",

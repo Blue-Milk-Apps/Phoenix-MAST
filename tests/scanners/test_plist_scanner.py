@@ -43,12 +43,8 @@ def test_plist_scan_writes_app_plist_and_index(tmp_path: Path) -> None:
     results = PlistSourceScanner().scan(config)
 
     assert len(results) == 2
-    plist_result = next(
-        result for result in results if result.relative_target_path == "ios/Info.json"
-    )
-    index_result = next(
-        result for result in results if result.relative_target_path == "scan_index.json"
-    )
+    plist_result = next(result for result in results if result.relative_target_path == "ios/Info.json")
+    index_result = next(result for result in results if result.relative_target_path == "scan_index.json")
     assert plist_result.success
     plist_report = json.loads(plist_result.raw_output)
     assert set(plist_report) == {
@@ -98,6 +94,17 @@ def test_plist_scan_groups_app_and_framework_bundles(tmp_path: Path) -> None:
                 ],
                 "NSAppTransportSecurity": {
                     "NSAllowsArbitraryLoads": True,
+                    "NSExceptionDomains": {
+                        "api.example.com": {
+                            "NSExceptionAllowsInsecureHTTPLoads": True,
+                            "NSExceptionMinimumTLSVersion": "TLSv1.1",
+                            "NSExceptionRequiresForwardSecrecy": False,
+                        },
+                        "third-party.example.com": {
+                            "NSThirdPartyExceptionMinimumTLSVersion": "TLSv1.0",
+                            "NSThirdPartyExceptionRequiresForwardSecrecy": False,
+                        },
+                    },
                 },
                 "NSCameraUsageDescription": "Scan codes",
             },
@@ -126,31 +133,47 @@ def test_plist_scan_groups_app_and_framework_bundles(tmp_path: Path) -> None:
 
     results = PlistSourceScanner().scan(config)
 
-    outputs = {
-        result.relative_target_path: json.loads(result.raw_output) for result in results
-    }
+    outputs = {result.relative_target_path: json.loads(result.raw_output) for result in results}
     assert set(outputs) == {
         "App/Info.json",
         "Frameworks/Foo.framework/Info.json",
         "scan_index.json",
     }
-    assert (
-        outputs["App/Info.json"]["app_meta"]["bundle_identifier"] == "com.example.app"
-    )
+    assert outputs["App/Info.json"]["app_meta"]["bundle_identifier"] == "com.example.app"
     assert outputs["App/Info.json"]["ats"]["allows_arbitrary_loads"] is True
+    assert outputs["App/Info.json"]["ats"]["exception_domains"] == [
+        {
+            "allows_insecure_http_loads": True,
+            "domain": "api.example.com",
+            "minimum_tls_version": "TLSv1.1",
+            "requires_forward_secrecy": False,
+        },
+        {
+            "allows_insecure_http_loads": False,
+            "domain": "third-party.example.com",
+            "minimum_tls_version": "TLSv1.0",
+            "requires_forward_secrecy": False,
+        },
+    ]
     assert outputs["App/Info.json"]["privacy"]["permissions"] == [
         {"key": "NSCameraUsageDescription", "purpose": "Scan codes"}
     ]
     assert outputs["App/Info.json"]["plist"]["NSAppTransportSecurity"] == {
-        "NSAllowsArbitraryLoads": True
+        "NSAllowsArbitraryLoads": True,
+        "NSExceptionDomains": {
+            "api.example.com": {
+                "NSExceptionAllowsInsecureHTTPLoads": True,
+                "NSExceptionMinimumTLSVersion": "TLSv1.1",
+                "NSExceptionRequiresForwardSecrecy": False,
+            },
+            "third-party.example.com": {
+                "NSThirdPartyExceptionMinimumTLSVersion": "TLSv1.0",
+                "NSThirdPartyExceptionRequiresForwardSecrecy": False,
+            },
+        },
     }
-    assert outputs["Frameworks/Foo.framework/Info.json"]["framework_meta"][
-        "bundle_identifier"
-    ] == ("com.example.foo")
-    assert (
-        outputs["Frameworks/Foo.framework/Info.json"]["framework_meta"]["package_type"]
-        == "FMWK"
-    )
+    assert outputs["Frameworks/Foo.framework/Info.json"]["framework_meta"]["bundle_identifier"] == ("com.example.foo")
+    assert outputs["Frameworks/Foo.framework/Info.json"]["framework_meta"]["package_type"] == "FMWK"
     assert outputs["scan_index.json"]["emitted_plist_count"] == 2
     assert [item["role"] for item in outputs["scan_index.json"]["plists"]] == [
         "app",
@@ -186,9 +209,7 @@ def test_plist_scan_skips_xcode_project_plists(tmp_path: Path) -> None:
 
     results = PlistSourceScanner().scan(config)
 
-    outputs = {
-        result.relative_target_path: json.loads(result.raw_output) for result in results
-    }
+    outputs = {result.relative_target_path: json.loads(result.raw_output) for result in results}
     assert set(outputs) == {"App/Info.json", "scan_index.json"}
     assert outputs["scan_index.json"]["plist_count"] == 2
     assert outputs["scan_index.json"]["skipped_plist_count"] == 1
@@ -238,9 +259,7 @@ def test_plist_scan_reports_sensitive_keys_without_copying_plist(
     results = PlistSourceScanner().scan(config)
 
     assert len(results) == 2
-    plist_result = next(
-        result for result in results if result.relative_target_path == "Info.json"
-    )
+    plist_result = next(result for result in results if result.relative_target_path == "Info.json")
     report = json.loads(plist_result.raw_output)
     assert report["important_items"]["ats"] == {}
     assert report["plist"]["APIToken"] == "0102"
@@ -277,13 +296,9 @@ def test_plist_scan_works_with_demo_project_fixture(tmp_path: Path) -> None:
     results = PlistSourceScanner().scan(config)
 
     assert len(results) == 2
-    plist_result = next(
-        result for result in results if result.relative_target_path == "Info.json"
-    )
+    plist_result = next(result for result in results if result.relative_target_path == "Info.json")
     assert plist_result.success
-    index_result = next(
-        result for result in results if result.relative_target_path == "scan_index.json"
-    )
+    index_result = next(result for result in results if result.relative_target_path == "scan_index.json")
     assert json.loads(index_result.raw_output)["plist_count"] == 1
 
     for result in results:
