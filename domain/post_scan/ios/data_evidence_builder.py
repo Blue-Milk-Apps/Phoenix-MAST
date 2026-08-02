@@ -37,10 +37,23 @@ class IOSStorageEvidence:
         "kSecAttrAccessibleAlways",
     )
     DEPRECATED_KEYCHAIN_ATTRIBUTES_RULE_ID = "ios.storage.deprecated-keychain-accessibility"
+    ADVERTISER_ID_INSECURE_STORAGE_RULE_ID = "ios.storage.advertiser-id-insecure-storage"
+    ADVERTISER_ID_MARKERS = (
+        "ASIdentifierManager",
+        "advertisingIdentifier",
+        "idfa",
+    )
+    INSECURE_STORAGE_MARKERS = (
+        "UserDefaults",
+        "setObject:forKey:",
+        "writeToFile:",
+        "writeToURL:",
+        "NSKeyedArchiver",
+    )
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
         self.deprecated_keychain_attributes = self._deprecated_keychain_attributes_entry(loaded_outputs)
-        self.advertiser_id_stored_insecurely = EvidenceEntry(False, "no_advertiser_id_stored_insecurely_hits")
+        self.advertiser_id_stored_insecurely = self._advertiser_id_stored_insecurely_entry(loaded_outputs)
         self.imei_stored_insecurely = EvidenceEntry(False, "no_imei_stored_insecurely_hits")
         self.global_write_permissions = EvidenceEntry(False, "no_global_write_permissions_hits")
         self.gps_latitude_stored_insecurely = EvidenceEntry(False, "no_gps_latitude_stored_insecurely_hits")
@@ -82,3 +95,24 @@ class IOSStorageEvidence:
                         return EvidenceEntry(True, f"{path}: {attribute}")
 
         return EvidenceEntry(False, "no_deprecated_keychain_attributes_hits")
+
+    @classmethod
+    def _advertiser_id_stored_insecurely_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        for result in (loaded_outputs.get("opengrep") or {}).get("results") or []:
+            if not isinstance(result, dict) or result.get("check_id") != cls.ADVERTISER_ID_INSECURE_STORAGE_RULE_ID:
+                continue
+            extra = result.get("extra") or {}
+            evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
+            path = str(result.get("path", "")).strip()
+            return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
+
+        strings_outputs = loaded_outputs.get("strings_outputs") or {}
+        if isinstance(strings_outputs, dict):
+            for path, content in strings_outputs.items():
+                text = str(content or "")
+                advertiser_id_marker = next((marker for marker in cls.ADVERTISER_ID_MARKERS if marker in text), "")
+                storage_marker = next((marker for marker in cls.INSECURE_STORAGE_MARKERS if marker in text), "")
+                if advertiser_id_marker and storage_marker:
+                    return EvidenceEntry(True, f"{path}: {advertiser_id_marker}; {storage_marker}")
+
+        return EvidenceEntry(False, "no_advertiser_id_stored_insecurely_hits")
