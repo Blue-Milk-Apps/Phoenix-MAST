@@ -105,23 +105,20 @@ IOS_NETWORK_EVIDENCE_KEY_BY_CHECK = {
 IOS_DATA_EVIDENCE_KEY_BY_CHECK = {
     "application utilizes deprecated keychain attributes": "deprecated_keychain_attributes",
     "local data exposure: advertiser id stored insecurely": "advertiser_id_stored_insecurely",
-    "local data exposure: device imei stored insecurely": "imei_stored_insecurely",
+    "local data exposure: imei-labeled value stored insecurely": "imei_labeled_value_stored_insecurely",
     "local data exposure: global write permissions": "global_write_permissions",
-    "local data exposure: gps latitude stored insecurely": "gps_latitude_stored_insecurely",
-    "local data exposure: gps longitude stored insecurely": "gps_longitude_stored_insecurely",
+    "local data exposure: location data stored insecurely": "location_data_stored_insecurely",
     "local data exposure: insecure hardcoded api keys": "hardcoded_api_keys_stored_insecurely",
     "local data exposure: insecure hardcoded passwords": "hardcoded_passwords_stored_insecurely",  # pragma: allowlist secret
     "local data exposure: sensitive values stored insecurely": "sensitive_values_stored_insecurely",
     "local data exposure: wifi ip address stored insecurely": "wifi_ip_stored_insecurely",
-    "local data exposure: wifi mac address stored insecurely": "wifi_mac_stored_insecurely",
-    "sensitive values stored in plaintext within the keychain": "keychain_plaintext_values",
+    "keychain accessibility requires review": "keychain_accessibility_requires_review",
     "sensitive values stored insecurely within nsuserdefaults": "nsuserdefaults_sensitive_values",
     "local data exposure: advertiser id logged insecurely": "advertiser_id_logged_insecurely",
     "local data exposure: device imei logged insecurely": "imei_logged_insecurely",
     "local data exposure: gps latitude logged insecurely": "gps_latitude_logged_insecurely",
     "local data exposure: gps longitude logged insecurely": "gps_longitude_logged_insecurely",
     "local data exposure: sensitive data logged insecurely": "sensitive_data_logged_insecurely",
-    "local data exposure: sensitive values stored in memory": "sensitive_values_in_memory",
     "local data exposure: wifi mac address logged insecurely": "wifi_mac_logged_insecurely",
     "sensitive data exposed through device keyboard cache": "keyboard_cache_exposure",
 }
@@ -1246,6 +1243,48 @@ IOS_DATA_CHECK_SPECS = (
         "aliases": (),
     },
 )
+_IOS_RETIRED_DATA_CHECK_NAMES = {
+    "Local Data Exposure: WiFi MAC Address Stored Insecurely",
+    "Local Data Exposure: Sensitive Values Stored in Memory",
+}
+IOS_DATA_CHECK_SPECS = tuple(
+    {
+        **spec,
+        **(
+            {
+                "check": "Local Data Exposure: IMEI-Labeled Value Stored Insecurely",
+                "present_explanation": "An IMEI-labeled value is written to an unprotected on-device storage location.",
+                "not_present_explanation": "No IMEI-labeled value is written to an unprotected on-device storage location.",
+            }
+            if spec["check"] == "Local Data Exposure: Device IMEI Stored Insecurely"
+            else {}
+        ),
+        **(
+            {
+                "check": "Local Data Exposure: Location Data Stored Insecurely",
+                "present_explanation": "Location data is written to an unprotected on-device storage location.",
+                "not_present_explanation": "Location data is not written to an unprotected on-device storage location.",
+            }
+            if spec["check"] == "Local Data Exposure: GPS Latitude Stored Insecurely"
+            else {}
+        ),
+        **(
+            {
+                "check": "Keychain Accessibility Requires Review",
+                "severity": "Medium",
+                "present_explanation": "A Keychain item's configured accessibility requires review.",
+                "not_present_explanation": "No Keychain accessibility configuration requires review.",
+                "confidence_caveat": "Detected from Keychain accessibility configuration, not a direct read of stored values.",
+            }
+            if spec["check"] == "Sensitive Values Stored in Plaintext Within the Keychain"
+            else {}
+        ),
+    }
+    for spec in IOS_DATA_CHECK_SPECS
+    if spec["check"] not in _IOS_RETIRED_DATA_CHECK_NAMES
+    and spec["check"] != "Local Data Exposure: GPS Longitude Stored Insecurely"
+)
+
 IOS_RESILIENCE_CHECK_SPECS = (
     {
         "check": "Biometric / Local Authentication Bypass Possible",

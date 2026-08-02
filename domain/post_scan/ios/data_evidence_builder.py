@@ -7,28 +7,28 @@ from typing import Any
 
 from domain.post_scan.ios.code_evidence_builder import EvidenceEntry
 
+# TODO(dynamic): Add sensitive-values-in-memory evidence when runtime memory inspection is available.
+# It is intentionally omitted from static scan results.
+
 
 @dataclass
 class IOSStorageEvidence:
     deprecated_keychain_attributes: EvidenceEntry
     advertiser_id_stored_insecurely: EvidenceEntry
-    imei_stored_insecurely: EvidenceEntry
+    imei_labeled_value_stored_insecurely: EvidenceEntry
     global_write_permissions: EvidenceEntry
-    gps_latitude_stored_insecurely: EvidenceEntry
-    gps_longitude_stored_insecurely: EvidenceEntry
+    location_data_stored_insecurely: EvidenceEntry
     hardcoded_api_keys_stored_insecurely: EvidenceEntry
     hardcoded_passwords_stored_insecurely: EvidenceEntry
     sensitive_values_stored_insecurely: EvidenceEntry
     wifi_ip_stored_insecurely: EvidenceEntry
-    wifi_mac_stored_insecurely: EvidenceEntry
-    keychain_plaintext_values: EvidenceEntry
+    keychain_accessibility_requires_review: EvidenceEntry
     nsuserdefaults_sensitive_values: EvidenceEntry
     advertiser_id_logged_insecurely: EvidenceEntry
     imei_logged_insecurely: EvidenceEntry
     gps_latitude_logged_insecurely: EvidenceEntry
     gps_longitude_logged_insecurely: EvidenceEntry
     sensitive_data_logged_insecurely: EvidenceEntry
-    sensitive_values_in_memory: EvidenceEntry
     wifi_mac_logged_insecurely: EvidenceEntry
     keyboard_cache_exposure: EvidenceEntry
 
@@ -54,25 +54,24 @@ class IOSStorageEvidence:
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
         self.deprecated_keychain_attributes = self._deprecated_keychain_attributes_entry(loaded_outputs)
         self.advertiser_id_stored_insecurely = self._advertiser_id_stored_insecurely_entry(loaded_outputs)
-        self.imei_stored_insecurely = EvidenceEntry(False, "no_imei_stored_insecurely_hits")
+        self.imei_labeled_value_stored_insecurely = EvidenceEntry(False, "no_imei_labeled_value_stored_insecurely_hits")
         self.global_write_permissions = EvidenceEntry(False, "no_global_write_permissions_hits")
-        self.gps_latitude_stored_insecurely = EvidenceEntry(False, "no_gps_latitude_stored_insecurely_hits")
-        self.gps_longitude_stored_insecurely = EvidenceEntry(False, "no_gps_longitude_stored_insecurely_hits")
+        self.location_data_stored_insecurely = EvidenceEntry(False, "no_location_data_stored_insecurely_hits")
         self.hardcoded_api_keys_stored_insecurely = EvidenceEntry(False, "no_hardcoded_api_keys_stored_insecurely_hits")
         self.hardcoded_passwords_stored_insecurely = EvidenceEntry(
             False, "no_hardcoded_passwords_stored_insecurely_hits"
         )
         self.sensitive_values_stored_insecurely = EvidenceEntry(False, "no_sensitive_values_stored_insecurely_hits")
         self.wifi_ip_stored_insecurely = EvidenceEntry(False, "no_wifi_ip_stored_insecurely_hits")
-        self.wifi_mac_stored_insecurely = EvidenceEntry(False, "no_wifi_mac_stored_insecurely_hits")
-        self.keychain_plaintext_values = EvidenceEntry(False, "no_keychain_plaintext_values_hits")
+        self.keychain_accessibility_requires_review = EvidenceEntry(
+            False, "no_keychain_accessibility_requires_review_hits"
+        )
         self.nsuserdefaults_sensitive_values = EvidenceEntry(False, "no_nsuserdefaults_sensitive_values_hits")
         self.advertiser_id_logged_insecurely = EvidenceEntry(False, "no_advertiser_id_logged_insecurely_hits")
         self.imei_logged_insecurely = EvidenceEntry(False, "no_imei_logged_insecurely_hits")
         self.gps_latitude_logged_insecurely = EvidenceEntry(False, "no_gps_latitude_logged_insecurely_hits")
         self.gps_longitude_logged_insecurely = EvidenceEntry(False, "no_gps_longitude_logged_insecurely_hits")
         self.sensitive_data_logged_insecurely = EvidenceEntry(False, "no_sensitive_data_logged_insecurely_hits")
-        self.sensitive_values_in_memory = EvidenceEntry(False, "no_sensitive_values_in_memory_hits")
         self.wifi_mac_logged_insecurely = EvidenceEntry(False, "no_wifi_mac_logged_insecurely_hits")
         self.keyboard_cache_exposure = EvidenceEntry(False, "no_keyboard_cache_exposure_hits")
 
