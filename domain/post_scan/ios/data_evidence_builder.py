@@ -32,9 +32,14 @@ class IOSStorageEvidence:
     wifi_mac_logged_insecurely: EvidenceEntry
     keyboard_cache_exposure: EvidenceEntry
 
+    DEPRECATED_KEYCHAIN_ATTRIBUTES = (
+        "kSecAttrAccessibleAlwaysThisDeviceOnly",
+        "kSecAttrAccessibleAlways",
+    )
+    DEPRECATED_KEYCHAIN_ATTRIBUTES_RULE_ID = "ios.storage.deprecated-keychain-accessibility"
+
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
-        _ = loaded_outputs
-        self.deprecated_keychain_attributes = EvidenceEntry(False, "no_deprecated_keychain_attributes_hits")
+        self.deprecated_keychain_attributes = self._deprecated_keychain_attributes_entry(loaded_outputs)
         self.advertiser_id_stored_insecurely = EvidenceEntry(False, "no_advertiser_id_stored_insecurely_hits")
         self.imei_stored_insecurely = EvidenceEntry(False, "no_imei_stored_insecurely_hits")
         self.global_write_permissions = EvidenceEntry(False, "no_global_write_permissions_hits")
@@ -57,3 +62,23 @@ class IOSStorageEvidence:
         self.sensitive_values_in_memory = EvidenceEntry(False, "no_sensitive_values_in_memory_hits")
         self.wifi_mac_logged_insecurely = EvidenceEntry(False, "no_wifi_mac_logged_insecurely_hits")
         self.keyboard_cache_exposure = EvidenceEntry(False, "no_keyboard_cache_exposure_hits")
+
+    @classmethod
+    def _deprecated_keychain_attributes_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        for result in (loaded_outputs.get("opengrep") or {}).get("results") or []:
+            if not isinstance(result, dict) or result.get("check_id") != cls.DEPRECATED_KEYCHAIN_ATTRIBUTES_RULE_ID:
+                continue
+            extra = result.get("extra") or {}
+            evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
+            path = str(result.get("path", "")).strip()
+            return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
+
+        strings_outputs = loaded_outputs.get("strings_outputs") or {}
+        if isinstance(strings_outputs, dict):
+            for path, content in strings_outputs.items():
+                text = str(content or "")
+                for attribute in cls.DEPRECATED_KEYCHAIN_ATTRIBUTES:
+                    if attribute in text:
+                        return EvidenceEntry(True, f"{path}: {attribute}")
+
+        return EvidenceEntry(False, "no_deprecated_keychain_attributes_hits")
