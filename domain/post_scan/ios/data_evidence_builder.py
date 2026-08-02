@@ -9,7 +9,7 @@ from domain.post_scan.ios.code_evidence_builder import EvidenceEntry
 
 
 @dataclass
-class IOSDataEvidence:
+class IOSStorageEvidence:
     deprecated_keychain_attributes: EvidenceEntry
     advertiser_id_stored_insecurely: EvidenceEntry
     imei_stored_insecurely: EvidenceEntry

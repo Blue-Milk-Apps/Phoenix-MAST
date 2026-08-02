@@ -7,7 +7,7 @@ from typing import Any
 
 from domain.post_scan.ios.app_info_builder import IOSAppInfo
 from domain.post_scan.ios.code_evidence_builder import IOSCodeEvidence
-from domain.post_scan.ios.data_evidence_builder import IOSDataEvidence
+from domain.post_scan.ios.data_evidence_builder import IOSStorageEvidence
 from domain.post_scan.ios.endpoints_builder import IOSEndpoints
 from domain.post_scan.ios.file_info import IOSFileInfo
 from domain.post_scan.ios.functionality_builder import IOSFunctionality
@@ -83,7 +83,7 @@ class IOSBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "permissions": IOSPermissions(loaded_outputs).items,
             "code_evidence": asdict(IOSCodeEvidence(loaded_outputs)),
             "network_evidence": asdict(IOSNetworkEvidence(loaded_outputs)),
-            "data_evidence": asdict(IOSDataEvidence(loaded_outputs)),
+            "data_evidence": asdict(IOSStorageEvidence(loaded_outputs)),
             "resilience_evidence": asdict(IOSResilienceEvidence(loaded_outputs)),
             "hardcoded_values": asdict(IOSHardcodedValues(loaded_outputs)),
             "endpoints": IOSEndpoints(loaded_outputs).items,
