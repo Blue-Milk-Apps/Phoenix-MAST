@@ -116,8 +116,7 @@ IOS_DATA_EVIDENCE_KEY_BY_CHECK = {
     "sensitive values stored insecurely within nsuserdefaults": "nsuserdefaults_sensitive_values",
     "local data exposure: advertiser id logged insecurely": "advertiser_id_logged_insecurely",
     "local data exposure: device imei logged insecurely": "imei_logged_insecurely",
-    "local data exposure: gps latitude logged insecurely": "gps_latitude_logged_insecurely",
-    "local data exposure: gps longitude logged insecurely": "gps_longitude_logged_insecurely",
+    "local data exposure: location data logged insecurely": "location_data_logged_insecurely",
     "local data exposure: sensitive data logged insecurely": "sensitive_data_logged_insecurely",
     "local data exposure: wifi mac address logged insecurely": "wifi_mac_logged_insecurely",
     "sensitive data exposed through device keyboard cache": "keyboard_cache_exposure",
@@ -1279,10 +1278,20 @@ IOS_DATA_CHECK_SPECS = tuple(
             if spec["check"] == "Sensitive Values Stored in Plaintext Within the Keychain"
             else {}
         ),
+        **(
+            {
+                "check": "Local Data Exposure: Location Data Logged Insecurely",
+                "present_explanation": "Location data is written to the device console/log.",
+                "not_present_explanation": "Location data is not written to the device console/log.",
+            }
+            if spec["check"] == "Local Data Exposure: GPS Latitude Logged Insecurely"
+            else {}
+        ),
     }
     for spec in IOS_DATA_CHECK_SPECS
     if spec["check"] not in _IOS_RETIRED_DATA_CHECK_NAMES
     and spec["check"] != "Local Data Exposure: GPS Longitude Stored Insecurely"
+    and spec["check"] != "Local Data Exposure: GPS Longitude Logged Insecurely"
 )
 
 IOS_RESILIENCE_CHECK_SPECS = (
