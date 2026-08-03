@@ -38,6 +38,9 @@ class IOSStorageEvidence:
     )
     DEPRECATED_KEYCHAIN_ATTRIBUTES_RULE_ID = "ios.storage.deprecated-keychain-accessibility"
     ADVERTISER_ID_INSECURE_STORAGE_RULE_ID = "ios.storage.advertiser-id-insecure-storage"
+    IMEI_LABELED_VALUE_INSECURE_STORAGE_RULE_ID = "ios.storage.imei-labeled-value-insecure-storage"
+    GLOBAL_WRITE_PERMISSIONS_RULE_ID = "ios.storage.global-write-permissions"
+    LOCATION_DATA_INSECURE_STORAGE_RULE_ID = "ios.storage.location-data-insecure-storage"
     ADVERTISER_ID_MARKERS = (
         "ASIdentifierManager",
         "advertisingIdentifier",
@@ -50,13 +53,14 @@ class IOSStorageEvidence:
         "writeToURL:",
         "NSKeyedArchiver",
     )
+    IMEI_MARKERS = ("imei", "deviceImei", "device_imei")
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
         self.deprecated_keychain_attributes = self._deprecated_keychain_attributes_entry(loaded_outputs)
         self.advertiser_id_stored_insecurely = self._advertiser_id_stored_insecurely_entry(loaded_outputs)
-        self.imei_labeled_value_stored_insecurely = EvidenceEntry(False, "no_imei_labeled_value_stored_insecurely_hits")
-        self.global_write_permissions = EvidenceEntry(False, "no_global_write_permissions_hits")
-        self.location_data_stored_insecurely = EvidenceEntry(False, "no_location_data_stored_insecurely_hits")
+        self.imei_labeled_value_stored_insecurely = self._imei_labeled_value_stored_insecurely_entry(loaded_outputs)
+        self.global_write_permissions = self._global_write_permissions_entry(loaded_outputs)
+        self.location_data_stored_insecurely = self._location_data_stored_insecurely_entry(loaded_outputs)
         self.hardcoded_api_keys_stored_insecurely = EvidenceEntry(False, "no_hardcoded_api_keys_stored_insecurely_hits")
         self.hardcoded_passwords_stored_insecurely = EvidenceEntry(
             False, "no_hardcoded_passwords_stored_insecurely_hits"
@@ -115,3 +119,70 @@ class IOSStorageEvidence:
                     return EvidenceEntry(True, f"{path}: {advertiser_id_marker}; {storage_marker}")
 
         return EvidenceEntry(False, "no_advertiser_id_stored_insecurely_hits")
+
+    @classmethod
+    def _imei_labeled_value_stored_insecurely_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        for result in (loaded_outputs.get("opengrep") or {}).get("results") or []:
+            if (
+                not isinstance(result, dict)
+                or result.get("check_id") != cls.IMEI_LABELED_VALUE_INSECURE_STORAGE_RULE_ID
+            ):
+                continue
+            extra = result.get("extra") or {}
+            evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
+            path = str(result.get("path", "")).strip()
+            return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
+
+        strings_outputs = loaded_outputs.get("strings_outputs") or {}
+        if isinstance(strings_outputs, dict):
+            for path, content in strings_outputs.items():
+                text = str(content or "")
+                lowered_text = text.lower()
+                imei_marker = next(
+                    (
+                        marker
+                        for marker in sorted(cls.IMEI_MARKERS, key=len, reverse=True)
+                        if marker.lower() in lowered_text
+                    ),
+                    "",
+                )
+                storage_marker = next((marker for marker in cls.INSECURE_STORAGE_MARKERS if marker in text), "")
+                if imei_marker and storage_marker:
+                    return EvidenceEntry(True, f"{path}: {imei_marker}; {storage_marker}")
+
+        return EvidenceEntry(False, "no_imei_labeled_value_stored_insecurely_hits")
+
+    @classmethod
+    def _global_write_permissions_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        # Source-focused: binary strings cannot prove a permission-setting call grants global write access.
+        opengrep = loaded_outputs.get("opengrep")
+        results = opengrep.get("results") if isinstance(opengrep, dict) else None
+        if not isinstance(results, list):
+            return EvidenceEntry(False, "global_write_permissions_not_assessed_no_opengrep_results")
+
+        for result in results:
+            if not isinstance(result, dict) or result.get("check_id") != cls.GLOBAL_WRITE_PERMISSIONS_RULE_ID:
+                continue
+            extra = result.get("extra") or {}
+            evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
+            path = str(result.get("path", "")).strip()
+            return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
+
+        return EvidenceEntry(False, "no_global_write_permissions_hits")
+
+    @classmethod
+    def _location_data_stored_insecurely_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        opengrep = loaded_outputs.get("opengrep")
+        results = opengrep.get("results") if isinstance(opengrep, dict) else None
+        if not isinstance(results, list):
+            return EvidenceEntry(False, "location_data_stored_insecurely_not_assessed_binary_scan")
+
+        for result in results:
+            if not isinstance(result, dict) or result.get("check_id") != cls.LOCATION_DATA_INSECURE_STORAGE_RULE_ID:
+                continue
+            extra = result.get("extra") or {}
+            evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
+            path = str(result.get("path", "")).strip()
+            return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
+
+        return EvidenceEntry(False, "no_location_data_stored_insecurely_hits")
