@@ -1780,7 +1780,7 @@ def test_ios_storage_evidence_sensitive_values_requires_source_finding() -> None
                         "check_id": "ios.storage.sensitive-value-insecure-storage",
                         "path": "Sources/Session.swift",
                         "extra": {
-                            "lines": 'UserDefaults.standard.set(accessToken, forKey: "session")',
+                            "lines": "accessToken.write(to: fileURL)",
                         },
                     }
                 ]
@@ -1789,19 +1789,16 @@ def test_ios_storage_evidence_sensitive_values_requires_source_finding() -> None
     )
     assert detected.sensitive_values_stored_insecurely.present is True
     assert detected.sensitive_values_stored_insecurely.evidence == (
-        'Sources/Session.swift: UserDefaults.standard.set(accessToken, forKey: "session")'
+        "Sources/Session.swift: accessToken.write(to: fileURL)"
     )
 
     no_hit = IOSStorageEvidence({"opengrep": {"results": []}})
     assert no_hit.sensitive_values_stored_insecurely.present is False
     assert no_hit.sensitive_values_stored_insecurely.evidence == "no_sensitive_values_stored_insecurely_hits"
 
-    binary_only = IOSStorageEvidence({"strings_outputs": {"App.txt": "accessToken\nUserDefaults"}})
-    assert binary_only.sensitive_values_stored_insecurely.present is False
-    assert (
-        binary_only.sensitive_values_stored_insecurely.evidence
-        == "sensitive_values_stored_insecurely_not_assessed_binary_scan"
-    )
+    binary_only = IOSStorageEvidence({"strings_outputs": {"App.txt": "accessToken\nNSKeyedArchiver"}})
+    assert binary_only.sensitive_values_stored_insecurely.present is True
+    assert binary_only.sensitive_values_stored_insecurely.evidence == "(Triage Signal) App.txt: token; NSKeyedArchiver"
 
 
 def test_ios_storage_evidence_wifi_ip_requires_source_finding() -> None:
@@ -1830,8 +1827,61 @@ def test_ios_storage_evidence_wifi_ip_requires_source_finding() -> None:
     assert no_hit.wifi_ip_stored_insecurely.evidence == "no_wifi_ip_stored_insecurely_hits"
 
     binary_only = IOSStorageEvidence({"strings_outputs": {"App.txt": "wifiIPAddress\nUserDefaults"}})
-    assert binary_only.wifi_ip_stored_insecurely.present is False
-    assert binary_only.wifi_ip_stored_insecurely.evidence == "wifi_ip_stored_insecurely_not_assessed_binary_scan"
+    assert binary_only.wifi_ip_stored_insecurely.present is True
+    assert binary_only.wifi_ip_stored_insecurely.evidence == "(Triage Signal) App.txt: wifiipaddress; UserDefaults"
+
+
+def test_ios_storage_evidence_source_only_storage_checks_have_ipa_triage() -> None:
+    cases = (
+        (
+            "location_data_stored_insecurely",
+            "ios.storage.location-data-insecure-storage",
+            "Sources/Location.swift",
+            "location.coordinate.write(to: fileURL)",
+            "CLLocation\nNSKeyedArchiver",
+            "cllocation",
+            "NSKeyedArchiver",
+            "no_location_data_stored_insecurely_hits",
+        ),
+        (
+            "hardcoded_api_keys_stored_insecurely",
+            "ios.storage.hardcoded-api-key-insecure-storage",
+            "Sources/Configuration.swift",
+            'UserDefaults.standard.set("key", forKey: "api_key")',
+            "api_key\nUserDefaults",
+            "api_key",
+            "UserDefaults",
+            "no_hardcoded_api_keys_stored_insecurely_hits",
+        ),
+        (
+            "hardcoded_passwords_stored_insecurely",
+            "ios.storage.hardcoded-password-insecure-storage",
+            "Sources/Configuration.swift",
+            'UserDefaults.standard.set("password", forKey: "password")',
+            "password\nUserDefaults",
+            "password",
+            "UserDefaults",
+            "no_hardcoded_passwords_stored_insecurely_hits",
+        ),
+    )
+
+    for field, rule_id, path, line, binary_text, data_marker, storage_marker, no_hit_evidence in cases:
+        source_detected = IOSStorageEvidence(
+            {"opengrep": {"results": [{"check_id": rule_id, "path": path, "extra": {"lines": line}}]}}
+        )
+        source_entry = getattr(source_detected, field)
+        assert source_entry.present is True
+        assert source_entry.evidence == f"{path}: {line}"
+
+        binary_triage = IOSStorageEvidence({"strings_outputs": {"App.txt": binary_text}})
+        binary_entry = getattr(binary_triage, field)
+        assert binary_entry.present is True
+        assert binary_entry.evidence == f"(Triage Signal) App.txt: {data_marker}; {storage_marker}"
+
+        no_hit = IOSStorageEvidence({"strings_outputs": {"App.txt": "settings"}})
+        no_hit_entry = getattr(no_hit, field)
+        assert no_hit_entry.present is False
+        assert no_hit_entry.evidence == no_hit_evidence
 
 
 def test_ios_storage_evidence_keychain_items_accessible_after_first_unlock() -> None:

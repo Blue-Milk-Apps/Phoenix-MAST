@@ -87,6 +87,10 @@ class IOSStorageEvidence:
     LOGGING_MARKERS = ("nslog", "os_log", "logger", "debugprint", "print")
     LOCATION_DATA_MARKERS = ("cllocation", "coordinate", "latitude", "longitude")
     WIFI_MAC_MARKERS = ("wifi_mac", "wifimac", "mac_address", "macaddress", "bssid")
+    API_KEY_MARKERS = ("api_key", "apikey", "api key")
+    PASSWORD_MARKERS = ("password", "passwd", "pwd")
+    WIFI_IP_MARKERS = ("wifi_ip", "wifiip", "wifi ip", "wifiipaddress")
+    NON_USER_DEFAULTS_STORAGE_MARKERS = ("writeToFile:", "writeToURL:", "NSKeyedArchiver")
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
         self.deprecated_keychain_attributes = self._deprecated_keychain_attributes_entry(loaded_outputs)
@@ -250,91 +254,95 @@ class IOSStorageEvidence:
 
     @classmethod
     def _location_data_stored_insecurely_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
-        opengrep = loaded_outputs.get("opengrep")
-        results = opengrep.get("results") if isinstance(opengrep, dict) else None
-        if not isinstance(results, list):
-            return EvidenceEntry(False, "location_data_stored_insecurely_not_assessed_binary_scan")
-
-        for result in results:
-            if not isinstance(result, dict) or result.get("check_id") != cls.LOCATION_DATA_INSECURE_STORAGE_RULE_ID:
-                continue
-            extra = result.get("extra") or {}
-            evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
-            path = str(result.get("path", "")).strip()
-            return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
-
-        return EvidenceEntry(False, "no_location_data_stored_insecurely_hits")
+        return cls._source_or_storage_triage_entry(
+            loaded_outputs,
+            rule_id=cls.LOCATION_DATA_INSECURE_STORAGE_RULE_ID,
+            data_markers=cls.LOCATION_DATA_MARKERS,
+            storage_markers=cls.INSECURE_STORAGE_MARKERS,
+            no_hit_evidence="no_location_data_stored_insecurely_hits",
+        )
 
     @classmethod
     def _hardcoded_api_keys_stored_insecurely_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
-        opengrep = loaded_outputs.get("opengrep")
-        results = opengrep.get("results") if isinstance(opengrep, dict) else None
-        if not isinstance(results, list):
-            return EvidenceEntry(False, "hardcoded_api_keys_stored_insecurely_not_assessed_binary_scan")
-
-        for result in results:
-            if not isinstance(result, dict) or result.get("check_id") != cls.HARDCODED_API_KEY_INSECURE_STORAGE_RULE_ID:
-                continue
-            extra = result.get("extra") or {}
-            evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
-            path = str(result.get("path", "")).strip()
-            return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
-
-        return EvidenceEntry(False, "no_hardcoded_api_keys_stored_insecurely_hits")
+        return cls._source_or_storage_triage_entry(
+            loaded_outputs,
+            rule_id=cls.HARDCODED_API_KEY_INSECURE_STORAGE_RULE_ID,
+            data_markers=cls.API_KEY_MARKERS,
+            storage_markers=cls.INSECURE_STORAGE_MARKERS,
+            no_hit_evidence="no_hardcoded_api_keys_stored_insecurely_hits",
+        )
 
     @classmethod
     def _hardcoded_passwords_stored_insecurely_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
-        opengrep = loaded_outputs.get("opengrep")
-        results = opengrep.get("results") if isinstance(opengrep, dict) else None
-        if not isinstance(results, list):
-            return EvidenceEntry(False, "hardcoded_passwords_stored_insecurely_not_assessed_binary_scan")
-
-        for result in results:
-            if (
-                not isinstance(result, dict)
-                or result.get("check_id") != cls.HARDCODED_PASSWORD_INSECURE_STORAGE_RULE_ID
-            ):
-                continue
-            extra = result.get("extra") or {}
-            evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
-            path = str(result.get("path", "")).strip()
-            return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
-
-        return EvidenceEntry(False, "no_hardcoded_passwords_stored_insecurely_hits")
+        return cls._source_or_storage_triage_entry(
+            loaded_outputs,
+            rule_id=cls.HARDCODED_PASSWORD_INSECURE_STORAGE_RULE_ID,
+            data_markers=cls.PASSWORD_MARKERS,
+            storage_markers=cls.INSECURE_STORAGE_MARKERS,
+            no_hit_evidence="no_hardcoded_passwords_stored_insecurely_hits",
+        )
 
     @classmethod
     def _sensitive_values_stored_insecurely_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
-        opengrep = loaded_outputs.get("opengrep")
-        results = opengrep.get("results") if isinstance(opengrep, dict) else None
-        if not isinstance(results, list):
-            return EvidenceEntry(False, "sensitive_values_stored_insecurely_not_assessed_binary_scan")
-
-        for result in results:
-            if not isinstance(result, dict) or result.get("check_id") != cls.SENSITIVE_VALUE_INSECURE_STORAGE_RULE_ID:
-                continue
-            extra = result.get("extra") or {}
-            evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
-            path = str(result.get("path", "")).strip()
-            return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
-
-        return EvidenceEntry(False, "no_sensitive_values_stored_insecurely_hits")
+        return cls._source_or_storage_triage_entry(
+            loaded_outputs,
+            rule_id=cls.SENSITIVE_VALUE_INSECURE_STORAGE_RULE_ID,
+            data_markers=cls.SENSITIVE_DATA_MARKERS,
+            storage_markers=cls.NON_USER_DEFAULTS_STORAGE_MARKERS,
+            no_hit_evidence="no_sensitive_values_stored_insecurely_hits",
+        )
 
     @classmethod
     def _wifi_ip_stored_insecurely_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        return cls._source_or_storage_triage_entry(
+            loaded_outputs,
+            rule_id=cls.WIFI_IP_INSECURE_STORAGE_RULE_ID,
+            data_markers=cls.WIFI_IP_MARKERS,
+            storage_markers=cls.INSECURE_STORAGE_MARKERS,
+            no_hit_evidence="no_wifi_ip_stored_insecurely_hits",
+        )
+
+    @classmethod
+    def _source_or_storage_triage_entry(
+        cls,
+        loaded_outputs: dict[str, Any],
+        *,
+        rule_id: str,
+        data_markers: tuple[str, ...],
+        storage_markers: tuple[str, ...],
+        no_hit_evidence: str,
+    ) -> EvidenceEntry:
         opengrep = loaded_outputs.get("opengrep")
         results = opengrep.get("results") if isinstance(opengrep, dict) else None
-        if not isinstance(results, list):
-            return EvidenceEntry(False, "wifi_ip_stored_insecurely_not_assessed_binary_scan")
+        if isinstance(results, list):
+            for result in results:
+                if not isinstance(result, dict) or result.get("check_id") != rule_id:
+                    continue
+                extra = result.get("extra") or {}
+                evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
+                path = str(result.get("path", "")).strip()
+                return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
 
-        for result in results:
-            if not isinstance(result, dict) or result.get("check_id") != cls.WIFI_IP_INSECURE_STORAGE_RULE_ID:
-                continue
-            extra = result.get("extra") or {}
-            evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
-            path = str(result.get("path", "")).strip()
-            return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
+            return EvidenceEntry(False, no_hit_evidence)
 
-        return EvidenceEntry(False, "no_wifi_ip_stored_insecurely_hits")
+        strings_outputs = loaded_outputs.get("strings_outputs") or {}
+        if isinstance(strings_outputs, dict):
+            for path, content in strings_outputs.items():
+                text = str(content or "")
+                lowered_text = text.lower()
+                data_marker = next(
+                    (
+                        marker
+                        for marker in sorted(data_markers, key=len, reverse=True)
+                        if marker.lower() in lowered_text
+                    ),
+                    "",
+                )
+                storage_marker = next((marker for marker in storage_markers if marker.lower() in lowered_text), "")
+                if data_marker and storage_marker:
+                    return EvidenceEntry(True, f"(Triage Signal) {path}: {data_marker}; {storage_marker}")
+
+        return EvidenceEntry(False, no_hit_evidence)
 
     @classmethod
     def _sensitive_data_stored_in_user_defaults_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:

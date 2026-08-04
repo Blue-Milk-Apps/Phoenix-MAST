@@ -107,11 +107,11 @@ IOS_DATA_EVIDENCE_KEY_BY_CHECK = {
     "local data exposure: advertiser id stored insecurely": "advertiser_id_stored_insecurely",
     "local data exposure: imei-labeled value stored insecurely": "imei_labeled_value_stored_insecurely",
     "local data exposure: global write permissions (source code only)": "global_write_permissions",
-    "local data exposure: location data stored insecurely (source code only)": "location_data_stored_insecurely",
-    "local data exposure: insecure hardcoded api keys (source code only)": "hardcoded_api_keys_stored_insecurely",
-    "local data exposure: insecure hardcoded passwords (source code only)": "hardcoded_passwords_stored_insecurely",  # pragma: allowlist secret
-    "local data exposure: sensitive values stored insecurely (source code only)": "sensitive_values_stored_insecurely",
-    "local data exposure: wifi ip address stored insecurely (source code only)": "wifi_ip_stored_insecurely",
+    "local data exposure: location data stored insecurely": "location_data_stored_insecurely",
+    "local data exposure: insecure hardcoded api keys": "hardcoded_api_keys_stored_insecurely",
+    "local data exposure: insecure hardcoded passwords": "hardcoded_passwords_stored_insecurely",  # pragma: allowlist secret
+    "local data exposure: sensitive values stored insecurely": "sensitive_values_stored_insecurely",
+    "local data exposure: wifi ip address stored insecurely": "wifi_ip_stored_insecurely",
     "keychain items accessible after first unlock": "keychain_items_accessible_after_first_unlock",
     "sensitive data stored in user defaults": "sensitive_data_stored_in_user_defaults",
     "local data exposure: advertiser id logged insecurely": "advertiser_id_logged_insecurely",
@@ -1076,39 +1076,39 @@ IOS_DATA_CHECK_SPECS = (
         "aliases": (),
     },
     {
-        "check": "Local Data Exposure: Insecure Hardcoded API Keys (Source Code Only)",
+        "check": "Local Data Exposure: Insecure Hardcoded API Keys",
         "severity": "High",
         "compliance": "MASVS-STORAGE-1, MASVS-CRYPTO-2; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
         "present_explanation": "A hardcoded API key was found persisted to unprotected on-device storage.",
         "not_present_explanation": "No hardcoded API key was found persisted to unprotected on-device storage.",
-        "confidence_caveat": "Approximated via storage-API symbol presence near PII-keyword strings, not confirmed data flow.",
+        "confidence_caveat": "Source findings identify data reaching storage; IPA-only findings are triage signals based on co-occurring symbols and strings and require source or runtime confirmation.",
         "aliases": (),
     },
     {
-        "check": "Local Data Exposure: Insecure Hardcoded Passwords (Source Code Only)",
+        "check": "Local Data Exposure: Insecure Hardcoded Passwords",
         "severity": "High",
         "compliance": "MASVS-STORAGE-1; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
         "present_explanation": "A hardcoded password was found persisted to unprotected on-device storage.",
         "not_present_explanation": "No hardcoded password was found persisted to unprotected on-device storage.",
-        "confidence_caveat": "Approximated via storage-API symbol presence near PII-keyword strings, not confirmed data flow.",
+        "confidence_caveat": "Source findings identify data reaching storage; IPA-only findings are triage signals based on co-occurring symbols and strings and require source or runtime confirmation.",
         "aliases": (),
     },
     {
-        "check": "Local Data Exposure: Sensitive Values Stored Insecurely (Source Code Only)",
+        "check": "Local Data Exposure: Sensitive Values Stored Insecurely",
         "severity": "High",
         "compliance": "MASVS-STORAGE-1; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
         "present_explanation": "Another sensitive value was found persisted to unprotected on-device storage.",
         "not_present_explanation": "No other sensitive value was found persisted to unprotected on-device storage.",
-        "confidence_caveat": "Approximated via storage-API symbol presence near PII-keyword strings, not confirmed data flow.",
+        "confidence_caveat": "Source findings identify data reaching storage; IPA-only findings are triage signals based on co-occurring symbols and strings and require source or runtime confirmation.",
         "aliases": (),
     },
     {
-        "check": "Local Data Exposure: WiFi IP Address Stored Insecurely (Source Code Only)",
+        "check": "Local Data Exposure: WiFi IP Address Stored Insecurely",
         "severity": "High",
         "compliance": "MASVS-STORAGE-1; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
         "present_explanation": "WiFi IP address is written to an unprotected on-device storage location.",
         "not_present_explanation": "WiFi IP address is not written to an unprotected on-device storage location.",
-        "confidence_caveat": "Source-code-only OpenGrep data-flow analysis; IPA-only scans are not assessed for this check.",
+        "confidence_caveat": "Source findings identify data reaching storage; IPA-only findings are triage signals based on co-occurring symbols and strings and require source or runtime confirmation.",
         "aliases": (),
     },
     {
@@ -1264,9 +1264,13 @@ IOS_DATA_CHECK_SPECS = tuple(
         ),
         **(
             {
-                "check": "Local Data Exposure: Location Data Stored Insecurely (Source Code Only)",
+                "check": "Local Data Exposure: Location Data Stored Insecurely",
                 "present_explanation": "Location data is written to an unprotected on-device storage location.",
                 "not_present_explanation": "Location data is not written to an unprotected on-device storage location.",
+                "confidence_caveat": (
+                    "Source findings identify data reaching storage; IPA-only findings are triage signals based on "
+                    "co-occurring symbols and strings and require source or runtime confirmation."
+                ),
             }
             if spec["check"] == "Local Data Exposure: GPS Latitude Stored Insecurely"
             else {}
