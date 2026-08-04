@@ -106,11 +106,11 @@ IOS_DATA_EVIDENCE_KEY_BY_CHECK = {
     "application utilizes deprecated keychain attributes": "deprecated_keychain_attributes",
     "local data exposure: advertiser id stored insecurely": "advertiser_id_stored_insecurely",
     "local data exposure: imei-labeled value stored insecurely": "imei_labeled_value_stored_insecurely",
-    "local data exposure: global write permissions": "global_write_permissions",
-    "local data exposure: location data stored insecurely": "location_data_stored_insecurely",
-    "local data exposure: insecure hardcoded api keys": "hardcoded_api_keys_stored_insecurely",
-    "local data exposure: insecure hardcoded passwords": "hardcoded_passwords_stored_insecurely",  # pragma: allowlist secret
-    "local data exposure: sensitive values stored insecurely": "sensitive_values_stored_insecurely",
+    "local data exposure: global write permissions (source code only)": "global_write_permissions",
+    "local data exposure: location data stored insecurely (source code only)": "location_data_stored_insecurely",
+    "local data exposure: insecure hardcoded api keys (source code only)": "hardcoded_api_keys_stored_insecurely",
+    "local data exposure: insecure hardcoded passwords (source code only)": "hardcoded_passwords_stored_insecurely",  # pragma: allowlist secret
+    "local data exposure: sensitive values stored insecurely (source code only)": "sensitive_values_stored_insecurely",
     "local data exposure: wifi ip address stored insecurely (source code only)": "wifi_ip_stored_insecurely",
     "keychain accessibility requires review": "keychain_accessibility_requires_review",
     "sensitive values stored insecurely within nsuserdefaults": "nsuserdefaults_sensitive_values",
@@ -1049,7 +1049,7 @@ IOS_DATA_CHECK_SPECS = (
         "aliases": (),
     },
     {
-        "check": "Local Data Exposure: Global Write Permissions",
+        "check": "Local Data Exposure: Global Write Permissions (Source Code Only)",
         "severity": "High",
         "compliance": "MASVS-STORAGE-1, MASVS-PLATFORM-1; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
         "present_explanation": "An app-created file has world-writable permissions.",
@@ -1076,7 +1076,7 @@ IOS_DATA_CHECK_SPECS = (
         "aliases": (),
     },
     {
-        "check": "Local Data Exposure: Insecure Hardcoded API Keys",
+        "check": "Local Data Exposure: Insecure Hardcoded API Keys (Source Code Only)",
         "severity": "High",
         "compliance": "MASVS-STORAGE-1, MASVS-CRYPTO-2; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
         "present_explanation": "A hardcoded API key was found persisted to unprotected on-device storage.",
@@ -1085,7 +1085,7 @@ IOS_DATA_CHECK_SPECS = (
         "aliases": (),
     },
     {
-        "check": "Local Data Exposure: Insecure Hardcoded Passwords",
+        "check": "Local Data Exposure: Insecure Hardcoded Passwords (Source Code Only)",
         "severity": "High",
         "compliance": "MASVS-STORAGE-1; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
         "present_explanation": "A hardcoded password was found persisted to unprotected on-device storage.",
@@ -1094,7 +1094,7 @@ IOS_DATA_CHECK_SPECS = (
         "aliases": (),
     },
     {
-        "check": "Local Data Exposure: Sensitive Values Stored Insecurely",
+        "check": "Local Data Exposure: Sensitive Values Stored Insecurely (Source Code Only)",
         "severity": "High",
         "compliance": "MASVS-STORAGE-1; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
         "present_explanation": "Another sensitive value was found persisted to unprotected on-device storage.",
@@ -1260,7 +1260,7 @@ IOS_DATA_CHECK_SPECS = tuple(
         ),
         **(
             {
-                "check": "Local Data Exposure: Location Data Stored Insecurely",
+                "check": "Local Data Exposure: Location Data Stored Insecurely (Source Code Only)",
                 "present_explanation": "Location data is written to an unprotected on-device storage location.",
                 "not_present_explanation": "Location data is not written to an unprotected on-device storage location.",
             }
