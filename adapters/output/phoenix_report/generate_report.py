@@ -111,7 +111,7 @@ IOS_DATA_EVIDENCE_KEY_BY_CHECK = {
     "local data exposure: insecure hardcoded api keys": "hardcoded_api_keys_stored_insecurely",
     "local data exposure: insecure hardcoded passwords": "hardcoded_passwords_stored_insecurely",  # pragma: allowlist secret
     "local data exposure: sensitive values stored insecurely": "sensitive_values_stored_insecurely",
-    "local data exposure: wifi ip address stored insecurely": "wifi_ip_stored_insecurely",
+    "local data exposure: wifi ip address stored insecurely (source code only)": "wifi_ip_stored_insecurely",
     "keychain accessibility requires review": "keychain_accessibility_requires_review",
     "sensitive values stored insecurely within nsuserdefaults": "nsuserdefaults_sensitive_values",
     "local data exposure: advertiser id logged insecurely": "advertiser_id_logged_insecurely",
@@ -1103,12 +1103,12 @@ IOS_DATA_CHECK_SPECS = (
         "aliases": (),
     },
     {
-        "check": "Local Data Exposure: WiFi IP Address Stored Insecurely",
+        "check": "Local Data Exposure: WiFi IP Address Stored Insecurely (Source Code Only)",
         "severity": "High",
         "compliance": "MASVS-STORAGE-1; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
         "present_explanation": "WiFi IP address is written to an unprotected on-device storage location.",
         "not_present_explanation": "WiFi IP address is not written to an unprotected on-device storage location.",
-        "confidence_caveat": "Approximated via storage-API symbol presence near PII-keyword strings, not confirmed data flow.",
+        "confidence_caveat": "Source-code-only OpenGrep data-flow analysis; IPA-only scans are not assessed for this check.",
         "aliases": (),
     },
     {

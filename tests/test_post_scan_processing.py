@@ -1804,6 +1804,36 @@ def test_ios_storage_evidence_sensitive_values_requires_source_finding() -> None
     )
 
 
+def test_ios_storage_evidence_wifi_ip_requires_source_finding() -> None:
+    detected = IOSStorageEvidence(
+        {
+            "opengrep": {
+                "results": [
+                    {
+                        "check_id": "ios.storage.wifi-ip-insecure-storage",
+                        "path": "Sources/NetworkInfo.swift",
+                        "extra": {
+                            "lines": 'UserDefaults.standard.set(wifiIPAddress, forKey: "network_ip")',
+                        },
+                    }
+                ]
+            }
+        }
+    )
+    assert detected.wifi_ip_stored_insecurely.present is True
+    assert detected.wifi_ip_stored_insecurely.evidence == (
+        'Sources/NetworkInfo.swift: UserDefaults.standard.set(wifiIPAddress, forKey: "network_ip")'
+    )
+
+    no_hit = IOSStorageEvidence({"opengrep": {"results": []}})
+    assert no_hit.wifi_ip_stored_insecurely.present is False
+    assert no_hit.wifi_ip_stored_insecurely.evidence == "no_wifi_ip_stored_insecurely_hits"
+
+    binary_only = IOSStorageEvidence({"strings_outputs": {"App.txt": "wifiIPAddress\nUserDefaults"}})
+    assert binary_only.wifi_ip_stored_insecurely.present is False
+    assert binary_only.wifi_ip_stored_insecurely.evidence == "wifi_ip_stored_insecurely_not_assessed_binary_scan"
+
+
 def test_ios_code_evidence_uses_imports_and_opengrep_heuristics() -> None:
     loaded_outputs = {
         "lief_outputs": {
