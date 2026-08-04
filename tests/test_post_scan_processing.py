@@ -1911,6 +1911,92 @@ def test_ios_storage_evidence_sensitive_data_stored_in_user_defaults() -> None:
     )
 
 
+def test_ios_storage_evidence_advertiser_id_logged_insecurely() -> None:
+    source_detected = IOSStorageEvidence(
+        {
+            "opengrep": {
+                "results": [
+                    {
+                        "check_id": "ios.storage.advertiser-id-logged-insecurely",
+                        "path": "Sources/Analytics.swift",
+                        "extra": {"lines": "print(advertisingIdentifier)"},
+                    }
+                ]
+            }
+        }
+    )
+    assert source_detected.advertiser_id_logged_insecurely.present is True
+    assert (
+        source_detected.advertiser_id_logged_insecurely.evidence
+        == "Sources/Analytics.swift: print(advertisingIdentifier)"
+    )
+
+    binary_triage = IOSStorageEvidence({"strings_outputs": {"App.txt": "NSLog\nadvertisingIdentifier"}})
+    assert binary_triage.advertiser_id_logged_insecurely.present is True
+    assert (
+        binary_triage.advertiser_id_logged_insecurely.evidence
+        == "(Triage Signal) App.txt: nslog; advertisingIdentifier"
+    )
+
+    no_hit = IOSStorageEvidence({"strings_outputs": {"App.txt": "NSLog\nsettings"}})
+    assert no_hit.advertiser_id_logged_insecurely.present is False
+    assert no_hit.advertiser_id_logged_insecurely.evidence == "no_advertiser_id_logged_insecurely_hits"
+
+
+def test_ios_storage_evidence_imei_logged_insecurely() -> None:
+    source_detected = IOSStorageEvidence(
+        {
+            "opengrep": {
+                "results": [
+                    {
+                        "check_id": "ios.storage.imei-logged-insecurely",
+                        "path": "Sources/Diagnostics.swift",
+                        "extra": {"lines": "debugPrint(deviceImei)"},
+                    }
+                ]
+            }
+        }
+    )
+    assert source_detected.imei_logged_insecurely.present is True
+    assert source_detected.imei_logged_insecurely.evidence == "Sources/Diagnostics.swift: debugPrint(deviceImei)"
+
+    binary_triage = IOSStorageEvidence({"strings_outputs": {"App.txt": "os_log\ndeviceImei"}})
+    assert binary_triage.imei_logged_insecurely.present is True
+    assert binary_triage.imei_logged_insecurely.evidence == "(Triage Signal) App.txt: os_log; deviceImei"
+
+    no_hit = IOSStorageEvidence({"strings_outputs": {"App.txt": "os_log\ndeviceIdentifier"}})
+    assert no_hit.imei_logged_insecurely.present is False
+    assert no_hit.imei_logged_insecurely.evidence == "no_imei_logged_insecurely_hits"
+
+
+def test_ios_storage_evidence_location_data_logged_insecurely() -> None:
+    source_detected = IOSStorageEvidence(
+        {
+            "opengrep": {
+                "results": [
+                    {
+                        "check_id": "ios.storage.location-data-logged-insecurely",
+                        "path": "Sources/Location.swift",
+                        "extra": {"lines": "print(location.coordinate)"},
+                    }
+                ]
+            }
+        }
+    )
+    assert source_detected.location_data_logged_insecurely.present is True
+    assert (
+        source_detected.location_data_logged_insecurely.evidence == "Sources/Location.swift: print(location.coordinate)"
+    )
+
+    binary_triage = IOSStorageEvidence({"strings_outputs": {"App.txt": "Logger\nlatitude"}})
+    assert binary_triage.location_data_logged_insecurely.present is True
+    assert binary_triage.location_data_logged_insecurely.evidence == "(Triage Signal) App.txt: logger; latitude"
+
+    no_hit = IOSStorageEvidence({"strings_outputs": {"App.txt": "Logger\nsettings"}})
+    assert no_hit.location_data_logged_insecurely.present is False
+    assert no_hit.location_data_logged_insecurely.evidence == "no_location_data_logged_insecurely_hits"
+
+
 def test_ios_code_evidence_uses_imports_and_opengrep_heuristics() -> None:
     loaded_outputs = {
         "lief_outputs": {

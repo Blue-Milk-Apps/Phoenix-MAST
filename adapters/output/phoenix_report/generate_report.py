@@ -1152,7 +1152,8 @@ IOS_DATA_CHECK_SPECS = (
         ),
         "not_present_explanation": "Advertiser ID is not written to the device console/log.",
         "confidence_caveat": (
-            "Detected via logging-API symbol presence near PII-keyword strings, not a confirmed log-output capture."
+            "Source findings identify a value reaching a logging call; IPA-only findings are triage signals based on "
+            "co-occurring symbols and strings and require source or runtime confirmation."
         ),
         "aliases": (),
     },
@@ -1163,7 +1164,8 @@ IOS_DATA_CHECK_SPECS = (
         "present_explanation": "Device IMEI is written to the device console/log.",
         "not_present_explanation": "Device IMEI is not written to the device console/log.",
         "confidence_caveat": (
-            "Detected via logging-API symbol presence near PII-keyword strings, not a confirmed log-output capture."
+            "Source findings identify a value reaching a logging call; IPA-only findings are triage signals based on "
+            "co-occurring symbols and strings and require source or runtime confirmation."
         ),
         "aliases": (),
     },
@@ -1283,6 +1285,10 @@ IOS_DATA_CHECK_SPECS = tuple(
                 "check": "Local Data Exposure: Location Data Logged Insecurely",
                 "present_explanation": "Location data is written to the device console/log.",
                 "not_present_explanation": "Location data is not written to the device console/log.",
+                "confidence_caveat": (
+                    "Source findings identify a value reaching a logging call; IPA-only findings are triage signals based "
+                    "on co-occurring symbols and strings and require source or runtime confirmation."
+                ),
             }
             if spec["check"] == "Local Data Exposure: GPS Latitude Logged Insecurely"
             else {}

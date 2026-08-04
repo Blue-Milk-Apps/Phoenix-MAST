@@ -50,6 +50,9 @@ class IOSStorageEvidence:
     SENSITIVE_VALUE_INSECURE_STORAGE_RULE_ID = "ios.storage.sensitive-value-insecure-storage"
     SENSITIVE_DATA_IN_USER_DEFAULTS_RULE_ID = "ios.storage.sensitive-data-in-user-defaults"
     WIFI_IP_INSECURE_STORAGE_RULE_ID = "ios.storage.wifi-ip-insecure-storage"
+    ADVERTISER_ID_LOGGING_RULE_ID = "ios.storage.advertiser-id-logged-insecurely"
+    IMEI_LOGGING_RULE_ID = "ios.storage.imei-logged-insecurely"
+    LOCATION_DATA_LOGGING_RULE_ID = "ios.storage.location-data-logged-insecurely"
     ADVERTISER_ID_MARKERS = (
         "ASIdentifierManager",
         "advertisingIdentifier",
@@ -78,6 +81,8 @@ class IOSStorageEvidence:
         "phone",
         "ssn",
     )
+    LOGGING_MARKERS = ("nslog", "os_log", "logger", "debugprint", "print")
+    LOCATION_DATA_MARKERS = ("cllocation", "coordinate", "latitude", "longitude")
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
         self.deprecated_keychain_attributes = self._deprecated_keychain_attributes_entry(loaded_outputs)
@@ -93,9 +98,24 @@ class IOSStorageEvidence:
             loaded_outputs
         )
         self.sensitive_data_stored_in_user_defaults = self._sensitive_data_stored_in_user_defaults_entry(loaded_outputs)
-        self.advertiser_id_logged_insecurely = EvidenceEntry(False, "no_advertiser_id_logged_insecurely_hits")
-        self.imei_logged_insecurely = EvidenceEntry(False, "no_imei_logged_insecurely_hits")
-        self.location_data_logged_insecurely = EvidenceEntry(False, "no_location_data_logged_insecurely_hits")
+        self.advertiser_id_logged_insecurely = self._logged_insecurely_entry(
+            loaded_outputs,
+            rule_id=self.ADVERTISER_ID_LOGGING_RULE_ID,
+            data_markers=self.ADVERTISER_ID_MARKERS,
+            no_hit_evidence="no_advertiser_id_logged_insecurely_hits",
+        )
+        self.imei_logged_insecurely = self._logged_insecurely_entry(
+            loaded_outputs,
+            rule_id=self.IMEI_LOGGING_RULE_ID,
+            data_markers=self.IMEI_MARKERS,
+            no_hit_evidence="no_imei_logged_insecurely_hits",
+        )
+        self.location_data_logged_insecurely = self._logged_insecurely_entry(
+            loaded_outputs,
+            rule_id=self.LOCATION_DATA_LOGGING_RULE_ID,
+            data_markers=self.LOCATION_DATA_MARKERS,
+            no_hit_evidence="no_location_data_logged_insecurely_hits",
+        )
         self.sensitive_data_logged_insecurely = EvidenceEntry(False, "no_sensitive_data_logged_insecurely_hits")
         self.wifi_mac_logged_insecurely = EvidenceEntry(False, "no_wifi_mac_logged_insecurely_hits")
         self.keyboard_cache_exposure = EvidenceEntry(False, "no_keyboard_cache_exposure_hits")
@@ -331,3 +351,44 @@ class IOSStorageEvidence:
                     return EvidenceEntry(True, f"(Triage Signal) {path}: {user_defaults_marker}; {sensitive_marker}")
 
         return EvidenceEntry(False, "no_sensitive_data_stored_in_user_defaults_hits")
+
+    @classmethod
+    def _logged_insecurely_entry(
+        cls,
+        loaded_outputs: dict[str, Any],
+        *,
+        rule_id: str,
+        data_markers: tuple[str, ...],
+        no_hit_evidence: str,
+    ) -> EvidenceEntry:
+        opengrep = loaded_outputs.get("opengrep")
+        results = opengrep.get("results") if isinstance(opengrep, dict) else None
+        if isinstance(results, list):
+            for result in results:
+                if not isinstance(result, dict) or result.get("check_id") != rule_id:
+                    continue
+                extra = result.get("extra") or {}
+                evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
+                path = str(result.get("path", "")).strip()
+                return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
+
+            return EvidenceEntry(False, no_hit_evidence)
+
+        strings_outputs = loaded_outputs.get("strings_outputs") or {}
+        if isinstance(strings_outputs, dict):
+            for path, content in strings_outputs.items():
+                text = str(content or "")
+                lowered_text = text.lower()
+                logging_marker = next((marker for marker in cls.LOGGING_MARKERS if marker in lowered_text), "")
+                data_marker = next(
+                    (
+                        marker
+                        for marker in sorted(data_markers, key=len, reverse=True)
+                        if marker.lower() in lowered_text
+                    ),
+                    "",
+                )
+                if logging_marker and data_marker:
+                    return EvidenceEntry(True, f"(Triage Signal) {path}: {logging_marker}; {data_marker}")
+
+        return EvidenceEntry(False, no_hit_evidence)
