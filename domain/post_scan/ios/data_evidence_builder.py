@@ -23,7 +23,7 @@ class IOSStorageEvidence:
     sensitive_values_stored_insecurely: EvidenceEntry
     wifi_ip_stored_insecurely: EvidenceEntry
     keychain_items_accessible_after_first_unlock: EvidenceEntry
-    nsuserdefaults_sensitive_values: EvidenceEntry
+    sensitive_data_stored_in_user_defaults: EvidenceEntry
     advertiser_id_logged_insecurely: EvidenceEntry
     imei_logged_insecurely: EvidenceEntry
     location_data_logged_insecurely: EvidenceEntry
@@ -48,6 +48,7 @@ class IOSStorageEvidence:
     HARDCODED_API_KEY_INSECURE_STORAGE_RULE_ID = "ios.storage.hardcoded-api-key-insecure-storage"
     HARDCODED_PASSWORD_INSECURE_STORAGE_RULE_ID = "ios.storage.hardcoded-password-insecure-storage"
     SENSITIVE_VALUE_INSECURE_STORAGE_RULE_ID = "ios.storage.sensitive-value-insecure-storage"
+    SENSITIVE_DATA_IN_USER_DEFAULTS_RULE_ID = "ios.storage.sensitive-data-in-user-defaults"
     WIFI_IP_INSECURE_STORAGE_RULE_ID = "ios.storage.wifi-ip-insecure-storage"
     ADVERTISER_ID_MARKERS = (
         "ASIdentifierManager",
@@ -62,6 +63,21 @@ class IOSStorageEvidence:
         "NSKeyedArchiver",
     )
     IMEI_MARKERS = ("imei", "deviceImei", "device_imei")
+    USER_DEFAULTS_MARKERS = ("UserDefaults", "NSUserDefaults", "setObject:forKey:")
+    SENSITIVE_DATA_MARKERS = (
+        "access_token",
+        "auth_token",
+        "api_key",
+        "account_number",
+        "credit_card",
+        "password",
+        "passwd",
+        "token",
+        "session",
+        "email",
+        "phone",
+        "ssn",
+    )
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
         self.deprecated_keychain_attributes = self._deprecated_keychain_attributes_entry(loaded_outputs)
@@ -76,7 +92,7 @@ class IOSStorageEvidence:
         self.keychain_items_accessible_after_first_unlock = self._keychain_items_accessible_after_first_unlock_entry(
             loaded_outputs
         )
-        self.nsuserdefaults_sensitive_values = EvidenceEntry(False, "no_nsuserdefaults_sensitive_values_hits")
+        self.sensitive_data_stored_in_user_defaults = self._sensitive_data_stored_in_user_defaults_entry(loaded_outputs)
         self.advertiser_id_logged_insecurely = EvidenceEntry(False, "no_advertiser_id_logged_insecurely_hits")
         self.imei_logged_insecurely = EvidenceEntry(False, "no_imei_logged_insecurely_hits")
         self.location_data_logged_insecurely = EvidenceEntry(False, "no_location_data_logged_insecurely_hits")
@@ -285,3 +301,33 @@ class IOSStorageEvidence:
             return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
 
         return EvidenceEntry(False, "no_wifi_ip_stored_insecurely_hits")
+
+    @classmethod
+    def _sensitive_data_stored_in_user_defaults_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        opengrep = loaded_outputs.get("opengrep")
+        results = opengrep.get("results") if isinstance(opengrep, dict) else None
+        if isinstance(results, list):
+            for result in results:
+                if (
+                    not isinstance(result, dict)
+                    or result.get("check_id") != cls.SENSITIVE_DATA_IN_USER_DEFAULTS_RULE_ID
+                ):
+                    continue
+                extra = result.get("extra") or {}
+                evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
+                path = str(result.get("path", "")).strip()
+                return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
+
+            return EvidenceEntry(False, "no_sensitive_data_stored_in_user_defaults_hits")
+
+        strings_outputs = loaded_outputs.get("strings_outputs") or {}
+        if isinstance(strings_outputs, dict):
+            for path, content in strings_outputs.items():
+                text = str(content or "")
+                lowered_text = text.lower()
+                user_defaults_marker = next((marker for marker in cls.USER_DEFAULTS_MARKERS if marker in text), "")
+                sensitive_marker = next((marker for marker in cls.SENSITIVE_DATA_MARKERS if marker in lowered_text), "")
+                if user_defaults_marker and sensitive_marker:
+                    return EvidenceEntry(True, f"(Triage Signal) {path}: {user_defaults_marker}; {sensitive_marker}")
+
+        return EvidenceEntry(False, "no_sensitive_data_stored_in_user_defaults_hits")

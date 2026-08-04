@@ -784,7 +784,7 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
         "sensitive_values_stored_insecurely",
         "wifi_ip_stored_insecurely",
         "keychain_items_accessible_after_first_unlock",
-        "nsuserdefaults_sensitive_values",
+        "sensitive_data_stored_in_user_defaults",
         "advertiser_id_logged_insecurely",
         "imei_logged_insecurely",
         "location_data_logged_insecurely",
@@ -1866,6 +1866,48 @@ def test_ios_storage_evidence_keychain_items_accessible_after_first_unlock() -> 
     assert (
         no_hit.keychain_items_accessible_after_first_unlock.evidence
         == "no_keychain_items_accessible_after_first_unlock_hits"
+    )
+
+
+def test_ios_storage_evidence_sensitive_data_stored_in_user_defaults() -> None:
+    source_detected = IOSStorageEvidence(
+        {
+            "opengrep": {
+                "results": [
+                    {
+                        "check_id": "ios.storage.sensitive-data-in-user-defaults",
+                        "path": "Sources/Session.swift",
+                        "extra": {
+                            "lines": 'UserDefaults.standard.set(accessToken, forKey: "session")',
+                        },
+                    }
+                ]
+            }
+        }
+    )
+    assert source_detected.sensitive_data_stored_in_user_defaults.present is True
+    assert source_detected.sensitive_data_stored_in_user_defaults.evidence == (
+        'Sources/Session.swift: UserDefaults.standard.set(accessToken, forKey: "session")'
+    )
+
+    source_no_hit = IOSStorageEvidence({"opengrep": {"results": []}})
+    assert source_no_hit.sensitive_data_stored_in_user_defaults.present is False
+    assert (
+        source_no_hit.sensitive_data_stored_in_user_defaults.evidence
+        == "no_sensitive_data_stored_in_user_defaults_hits"
+    )
+
+    binary_triage = IOSStorageEvidence({"strings_outputs": {"App.txt": "UserDefaults\naccessToken"}})
+    assert binary_triage.sensitive_data_stored_in_user_defaults.present is True
+    assert (
+        binary_triage.sensitive_data_stored_in_user_defaults.evidence == "(Triage Signal) App.txt: UserDefaults; token"
+    )
+
+    binary_no_hit = IOSStorageEvidence({"strings_outputs": {"App.txt": "UserDefaults\nsettings"}})
+    assert binary_no_hit.sensitive_data_stored_in_user_defaults.present is False
+    assert (
+        binary_no_hit.sensitive_data_stored_in_user_defaults.evidence
+        == "no_sensitive_data_stored_in_user_defaults_hits"
     )
 
 

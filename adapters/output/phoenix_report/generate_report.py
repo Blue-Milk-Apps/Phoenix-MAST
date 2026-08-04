@@ -113,7 +113,7 @@ IOS_DATA_EVIDENCE_KEY_BY_CHECK = {
     "local data exposure: sensitive values stored insecurely (source code only)": "sensitive_values_stored_insecurely",
     "local data exposure: wifi ip address stored insecurely (source code only)": "wifi_ip_stored_insecurely",
     "keychain items accessible after first unlock": "keychain_items_accessible_after_first_unlock",
-    "sensitive values stored insecurely within nsuserdefaults": "nsuserdefaults_sensitive_values",
+    "sensitive data stored in user defaults": "sensitive_data_stored_in_user_defaults",
     "local data exposure: advertiser id logged insecurely": "advertiser_id_logged_insecurely",
     "local data exposure: device imei logged insecurely": "imei_logged_insecurely",
     "local data exposure: location data logged insecurely": "location_data_logged_insecurely",
@@ -1130,16 +1130,16 @@ IOS_DATA_CHECK_SPECS = (
         "aliases": (),
     },
     {
-        "check": "Sensitive Values Stored Insecurely Within NSUserDefaults",
+        "check": "Sensitive Data Stored in User Defaults",
         "severity": "High",
         "compliance": "MASVS-STORAGE-1; MASTG-TEST-0300-0302; MASTG-KNOW-0093; legacy MSTG-STORAGE-1",
-        "present_explanation": "A sensitive-looking key/value pair was found in the app's NSUserDefaults (UserDefaults) plist.",
+        "present_explanation": "Sensitive data was found written to the app's local User Defaults preferences storage.",
         "not_present_explanation": (
-            "No sensitive-looking key/value pair was found in the app's NSUserDefaults (UserDefaults) plist."
+            "No sensitive data was found written to the app's local User Defaults preferences storage."
         ),
         "confidence_caveat": (
-            "Reliable where the actual preferences plist is extracted and inspected directly; otherwise "
-            "approximated via API-usage pattern."
+            "Source findings identify a User Defaults write; IPA-only findings are triage signals based on "
+            "co-occurring symbols and strings and require source or runtime confirmation."
         ),
         "aliases": (),
     },
