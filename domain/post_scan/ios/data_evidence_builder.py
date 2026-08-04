@@ -22,7 +22,7 @@ class IOSStorageEvidence:
     hardcoded_passwords_stored_insecurely: EvidenceEntry
     sensitive_values_stored_insecurely: EvidenceEntry
     wifi_ip_stored_insecurely: EvidenceEntry
-    keychain_accessibility_requires_review: EvidenceEntry
+    keychain_items_accessible_after_first_unlock: EvidenceEntry
     nsuserdefaults_sensitive_values: EvidenceEntry
     advertiser_id_logged_insecurely: EvidenceEntry
     imei_logged_insecurely: EvidenceEntry
@@ -35,7 +35,12 @@ class IOSStorageEvidence:
         "kSecAttrAccessibleAlwaysThisDeviceOnly",
         "kSecAttrAccessibleAlways",
     )
+    KEYCHAIN_ACCESSIBILITY_REVIEW_ATTRIBUTES = (
+        "kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly",
+        "kSecAttrAccessibleAfterFirstUnlock",
+    )
     DEPRECATED_KEYCHAIN_ATTRIBUTES_RULE_ID = "ios.storage.deprecated-keychain-accessibility"
+    KEYCHAIN_ITEMS_ACCESSIBLE_AFTER_FIRST_UNLOCK_RULE_ID = "ios.storage.keychain-items-accessible-after-first-unlock"
     ADVERTISER_ID_INSECURE_STORAGE_RULE_ID = "ios.storage.advertiser-id-insecure-storage"
     IMEI_LABELED_VALUE_INSECURE_STORAGE_RULE_ID = "ios.storage.imei-labeled-value-insecure-storage"
     GLOBAL_WRITE_PERMISSIONS_RULE_ID = "ios.storage.global-write-permissions"
@@ -68,8 +73,8 @@ class IOSStorageEvidence:
         self.hardcoded_passwords_stored_insecurely = self._hardcoded_passwords_stored_insecurely_entry(loaded_outputs)
         self.sensitive_values_stored_insecurely = self._sensitive_values_stored_insecurely_entry(loaded_outputs)
         self.wifi_ip_stored_insecurely = self._wifi_ip_stored_insecurely_entry(loaded_outputs)
-        self.keychain_accessibility_requires_review = EvidenceEntry(
-            False, "no_keychain_accessibility_requires_review_hits"
+        self.keychain_items_accessible_after_first_unlock = self._keychain_items_accessible_after_first_unlock_entry(
+            loaded_outputs
         )
         self.nsuserdefaults_sensitive_values = EvidenceEntry(False, "no_nsuserdefaults_sensitive_values_hits")
         self.advertiser_id_logged_insecurely = EvidenceEntry(False, "no_advertiser_id_logged_insecurely_hits")
@@ -98,6 +103,29 @@ class IOSStorageEvidence:
                         return EvidenceEntry(True, f"{path}: {attribute}")
 
         return EvidenceEntry(False, "no_deprecated_keychain_attributes_hits")
+
+    @classmethod
+    def _keychain_items_accessible_after_first_unlock_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        for result in (loaded_outputs.get("opengrep") or {}).get("results") or []:
+            if (
+                not isinstance(result, dict)
+                or result.get("check_id") != cls.KEYCHAIN_ITEMS_ACCESSIBLE_AFTER_FIRST_UNLOCK_RULE_ID
+            ):
+                continue
+            extra = result.get("extra") or {}
+            evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
+            path = str(result.get("path", "")).strip()
+            return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
+
+        strings_outputs = loaded_outputs.get("strings_outputs") or {}
+        if isinstance(strings_outputs, dict):
+            for path, content in strings_outputs.items():
+                text = str(content or "")
+                for attribute in cls.KEYCHAIN_ACCESSIBILITY_REVIEW_ATTRIBUTES:
+                    if attribute in text:
+                        return EvidenceEntry(True, f"{path}: {attribute}")
+
+        return EvidenceEntry(False, "no_keychain_items_accessible_after_first_unlock_hits")
 
     @classmethod
     def _advertiser_id_stored_insecurely_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:

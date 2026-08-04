@@ -783,7 +783,7 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
         "hardcoded_passwords_stored_insecurely",
         "sensitive_values_stored_insecurely",
         "wifi_ip_stored_insecurely",
-        "keychain_accessibility_requires_review",
+        "keychain_items_accessible_after_first_unlock",
         "nsuserdefaults_sensitive_values",
         "advertiser_id_logged_insecurely",
         "imei_logged_insecurely",
@@ -1832,6 +1832,41 @@ def test_ios_storage_evidence_wifi_ip_requires_source_finding() -> None:
     binary_only = IOSStorageEvidence({"strings_outputs": {"App.txt": "wifiIPAddress\nUserDefaults"}})
     assert binary_only.wifi_ip_stored_insecurely.present is False
     assert binary_only.wifi_ip_stored_insecurely.evidence == "wifi_ip_stored_insecurely_not_assessed_binary_scan"
+
+
+def test_ios_storage_evidence_keychain_items_accessible_after_first_unlock() -> None:
+    source_detected = IOSStorageEvidence(
+        {
+            "opengrep": {
+                "results": [
+                    {
+                        "check_id": "ios.storage.keychain-items-accessible-after-first-unlock",
+                        "path": "Sources/Credentials.swift",
+                        "extra": {
+                            "lines": "kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly",
+                        },
+                    }
+                ]
+            }
+        }
+    )
+    assert source_detected.keychain_items_accessible_after_first_unlock.present is True
+    assert source_detected.keychain_items_accessible_after_first_unlock.evidence == (
+        "Sources/Credentials.swift: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly"
+    )
+
+    binary_detected = IOSStorageEvidence({"strings_outputs": {"App.txt": "kSecAttrAccessibleAfterFirstUnlock"}})
+    assert binary_detected.keychain_items_accessible_after_first_unlock.present is True
+    assert binary_detected.keychain_items_accessible_after_first_unlock.evidence == (
+        "App.txt: kSecAttrAccessibleAfterFirstUnlock"
+    )
+
+    no_hit = IOSStorageEvidence({"opengrep": {"results": []}, "strings_outputs": {"App.txt": ""}})
+    assert no_hit.keychain_items_accessible_after_first_unlock.present is False
+    assert (
+        no_hit.keychain_items_accessible_after_first_unlock.evidence
+        == "no_keychain_items_accessible_after_first_unlock_hits"
+    )
 
 
 def test_ios_code_evidence_uses_imports_and_opengrep_heuristics() -> None:

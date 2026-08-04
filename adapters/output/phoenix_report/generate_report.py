@@ -112,7 +112,7 @@ IOS_DATA_EVIDENCE_KEY_BY_CHECK = {
     "local data exposure: insecure hardcoded passwords (source code only)": "hardcoded_passwords_stored_insecurely",  # pragma: allowlist secret
     "local data exposure: sensitive values stored insecurely (source code only)": "sensitive_values_stored_insecurely",
     "local data exposure: wifi ip address stored insecurely (source code only)": "wifi_ip_stored_insecurely",
-    "keychain accessibility requires review": "keychain_accessibility_requires_review",
+    "keychain items accessible after first unlock": "keychain_items_accessible_after_first_unlock",
     "sensitive values stored insecurely within nsuserdefaults": "nsuserdefaults_sensitive_values",
     "local data exposure: advertiser id logged insecurely": "advertiser_id_logged_insecurely",
     "local data exposure: device imei logged insecurely": "imei_logged_insecurely",
@@ -1269,10 +1269,10 @@ IOS_DATA_CHECK_SPECS = tuple(
         ),
         **(
             {
-                "check": "Keychain Accessibility Requires Review",
+                "check": "Keychain Items Accessible After First Unlock",
                 "severity": "Medium",
-                "present_explanation": "A Keychain item's configured accessibility requires review.",
-                "not_present_explanation": "No Keychain accessibility configuration requires review.",
+                "present_explanation": "One or more Keychain items are configured to be accessible after the first device unlock.",
+                "not_present_explanation": "No Keychain items configured to be accessible after the first device unlock were identified.",
                 "confidence_caveat": "Detected from Keychain accessibility configuration, not a direct read of stored values.",
             }
             if spec["check"] == "Sensitive Values Stored in Plaintext Within the Keychain"
