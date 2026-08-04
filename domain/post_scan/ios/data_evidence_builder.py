@@ -55,6 +55,7 @@ class IOSStorageEvidence:
     LOCATION_DATA_LOGGING_RULE_ID = "ios.storage.location-data-logged-insecurely"
     SENSITIVE_DATA_LOGGING_RULE_ID = "ios.storage.sensitive-data-logged-insecurely"
     WIFI_MAC_LOGGING_RULE_ID = "ios.storage.wifi-mac-logged-insecurely"
+    KEYBOARD_CACHE_EXPOSURE_RULE_ID = "ios.storage.keyboard-cache-exposure"
     ADVERTISER_ID_MARKERS = (
         "ASIdentifierManager",
         "advertisingIdentifier",
@@ -131,7 +132,7 @@ class IOSStorageEvidence:
             data_markers=self.WIFI_MAC_MARKERS,
             no_hit_evidence="no_wifi_mac_logged_insecurely_hits",
         )
-        self.keyboard_cache_exposure = EvidenceEntry(False, "no_keyboard_cache_exposure_hits")
+        self.keyboard_cache_exposure = self._keyboard_cache_exposure_entry(loaded_outputs)
 
     @classmethod
     def _deprecated_keychain_attributes_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
@@ -405,3 +406,20 @@ class IOSStorageEvidence:
                     return EvidenceEntry(True, f"(Triage Signal) {path}: {logging_marker}; {data_marker}")
 
         return EvidenceEntry(False, no_hit_evidence)
+
+    @classmethod
+    def _keyboard_cache_exposure_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        opengrep = loaded_outputs.get("opengrep")
+        results = opengrep.get("results") if isinstance(opengrep, dict) else None
+        if not isinstance(results, list):
+            return EvidenceEntry(False, "keyboard_cache_exposure_not_assessed_binary_scan")
+
+        for result in results:
+            if not isinstance(result, dict) or result.get("check_id") != cls.KEYBOARD_CACHE_EXPOSURE_RULE_ID:
+                continue
+            extra = result.get("extra") or {}
+            evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
+            path = str(result.get("path", "")).strip()
+            return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
+
+        return EvidenceEntry(False, "no_keyboard_cache_exposure_hits")

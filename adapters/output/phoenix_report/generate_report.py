@@ -119,7 +119,7 @@ IOS_DATA_EVIDENCE_KEY_BY_CHECK = {
     "local data exposure: location data logged insecurely": "location_data_logged_insecurely",
     "local data exposure: sensitive data logged insecurely": "sensitive_data_logged_insecurely",
     "local data exposure: wifi mac address logged insecurely": "wifi_mac_logged_insecurely",
-    "sensitive data exposed through device keyboard cache": "keyboard_cache_exposure",
+    "sensitive data exposed through device keyboard cache (source code only)": "keyboard_cache_exposure",
 }
 IOS_RESILIENCE_EVIDENCE_KEY_BY_CHECK = {
     "biometric / local authentication bypass possible": "biometric_bypass_possible",
@@ -1232,18 +1232,17 @@ IOS_DATA_CHECK_SPECS = (
         "aliases": (),
     },
     {
-        "check": "Sensitive Data Exposed Through Device Keyboard Cache",
+        "check": "Sensitive Data Exposed Through Device Keyboard Cache (Source Code Only)",
         "severity": "Medium",
         "compliance": "MASVS-STORAGE-2; legacy MSTG-STORAGE-2",
         "present_explanation": (
-            "One or more sensitive input fields do not disable the keyboard's autocorrect/predictive-text "
-            "cache (e.g. via isSecureTextEntry or UITextAutocorrectionTypeNo)."
+            "One or more sensitive input fields explicitly enable autocorrection or spell checking, or disable "
+            "secure text entry."
         ),
         "not_present_explanation": (
-            "Sensitive input fields disable the keyboard's autocorrect/predictive-text cache (e.g. via "
-            "isSecureTextEntry or UITextAutocorrectionTypeNo)."
+            "No sensitive input fields with an explicitly unsafe keyboard configuration were identified."
         ),
-        "confidence_caveat": "Low-confidence static heuristic -- absence of a security attribute is inferred, not directly observed.",
+        "confidence_caveat": "Source-code-only detection of explicit unsafe input settings; IPA-only scans are not assessed.",
         "aliases": (),
     },
 )

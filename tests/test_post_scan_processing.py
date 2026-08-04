@@ -2049,6 +2049,35 @@ def test_ios_storage_evidence_wifi_mac_logged_insecurely() -> None:
     assert no_hit.wifi_mac_logged_insecurely.evidence == "no_wifi_mac_logged_insecurely_hits"
 
 
+def test_ios_storage_evidence_keyboard_cache_exposure_requires_source_finding() -> None:
+    source_detected = IOSStorageEvidence(
+        {
+            "opengrep": {
+                "results": [
+                    {
+                        "check_id": "ios.storage.keyboard-cache-exposure",
+                        "path": "Sources/LoginView.swift",
+                        "extra": {"lines": "passwordField.autocorrectionType = .yes"},
+                    }
+                ]
+            }
+        }
+    )
+    assert source_detected.keyboard_cache_exposure.present is True
+    assert (
+        source_detected.keyboard_cache_exposure.evidence
+        == "Sources/LoginView.swift: passwordField.autocorrectionType = .yes"
+    )
+
+    source_no_hit = IOSStorageEvidence({"opengrep": {"results": []}})
+    assert source_no_hit.keyboard_cache_exposure.present is False
+    assert source_no_hit.keyboard_cache_exposure.evidence == "no_keyboard_cache_exposure_hits"
+
+    binary_only = IOSStorageEvidence({"strings_outputs": {"App.txt": "UITextField\nautocorrectionType"}})
+    assert binary_only.keyboard_cache_exposure.present is False
+    assert binary_only.keyboard_cache_exposure.evidence == "keyboard_cache_exposure_not_assessed_binary_scan"
+
+
 def test_ios_code_evidence_uses_imports_and_opengrep_heuristics() -> None:
     loaded_outputs = {
         "lief_outputs": {
