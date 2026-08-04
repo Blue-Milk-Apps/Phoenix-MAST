@@ -53,6 +53,8 @@ class IOSStorageEvidence:
     ADVERTISER_ID_LOGGING_RULE_ID = "ios.storage.advertiser-id-logged-insecurely"
     IMEI_LOGGING_RULE_ID = "ios.storage.imei-logged-insecurely"
     LOCATION_DATA_LOGGING_RULE_ID = "ios.storage.location-data-logged-insecurely"
+    SENSITIVE_DATA_LOGGING_RULE_ID = "ios.storage.sensitive-data-logged-insecurely"
+    WIFI_MAC_LOGGING_RULE_ID = "ios.storage.wifi-mac-logged-insecurely"
     ADVERTISER_ID_MARKERS = (
         "ASIdentifierManager",
         "advertisingIdentifier",
@@ -83,6 +85,7 @@ class IOSStorageEvidence:
     )
     LOGGING_MARKERS = ("nslog", "os_log", "logger", "debugprint", "print")
     LOCATION_DATA_MARKERS = ("cllocation", "coordinate", "latitude", "longitude")
+    WIFI_MAC_MARKERS = ("wifi_mac", "wifimac", "mac_address", "macaddress", "bssid")
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
         self.deprecated_keychain_attributes = self._deprecated_keychain_attributes_entry(loaded_outputs)
@@ -116,8 +119,18 @@ class IOSStorageEvidence:
             data_markers=self.LOCATION_DATA_MARKERS,
             no_hit_evidence="no_location_data_logged_insecurely_hits",
         )
-        self.sensitive_data_logged_insecurely = EvidenceEntry(False, "no_sensitive_data_logged_insecurely_hits")
-        self.wifi_mac_logged_insecurely = EvidenceEntry(False, "no_wifi_mac_logged_insecurely_hits")
+        self.sensitive_data_logged_insecurely = self._logged_insecurely_entry(
+            loaded_outputs,
+            rule_id=self.SENSITIVE_DATA_LOGGING_RULE_ID,
+            data_markers=self.SENSITIVE_DATA_MARKERS,
+            no_hit_evidence="no_sensitive_data_logged_insecurely_hits",
+        )
+        self.wifi_mac_logged_insecurely = self._logged_insecurely_entry(
+            loaded_outputs,
+            rule_id=self.WIFI_MAC_LOGGING_RULE_ID,
+            data_markers=self.WIFI_MAC_MARKERS,
+            no_hit_evidence="no_wifi_mac_logged_insecurely_hits",
+        )
         self.keyboard_cache_exposure = EvidenceEntry(False, "no_keyboard_cache_exposure_hits")
 
     @classmethod

@@ -1198,7 +1198,8 @@ IOS_DATA_CHECK_SPECS = (
         "present_explanation": "Other sensitive data is written to the device console/log.",
         "not_present_explanation": "No other sensitive data is written to the device console/log.",
         "confidence_caveat": (
-            "Detected via logging-API symbol presence near PII-keyword strings, not a confirmed log-output capture."
+            "Source findings identify a value reaching a logging call; IPA-only findings are triage signals based on "
+            "co-occurring symbols and strings and require source or runtime confirmation."
         ),
         "aliases": (),
     },
@@ -1224,7 +1225,9 @@ IOS_DATA_CHECK_SPECS = (
         "present_explanation": "WiFi MAC address is written to the device console/log.",
         "not_present_explanation": "WiFi MAC address is not written to the device console/log.",
         "confidence_caveat": (
-            "Detected via logging-API symbol presence near PII-keyword strings, not a confirmed log-output capture."
+            "Source findings identify a value reaching a logging call; IPA-only findings are triage signals based on "
+            "co-occurring symbols and strings and require source or runtime confirmation. BSSID can identify an "
+            "access point rather than the device's own MAC address."
         ),
         "aliases": (),
     },

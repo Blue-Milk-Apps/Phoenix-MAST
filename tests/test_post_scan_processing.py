@@ -1997,6 +1997,58 @@ def test_ios_storage_evidence_location_data_logged_insecurely() -> None:
     assert no_hit.location_data_logged_insecurely.evidence == "no_location_data_logged_insecurely_hits"
 
 
+def test_ios_storage_evidence_sensitive_data_logged_insecurely() -> None:
+    source_detected = IOSStorageEvidence(
+        {
+            "opengrep": {
+                "results": [
+                    {
+                        "check_id": "ios.storage.sensitive-data-logged-insecurely",
+                        "path": "Sources/Session.swift",
+                        "extra": {"lines": "print(accessToken)"},
+                    }
+                ]
+            }
+        }
+    )
+    assert source_detected.sensitive_data_logged_insecurely.present is True
+    assert source_detected.sensitive_data_logged_insecurely.evidence == "Sources/Session.swift: print(accessToken)"
+
+    binary_triage = IOSStorageEvidence({"strings_outputs": {"App.txt": "NSLog\naccessToken"}})
+    assert binary_triage.sensitive_data_logged_insecurely.present is True
+    assert binary_triage.sensitive_data_logged_insecurely.evidence == "(Triage Signal) App.txt: nslog; token"
+
+    no_hit = IOSStorageEvidence({"strings_outputs": {"App.txt": "NSLog\nsettings"}})
+    assert no_hit.sensitive_data_logged_insecurely.present is False
+    assert no_hit.sensitive_data_logged_insecurely.evidence == "no_sensitive_data_logged_insecurely_hits"
+
+
+def test_ios_storage_evidence_wifi_mac_logged_insecurely() -> None:
+    source_detected = IOSStorageEvidence(
+        {
+            "opengrep": {
+                "results": [
+                    {
+                        "check_id": "ios.storage.wifi-mac-logged-insecurely",
+                        "path": "Sources/NetworkInfo.swift",
+                        "extra": {"lines": "logger.info(wifiMac)"},
+                    }
+                ]
+            }
+        }
+    )
+    assert source_detected.wifi_mac_logged_insecurely.present is True
+    assert source_detected.wifi_mac_logged_insecurely.evidence == "Sources/NetworkInfo.swift: logger.info(wifiMac)"
+
+    binary_triage = IOSStorageEvidence({"strings_outputs": {"App.txt": "Logger\nBSSID"}})
+    assert binary_triage.wifi_mac_logged_insecurely.present is True
+    assert binary_triage.wifi_mac_logged_insecurely.evidence == "(Triage Signal) App.txt: logger; bssid"
+
+    no_hit = IOSStorageEvidence({"strings_outputs": {"App.txt": "Logger\nnetworkName"}})
+    assert no_hit.wifi_mac_logged_insecurely.present is False
+    assert no_hit.wifi_mac_logged_insecurely.evidence == "no_wifi_mac_logged_insecurely_hits"
+
+
 def test_ios_code_evidence_uses_imports_and_opengrep_heuristics() -> None:
     loaded_outputs = {
         "lief_outputs": {
