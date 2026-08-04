@@ -42,6 +42,7 @@ class IOSStorageEvidence:
     LOCATION_DATA_INSECURE_STORAGE_RULE_ID = "ios.storage.location-data-insecure-storage"
     HARDCODED_API_KEY_INSECURE_STORAGE_RULE_ID = "ios.storage.hardcoded-api-key-insecure-storage"
     HARDCODED_PASSWORD_INSECURE_STORAGE_RULE_ID = "ios.storage.hardcoded-password-insecure-storage"
+    SENSITIVE_VALUE_INSECURE_STORAGE_RULE_ID = "ios.storage.sensitive-value-insecure-storage"
     ADVERTISER_ID_MARKERS = (
         "ASIdentifierManager",
         "advertisingIdentifier",
@@ -64,7 +65,7 @@ class IOSStorageEvidence:
         self.location_data_stored_insecurely = self._location_data_stored_insecurely_entry(loaded_outputs)
         self.hardcoded_api_keys_stored_insecurely = self._hardcoded_api_keys_stored_insecurely_entry(loaded_outputs)
         self.hardcoded_passwords_stored_insecurely = self._hardcoded_passwords_stored_insecurely_entry(loaded_outputs)
-        self.sensitive_values_stored_insecurely = EvidenceEntry(False, "no_sensitive_values_stored_insecurely_hits")
+        self.sensitive_values_stored_insecurely = self._sensitive_values_stored_insecurely_entry(loaded_outputs)
         self.wifi_ip_stored_insecurely = EvidenceEntry(False, "no_wifi_ip_stored_insecurely_hits")
         self.keychain_accessibility_requires_review = EvidenceEntry(
             False, "no_keychain_accessibility_requires_review_hits"
@@ -221,3 +222,20 @@ class IOSStorageEvidence:
             return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
 
         return EvidenceEntry(False, "no_hardcoded_passwords_stored_insecurely_hits")
+
+    @classmethod
+    def _sensitive_values_stored_insecurely_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        opengrep = loaded_outputs.get("opengrep")
+        results = opengrep.get("results") if isinstance(opengrep, dict) else None
+        if not isinstance(results, list):
+            return EvidenceEntry(False, "sensitive_values_stored_insecurely_not_assessed_binary_scan")
+
+        for result in results:
+            if not isinstance(result, dict) or result.get("check_id") != cls.SENSITIVE_VALUE_INSECURE_STORAGE_RULE_ID:
+                continue
+            extra = result.get("extra") or {}
+            evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
+            path = str(result.get("path", "")).strip()
+            return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
+
+        return EvidenceEntry(False, "no_sensitive_values_stored_insecurely_hits")

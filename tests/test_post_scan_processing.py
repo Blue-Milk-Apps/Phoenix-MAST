@@ -8,6 +8,7 @@ from adapters.post_scan import (
     IOSBinaryScanOutputLoader,
 )
 from application.post_scan_processing_service import PostScanProcessingService
+from domain.post_scan.ios.data_evidence_builder import IOSStorageEvidence
 from domain.post_scan.ios.network_evidence_builder import IOSNetworkEvidence
 
 
@@ -1768,6 +1769,39 @@ def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
             "general_description": "Permits reading from the user's photo library.",
         },
     ]
+
+
+def test_ios_storage_evidence_sensitive_values_requires_source_finding() -> None:
+    detected = IOSStorageEvidence(
+        {
+            "opengrep": {
+                "results": [
+                    {
+                        "check_id": "ios.storage.sensitive-value-insecure-storage",
+                        "path": "Sources/Session.swift",
+                        "extra": {
+                            "lines": 'UserDefaults.standard.set(accessToken, forKey: "session")',
+                        },
+                    }
+                ]
+            }
+        }
+    )
+    assert detected.sensitive_values_stored_insecurely.present is True
+    assert detected.sensitive_values_stored_insecurely.evidence == (
+        'Sources/Session.swift: UserDefaults.standard.set(accessToken, forKey: "session")'
+    )
+
+    no_hit = IOSStorageEvidence({"opengrep": {"results": []}})
+    assert no_hit.sensitive_values_stored_insecurely.present is False
+    assert no_hit.sensitive_values_stored_insecurely.evidence == "no_sensitive_values_stored_insecurely_hits"
+
+    binary_only = IOSStorageEvidence({"strings_outputs": {"App.txt": "accessToken\nUserDefaults"}})
+    assert binary_only.sensitive_values_stored_insecurely.present is False
+    assert (
+        binary_only.sensitive_values_stored_insecurely.evidence
+        == "sensitive_values_stored_insecurely_not_assessed_binary_scan"
+    )
 
 
 def test_ios_code_evidence_uses_imports_and_opengrep_heuristics() -> None:
