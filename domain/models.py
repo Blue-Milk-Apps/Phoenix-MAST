@@ -37,7 +37,6 @@ class ScanType(str, Enum):
     STRINGS = "strings"
     PLIST_SOURCE = "plist_source"
     PLIST_BINARY = "plist_binary"
-    DEPENDENCY_CHECK = "dependency_check"
     SYFT = "syft"
 
 

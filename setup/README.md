@@ -15,7 +15,6 @@ Phoenix scanner adapters call external tools from the local `PATH`. The current 
 | TruffleHog | `trufflehog` | None |
 | Gitleaks | `gitleaks` | `.gitleaks.toml` in the scanned project or `GITLEAKS_CONFIG` |
 | Strings | `strings` | App binaries and embedded frameworks / native libraries |
-| OWASP Dependency-Check | `dependency-check` | NVD data under `nvd-owasp-data/` or `DEPENDENCY_CHECK_DATA_DIR` |
 | Syft | `syft` | None |
 | Phoenix PDF Report | Python `jinja2`, `weasyprint`, `matplotlib`, `numpy`, `markupsafe` packages | Native WeasyPrint libraries such as `pango`, `glib`, and `cairo` |
 
@@ -32,7 +31,6 @@ The Phoenix Docker image pins scanner tool versions with build arguments so CI i
 | `GITLEAKS_VERSION` | `8.30.1` |
 | `APKTOOL_VERSION` | `2.10.0` |
 | `IPSW_VERSION` | `3.1.687` |
-| `DEPENDENCY_CHECK_VERSION` | `12.2.0` |
 | `APKID_VERSION` | `3.1.0` |
 | `ANDROGUARD_VERSION` | `4.1.3` |
 | `LIEF_VERSION` | `0.17.2` |
@@ -53,7 +51,6 @@ docker compose build Phoenix --build-arg GITLEAKS_VERSION=8.30.1
 - [Apktool](apktool/README.md)
 - [Apksigner](apksigner/README.md)
 - [APKiD](apkid/README.md)
-- [OWASP Dependency-Check and NVD data](dependency-check/README.md)
 - [Syft](syft/README.md)
 - [TruffleHog](trufflehog/README.md)
 - [Gitleaks](gitleaks/README.md)
@@ -94,26 +91,6 @@ Source scans run Gitleaks as part of the Phoenix pipeline, while binary scans ru
 
 For local APK signing evidence, Phoenix resolves `apksigner` from `PATH`. For Docker scans, the Phoenix image installs `apksigner` inside the container during image build, so host Android SDK paths are not needed. APKiD follows the same runtime availability model: local scans need `apkid` on `PATH`, while Docker scans use the APKiD command installed in the Phoenix image.
 
-Phoenix currently looks for OWASP Dependency-Check data in this order:
-
-1. `DEPENDENCY_CHECK_DATA_DIR` from the process environment.
-2. `DEPENDENCY_CHECK_DATA_DIR` from `.env` in the current working directory.
-3. `DEPENDENCY_CHECK_DATA_DIR` from `.env` in the scanned project.
-4. `nvd-owasp-data/` in the current working directory.
-5. `/opt/dependency-check/data` in the container when `DC_NO_UPDATE=1`.
-
-For local offline scans, the easiest stable setup is:
-
-```bash
-mkdir -p rules nvd-owasp-data
-cat > .env <<'ENV'
-DEPENDENCY_CHECK_DATA_DIR=nvd-owasp-data/
-DC_NO_UPDATE=1
-ENV
-```
-
-`nvd-owasp-data/` should contain the Dependency-Check H2 database file named `odc.mv.db`.
-
 ## Verification
 
 After setup, these commands should all resolve:
@@ -127,7 +104,6 @@ aapt2 version
 apksigner version
 apkid --version
 ipsw version
-dependency-check --version
 syft version
 ```
 
@@ -155,8 +131,6 @@ MOBSF_URL=http://mobsf-scanner:8000 make compose-run PROJECT_PATH="path/to/app.i
 ## Online references
 
 - MobSF Docker setup: https://mobsf.github.io/Mobile-Security-Framework-MobSF/
-- OWASP Dependency-Check project: https://owasp.org/www-project-dependency-check/
-- OWASP Dependency-Check CLI arguments: https://dependency-check.github.io/DependencyCheck/dependency-check-cli/arguments.html
 - Syft installation: https://oss.anchore.com/docs/installation/syft
 - TruffleHog installation and usage: https://github.com/trufflesecurity/trufflehog
 - ipsw installation: https://blacktop.github.io/ipsw/docs/getting-started/installation/

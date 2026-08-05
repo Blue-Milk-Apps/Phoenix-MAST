@@ -12,15 +12,14 @@ ENV DEBIAN_FRONTEND=noninteractive \
     OPENGREP_OFFLINE=1 \
     OPENGREP_DISABLE_METRICS=1 \
     OPENGREP_SEND_METRICS=off \
-    DC_NO_UPDATE=1 \
     TRUFFLEHOG_NO_UPDATE=1
 
 # 2. System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    bash git curl wget unzip jq ca-certificates \
+    bash git curl ca-certificates \
     apksigner \
     binutils libmagic1 \
-    openjdk-17-jdk \
+    openjdk-17-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
 # 3. Static Tooling Installations
@@ -47,18 +46,7 @@ RUN curl -sSfL "https://raw.githubusercontent.com/anchore/syft/${SYFT_VERSION}/i
     && syft version \
     && trufflehog --version
 
-# 4. OWASP Dependency Check
-ARG DEPENDENCY_CHECK_VERSION=12.2.0
-ENV DC_NO_UPDATE=1
-RUN wget -q -L "https://github.com/dependency-check/DependencyCheck/releases/download/v${DEPENDENCY_CHECK_VERSION}/dependency-check-${DEPENDENCY_CHECK_VERSION}-release.zip" \
-    && unzip -q "dependency-check-${DEPENDENCY_CHECK_VERSION}-release.zip" -d /opt \
-    && rm "dependency-check-${DEPENDENCY_CHECK_VERSION}-release.zip" \
-    && ln -s /opt/dependency-check/bin/dependency-check.sh /usr/local/bin/dependency-check \
-    && chmod +x /opt/dependency-check/bin/dependency-check.sh \
-    && mkdir -p /opt/dependency-check/data \
-    && dependency-check --version
-
-# 5. Python Environment Setup
+# 4. Python Environment Setup
 ARG APKID_VERSION=3.1.0
 ARG ANDROGUARD_VERSION=4.1.3
 ARG LIEF_VERSION=0.17.2
@@ -83,27 +71,14 @@ RUN python -m venv /opt/phoenix-venv \
     && /opt/phoenix-venv/bin/python -c "from importlib.metadata import version; print('apkid ' + version('apkid'))" \
     && /opt/phoenix-venv/bin/python -c "from androguard.misc import AnalyzeAPK; import lief; print('androguard and lief imports ok')"
 
-# 6. Copy Modular Source Code
+# 5. Application User and Source Code
 WORKDIR /app
-COPY README.md pyproject.toml ./
-COPY __init__.py ./
-COPY utilities ./utilities
-COPY adapters ./adapters
-COPY application ./application
-COPY domain ./domain
-COPY entrypoints ./entrypoints
-COPY ports ./ports
-COPY rules ./rules
+COPY . /app
 
 RUN /opt/phoenix-venv/bin/pip install --no-cache-dir .
 
-# 7. Permissions & Working Dir
-# We need to ensure the 'phoenix' user owns the data mount point
-# so it can create the H2 database lock files.
-RUN useradd -m -u 1001 phoenix \
-    && mkdir -p /opt/dependency-check/data \
-    && chown -R phoenix:phoenix /app /opt/dependency-check /opt/phoenix-venv /usr/local/bin/opengrep
-
+# 6. Working Directory
+RUN useradd -m -u 1001 phoenix
 USER phoenix
 WORKDIR /workspace
 
