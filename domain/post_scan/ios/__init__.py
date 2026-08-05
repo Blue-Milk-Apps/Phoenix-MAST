@@ -2,7 +2,7 @@
 
 from domain.post_scan.ios.app_info_builder import IOSAppInfo
 from domain.post_scan.ios.code_evidence_builder import IOSCodeEvidence
-from domain.post_scan.ios.data_evidence_builder import IOSDataEvidence
+from domain.post_scan.ios.data_evidence_builder import IOSStorageEvidence
 from domain.post_scan.ios.endpoints_builder import IOSEndpoints
 from domain.post_scan.ios.file_info import IOSFileInfo
 from domain.post_scan.ios.functionality_builder import IOSFunctionality
@@ -18,7 +18,7 @@ from domain.post_scan.ios.url_schemes_builder import IOSURLSchemes
 __all__ = [
     "IOSAppInfo",
     "IOSCodeEvidence",
-    "IOSDataEvidence",
+    "IOSStorageEvidence",
     "IOSEndpoints",
     "IOSFileInfo",
     "IOSFunctionality",
