@@ -10,7 +10,6 @@ Phoenix MAST is an open source mobile application security testing toolkit for i
 - Static analysis orchestration for iOS, Android, Flutter, and React Native projects
 - Secret detection with OSS scanners such as Gitleaks and TruffleHog
 - OpenGrep support for custom source and binary pattern matching
-- Dependency vulnerability checks with OWASP Dependency-Check
 - SBOM generation with Syft
 - IPA and APK binary analysis with tools such as Strings, LIEF, ipsw, Androguard, Apktool, Apksigner, and APKiD
 - Optional MobSF integration for deeper binary scanning
@@ -46,7 +45,7 @@ phoenix scan --native-android-source-path path/to/project
 phoenix scan --native-ios-source-path path/to/project
 ```
 
-Source scans run Gitleaks, TruffleHog, Dependency-Check, and Syft, with plist extraction included for Flutter, React Native, and native iOS source scans.
+Source scans run Gitleaks, TruffleHog, and Syft, with plist extraction included for Flutter, React Native, and native iOS source scans.
 
 Binary scans run Strings, with LIEF, ipsw, and plist extraction for iOS binaries and Androguard, Apktool, Apksigner, and APKiD for Android binaries. MobSF runs for binary scans only when `MOBSF_URL` is configured.
 
@@ -195,16 +194,14 @@ At minimum, local development scans may require:
 - the standalone `opengrep` and `opengrep-core` binaries for local OpenGrep scans
 - `trufflehog`
 - `gitleaks`
-- `dependency-check`
 - `syft`
 - `strings`
 - `ipsw` for IPA signing, entitlement, and Mach-O load-command analysis
 - `apktool` for APK semantic reconstruction and evidence extraction
 - `apksigner` for APK signing integrity and signer identity evidence
-- Java and local NVD data for OWASP Dependency-Check
 - The Python packages used by binary scanners, including `lief`, `androguard`, and `apkid`
 
-Detailed setup notes are available in [setup/README.md](setup/README.md), including tool-specific instructions for [MobSF](setup/mobsf-scanner/README.md), [Dependency-Check](setup/dependency-check/README.md), [Syft](setup/syft/README.md), [TruffleHog](setup/trufflehog/README.md), [Gitleaks](setup/gitleaks/README.md), [Strings](setup/strings/README.md), [LIEF](setup/lief/README.md), [ipsw](setup/ipsw/README.md), [Apktool](setup/apktool/README.md), and [Apksigner](setup/apksigner/README.md).
+Detailed setup notes are available in [setup/README.md](setup/README.md), including tool-specific instructions for [MobSF](setup/mobsf-scanner/README.md), [Syft](setup/syft/README.md), [TruffleHog](setup/trufflehog/README.md), [Gitleaks](setup/gitleaks/README.md), [Strings](setup/strings/README.md), [LIEF](setup/lief/README.md), [ipsw](setup/ipsw/README.md), [Apktool](setup/apktool/README.md), and [Apksigner](setup/apksigner/README.md).
 
 ## MobSF Sidecar
 

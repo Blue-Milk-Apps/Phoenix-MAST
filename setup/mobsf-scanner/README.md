@@ -61,7 +61,7 @@ Use `make compose-down` if you want to stop the whole compose stack.
 
 ## Local Versus Compose
 
-`make services-up` starts only MobSF. It does not start the NVD sidecar and it does not run Phoenix inside Docker. Local `phoenix scan` still uses local scanner prerequisites for TruffleHog, Gitleaks, Dependency-Check, and Syft.
+`make services-up` starts only MobSF. It does not run Phoenix inside Docker. Local `phoenix scan` still uses local scanner prerequisites for TruffleHog, Gitleaks, and Syft.
 
 Use the Compose workflow when you want Docker to run Phoenix against a mounted scan target. MobSF is optional in this flow; pass `MOBSF_URL` when you want MobSF evidence included:
 
