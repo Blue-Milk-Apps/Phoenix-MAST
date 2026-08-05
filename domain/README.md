@@ -6,7 +6,7 @@ Core business entities used throughout the application. Defined in `models.py`.
 
 | Class | Purpose |
 |-------|---------|
-| `ScanType` | Enum of scanner identifiers: `mobsf_scanner`, `lief`, `androguard`, `apktool`, `apksigner`, `apkid`, `ipsw`, `trufflehog`, `gitleaks`, `strings`, `plist_source`, `plist_binary`, `dependency_check`, and `syft` |
+| `ScanType` | Enum of scanner identifiers: `mobsf_scanner`, `lief`, `androguard`, `apktool`, `apksigner`, `apkid`, `ipsw`, `trufflehog`, `gitleaks`, `strings`, `plist_source`, `plist_binary`, and `syft` |
 | `ScanResult` | Result from one scanner — scanner name, success/error state, and raw output |
 | `ScanConfig` | Configuration for a scan session — paths, enabled scans, rules path, and ignore settings |
 

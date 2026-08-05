@@ -119,13 +119,11 @@ phoenix may use the following tools from the local `PATH`:
 
 - `trufflehog`
 - `gitleaks`
-- `dependency-check`
 - `syft`
 - `strings`
 
 MobSF binary scanning uses a sidecar service configured through `MOBSF_URL` and `MOBSF_API_KEY`.
 
-OWASP Dependency-Check may require a local NVD data directory, commonly configured with `DEPENDENCY_CHECK_DATA_DIR` or `nvd-owasp-data/`.
 
 Do not assume these tools are installed when writing unit tests.
 

@@ -98,11 +98,6 @@ def _patch_core_scanners(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         workflow,
-        "DependencyCheckScanner",
-        _fake_scanner(ScanType.DEPENDENCY_CHECK, "Dependency Check"),
-    )
-    monkeypatch.setattr(
-        workflow,
         "SyftScanner",
         _fake_scanner(ScanType.SYFT, "Syft"),
     )
@@ -361,7 +356,6 @@ def test_create_scan_config_for_flutter_source(tmp_path: Path) -> None:
             ScanType.TRUFFLEHOG,
             ScanType.GITLEAKS,
             ScanType.PLIST_SOURCE,
-            ScanType.DEPENDENCY_CHECK,
             ScanType.SYFT,
         },
     )
@@ -385,7 +379,6 @@ def test_create_scan_config_for_flutter_source_includes_opengrep_when_rules_path
         ScanType.TRUFFLEHOG,
         ScanType.GITLEAKS,
         ScanType.PLIST_SOURCE,
-        ScanType.DEPENDENCY_CHECK,
         ScanType.SYFT,
     }
 
@@ -434,7 +427,6 @@ def test_create_scan_config_for_react_native_source(tmp_path: Path) -> None:
             ScanType.TRUFFLEHOG,
             ScanType.GITLEAKS,
             ScanType.PLIST_SOURCE,
-            ScanType.DEPENDENCY_CHECK,
             ScanType.SYFT,
         },
     )
@@ -458,7 +450,6 @@ def test_create_scan_config_for_react_native_source_includes_opengrep_when_rules
         ScanType.TRUFFLEHOG,
         ScanType.GITLEAKS,
         ScanType.PLIST_SOURCE,
-        ScanType.DEPENDENCY_CHECK,
         ScanType.SYFT,
     }
 
@@ -479,7 +470,6 @@ def test_create_scan_config_for_native_android_source(tmp_path: Path) -> None:
         {
             ScanType.TRUFFLEHOG,
             ScanType.GITLEAKS,
-            ScanType.DEPENDENCY_CHECK,
             ScanType.SYFT,
         },
     )
@@ -502,7 +492,6 @@ def test_create_scan_config_for_native_android_source_includes_opengrep_when_rul
     assert {scanner.scan_type for scanner in _build_scanners(config)} == {
         ScanType.TRUFFLEHOG,
         ScanType.GITLEAKS,
-        ScanType.DEPENDENCY_CHECK,
         ScanType.SYFT,
     }
 

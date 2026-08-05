@@ -1,4 +1,4 @@
-.PHONY: help build build-mobsf-owaspdc run test hooks-install services-up services-down compose-run compose-run-standalone compose-run-mobsf-owaspdc compose-down
+.PHONY: help build run test hooks-install services-up services-down compose-run compose-down
 
 # Image Variables
 IMAGE_NAME ?= phoenix
@@ -16,30 +16,22 @@ help:
 	@echo ""
 	@echo "Targets:"
 	@echo "  make build         Build the phoenix image"
-	@echo "  make build-mobsf-owaspdc"
-	@echo "                     Build the phoenix compose image with MobSF and NVD sidecars"
 	@echo "  make run           Run a standalone docker run scan"
 	@echo "  make services-up   Start the MobSF sidecar"
 	@echo "  make services-down Stop the MobSF sidecar"
 	@echo "  make compose-run   Build and run a scan with docker compose"
-	@echo "  make compose-run-mobsf-owaspdc"
-	@echo "                     Build and run a compose scan with MobSF and NVD sidecars"
 	@echo "  make test          Run local pytest"
 	@echo "  make hooks-install Install the repository pre-commit hook"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make run PROJECT_PATH=/path/to/project SCAN_FLAG=--native-ios-source-path"
 	@echo "  make compose-run PROJECT_PATH=/path/to/project SCAN_FLAG=--native-ios-source-path"
-	@echo "  make compose-run-mobsf-owaspdc PROJECT_PATH=/path/to/app.ipa SCAN_FLAG=--ios-binary-path"
 	@echo "  make compose-run PROJECT_PATH=/path/to/app.ipa SCAN_FLAG=--ios-binary-path"
 
 build:
 	docker build \
 		--pull \
 		-t $(IMAGE_NAME):$(TAG) .
-
-build-mobsf-owaspdc:
-	docker compose build phoenix-mobsf-owaspdc
 
 run:
 	@mkdir -p $(RESULTS_DIR)
@@ -141,34 +133,6 @@ compose-run:
 	PHOENIX_SCAN_PATH="$$SCAN_PATH" \
 	GITLEAKS_SCAN_PATH="$${GITLEAKS_SCAN_PATH:-}" \
 	docker compose up --build --exit-code-from phoenix phoenix
-
-compose-run-mobsf-owaspdc:
-	@mkdir -p "$(RESULTS_DIR)"
-	@if [ -z "$(SCAN_FLAG)" ]; then \
-		echo "Set SCAN_FLAG to one phoenix scan target flag"; \
-		exit 1; \
-	fi; \
-	PROJECT_MOUNT_PATH="$(PROJECT_PATH)"; \
-	SCAN_PATH="$(PHOENIX_SCAN_PATH)"; \
-	if [ ! -e "$$PROJECT_MOUNT_PATH" ]; then \
-		echo "PROJECT_PATH does not exist: $$PROJECT_MOUNT_PATH"; \
-		echo "If the path contains spaces, wrap it in quotes."; \
-		exit 1; \
-	fi; \
-	if [ -f "$$PROJECT_MOUNT_PATH" ]; then \
-		if [ "$$SCAN_PATH" = "/workspace" ]; then \
-			SCAN_PATH="/workspace/$$(basename "$$PROJECT_MOUNT_PATH")"; \
-		fi; \
-		PROJECT_MOUNT_PATH="$$(dirname "$$PROJECT_MOUNT_PATH")"; \
-	fi; \
-	echo "Mounting: $$PROJECT_MOUNT_PATH -> /workspace"; \
-	echo "Scanning: $$SCAN_PATH"; \
-	OUTPUT_PATH="$(RESULTS_DIR)" \
-	PROJECT_MOUNT_PATH="$$PROJECT_MOUNT_PATH" \
-	SCAN_FLAG="$(SCAN_FLAG)" \
-	PHOENIX_SCAN_PATH="$$SCAN_PATH" \
-	GITLEAKS_SCAN_PATH="$${GITLEAKS_SCAN_PATH:-}" \
-	docker compose up --build --exit-code-from phoenix-mobsf-owaspdc phoenix-mobsf-owaspdc
 
 compose-down:
 	docker compose down
