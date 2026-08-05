@@ -73,12 +73,20 @@ RUN python -m venv /opt/phoenix-venv \
 
 # 5. Application User and Source Code
 WORKDIR /app
-COPY . /app
+COPY --chown=phoenix:phoenix README.md pyproject.toml ./
+COPY --chown=phoenix:phoenix __init__.py ./
+COPY --chown=phoenix:phoenix utilities ./utilities
+COPY --chown=phoenix:phoenix adapters ./adapters
+COPY --chown=phoenix:phoenix application ./application
+COPY --chown=phoenix:phoenix domain ./domain
+COPY --chown=phoenix:phoenix entrypoints ./entrypoints
+COPY --chown=phoenix:phoenix ports ./ports
+COPY --chown=phoenix:phoenix rules ./rules
 
-RUN /opt/phoenix-venv/bin/pip install --no-cache-dir .
+RUN useradd -m -u 1001 phoenix \
+    && /opt/phoenix-venv/bin/pip install --no-cache-dir .
 
 # 6. Working Directory
-RUN useradd -m -u 1001 phoenix
 USER phoenix
 WORKDIR /workspace
 
