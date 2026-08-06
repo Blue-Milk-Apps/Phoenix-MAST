@@ -162,7 +162,7 @@
 
     "report_section": {
       "type": ["string", "null"],
-      "enum": ["Code", "Network", "Resilience", "Storage", "Permissions", "Certificate Info", "App Info", "Hardcoded Values", "Endpoint Connections", null],
+      "enum": ["Code", "Network", "Resilience", "Data Storage", "Permissions", "Certificate Info", "App Info", "Hardcoded Values", "Endpoint Connections", null],
       "description": "Which phoenix report section this check's result would render under, if displayed. Presentation-only -- everything above this field is source-of-truth data independent of any one report layout."
     }
   }

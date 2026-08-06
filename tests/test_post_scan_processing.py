@@ -8,7 +8,7 @@ from adapters.post_scan import (
     IOSBinaryScanOutputLoader,
 )
 from application.post_scan_processing_service import PostScanProcessingService
-from domain.post_scan.ios.network_evidence_builder import IOSNetworkEvidence
+from domain.post_scan.ios.network_evidence import IOSNetworkEvidence
 
 
 def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() -> None:
@@ -510,7 +510,7 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
         "permissions",
         "code_evidence",
         "network_evidence",
-        "data_evidence",
+        "data_storage_evidence",
         "resilience_evidence",
         "hardcoded_values",
         "endpoints",
@@ -631,7 +631,7 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
         "insecure_tls_configuration",
         "certificate_pinning_not_implemented",
     }
-    assert set(result["data_evidence"]) == {
+    assert set(result["data_storage_evidence"]) == {
         "deprecated_keychain_attributes",
         "advertiser_id_stored_insecurely",
         "imei_labeled_value_stored_insecurely",

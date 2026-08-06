@@ -1,4 +1,4 @@
-from domain.post_scan.ios.resilience_evidence_builder import IOSResilienceEvidence
+from domain.post_scan.ios.resilience_evidence import IOSResilienceEvidence
 
 
 def test_ios_resilience_evidence_returns_default_binary_assessment() -> None:

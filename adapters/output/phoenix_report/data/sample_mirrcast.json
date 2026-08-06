@@ -542,7 +542,7 @@
       ]
     },
     {
-      "section_name": "Storage",
+      "section_name": "Data Storage",
       "findings_text": "Analysis of MirrCast suggests a medium level of risk associated with data storage. The app can read from and write to external storage, which is world-readable and may be analyzed or modified by other applications. Source files disclose a hardcoded IP address, and the app logs information to the device log, which should never include sensitive values in production builds. No sensitive values were identified specifically in SharedPreferences or HTTP cache databases during this scan.",
       "checks": [
         {

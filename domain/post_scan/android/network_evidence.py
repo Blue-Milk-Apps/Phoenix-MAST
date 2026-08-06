@@ -19,7 +19,7 @@ from domain.post_scan.utilities import (
 
 
 @dataclass
-class NetworkEvidenceBuilder:
+class NetworkEvidence:
     allows_cleartext_traffic_for_all_domains: dict[str, Any]
     contains_hostname_verifier_accepts_all: dict[str, Any]
     contains_x509_trust_manager_accepts_all: dict[str, Any]

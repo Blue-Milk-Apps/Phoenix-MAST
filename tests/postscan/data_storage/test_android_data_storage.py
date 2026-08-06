@@ -4,7 +4,7 @@ from pathlib import Path
 from adapters.post_scan import AndroidBinaryScanOutputLoader
 
 
-def test_android_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Path) -> None:
+def test_android_data_storage_scan_output_loader_loads_expected_artifacts(tmp_path: Path) -> None:
     scan_dir = tmp_path / "SAST_android_binary_2026-07-03_23-34-29"
     (scan_dir / "opengrep_source").mkdir(parents=True)
     (scan_dir / "androguard").mkdir()

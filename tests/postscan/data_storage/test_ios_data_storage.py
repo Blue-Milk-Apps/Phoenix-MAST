@@ -4,7 +4,7 @@ from pathlib import Path
 from adapters.post_scan import IOSBinaryScanOutputLoader
 
 
-def test_ios_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Path) -> None:
+def test_ios_data_storage_scan_output_loader_loads_expected_artifacts(tmp_path: Path) -> None:
     scan_dir = tmp_path / "SAST_ios_binary_2026-07-23_10-00-00"
     (scan_dir / "opengrep_source").mkdir(parents=True)
     (scan_dir / "ipsw" / "Payload" / "App.app").mkdir(parents=True)
@@ -76,7 +76,7 @@ def test_ios_binary_scan_output_loader_loads_expected_artifacts(tmp_path: Path) 
     assert loaded["syft_outputs"] == {"sbom.json": {}}
 
 
-def test_ios_binary_scan_output_loader_tolerates_missing_optional_artifacts(tmp_path: Path) -> None:
+def test_ios_data_storage_scan_output_loader_tolerates_missing_optional_artifacts(tmp_path: Path) -> None:
     scan_dir = tmp_path / "SAST_ios_binary_2026-07-23_10-00-00"
     scan_dir.mkdir()
     _write_json(scan_dir / "scan_metadata.json", {"platform": "IOS"})
