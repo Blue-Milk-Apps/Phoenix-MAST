@@ -18,7 +18,7 @@ from domain.post_scan.utilities import (
 
 
 @dataclass
-class DataStorageEvidenceBuilder:
+class DataStorageEvidence:
     accesses_external_storage: dict[str, Any]
     authentication_credentials_not_protected_with_android_keystore: dict[str, Any]
     sensitive_information_stored_in_world_readable_or_writable_file_in_internal_storage: dict[str, Any]
