@@ -517,7 +517,7 @@
       ]
     },
     {
-      "section_name": "Storage",
+      "section_name": "Data Storage",
       "findings_text": "Analysis of InsecureBankv2 suggests a high level of risk associated with data storage. A high level of risk indicates the app could be manipulated by attackers. The app stores sensitive information in Android's shared external storage space, where files are world-readable and may be analyzed or modified by other applications. InsecureBankv2 also stores the user's account password without hardware-backed encryption; this file can only be accessed by the app itself, reducing risk, but it would benefit from encryption backed by the Android KeyStore. Finally, the app does not prevent screen capture of bank account numbers, meaning sensitive information can be duplicated to other locations on the file system through routine OS screen-capture behavior. The high risk rating for data storage is justified based on these findings.",
       "checks": [
         {

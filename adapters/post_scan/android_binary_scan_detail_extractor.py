@@ -10,17 +10,17 @@ from domain.post_scan.android.app_certificate_builder import AppCertificateBuild
 from domain.post_scan.android.app_component_builder import AppComponentBuilder
 from domain.post_scan.android.app_info_builder import AndroidAppInfoBuilder
 from domain.post_scan.android.application_builder import ApplicationBuilder
-from domain.post_scan.android.code_evidence_builder import CodeEvidenceBuilder
+from domain.post_scan.android.code_evidence import CodeEvidence
+from domain.post_scan.android.data_storage_evidence import DataStorageEvidence
 from domain.post_scan.android.deep_links_builder import DeepLinksBuilder
 from domain.post_scan.android.endpoints_builder import EndpointsBuilder
 from domain.post_scan.android.file_info_builder import FileInfoBuilder
 from domain.post_scan.android.functionality_builder import FunctionalityBuilder
 from domain.post_scan.android.hardcoded_values_builder import HardcodedValuesBuilder
 from domain.post_scan.android.meta import AndroidMeta
-from domain.post_scan.android.network_evidence_builder import NetworkEvidenceBuilder
+from domain.post_scan.android.network_evidence import NetworkEvidence
 from domain.post_scan.android.permissions_builder import PermissionsBuilder
-from domain.post_scan.android.resilience_evidence_builder import ResilienceEvidenceBuilder
-from domain.post_scan.android.storage_evidence_builder import StorageEvidenceBuilder
+from domain.post_scan.android.resilience_evidence import ResilienceEvidence
 from ports.scan_detail_extractor_port import ScanDetailExtractorPort
 
 
@@ -34,16 +34,16 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         application = ApplicationBuilder(loaded_outputs)
         app_components = AppComponentBuilder(loaded_outputs)
         certificate = AppCertificateBuilder(loaded_outputs)
-        code_evidence = CodeEvidenceBuilder(loaded_outputs, app_components, application, app_info)
+        code_evidence = CodeEvidence(loaded_outputs, app_components, application, app_info)
         file_info = FileInfoBuilder(loaded_outputs)
         permissions = PermissionsBuilder(loaded_outputs).items
         functionality = FunctionalityBuilder(loaded_outputs).items
-        resilience_evidence = ResilienceEvidenceBuilder(loaded_outputs)
+        resilience_evidence = ResilienceEvidence(loaded_outputs)
         deeplink_builder = DeepLinksBuilder(loaded_outputs)
         hardcoded_values = HardcodedValuesBuilder(loaded_outputs)
         meta = AndroidMeta(loaded_outputs)
-        network_evidence = NetworkEvidenceBuilder(loaded_outputs, hardcoded_values)
-        storage_evidence = StorageEvidenceBuilder(loaded_outputs, hardcoded_values)
+        network_evidence = NetworkEvidence(loaded_outputs, hardcoded_values)
+        data_storage_evidence = DataStorageEvidence(loaded_outputs, hardcoded_values)
         endpoints = EndpointsBuilder(loaded_outputs).items
 
         return {
@@ -58,7 +58,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "functionality": functionality,
             "network_evidence": asdict(network_evidence),
             "resilience_evidence": asdict(resilience_evidence),
-            "storage_evidence": asdict(storage_evidence),
+            "data_storage_evidence": asdict(data_storage_evidence),
             "deep_links": asdict(deeplink_builder),
             "hardcoded_values": asdict(hardcoded_values),
             "endpoints": endpoints,

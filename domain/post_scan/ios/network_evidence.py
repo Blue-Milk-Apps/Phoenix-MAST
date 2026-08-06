@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
-from domain.post_scan.ios.code_evidence_builder import EvidenceEntry
+from domain.post_scan.ios.code_evidence import EvidenceEntry
 
 
 @dataclass

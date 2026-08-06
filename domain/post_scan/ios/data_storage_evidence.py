@@ -1,18 +1,18 @@
-"""Build default iOS data evidence section."""
+"""Build the iOS data-storage evidence section."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
 
-from domain.post_scan.ios.code_evidence_builder import EvidenceEntry
+from domain.post_scan.ios.code_evidence import EvidenceEntry
 
 # TODO(dynamic): Add sensitive-values-in-memory evidence when runtime memory inspection is available.
 # It is intentionally omitted from static scan results.
 
 
 @dataclass
-class IOSStorageEvidence:
+class IOSDataStorageEvidence:
     deprecated_keychain_attributes: EvidenceEntry
     advertiser_id_stored_insecurely: EvidenceEntry
     imei_labeled_value_stored_insecurely: EvidenceEntry

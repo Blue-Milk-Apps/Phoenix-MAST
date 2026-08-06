@@ -1,4 +1,4 @@
-"""Build iOS IPA binary evidence section from binary scanner outputs."""
+"""Represent iOS IPA binary evidence from binary scanner outputs."""
 
 from __future__ import annotations
 

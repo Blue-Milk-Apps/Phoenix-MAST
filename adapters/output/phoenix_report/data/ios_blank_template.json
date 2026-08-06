@@ -19,7 +19,7 @@
   },
   "risk_summary": {
     "code_vulnerability": "Low",
-    "data": "Low",
+    "data_storage": "Low",
     "networking": "Low",
     "resilience": "Low"
   },
@@ -50,7 +50,7 @@
   "url_schemes": [],
   "code_evidence": {},
   "network_evidence": {},
-  "data_evidence": {},
+  "data_storage_evidence": {},
   "resilience_evidence": {},
   "functionality": {
     "Camera": { "present": false, "explanation": "" },
@@ -121,7 +121,7 @@
   "vulnerability_sections": [
     { "section_name": "Code", "findings_text": "", "checks": [] },
     { "section_name": "Network", "findings_text": "", "checks": [] },
-    { "section_name": "Data", "findings_text": "", "checks": [] },
+    { "section_name": "Data Storage", "findings_text": "", "checks": [] },
     { "section_name": "Resilience", "findings_text": "", "checks": [] }
   ],
   "hardcoded_values": {

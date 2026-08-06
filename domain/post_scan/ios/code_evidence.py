@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from domain.post_scan.ios.ipa_binary_evidence_builder import IOSIPABinaryEvidence
+from domain.post_scan.ios.ipa_binary_evidence import IOSIPABinaryEvidence
 from domain.post_scan.utilities import first_non_empty
 
 
