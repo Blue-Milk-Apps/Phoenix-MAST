@@ -459,7 +459,7 @@
       ]
     },
     {
-      "section_name": "Storage",
+      "section_name": "Data Storage",
       "findings_text": "",
       "checks": [
         {

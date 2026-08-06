@@ -32,18 +32,13 @@ RISK_LEVEL_COLOR = {"low": "#2980b9", "medium": "#e08e0b", "high": "#c0392b"}
 FINDINGS_SEVERITY_KEYS = ("critical", "high", "medium", "low", "info", "secure")
 SECTION_TO_AREA = {
     "code": ("Code Vulnerability", "code_vulnerability"),
-    "storage": ("Data Storage", "data_storage"),
+    "data storage": ("Data Storage", "data_storage"),
     "network": ("Networking", "networking"),
     "resilience": ("Resilience", "resilience"),
 }
-# iOS uses "Data" (not "Data Storage") as both the section name and the risk
-# summary/polar-chart key -- make_overall_risk_polar_chart() derives its axis
-# label straight from the risk_summary key, so keying this as "data" (one
-# word) is what makes the chart print "Data" instead of an auto title-cased
-# "Data Storage".
 IOS_SECTION_TO_AREA = {
     "code": ("Code Vulnerability", "code_vulnerability"),
-    "data": ("Data", "data"),
+    "data storage": ("Data Storage", "data_storage"),
     "network": ("Networking", "networking"),
     "resilience": ("Resilience", "resilience"),
 }
@@ -60,10 +55,9 @@ SECTION_SEVERITY_ORDER = {
 # CODE_EVIDENCE_KEY_BY_CHECK / NETWORK_EVIDENCE_KEY_BY_CHECK /
 # STORAGE_EVIDENCE_KEY_BY_CHECK / RESILIENCE_EVIDENCE_KEY_BY_CHECK. A
 # post-scan-processing pipeline (ipsw/LIEF/plist/opengrep) is expected to
-# emit `code_evidence` / `network_evidence` / `data_evidence` /
+# emit `code_evidence` / `network_evidence` / `storage_evidence` /
 # `resilience_evidence` dicts keyed by these snake_case names, each holding
-# {"present": bool, "evidence": str}. iOS's 4th section is `data_evidence`
-# (not `storage_evidence`) to match the "Data" section rename.
+# {"present": bool, "evidence": str}.
 IOS_CODE_EVIDENCE_KEY_BY_CHECK = {
     "deprecated api - uiwebview": "uses_uiwebview",
     "insecure nanopb library": "insecure_nanopb_library",
@@ -102,7 +96,7 @@ IOS_NETWORK_EVIDENCE_KEY_BY_CHECK = {
     "insecure tls configuration": "insecure_tls_configuration",
     "certificate pinning not implemented": "certificate_pinning_not_implemented",
 }
-IOS_DATA_EVIDENCE_KEY_BY_CHECK = {
+IOS_STORAGE_EVIDENCE_KEY_BY_CHECK = {
     "application utilizes deprecated keychain attributes": "deprecated_keychain_attributes",
     "local data exposure: advertiser id stored insecurely": "advertiser_id_stored_insecurely",
     "local data exposure: imei-labeled value stored insecurely": "imei_labeled_value_stored_insecurely",
@@ -128,7 +122,7 @@ IOS_RESILIENCE_EVIDENCE_KEY_BY_CHECK = {
 IOS_SECTION_EVIDENCE = {
     "code": ("code_evidence", IOS_CODE_EVIDENCE_KEY_BY_CHECK),
     "network": ("network_evidence", IOS_NETWORK_EVIDENCE_KEY_BY_CHECK),
-    "data": ("data_evidence", IOS_DATA_EVIDENCE_KEY_BY_CHECK),
+    "data storage": ("storage_evidence", IOS_STORAGE_EVIDENCE_KEY_BY_CHECK),
     "resilience": ("resilience_evidence", IOS_RESILIENCE_EVIDENCE_KEY_BY_CHECK),
 }
 
@@ -1020,7 +1014,7 @@ IOS_NETWORK_CHECK_SPECS = (
         "aliases": ("application utilizes certificate pinning protections",),
     },
 )
-IOS_DATA_CHECK_SPECS = (
+IOS_STORAGE_CHECK_SPECS = (
     {
         "check": "Application Utilizes Deprecated Keychain Attributes",
         "severity": "Medium",
@@ -1246,11 +1240,11 @@ IOS_DATA_CHECK_SPECS = (
         "aliases": (),
     },
 )
-_IOS_RETIRED_DATA_CHECK_NAMES = {
+_IOS_RETIRED_STORAGE_CHECK_NAMES = {
     "Local Data Exposure: WiFi MAC Address Stored Insecurely",
     "Local Data Exposure: Sensitive Values Stored in Memory",
 }
-IOS_DATA_CHECK_SPECS = tuple(
+IOS_STORAGE_CHECK_SPECS = tuple(
     {
         **spec,
         **(
@@ -1300,8 +1294,8 @@ IOS_DATA_CHECK_SPECS = tuple(
             else {}
         ),
     }
-    for spec in IOS_DATA_CHECK_SPECS
-    if spec["check"] not in _IOS_RETIRED_DATA_CHECK_NAMES
+    for spec in IOS_STORAGE_CHECK_SPECS
+    if spec["check"] not in _IOS_RETIRED_STORAGE_CHECK_NAMES
     and spec["check"] != "Local Data Exposure: GPS Longitude Stored Insecurely"
     and spec["check"] != "Local Data Exposure: GPS Longitude Logged Insecurely"
 )
@@ -1648,11 +1642,12 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     is_ios = _is_ios_platform(data)
     base_template = _ios_blank_template() if is_ios else _blank_template()
     report_data = _merge_nested(base_template, data)
+    _normalize_storage_section_name(report_data)
 
     if is_ios:
         _canonicalize_ios_code_section(report_data)
         _canonicalize_ios_network_section(report_data)
-        _canonicalize_ios_data_section(report_data)
+        _canonicalize_ios_storage_section(report_data)
         _canonicalize_ios_resilience_section(report_data)
         _apply_ios_derived_checks(report_data)
         _canonicalize_ios_binary_protections(report_data)
@@ -1679,6 +1674,20 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     report_data["findings_severity"] = _build_findings_severity(report_data)
 
     return _prune_placeholder_rows(report_data)
+
+
+def _normalize_storage_section_name(report_data: dict[str, Any]) -> None:
+    """Normalize current and legacy storage section labels for both platforms."""
+    sections = report_data.get("vulnerability_sections")
+    if not isinstance(sections, list):
+        return
+
+    for section in sections:
+        if not isinstance(section, dict):
+            continue
+        section_name = str(section.get("section_name", "")).strip().lower()
+        if section_name in {"data", "storage", "data storage"}:
+            section["section_name"] = "Data Storage"
 
 
 def _add_permission_display_names(report_data: dict[str, Any]) -> None:
@@ -1791,7 +1800,7 @@ def _canonicalize_storage_section(report_data: dict[str, Any]) -> None:
 
     storage_section = None
     for section in sections:
-        if str(section.get("section_name", "")).strip().lower() == "storage":
+        if str(section.get("section_name", "")).strip().lower() == "data storage":
             storage_section = section
             break
     if storage_section is None:
@@ -1840,8 +1849,8 @@ def _canonicalize_ios_network_section(report_data: dict[str, Any]) -> None:
     _canonicalize_ios_section(report_data, "network", IOS_NETWORK_CHECK_SPECS)
 
 
-def _canonicalize_ios_data_section(report_data: dict[str, Any]) -> None:
-    _canonicalize_ios_section(report_data, "data", IOS_DATA_CHECK_SPECS)
+def _canonicalize_ios_storage_section(report_data: dict[str, Any]) -> None:
+    _canonicalize_ios_section(report_data, "data storage", IOS_STORAGE_CHECK_SPECS)
 
 
 def _canonicalize_ios_resilience_section(report_data: dict[str, Any]) -> None:
@@ -1853,10 +1862,10 @@ def _canonicalize_ios_section(
     section_name: str,
     specs: tuple[dict[str, Any], ...],
 ) -> None:
-    """Shared iOS canonicalizer for the Code/Network/Data/Resilience sections.
+    """Shared iOS canonicalizer for the Code/Network/Data Storage/Resilience sections.
 
     Mirrors the Android canonicalizers' precedence: (1) an evidence-dict
-    entry (`code_evidence` / `network_evidence` / `data_evidence` /
+    entry (`code_evidence` / `network_evidence` / `storage_evidence` /
     `resilience_evidence`, keyed via IOS_SECTION_EVIDENCE) with a non-null
     "present" wins first, since that's the structured, machine-generated
     scan output; (2) a check already present in the incoming
@@ -1886,6 +1895,8 @@ def _canonicalize_ios_section(
 
     evidence_top_key, evidence_map = IOS_SECTION_EVIDENCE.get(section_name, (None, {}))
     evidence_dict = report_data.get(evidence_top_key) if evidence_top_key else None
+    if section_name == "data storage" and not evidence_dict:
+        evidence_dict = report_data.get("data_evidence")
     evidence_dict = evidence_dict if isinstance(evidence_dict, dict) else {}
 
     section["checks"] = [_canonical_ios_check(spec, lookup, evidence_dict, evidence_map) for spec in specs]
@@ -2287,7 +2298,7 @@ def _apply_derived_check(
     section_name = str(section.get("section_name", "")).strip().lower()
     if section_name == "code":
         _apply_derived_code_check(report_data, check)
-    elif section_name == "storage":
+    elif section_name == "data storage":
         _apply_derived_storage_check(report_data, check)
 
 

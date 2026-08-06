@@ -7,7 +7,6 @@ from typing import Any
 
 from domain.post_scan.ios.app_info_builder import IOSAppInfo
 from domain.post_scan.ios.code_evidence_builder import IOSCodeEvidence
-from domain.post_scan.ios.data_evidence_builder import IOSStorageEvidence
 from domain.post_scan.ios.endpoints_builder import IOSEndpoints
 from domain.post_scan.ios.file_info import IOSFileInfo
 from domain.post_scan.ios.functionality_builder import IOSFunctionality
@@ -17,6 +16,7 @@ from domain.post_scan.ios.meta_builder import IOSMeta
 from domain.post_scan.ios.network_evidence_builder import IOSNetworkEvidence
 from domain.post_scan.ios.permissions_builder import IOSPermissions
 from domain.post_scan.ios.resilience_evidence_builder import IOSResilienceEvidence
+from domain.post_scan.ios.storage_evidence_builder import IOSStorageEvidence
 from domain.post_scan.ios.third_party_sdks_builder import IOSThirdPartySDKs
 from domain.post_scan.ios.url_schemes_builder import IOSURLSchemes
 from ports.scan_detail_extractor_port import ScanDetailExtractorPort
@@ -83,7 +83,7 @@ class IOSBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "permissions": IOSPermissions(loaded_outputs).items,
             "code_evidence": asdict(IOSCodeEvidence(loaded_outputs)),
             "network_evidence": asdict(IOSNetworkEvidence(loaded_outputs)),
-            "data_evidence": asdict(IOSStorageEvidence(loaded_outputs)),
+            "storage_evidence": asdict(IOSStorageEvidence(loaded_outputs)),
             "resilience_evidence": asdict(IOSResilienceEvidence(loaded_outputs)),
             "hardcoded_values": asdict(IOSHardcodedValues(loaded_outputs)),
             "endpoints": IOSEndpoints(loaded_outputs).items,

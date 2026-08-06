@@ -1,4 +1,4 @@
-"""Build default iOS data evidence section."""
+"""Build the iOS storage evidence section."""
 
 from __future__ import annotations
 

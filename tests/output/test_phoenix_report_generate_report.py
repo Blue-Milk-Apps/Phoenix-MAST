@@ -40,9 +40,9 @@ def _check_map(checks: list[dict[str, str]]) -> dict[str, dict[str, str]]:
 def _storage_checks(path: Path) -> list[dict[str, str]]:
     report = load_report_data(json.loads(path.read_text(encoding="utf-8")))
     for section in report["vulnerability_sections"]:
-        if section["section_name"] == "Storage":
+        if section["section_name"] == "Data Storage":
             return section["checks"]
-    raise AssertionError("Storage section missing")
+    raise AssertionError("Data Storage section missing")
 
 
 def test_overall_evaluation_summarizes_only_the_highest_present_severity() -> None:
@@ -231,7 +231,7 @@ def test_load_report_data_uses_storage_evidence_bundle_for_actual_checks() -> No
     )
 
     for section in report["vulnerability_sections"]:
-        if section["section_name"] != "Storage":
+        if section["section_name"] != "Data Storage":
             continue
         check_map = _check_map(section["checks"])
         assert check_map["Accesses External Storage"]["result"] == "Present"
@@ -239,7 +239,7 @@ def test_load_report_data_uses_storage_evidence_bundle_for_actual_checks() -> No
         assert check_map["Authentication Credentials Not Protected with Android Keystore"]["result"] == "Present"
         break
     else:
-        raise AssertionError("Storage section missing")
+        raise AssertionError("Data Storage section missing")
 
 
 def test_load_report_data_keeps_storage_defaults_when_no_supporting_evidence_exists() -> None:
@@ -247,6 +247,42 @@ def test_load_report_data_keeps_storage_defaults_when_no_supporting_evidence_exi
 
     assert [check["check"] for check in checks] == CANONICAL_STORAGE_CHECKS
     assert all(check["result"] == "Not Present" for check in checks)
+
+
+def test_load_report_data_uses_data_storage_section_for_android_and_ios() -> None:
+    for platform in ("Android", "iOS"):
+        report = load_report_data({"meta": {"platform": platform}})
+
+        section_names = [section["section_name"] for section in report["vulnerability_sections"]]
+        assert "Data Storage" in section_names
+        assert "Data" not in section_names
+        assert "Storage" not in section_names
+        assert report["risk_summary"]["data_storage"] == "Low"
+        assert any(row["area_of_concern"] == "Data Storage" for row in report["overall_evaluation"])
+
+
+def test_load_report_data_uses_ios_storage_evidence_and_accepts_legacy_data_evidence() -> None:
+    evidence = {
+        "deprecated_keychain_attributes": {
+            "present": True,
+            "evidence": "kSecAttrAccessibleAlways",
+        }
+    }
+
+    for evidence_key in ("storage_evidence", "data_evidence"):
+        report = load_report_data(
+            {
+                "meta": {"platform": "iOS"},
+                evidence_key: evidence,
+            }
+        )
+        storage_section = next(
+            section for section in report["vulnerability_sections"] if section["section_name"] == "Data Storage"
+        )
+        check_map = _check_map(storage_section["checks"])
+        deprecated_check = check_map["Application Utilizes Deprecated Keychain Attributes"]
+        assert deprecated_check["result"] == "Present"
+        assert deprecated_check["evidence"] == "kSecAttrAccessibleAlways"
 
 
 def test_load_report_data_orders_present_functionalities_before_absent_ones() -> None:

@@ -1,4 +1,4 @@
-from domain.post_scan.ios.data_evidence_builder import IOSStorageEvidence
+from domain.post_scan.ios.storage_evidence_builder import IOSStorageEvidence
 
 
 def test_ios_storage_evidence_sensitive_values_requires_source_finding() -> None:

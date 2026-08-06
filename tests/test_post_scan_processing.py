@@ -510,7 +510,7 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
         "permissions",
         "code_evidence",
         "network_evidence",
-        "data_evidence",
+        "storage_evidence",
         "resilience_evidence",
         "hardcoded_values",
         "endpoints",
@@ -631,7 +631,7 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
         "insecure_tls_configuration",
         "certificate_pinning_not_implemented",
     }
-    assert set(result["data_evidence"]) == {
+    assert set(result["storage_evidence"]) == {
         "deprecated_keychain_attributes",
         "advertiser_id_stored_insecurely",
         "imei_labeled_value_stored_insecurely",
