@@ -1,4 +1,4 @@
-"""Build the iOS storage evidence section."""
+"""Build the iOS data-storage evidence section."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from domain.post_scan.ios.code_evidence_builder import EvidenceEntry
 
 
 @dataclass
-class IOSStorageEvidence:
+class IOSDataStorageEvidence:
     deprecated_keychain_attributes: EvidenceEntry
     advertiser_id_stored_insecurely: EvidenceEntry
     imei_labeled_value_stored_insecurely: EvidenceEntry

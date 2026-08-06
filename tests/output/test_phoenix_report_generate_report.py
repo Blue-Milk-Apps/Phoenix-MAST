@@ -16,7 +16,7 @@ CANONICAL_NETWORK_CHECKS = [
     "Password is not Hashed in Transit",
     "Weak Certificate Validation Enables MitM Attacks",
 ]
-CANONICAL_STORAGE_CHECKS = [
+CANONICAL_DATA_STORAGE_CHECKS = [
     "Accesses External Storage",
     "Authentication Credentials Not Protected with Android Keystore",
     "Sensitive Information Stored in World Readable or Writable File in Internal Storage",
@@ -37,7 +37,7 @@ def _check_map(checks: list[dict[str, str]]) -> dict[str, dict[str, str]]:
     return {check["check"]: check for check in checks}
 
 
-def _storage_checks(path: Path) -> list[dict[str, str]]:
+def _data_storage_checks(path: Path) -> list[dict[str, str]]:
     report = load_report_data(json.loads(path.read_text(encoding="utf-8")))
     for section in report["vulnerability_sections"]:
         if section["section_name"] == "Data Storage":
@@ -197,27 +197,27 @@ def test_load_report_data_keeps_network_defaults_when_no_supporting_evidence_exi
     assert all(check["result"] == "Not Present" for check in checks)
 
 
-def test_load_report_data_preserves_canonical_storage_checks() -> None:
-    checks = _storage_checks(BASE_DIR / "sample_insecurebankv2.json")
+def test_load_report_data_preserves_canonical_data_storage_checks() -> None:
+    checks = _data_storage_checks(BASE_DIR / "sample_insecurebankv2.json")
 
-    assert [check["check"] for check in checks] == CANONICAL_STORAGE_CHECKS
+    assert [check["check"] for check in checks] == CANONICAL_DATA_STORAGE_CHECKS
     check_map = _check_map(checks)
     assert check_map["Accesses External Storage"]["result"] == "Present"
     assert check_map["Sensitive Information Stored in External Storage"]["result"] == "Present"
 
 
-def test_load_report_data_maps_legacy_storage_vocabulary_to_canonical_checks() -> None:
-    checks = _storage_checks(BASE_DIR / "sample_mirrcast.json")
+def test_load_report_data_maps_legacy_data_storage_vocabulary_to_canonical_checks() -> None:
+    checks = _data_storage_checks(BASE_DIR / "sample_mirrcast.json")
 
-    assert [check["check"] for check in checks] == CANONICAL_STORAGE_CHECKS
+    assert [check["check"] for check in checks] == CANONICAL_DATA_STORAGE_CHECKS
     check_map = _check_map(checks)
     assert check_map["Accesses External Storage"]["result"] == "Present"
 
 
-def test_load_report_data_uses_storage_evidence_bundle_for_actual_checks() -> None:
+def test_load_report_data_uses_data_storage_evidence_bundle_for_actual_checks() -> None:
     report = load_report_data(
         {
-            "storage_evidence": {
+            "data_storage_evidence": {
                 "accesses_external_storage": {
                     "present": True,
                     "evidence": "android.permission.WRITE_EXTERNAL_STORAGE",
@@ -242,10 +242,10 @@ def test_load_report_data_uses_storage_evidence_bundle_for_actual_checks() -> No
         raise AssertionError("Data Storage section missing")
 
 
-def test_load_report_data_keeps_storage_defaults_when_no_supporting_evidence_exists() -> None:
-    checks = _storage_checks(BASE_DIR / "blank_template.json")
+def test_load_report_data_keeps_data_storage_defaults_when_no_supporting_evidence_exists() -> None:
+    checks = _data_storage_checks(BASE_DIR / "blank_template.json")
 
-    assert [check["check"] for check in checks] == CANONICAL_STORAGE_CHECKS
+    assert [check["check"] for check in checks] == CANONICAL_DATA_STORAGE_CHECKS
     assert all(check["result"] == "Not Present" for check in checks)
 
 
@@ -261,7 +261,7 @@ def test_load_report_data_uses_data_storage_section_for_android_and_ios() -> Non
         assert any(row["area_of_concern"] == "Data Storage" for row in report["overall_evaluation"])
 
 
-def test_load_report_data_uses_ios_storage_evidence_and_accepts_legacy_data_evidence() -> None:
+def test_load_report_data_uses_ios_data_storage_evidence() -> None:
     evidence = {
         "deprecated_keychain_attributes": {
             "present": True,
@@ -269,20 +269,19 @@ def test_load_report_data_uses_ios_storage_evidence_and_accepts_legacy_data_evid
         }
     }
 
-    for evidence_key in ("storage_evidence", "data_evidence"):
-        report = load_report_data(
-            {
-                "meta": {"platform": "iOS"},
-                evidence_key: evidence,
-            }
-        )
-        storage_section = next(
-            section for section in report["vulnerability_sections"] if section["section_name"] == "Data Storage"
-        )
-        check_map = _check_map(storage_section["checks"])
-        deprecated_check = check_map["Application Utilizes Deprecated Keychain Attributes"]
-        assert deprecated_check["result"] == "Present"
-        assert deprecated_check["evidence"] == "kSecAttrAccessibleAlways"
+    report = load_report_data(
+        {
+            "meta": {"platform": "iOS"},
+            "data_storage_evidence": evidence,
+        }
+    )
+    data_storage_section = next(
+        section for section in report["vulnerability_sections"] if section["section_name"] == "Data Storage"
+    )
+    check_map = _check_map(data_storage_section["checks"])
+    deprecated_check = check_map["Application Utilizes Deprecated Keychain Attributes"]
+    assert deprecated_check["result"] == "Present"
+    assert deprecated_check["evidence"] == "kSecAttrAccessibleAlways"
 
 
 def test_load_report_data_orders_present_functionalities_before_absent_ones() -> None:

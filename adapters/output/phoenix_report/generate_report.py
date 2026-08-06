@@ -53,9 +53,9 @@ SECTION_SEVERITY_ORDER = {
 
 # iOS evidence-key mappings -- the same shape/precedence as Android's
 # CODE_EVIDENCE_KEY_BY_CHECK / NETWORK_EVIDENCE_KEY_BY_CHECK /
-# STORAGE_EVIDENCE_KEY_BY_CHECK / RESILIENCE_EVIDENCE_KEY_BY_CHECK. A
+# DATA_STORAGE_EVIDENCE_KEY_BY_CHECK / RESILIENCE_EVIDENCE_KEY_BY_CHECK. A
 # post-scan-processing pipeline (ipsw/LIEF/plist/opengrep) is expected to
-# emit `code_evidence` / `network_evidence` / `storage_evidence` /
+# emit `code_evidence` / `network_evidence` / `data_storage_evidence` /
 # `resilience_evidence` dicts keyed by these snake_case names, each holding
 # {"present": bool, "evidence": str}.
 IOS_CODE_EVIDENCE_KEY_BY_CHECK = {
@@ -96,7 +96,7 @@ IOS_NETWORK_EVIDENCE_KEY_BY_CHECK = {
     "insecure tls configuration": "insecure_tls_configuration",
     "certificate pinning not implemented": "certificate_pinning_not_implemented",
 }
-IOS_STORAGE_EVIDENCE_KEY_BY_CHECK = {
+IOS_DATA_STORAGE_EVIDENCE_KEY_BY_CHECK = {
     "application utilizes deprecated keychain attributes": "deprecated_keychain_attributes",
     "local data exposure: advertiser id stored insecurely": "advertiser_id_stored_insecurely",
     "local data exposure: imei-labeled value stored insecurely": "imei_labeled_value_stored_insecurely",
@@ -122,7 +122,7 @@ IOS_RESILIENCE_EVIDENCE_KEY_BY_CHECK = {
 IOS_SECTION_EVIDENCE = {
     "code": ("code_evidence", IOS_CODE_EVIDENCE_KEY_BY_CHECK),
     "network": ("network_evidence", IOS_NETWORK_EVIDENCE_KEY_BY_CHECK),
-    "data storage": ("storage_evidence", IOS_STORAGE_EVIDENCE_KEY_BY_CHECK),
+    "data storage": ("data_storage_evidence", IOS_DATA_STORAGE_EVIDENCE_KEY_BY_CHECK),
     "resilience": ("resilience_evidence", IOS_RESILIENCE_EVIDENCE_KEY_BY_CHECK),
 }
 
@@ -153,7 +153,7 @@ NETWORK_EVIDENCE_KEY_BY_CHECK = {
     "password is not hashed in transit": "password_not_hashed_in_transit",
     "weak certificate validation enables mitm attacks": "weak_certificate_validation_enables_mitm",
 }
-STORAGE_EVIDENCE_KEY_BY_CHECK = {
+DATA_STORAGE_EVIDENCE_KEY_BY_CHECK = {
     "accesses external storage": "accesses_external_storage",
     "authentication credentials not protected with android keystore": (
         "authentication_credentials_not_protected_with_android_keystore"
@@ -370,7 +370,7 @@ CODE_CHECK_SPECS = (
         "aliases": (),
     },
 )
-STORAGE_CHECK_SPECS = (
+DATA_STORAGE_CHECK_SPECS = (
     {
         "check": "Accesses External Storage",
         "severity": "Medium",
@@ -1014,7 +1014,7 @@ IOS_NETWORK_CHECK_SPECS = (
         "aliases": ("application utilizes certificate pinning protections",),
     },
 )
-IOS_STORAGE_CHECK_SPECS = (
+IOS_DATA_STORAGE_CHECK_SPECS = (
     {
         "check": "Application Utilizes Deprecated Keychain Attributes",
         "severity": "Medium",
@@ -1240,11 +1240,11 @@ IOS_STORAGE_CHECK_SPECS = (
         "aliases": (),
     },
 )
-_IOS_RETIRED_STORAGE_CHECK_NAMES = {
+_IOS_RETIRED_DATA_STORAGE_CHECK_NAMES = {
     "Local Data Exposure: WiFi MAC Address Stored Insecurely",
     "Local Data Exposure: Sensitive Values Stored in Memory",
 }
-IOS_STORAGE_CHECK_SPECS = tuple(
+IOS_DATA_STORAGE_CHECK_SPECS = tuple(
     {
         **spec,
         **(
@@ -1294,8 +1294,8 @@ IOS_STORAGE_CHECK_SPECS = tuple(
             else {}
         ),
     }
-    for spec in IOS_STORAGE_CHECK_SPECS
-    if spec["check"] not in _IOS_RETIRED_STORAGE_CHECK_NAMES
+    for spec in IOS_DATA_STORAGE_CHECK_SPECS
+    if spec["check"] not in _IOS_RETIRED_DATA_STORAGE_CHECK_NAMES
     and spec["check"] != "Local Data Exposure: GPS Longitude Stored Insecurely"
     and spec["check"] != "Local Data Exposure: GPS Longitude Logged Insecurely"
 )
@@ -1642,12 +1642,12 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     is_ios = _is_ios_platform(data)
     base_template = _ios_blank_template() if is_ios else _blank_template()
     report_data = _merge_nested(base_template, data)
-    _normalize_storage_section_name(report_data)
+    _normalize_data_storage_section_name(report_data)
 
     if is_ios:
         _canonicalize_ios_code_section(report_data)
         _canonicalize_ios_network_section(report_data)
-        _canonicalize_ios_storage_section(report_data)
+        _canonicalize_ios_data_storage_section(report_data)
         _canonicalize_ios_resilience_section(report_data)
         _apply_ios_derived_checks(report_data)
         _canonicalize_ios_binary_protections(report_data)
@@ -1655,7 +1655,7 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
         section_to_area = IOS_SECTION_TO_AREA
     else:
         _canonicalize_code_section(report_data)
-        _canonicalize_storage_section(report_data)
+        _canonicalize_data_storage_section(report_data)
         _canonicalize_network_section(report_data)
         _canonicalize_resilience_section(report_data)
         _apply_derived_vulnerability_checks(report_data)
@@ -1676,7 +1676,7 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     return _prune_placeholder_rows(report_data)
 
 
-def _normalize_storage_section_name(report_data: dict[str, Any]) -> None:
+def _normalize_data_storage_section_name(report_data: dict[str, Any]) -> None:
     """Normalize current and legacy storage section labels for both platforms."""
     sections = report_data.get("vulnerability_sections")
     if not isinstance(sections, list):
@@ -1793,27 +1793,29 @@ def _canonicalize_network_section(report_data: dict[str, Any]) -> None:
     network_section["checks"] = canonical_checks
 
 
-def _canonicalize_storage_section(report_data: dict[str, Any]) -> None:
+def _canonicalize_data_storage_section(report_data: dict[str, Any]) -> None:
     sections = report_data.get("vulnerability_sections")
     if not isinstance(sections, list):
         return
 
-    storage_section = None
+    data_storage_section = None
     for section in sections:
         if str(section.get("section_name", "")).strip().lower() == "data storage":
-            storage_section = section
+            data_storage_section = section
             break
-    if storage_section is None:
+    if data_storage_section is None:
         return
 
-    incoming_checks = list(storage_section.get("checks") or [])
+    incoming_checks = list(data_storage_section.get("checks") or [])
     lookup = {
         _normalized_check_name(check.get("check")): check
         for check in incoming_checks
         if isinstance(check, dict) and str(check.get("check", "")).strip()
     }
 
-    storage_section["checks"] = [_canonical_storage_check(report_data, spec, lookup) for spec in STORAGE_CHECK_SPECS]
+    data_storage_section["checks"] = [
+        _canonical_data_storage_check(report_data, spec, lookup) for spec in DATA_STORAGE_CHECK_SPECS
+    ]
 
 
 def _canonicalize_resilience_section(report_data: dict[str, Any]) -> None:
@@ -1849,8 +1851,8 @@ def _canonicalize_ios_network_section(report_data: dict[str, Any]) -> None:
     _canonicalize_ios_section(report_data, "network", IOS_NETWORK_CHECK_SPECS)
 
 
-def _canonicalize_ios_storage_section(report_data: dict[str, Any]) -> None:
-    _canonicalize_ios_section(report_data, "data storage", IOS_STORAGE_CHECK_SPECS)
+def _canonicalize_ios_data_storage_section(report_data: dict[str, Any]) -> None:
+    _canonicalize_ios_section(report_data, "data storage", IOS_DATA_STORAGE_CHECK_SPECS)
 
 
 def _canonicalize_ios_resilience_section(report_data: dict[str, Any]) -> None:
@@ -1865,7 +1867,7 @@ def _canonicalize_ios_section(
     """Shared iOS canonicalizer for the Code/Network/Data Storage/Resilience sections.
 
     Mirrors the Android canonicalizers' precedence: (1) an evidence-dict
-    entry (`code_evidence` / `network_evidence` / `storage_evidence` /
+    entry (`code_evidence` / `network_evidence` / `data_storage_evidence` /
     `resilience_evidence`, keyed via IOS_SECTION_EVIDENCE) with a non-null
     "present" wins first, since that's the structured, machine-generated
     scan output; (2) a check already present in the incoming
@@ -1895,8 +1897,6 @@ def _canonicalize_ios_section(
 
     evidence_top_key, evidence_map = IOS_SECTION_EVIDENCE.get(section_name, (None, {}))
     evidence_dict = report_data.get(evidence_top_key) if evidence_top_key else None
-    if section_name == "data storage" and not evidence_dict:
-        evidence_dict = report_data.get("data_evidence")
     evidence_dict = evidence_dict if isinstance(evidence_dict, dict) else {}
 
     section["checks"] = [_canonical_ios_check(spec, lookup, evidence_dict, evidence_map) for spec in specs]
@@ -2078,7 +2078,7 @@ def _normalize_ios_url_schemes(report_data: dict[str, Any]) -> None:
     report_data["url_schemes"] = normalized
 
 
-def _canonical_storage_check(
+def _canonical_data_storage_check(
     report_data: dict[str, Any],
     spec: dict[str, Any],
     lookup: dict[str, dict[str, Any]],
@@ -2091,18 +2091,18 @@ def _canonical_storage_check(
 
     canonical_name = _normalized_check_name(spec["check"])
     source = lookup.get(canonical_name)
-    storage_evidence = _storage_evidence_entry(report_data, canonical_name)
+    data_storage_evidence = _data_storage_evidence_entry(report_data, canonical_name)
 
-    if storage_evidence is not None and storage_evidence.get("present") is not None:
-        result = "Present" if storage_evidence.get("present") else "Not Present"
-        explanation = _storage_explanation(spec, result)
-        evidence = _non_empty_string(storage_evidence.get("evidence"))
+    if data_storage_evidence is not None and data_storage_evidence.get("present") is not None:
+        result = "Present" if data_storage_evidence.get("present") else "Not Present"
+        explanation = _data_storage_explanation(spec, result)
+        evidence = _non_empty_string(data_storage_evidence.get("evidence"))
         if source is not None:
             compliance = _non_empty_string(source.get("compliance")) or compliance
             remediation_link = _non_empty_string(source.get("remediation_link"))
     elif source is not None:
         result = _present_not_present(source.get("result")) or result
-        explanation = _non_empty_string(source.get("explanation")) or _storage_explanation(spec, result)
+        explanation = _non_empty_string(source.get("explanation")) or _data_storage_explanation(spec, result)
         compliance = _non_empty_string(source.get("compliance")) or compliance
         evidence = _non_empty_string(source.get("evidence"))
         remediation_link = _non_empty_string(source.get("remediation_link"))
@@ -2110,7 +2110,7 @@ def _canonical_storage_check(
         alias_source = _first_matching_alias(spec, lookup)
         if alias_source is not None:
             result = _present_not_present(alias_source.get("result")) or result
-            explanation = _storage_explanation(spec, result)
+            explanation = _data_storage_explanation(spec, result)
             compliance = _non_empty_string(alias_source.get("compliance")) or compliance
             evidence = _non_empty_string(alias_source.get("evidence"))
             remediation_link = _non_empty_string(alias_source.get("remediation_link"))
@@ -2498,14 +2498,14 @@ def _network_evidence_entry(report_data: dict[str, Any], canonical_check_name: s
     return entry
 
 
-def _storage_evidence_entry(report_data: dict[str, Any], canonical_check_name: str) -> dict[str, Any] | None:
-    storage_evidence = report_data.get("storage_evidence")
-    if not isinstance(storage_evidence, dict):
+def _data_storage_evidence_entry(report_data: dict[str, Any], canonical_check_name: str) -> dict[str, Any] | None:
+    data_storage_evidence = report_data.get("data_storage_evidence")
+    if not isinstance(data_storage_evidence, dict):
         return None
-    evidence_key = STORAGE_EVIDENCE_KEY_BY_CHECK.get(canonical_check_name)
+    evidence_key = DATA_STORAGE_EVIDENCE_KEY_BY_CHECK.get(canonical_check_name)
     if not evidence_key:
         return None
-    entry = storage_evidence.get(evidence_key)
+    entry = data_storage_evidence.get(evidence_key)
     if not isinstance(entry, dict):
         return None
     return entry
@@ -2614,7 +2614,7 @@ def _network_explanation(spec: dict[str, Any], result: str) -> str:
     return spec["not_present_explanation"]
 
 
-def _storage_explanation(spec: dict[str, Any], result: str) -> str:
+def _data_storage_explanation(spec: dict[str, Any], result: str) -> str:
     if _normalized_check_name(result) == "present":
         return spec["present_explanation"]
     return spec["not_present_explanation"]

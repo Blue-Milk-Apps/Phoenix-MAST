@@ -11,6 +11,7 @@ from domain.post_scan.android.app_component_builder import AppComponentBuilder
 from domain.post_scan.android.app_info_builder import AndroidAppInfoBuilder
 from domain.post_scan.android.application_builder import ApplicationBuilder
 from domain.post_scan.android.code_evidence_builder import CodeEvidenceBuilder
+from domain.post_scan.android.data_storage_evidence_builder import DataStorageEvidenceBuilder
 from domain.post_scan.android.deep_links_builder import DeepLinksBuilder
 from domain.post_scan.android.endpoints_builder import EndpointsBuilder
 from domain.post_scan.android.file_info_builder import FileInfoBuilder
@@ -20,7 +21,6 @@ from domain.post_scan.android.meta import AndroidMeta
 from domain.post_scan.android.network_evidence_builder import NetworkEvidenceBuilder
 from domain.post_scan.android.permissions_builder import PermissionsBuilder
 from domain.post_scan.android.resilience_evidence_builder import ResilienceEvidenceBuilder
-from domain.post_scan.android.storage_evidence_builder import StorageEvidenceBuilder
 from ports.scan_detail_extractor_port import ScanDetailExtractorPort
 
 
@@ -43,7 +43,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
         hardcoded_values = HardcodedValuesBuilder(loaded_outputs)
         meta = AndroidMeta(loaded_outputs)
         network_evidence = NetworkEvidenceBuilder(loaded_outputs, hardcoded_values)
-        storage_evidence = StorageEvidenceBuilder(loaded_outputs, hardcoded_values)
+        data_storage_evidence = DataStorageEvidenceBuilder(loaded_outputs, hardcoded_values)
         endpoints = EndpointsBuilder(loaded_outputs).items
 
         return {
@@ -58,7 +58,7 @@ class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "functionality": functionality,
             "network_evidence": asdict(network_evidence),
             "resilience_evidence": asdict(resilience_evidence),
-            "storage_evidence": asdict(storage_evidence),
+            "data_storage_evidence": asdict(data_storage_evidence),
             "deep_links": asdict(deeplink_builder),
             "hardcoded_values": asdict(hardcoded_values),
             "endpoints": endpoints,

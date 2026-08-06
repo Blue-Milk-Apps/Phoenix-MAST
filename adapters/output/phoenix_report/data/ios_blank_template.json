@@ -50,7 +50,7 @@
   "url_schemes": [],
   "code_evidence": {},
   "network_evidence": {},
-  "storage_evidence": {},
+  "data_storage_evidence": {},
   "resilience_evidence": {},
   "functionality": {
     "Camera": { "present": false, "explanation": "" },

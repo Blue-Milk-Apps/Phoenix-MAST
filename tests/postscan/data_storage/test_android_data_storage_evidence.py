@@ -1,7 +1,7 @@
 from adapters.post_scan import AndroidBinaryScanDetailExtractor
 
 
-def test_android_binary_scan_detail_extractor_builds_storage_evidence_from_permissions_and_api_calls() -> None:
+def test_android_binary_scan_detail_extractor_builds_data_storage_evidence_from_permissions_and_api_calls() -> None:
     loaded_outputs = {
         "aapt2_permissions": {
             "permissions": [
@@ -36,7 +36,7 @@ def test_android_binary_scan_detail_extractor_builds_storage_evidence_from_permi
 
     sections = AndroidBinaryScanDetailExtractor().extract_sections(loaded_outputs)
 
-    assert sections["storage_evidence"] == {
+    assert sections["data_storage_evidence"] == {
         "accesses_external_storage": {
             "present": True,
             "evidence": ("android.permission.READ_EXTERNAL_STORAGE, android.permission.WRITE_EXTERNAL_STORAGE"),
