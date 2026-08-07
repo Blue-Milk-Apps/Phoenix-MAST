@@ -7,7 +7,7 @@ from domain.post_scan.utilities import first_non_empty
 
 
 @dataclass
-class FunctionalityBuilder:
+class Functionality:
     items: dict[str, dict[str, Any]]
 
     KEYS = (

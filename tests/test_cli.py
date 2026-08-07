@@ -127,7 +127,10 @@ def _assert_scanner_types(config: ScanConfig, expected_scan_types: set[ScanType]
 
 
 def test_create_scan_config_for_android_binary(tmp_path: Path, monkeypatch) -> None:
+    rules_path = tmp_path / "rules" / "android"
+    rules_path.mkdir(parents=True)
     monkeypatch.delenv("MOBSF_URL", raising=False)
+    monkeypatch.setattr(cli, "_resolve_opengrep_rules_path", lambda override, slug: rules_path)
     args = _scan_args(tmp_path, "--android-binary-path")
 
     config = cli._create_scan_config(args)
@@ -137,7 +140,7 @@ def test_create_scan_config_for_android_binary(tmp_path: Path, monkeypatch) -> N
     assert config.target_type == "BINARY"
     assert config.platform == "ANDROID"
     assert config.stack == "ANY"
-    assert config.opengrep_rules_path == (Path(cli.__file__).parent.parent / "rules" / "android").resolve()
+    assert config.opengrep_rules_path == rules_path
     assert config.output_path.parent == (tmp_path / "results").resolve()
     assert config.output_path.name.startswith("SAST_android_binary_")
     _assert_scanner_types(
@@ -454,7 +457,10 @@ def test_create_scan_config_for_react_native_source_includes_opengrep_when_rules
     }
 
 
-def test_create_scan_config_for_native_android_source(tmp_path: Path) -> None:
+def test_create_scan_config_for_native_android_source(tmp_path: Path, monkeypatch) -> None:
+    rules_path = tmp_path / "rules" / "android"
+    rules_path.mkdir(parents=True)
+    monkeypatch.setattr(cli, "_resolve_opengrep_rules_path", lambda override, slug: rules_path)
     args = _scan_args(tmp_path, "--native-android-source-path")
 
     config = cli._create_scan_config(args)
@@ -463,7 +469,7 @@ def test_create_scan_config_for_native_android_source(tmp_path: Path) -> None:
     assert config.target_type == "SOURCE"
     assert config.platform == "ANDROID"
     assert config.stack == "NATIVE_ANDROID"
-    assert config.opengrep_rules_path == (Path(cli.__file__).parent.parent / "rules" / "android").resolve()
+    assert config.opengrep_rules_path == rules_path
     assert config.output_path.name.startswith("SAST_native_android_source_")
     _assert_scanner_types(
         config,
@@ -590,7 +596,10 @@ def test_scan_command_passes_scan_config_to_mobile_analysis_workflow_service(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
+    rules_path = tmp_path / "rules" / "android"
+    rules_path.mkdir(parents=True)
     monkeypatch.delenv("MOBSF_URL", raising=False)
+    monkeypatch.setattr(cli, "_resolve_opengrep_rules_path", lambda override, slug: rules_path)
     captured = {}
 
     class RecordingMobileAnalysisWorkflowService:
@@ -617,7 +626,7 @@ def test_scan_command_passes_scan_config_to_mobile_analysis_workflow_service(
     assert exit_code == 0
     assert captured["config"].platform == "ANDROID"
     assert captured["config"].stack == "ANY"
-    assert captured["config"].opengrep_rules_path == (Path(cli.__file__).parent.parent / "rules" / "android").resolve()
+    assert captured["config"].opengrep_rules_path == rules_path
     assert not hasattr(captured["config"], "scanners")
     assert not hasattr(captured["config"], "enabled_scans")
 

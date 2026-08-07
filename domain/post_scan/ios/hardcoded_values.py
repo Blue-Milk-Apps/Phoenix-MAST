@@ -1,4 +1,4 @@
-"""Build default iOS hardcoded values section."""
+"""Build the default iOS hardcoded values section."""
 
 from __future__ import annotations
 

@@ -4,8 +4,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from domain.post_scan.android.functionality_builder import FunctionalityBuilder
-from domain.post_scan.android.hardcoded_values_builder import HardcodedValuesBuilder
+from domain.post_scan.android.functionality import Functionality
+from domain.post_scan.android.hardcoded_values import HardcodedValues
 from domain.post_scan.utilities import (
     api_call_caller_signature,
     api_call_signature,
@@ -44,7 +44,7 @@ class DataStorageEvidence:
         "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
     }
 
-    def __init__(self, loaded_outputs: dict[str, Any], hardcoded_values: HardcodedValuesBuilder) -> None:
+    def __init__(self, loaded_outputs: dict[str, Any], hardcoded_values: HardcodedValues) -> None:
         aapt2_permissions = loaded_outputs.get("aapt2_permissions") or {}
         androguard_api_calls = loaded_outputs.get("androguard_api_calls") or {}
 
@@ -73,7 +73,7 @@ class DataStorageEvidence:
         accesses_external_storage_evidence = dedupe_preserve_order(
             [*external_storage_permissions, *external_storage_callers]
         )
-        keystore = FunctionalityBuilder(loaded_outputs).items.get("Keystore") or {}
+        keystore = Functionality(loaded_outputs).items.get("Keystore") or {}
         keystore_present = bool(keystore.get("present"))
 
         authentication_credentials_present = None
@@ -156,7 +156,7 @@ class DataStorageEvidence:
         self,
         external_storage_callers: list[str],
         *,
-        hardcoded_values: HardcodedValuesBuilder,
+        hardcoded_values: HardcodedValues,
     ) -> dict[str, Any]:
         sensitive_callers = [
             caller

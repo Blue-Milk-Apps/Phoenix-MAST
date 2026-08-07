@@ -5,7 +5,7 @@ from domain.post_scan.utilities import first_non_empty
 
 
 @dataclass
-class ApplicationBuilder:
+class Application:
     debuggable: bool = False
     allow_backup: bool = False
     uses_cleartext_traffic: bool = False

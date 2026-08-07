@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from domain.post_scan.android.hardcoded_values_builder import HardcodedValuesBuilder
+from domain.post_scan.android.hardcoded_values import HardcodedValues
 from domain.post_scan.utilities import (
     api_call_caller_signature,
     api_call_signature,
@@ -60,7 +60,7 @@ class NetworkEvidence:
         "argon2",
     )
 
-    def __init__(self, loaded_outputs: dict[str, Any], hardcoded_values: HardcodedValuesBuilder) -> None:
+    def __init__(self, loaded_outputs: dict[str, Any], hardcoded_values: HardcodedValues) -> None:
         network_security = loaded_outputs.get("apktool_network_security_config") or {}
         aapt2_application = loaded_outputs.get("aapt2_application") or {}
         aapt2_posture = loaded_outputs.get("aapt2_manifest_security_posture") or {}
@@ -256,7 +256,7 @@ class NetworkEvidence:
 
     @staticmethod
     def _detect_unencrypted_transit_issue(
-        hardcoded_values: HardcodedValuesBuilder,
+        hardcoded_values: HardcodedValues,
         *,
         cleartext_present: bool,
         password_not_hashed_in_transit: dict[str, Any],

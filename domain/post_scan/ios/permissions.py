@@ -1,4 +1,4 @@
-"""Build default iOS permissions section."""
+"""Build the default iOS permissions section."""
 
 from __future__ import annotations
 

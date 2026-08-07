@@ -1,4 +1,4 @@
-"""Build iOS binary meta section for post-scan reports."""
+"""Build the iOS binary meta section for post-scan reports."""
 
 from __future__ import annotations
 

@@ -1,11 +1,11 @@
-"""Build default iOS app info section for post-scan reports."""
+"""Build the default iOS app info section for post-scan reports."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
 
-from domain.post_scan.ios.meta_builder import IOSMeta, IOSProjectMetadata
+from domain.post_scan.ios.meta import IOSMeta, IOSProjectMetadata
 from domain.post_scan.utilities import first_non_empty
 
 

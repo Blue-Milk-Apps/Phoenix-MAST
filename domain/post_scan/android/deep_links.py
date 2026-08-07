@@ -5,7 +5,7 @@ from typing import Any
 
 
 @dataclass
-class DeepLinksBuilder:
+class DeepLinks:
     deep_links: list[dict[str, Any]]
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
