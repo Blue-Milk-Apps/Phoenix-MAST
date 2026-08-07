@@ -282,10 +282,19 @@ def test_plist_scan_skips_when_no_plists_found(tmp_path: Path) -> None:
     assert "No plist files" in results[0].error_message
 
 
-def test_plist_scan_works_with_demo_project_fixture(tmp_path: Path) -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    project_path = repo_root / "demo-projects" / "plist_example"
-    assert project_path.exists()
+def test_plist_scan_works_with_temporary_project_fixture(tmp_path: Path) -> None:
+    project_path = tmp_path / "plist_example"
+    project_path.mkdir()
+    with (project_path / "Info.plist").open("wb") as handle:
+        plistlib.dump(
+            {
+                "CFBundleIdentifier": "com.example.fixture",
+                "CFBundleName": "FixtureApp",
+                "CFBundlePackageType": "APPL",
+            },
+            handle,
+            fmt=plistlib.FMT_BINARY,
+        )
 
     config = ScanConfig(
         project_path=project_path,

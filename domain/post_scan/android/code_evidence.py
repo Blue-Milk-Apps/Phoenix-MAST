@@ -2,10 +2,10 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from domain.post_scan.android.app_component_builder import AppComponentBuilder
-from domain.post_scan.android.app_info_builder import AndroidAppInfoBuilder
-from domain.post_scan.android.application_builder import ApplicationBuilder
-from domain.post_scan.android.hardcoded_values_builder import HardcodedValuesBuilder
+from domain.post_scan.android.app_component import AppComponent
+from domain.post_scan.android.app_info import AndroidAppInfo
+from domain.post_scan.android.application import Application
+from domain.post_scan.android.hardcoded_values import HardcodedValues
 from domain.post_scan.utilities import (
     api_call_caller_signature,
     api_call_signature,
@@ -88,11 +88,11 @@ class CodeEvidence:
     def __init__(
         self,
         loaded_outputs: dict[str, Any],
-        app_components: AppComponentBuilder,
-        application: ApplicationBuilder,
-        app_info: AndroidAppInfoBuilder,
+        app_components: AppComponent,
+        application: Application,
+        app_info: AndroidAppInfo,
     ):
-        hardcoded_values = HardcodedValuesBuilder(loaded_outputs)
+        hardcoded_values = HardcodedValues(loaded_outputs)
 
         aapt2_identity = loaded_outputs.get("aapt2_identity") or {}
         aapt2_permissions = loaded_outputs.get("aapt2_permissions") or {}
@@ -715,7 +715,7 @@ class CodeEvidence:
 
     def component_access_evidence(
         self,
-        app_components: AppComponentBuilder,
+        app_components: AppComponent,
         exported_key: str,
         label: str,
     ) -> dict[str, Any]:

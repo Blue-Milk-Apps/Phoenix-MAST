@@ -1,4 +1,4 @@
-"""Build default iOS third-party SDK section."""
+"""Build the default iOS third-party SDK section."""
 
 from __future__ import annotations
 

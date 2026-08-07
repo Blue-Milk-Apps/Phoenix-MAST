@@ -1,4 +1,4 @@
-"""Build iOS functionality section from loaded scan outputs."""
+"""Build the iOS functionality section from loaded scan outputs."""
 
 from __future__ import annotations
 
