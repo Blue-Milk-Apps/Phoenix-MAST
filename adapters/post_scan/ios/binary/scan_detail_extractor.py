@@ -5,21 +5,21 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any
 
-from domain.post_scan.ios.app_info import IOSAppInfo
-from domain.post_scan.ios.code_evidence import IOSCodeEvidence
-from domain.post_scan.ios.data_storage_evidence import IOSDataStorageEvidence
-from domain.post_scan.ios.endpoints import IOSEndpoints
-from domain.post_scan.ios.file_info import IOSFileInfo
-from domain.post_scan.ios.functionality import IOSFunctionality
-from domain.post_scan.ios.hardcoded_values import IOSHardcodedValues
-from domain.post_scan.ios.ipa_binary_evidence import IOSIPABinaryEvidence
-from domain.post_scan.ios.meta import IOSMeta
-from domain.post_scan.ios.network_evidence import IOSNetworkEvidence
-from domain.post_scan.ios.permissions import IOSPermissions
-from domain.post_scan.ios.resilience_evidence import IOSResilienceEvidence
-from domain.post_scan.ios.third_party_sdks import IOSThirdPartySDKs
-from domain.post_scan.ios.url_schemes import IOSURLSchemes
-from ports.scan_detail_extractor_port import ScanDetailExtractorPort
+from domain.post_scan.ios.binary.app_info import IOSAppInfo
+from domain.post_scan.ios.binary.code_evidence import IOSCodeEvidence
+from domain.post_scan.ios.binary.endpoints import IOSEndpoints
+from domain.post_scan.ios.binary.file_info import IOSFileInfo
+from domain.post_scan.ios.binary.hardcoded_values import IOSHardcodedValues
+from domain.post_scan.ios.binary.ipa_binary_evidence import IOSIPABinaryEvidence
+from domain.post_scan.ios.binary.meta import IOSMeta
+from domain.post_scan.ios.binary.resilience_evidence import IOSResilienceEvidence
+from domain.post_scan.ios.binary.url_schemes import IOSURLSchemes
+from domain.post_scan.ios.common.data_storage_evidence import IOSDataStorageEvidence
+from domain.post_scan.ios.common.functionality import IOSFunctionality
+from domain.post_scan.ios.common.network_evidence import IOSNetworkEvidence
+from domain.post_scan.ios.common.permissions import IOSPermissions
+from domain.post_scan.ios.common.third_party_sdks import IOSThirdPartySDKs
+from ports.post_scan.scan_detail_extractor_port import ScanDetailExtractorPort
 
 
 class IOSBinaryScanDetailExtractor(ScanDetailExtractorPort):

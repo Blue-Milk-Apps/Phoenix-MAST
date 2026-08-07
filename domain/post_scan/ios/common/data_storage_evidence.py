@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from domain.post_scan.ios.code_evidence import EvidenceEntry
+from domain.post_scan.ios.common.evidence import EvidenceEntry
 
 # TODO(dynamic): Add sensitive-values-in-memory evidence when runtime memory inspection is available.
 # It is intentionally omitted from static scan results.

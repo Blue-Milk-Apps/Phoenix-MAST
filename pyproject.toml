@@ -35,6 +35,9 @@ packages = [
     "adapters.output",
     "adapters.output.phoenix_report",
     "adapters.post_scan",
+    "adapters.post_scan.ios",
+    "adapters.post_scan.ios.binary",
+    "adapters.post_scan.ios.native",
     "adapters.storage",
     "adapters.source_code_scanners",
     "application",
@@ -42,8 +45,12 @@ packages = [
     "domain.post_scan",
     "domain.post_scan.android",
     "domain.post_scan.ios",
+    "domain.post_scan.ios.binary",
+    "domain.post_scan.ios.common",
+    "domain.post_scan.ios.native",
     "entrypoints",
     "ports",
+    "ports.post_scan",
     "utilities",
 ]
 

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from domain.post_scan.ios.native_meta import NativeIOSMeta
-from domain.post_scan.ios.native_scan_extraction_context import NativeIOSScanExtractionContext
+from domain.post_scan.ios.native.meta import NativeIOSMeta
+from domain.post_scan.ios.native.scan_extraction_context import NativeIOSScanExtractionContext
 
 
 @dataclass

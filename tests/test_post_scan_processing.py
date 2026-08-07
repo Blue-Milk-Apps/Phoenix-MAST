@@ -8,7 +8,7 @@ from adapters.post_scan import (
     IOSBinaryScanOutputLoader,
 )
 from application.post_scan_processing_service import PostScanProcessingService
-from domain.post_scan.ios.network_evidence import IOSNetworkEvidence
+from domain.post_scan.ios.common.network_evidence import IOSNetworkEvidence
 
 
 def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() -> None:

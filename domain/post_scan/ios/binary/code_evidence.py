@@ -6,14 +6,9 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from domain.post_scan.ios.ipa_binary_evidence import IOSIPABinaryEvidence
+from domain.post_scan.ios.binary.ipa_binary_evidence import IOSIPABinaryEvidence
+from domain.post_scan.ios.common.evidence import EvidenceEntry
 from domain.post_scan.utilities import first_non_empty
-
-
-@dataclass
-class EvidenceEntry:
-    present: bool = False
-    evidence: str = ""
 
 
 @dataclass

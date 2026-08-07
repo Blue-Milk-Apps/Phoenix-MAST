@@ -6,7 +6,7 @@ import json
 import re
 from dataclasses import dataclass
 
-from domain.post_scan.ios.native_scan_extraction_context import NativeIOSScanExtractionContext
+from domain.post_scan.ios.native.scan_extraction_context import NativeIOSScanExtractionContext
 
 
 @dataclass

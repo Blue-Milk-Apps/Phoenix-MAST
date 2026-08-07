@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from domain.post_scan.ios.meta import IOSMeta, IOSProjectMetadata
+from domain.post_scan.ios.binary.meta import IOSMeta, IOSProjectMetadata
 from domain.post_scan.utilities import first_non_empty
 
 

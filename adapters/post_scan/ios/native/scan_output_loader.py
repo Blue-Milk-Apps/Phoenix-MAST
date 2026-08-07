@@ -1,4 +1,4 @@
-"""iOS binary scan-output loader for post-scan processing."""
+"""Native iOS source scan-output loader for post-scan processing."""
 
 from __future__ import annotations
 
@@ -6,11 +6,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from ports.scan_output_loader_port import ScanOutputLoaderPort
+from ports.post_scan.scan_output_loader_port import ScanOutputLoaderPort
 
 
-class IOSBinaryScanOutputLoader(ScanOutputLoaderPort):
-    """Load iOS binary scan outputs needed by post-scan processing."""
+class NativeIOSScanOutputLoader(ScanOutputLoaderPort):
+    """Load native iOS source scan outputs needed by post-scan processing."""
 
     def load(self, scan_output_path: Path) -> dict[str, Any]:
         root = Path(scan_output_path)
@@ -18,11 +18,11 @@ class IOSBinaryScanOutputLoader(ScanOutputLoaderPort):
             "scan_output_path": str(root),
             "scan_metadata": self._load_json(root / "scan_metadata.json"),
             "opengrep": self._load_json(root / "opengrep_source" / "opengrep_results.json"),
-            "ipsw_outputs": self._load_json_documents(root / "ipsw"),
-            "lief_outputs": self._load_json_documents(root / "lief"),
-            "plist_outputs": self._load_json_documents(root / "plist_binary", exclude={"scan_index.json"}),
-            "plist_index": self._load_json(root / "plist_binary" / "scan_index.json"),
-            "strings_outputs": self._load_text_outputs(root / "strings", "*.txt"),
+            "plist_outputs": self._load_json_documents(
+                root / "plist_source",
+                exclude={"scan_index.json"},
+            ),
+            "plist_index": self._load_json(root / "plist_source" / "scan_index.json"),
             "trufflehog_outputs": self._load_optional_outputs(root / "trufflehog"),
             "gitleaks_outputs": self._load_optional_outputs(root / "gitleaks"),
             "syft_outputs": self._load_optional_outputs(root / "syft"),
@@ -57,21 +57,6 @@ class IOSBinaryScanOutputLoader(ScanOutputLoaderPort):
             outputs[relative_path] = cls._load_json(path)
         return outputs
 
-    @staticmethod
-    def _load_text_outputs(root: Path, pattern: str = "*") -> dict[str, str]:
-        if not root.is_dir():
-            return {}
-
-        outputs: dict[str, str] = {}
-        for path in sorted(root.rglob(pattern)):
-            if not path.is_file():
-                continue
-            outputs[path.relative_to(root).as_posix()] = path.read_text(
-                encoding="utf-8",
-                errors="ignore",
-            )
-        return outputs
-
     @classmethod
     def _load_optional_outputs(cls, root: Path, pattern: str = "*") -> dict[str, Any]:
         if not root.is_dir():
@@ -81,11 +66,11 @@ class IOSBinaryScanOutputLoader(ScanOutputLoaderPort):
         for path in sorted(root.rglob(pattern)):
             if not path.is_file():
                 continue
-            relative = path.relative_to(root).as_posix()
+            relative_path = path.relative_to(root).as_posix()
             if path.suffix.lower() == ".json":
-                outputs[relative] = cls._load_json(path)
+                outputs[relative_path] = cls._load_json(path)
             else:
-                outputs[relative] = path.read_text(
+                outputs[relative_path] = path.read_text(
                     encoding="utf-8",
                     errors="ignore",
                 )

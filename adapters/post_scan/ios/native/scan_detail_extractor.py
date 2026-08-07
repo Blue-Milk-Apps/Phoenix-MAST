@@ -5,18 +5,18 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any
 
-from domain.post_scan.ios.data_storage_evidence import IOSDataStorageEvidence
-from domain.post_scan.ios.functionality import IOSFunctionality
-from domain.post_scan.ios.native_app_info import NativeIOSAppInfo
-from domain.post_scan.ios.native_code_evidence import NativeIOSCodeEvidence
-from domain.post_scan.ios.native_file_info import NativeIOSFileInfo
-from domain.post_scan.ios.native_meta import NativeIOSMeta
-from domain.post_scan.ios.native_scan_extraction_context import NativeIOSScanExtractionContext
-from domain.post_scan.ios.native_url_schemes import NativeIOSURLSchemes
-from domain.post_scan.ios.network_evidence import IOSNetworkEvidence
-from domain.post_scan.ios.permissions import IOSPermissions
-from domain.post_scan.ios.third_party_sdks import IOSThirdPartySDKs
-from ports.scan_detail_extractor_port import ScanDetailExtractorPort
+from domain.post_scan.ios.common.data_storage_evidence import IOSDataStorageEvidence
+from domain.post_scan.ios.common.functionality import IOSFunctionality
+from domain.post_scan.ios.common.network_evidence import IOSNetworkEvidence
+from domain.post_scan.ios.common.permissions import IOSPermissions
+from domain.post_scan.ios.common.third_party_sdks import IOSThirdPartySDKs
+from domain.post_scan.ios.native.app_info import NativeIOSAppInfo
+from domain.post_scan.ios.native.code_evidence import NativeIOSCodeEvidence
+from domain.post_scan.ios.native.file_info import NativeIOSFileInfo
+from domain.post_scan.ios.native.meta import NativeIOSMeta
+from domain.post_scan.ios.native.scan_extraction_context import NativeIOSScanExtractionContext
+from domain.post_scan.ios.native.url_schemes import NativeIOSURLSchemes
+from ports.post_scan.scan_detail_extractor_port import ScanDetailExtractorPort
 
 
 class NativeIOSScanDetailExtractor(ScanDetailExtractorPort):
