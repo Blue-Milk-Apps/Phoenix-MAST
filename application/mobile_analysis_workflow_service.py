@@ -46,7 +46,7 @@ class MobileScannerFactory:
     def build_scanner_list(self, config: ScanConfig) -> list[ScannerPort]:
         scanners = self._base_scanners(config)
 
-        if self._mobsf_url_configured():
+        if config.target_type == "BINARY" and self._mobsf_url_configured():
             scanners.append(MobSFScanner())
 
         return scanners
@@ -105,7 +105,7 @@ class MobileScannerFactory:
     @staticmethod
     def _get_opengrep_scan_paths(config: ScanConfig) -> list[Path]:
         if config.target_type == "SOURCE":
-            return [config.project_path, config.output_path]
+            return [config.project_path]
         if config.target_type == "BINARY":
             return [config.output_path]
         raise ValueError(f"Unsupported target type for OpenGrep scan paths: {config.target_type}")
