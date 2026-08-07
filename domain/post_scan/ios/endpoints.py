@@ -1,4 +1,4 @@
-"""Build default iOS endpoints section."""
+"""Build the default iOS endpoints section."""
 
 from __future__ import annotations
 

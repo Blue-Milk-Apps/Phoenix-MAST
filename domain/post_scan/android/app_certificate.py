@@ -5,7 +5,7 @@ from domain.post_scan.utilities import first_non_empty
 
 
 @dataclass
-class AppCertificateBuilder:
+class AppCertificate:
     owner_name: str = ""
     organization: str = ""
     organizational_unit: str = ""
