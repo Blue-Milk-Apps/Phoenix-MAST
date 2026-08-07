@@ -21,6 +21,8 @@ from adapters.post_scan import (
     AndroidBinaryScanOutputLoader,
     IOSBinaryScanDetailExtractor,
     IOSBinaryScanOutputLoader,
+    NativeIOSScanDetailExtractor,
+    NativeIOSScanOutputLoader,
 )
 from adapters.source_code_scanners import (
     GitleaksScanner,
@@ -239,6 +241,11 @@ class MobileAnalysisWorkflowService:
                 return PostScanProcessingService(
                     scan_output_loader=IOSBinaryScanOutputLoader(),
                     scan_detail_extractor=IOSBinaryScanDetailExtractor(),
+                )
+            case ("SOURCE", "IOS", "NATIVE_IOS"):
+                return PostScanProcessingService(
+                    scan_output_loader=NativeIOSScanOutputLoader(),
+                    scan_detail_extractor=NativeIOSScanDetailExtractor(),
                 )
             case _:
                 return None
