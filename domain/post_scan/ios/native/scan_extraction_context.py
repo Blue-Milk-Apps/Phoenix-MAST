@@ -30,11 +30,37 @@ class NativeIOSScanExtractionContext:
         return {path: document for path, document in outputs.items() if isinstance(document, dict)}
 
     @property
+    def plist_index_entries(self) -> list[dict[str, Any]]:
+        index = self.loaded_outputs.get("plist_index") or {}
+        entries = index.get("plists") if isinstance(index, dict) else None
+        if not isinstance(entries, list):
+            return []
+        return [entry for entry in entries if isinstance(entry, dict)]
+
+    @property
+    def entitlement_outputs(self) -> dict[str, dict[str, Any]]:
+        return self._outputs_for_role("entitlements")
+
+    @property
+    def privacy_manifest_outputs(self) -> dict[str, dict[str, Any]]:
+        return self._outputs_for_role("privacy_manifest")
+
+    @property
     def primary_app_meta(self) -> dict[str, Any]:
-        for document in self.plist_outputs.values():
-            app_meta = document.get("app_meta")
-            if isinstance(app_meta, dict) and app_meta:
-                return app_meta
+        indexed_app_paths = {
+            str(entry.get("output_path", ""))
+            for entry in self.plist_index_entries
+            if entry.get("role") == "app" and entry.get("output_path")
+        }
+        candidates = [
+            (path, app_meta)
+            for path, document in self.plist_outputs.items()
+            if (not indexed_app_paths or path in indexed_app_paths)
+            and isinstance((app_meta := document.get("app_meta")), dict)
+            and app_meta
+        ]
+        if candidates:
+            return min(candidates, key=self._primary_app_sort_key)[1]
         return {}
 
     @property
@@ -89,3 +115,42 @@ class NativeIOSScanExtractionContext:
         if not isinstance(value, list):
             return []
         return list(dict.fromkeys(str(item).strip() for item in value if str(item).strip()))
+
+    def _outputs_for_role(self, role: str) -> dict[str, dict[str, Any]]:
+        paths = {
+            str(entry.get("output_path", ""))
+            for entry in self.plist_index_entries
+            if entry.get("role") == role and entry.get("output_path")
+        }
+        return {path: document for path, document in self.plist_outputs.items() if path in paths}
+
+    def _primary_app_sort_key(self, candidate: tuple[str, dict[str, Any]]) -> tuple[int, int, int, str]:
+        path, app_meta = candidate
+        lowered_parts = {part.lower() for part in Path(path).parts}
+        dependency_parts = {
+            ".build",
+            "carthage",
+            "deriveddata",
+            "frameworks",
+            "pods",
+            "vendor",
+        }
+        dependency_penalty = int(bool(lowered_parts & dependency_parts) or ".framework" in path.lower())
+
+        project_name = self._normalized_name(self.project_path.stem)
+        candidate_names = " ".join(
+            (
+                path,
+                str(app_meta.get("bundle_identifier", "")),
+                str(app_meta.get("bundle_name", "")),
+                str(app_meta.get("display_name", "")),
+            )
+        )
+        project_affinity_penalty = int(
+            bool(project_name) and project_name not in self._normalized_name(candidate_names)
+        )
+        return dependency_penalty, project_affinity_penalty, len(Path(path).parts), path.lower()
+
+    @staticmethod
+    def _normalized_name(value: str) -> str:
+        return "".join(character for character in value.lower() if character.isalnum())
