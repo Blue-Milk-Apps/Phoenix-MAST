@@ -3,17 +3,6 @@ import os
 import time
 from pathlib import Path
 
-from adapters.binary_scanners import (
-    Aapt2Scanner,
-    AndroguardScanner,
-    ApkidScanner,
-    ApksignerScanner,
-    ApktoolScanner,
-    IpswScanner,
-    LIEFScanner,
-    MobSFScanner,
-    PlistBinaryScanner,
-)
 from adapters.output.file_output import FileScanOutput
 from adapters.output.phoenix_report.generate_report import generate_report
 from adapters.post_scan import (
@@ -24,13 +13,26 @@ from adapters.post_scan import (
     NativeIOSScanDetailExtractor,
     NativeIOSScanOutputLoader,
 )
-from adapters.source_code_scanners import (
+from adapters.scanners.android import (
+    Aapt2Scanner,
+    AndroguardScanner,
+    ApkidScanner,
+    ApksignerScanner,
+    ApktoolScanner,
+)
+from adapters.scanners.common import (
     GitleaksScanner,
+    MobSFScanner,
     OpenGrepScanner,
-    PlistSourceScanner,
     StringsScanner,
     SyftScanner,
     TrufflehogScanner,
+)
+from adapters.scanners.ios import (
+    IpswScanner,
+    LIEFScanner,
+    PlistBinaryScanner,
+    PlistSourceScanner,
 )
 from application.post_scan_processing_service import PostScanProcessingService
 from application.scanner_service import ScannerService
