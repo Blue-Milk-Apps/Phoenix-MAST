@@ -21,19 +21,30 @@
     <img class="cover-icon" src="{{ app_icon_uri }}">
     <div class="cover-heading-text">
       <div class="title">{{ data.meta.app_display_name }}</div>
-      <div class="subtitle">Application Vulnerability Assessment</div>
+      <div class="subtitle">{{ data.report_scope.assessment_title }}</div>
     </div>
   </div>
   <table class="meta-table">
-    <tr><td class="label">File Name</td><td class="value">{{ data.meta.file_name }}</td></tr>
+    <tr><td class="label">{{ data.report_scope.target_label }}</td><td class="value">{{ data.meta.file_name }}</td></tr>
+    <tr><td class="label">Assessment Type</td><td class="value">{{ data.report_scope.assessment_label }}</td></tr>
     <tr><td class="label">Package Name</td><td class="value">{{ data.meta.package_name }}</td></tr>
     <tr><td class="label">Scan Date</td><td class="value">{{ data.meta.scan_date }}</td></tr>
     <tr><td class="label">Platform</td><td class="value">{{ data.meta.platform }}</td></tr>
-    <tr><td class="label">Version</td><td class="value">{{ data.meta.version_name }} ({{ data.meta.version_code }})</td></tr>
+    {% if data.meta.version_name or data.meta.version_code %}
+    <tr><td class="label">Version</td><td class="value">{% if data.meta.version_name and data.meta.version_code %}{{ data.meta.version_name }} ({{ data.meta.version_code }}){% else %}{{ data.meta.version_name or data.meta.version_code }}{% endif %}</td></tr>
+    {% endif %}
+    {% if not data.report_scope.target_type == 'SOURCE' or data.app_info.app_store_id %}
     <tr><td class="label">{{ 'App Store' if data.meta.platform == 'iOS' else 'Play Store' }}</td><td class="value">{{ data.app_info.app_store_id }}</td></tr>
+    {% endif %}
+    {% if not data.report_scope.target_type == 'SOURCE' or data.app_info.developer %}
     <tr><td class="label">Developer</td><td class="value">{{ data.app_info.developer }}</td></tr>
+    {% endif %}
+    {% if not data.report_scope.target_type == 'SOURCE' or data.app_info.categories %}
     <tr><td class="label">Categories</td><td class="value">{{ data.app_info.categories }}</td></tr>
+    {% endif %}
+    {% if not data.report_scope.target_type == 'SOURCE' or data.app_info.trackers_detected %}
     <tr><td class="label">Trackers Detected</td><td class="value">{{ data.app_info.trackers_detected }}</td></tr>
+    {% endif %}
   </table>
 </div>
 
@@ -98,13 +109,15 @@
   </table>
   {% endif %}
 
-  <h2>File Information</h2>
+  <h2>{{ data.report_scope.target_information_heading }}</h2>
   <table class="kv-table">
-    <tr><td class="k">File Name</td><td class="v">{{ data.file_info.filename }}</td></tr>
+    <tr><td class="k">{{ data.report_scope.target_label }}</td><td class="v">{{ data.file_info.filename }}</td></tr>
+    {% if data.report_scope.show_file_hashes %}
     <tr><td class="k">Size</td><td class="v">{{ data.file_info.size }}</td></tr>
     <tr><td class="k">MD5</td><td class="v mono">{{ data.file_info.md5 }}</td></tr>
     <tr><td class="k">SHA-1</td><td class="v mono">{{ data.file_info.sha1 }}</td></tr>
     <tr><td class="k">SHA-256</td><td class="v mono">{{ data.file_info.sha256 }}</td></tr>
+    {% endif %}
   </table>
 
   <h2>App Information</h2>
@@ -120,7 +133,7 @@
     <tr><td class="k">Version Name</td><td class="v">{{ data.app_info.version_name }}</td></tr>
   </table>
 
-  {% if data.meta.platform == 'iOS' %}
+  {% if data.report_scope.show_ios_binary_analysis %}
   <h2>IPA Binary Code Analysis</h2>
   <table>
     <tr><th class="col-check">Protection</th><th class="col-result">Status</th><th class="col-severity">Severity</th><th>Description</th></tr>
@@ -133,7 +146,9 @@
     </tr>
     {% endfor %}
   </table>
+  {% endif %}
 
+  {% if data.meta.platform == 'iOS' %}
   <h3>Custom URL Schemes</h3>
   {% if data.url_schemes %}
   <table class="compact">

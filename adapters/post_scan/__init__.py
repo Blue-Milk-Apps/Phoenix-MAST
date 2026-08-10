@@ -6,12 +6,14 @@ from adapters.post_scan.android_binary_scan_detail_extractor import (
 from adapters.post_scan.android_binary_scan_output_loader import (
     AndroidBinaryScanOutputLoader,
 )
-from adapters.post_scan.ios_binary_scan_detail_extractor import IOSBinaryScanDetailExtractor
-from adapters.post_scan.ios_binary_scan_output_loader import IOSBinaryScanOutputLoader
+from adapters.post_scan.ios.binary import IOSBinaryScanDetailExtractor, IOSBinaryScanOutputLoader
+from adapters.post_scan.ios.native import NativeIOSScanDetailExtractor, NativeIOSScanOutputLoader
 
 __all__ = [
     "AndroidBinaryScanDetailExtractor",
     "AndroidBinaryScanOutputLoader",
     "IOSBinaryScanDetailExtractor",
     "IOSBinaryScanOutputLoader",
+    "NativeIOSScanDetailExtractor",
+    "NativeIOSScanOutputLoader",
 ]
