@@ -1,7 +1,12 @@
 import json
 from pathlib import Path
 
-from adapters.output.phoenix_report.generate_report import _build_overall_evaluation, load_report_data
+from adapters.output.phoenix_report.generate_report import (
+    _build_overall_evaluation,
+    load_report_data,
+    result_badge,
+    risk_badge,
+)
 
 BASE_DIR = Path(__file__).resolve().parents[2] / "adapters" / "output" / "phoenix_report" / "data"
 CANONICAL_NETWORK_CHECKS = [
@@ -35,6 +40,22 @@ def _network_checks(path: Path) -> list[dict[str, str]]:
 
 def _check_map(checks: list[dict[str, str]]) -> dict[str, dict[str, str]]:
     return {check["check"]: check for check in checks}
+
+
+def _render_report_html(data: dict) -> str:
+    from jinja2 import Environment, FileSystemLoader
+
+    environment = Environment(loader=FileSystemLoader(str(BASE_DIR.parent / "templates")))
+    environment.globals["risk_badge"] = risk_badge
+    environment.globals["result_badge"] = result_badge
+    return environment.get_template("report.html.jinja").render(
+        data=load_report_data(data),
+        css="",
+        charts={"overall_risk_polar": ""},
+        app_icon_uri="",
+        phoenix_brand_icon_uri="",
+        show_confidence_caveats=False,
+    )
 
 
 def _data_storage_checks(path: Path) -> list[dict[str, str]]:
@@ -347,6 +368,91 @@ def test_load_report_data_adds_display_permission_names() -> None:
     assert report["permissions"][1]["display_permission"] == "com.example.app.permission.C2D_MESSAGE"
 
 
+def test_load_report_data_limits_ios_source_reports_to_assessed_content() -> None:
+    report = load_report_data(
+        {
+            "meta": {
+                "app_display_name": "Example",
+                "file_name": "Example",
+                "platform": "iOS",
+                "target_type": "SOURCE",
+            },
+            "code_evidence": {
+                "uses_uiwebview": {
+                    "present": True,
+                    "evidence": "Sources/WebView.swift: UIWebView",
+                }
+            },
+            "ipa_binary_evidence": {
+                "arc": False,
+                "pie": False,
+                "stack canary": False,
+            },
+        }
+    )
+
+    assert report["report_scope"] == {
+        "platform": "iOS",
+        "target_type": "SOURCE",
+        "assessment_label": "Source Code",
+        "assessment_title": "Source Code Vulnerability Assessment",
+        "target_label": "Project Name",
+        "target_information_heading": "Source Project Information",
+        "show_file_hashes": False,
+        "show_ios_binary_analysis": False,
+        "assessed_sections": ("code", "network", "data storage"),
+    }
+    assert [section["section_name"] for section in report["vulnerability_sections"]] == [
+        "Code",
+        "Network",
+        "Data Storage",
+    ]
+    code_section = next(section for section in report["vulnerability_sections"] if section["section_name"] == "Code")
+    check_map = _check_map(code_section["checks"])
+    assert check_map["Deprecated API - UIWebView"]["result"] == "Present"
+    assert "Missing ARC Binary Protections" not in check_map
+    assert "Position-Independent Code (PIC) Not Enabled" not in check_map
+    assert "Stack Canaries Not Enabled" not in check_map
+    assert "Insecure API Usage in Binary" not in check_map
+    assert "Usage of malloc Instead of calloc in Binary" not in check_map
+    assert report["ipa_binary_protections"] == []
+    assert set(report["risk_summary"]) == {"code_vulnerability", "data_storage", "networking"}
+
+
+def test_report_template_switches_between_ios_source_and_binary_presentation() -> None:
+    source_html = _render_report_html(
+        {
+            "meta": {
+                "app_display_name": "Example",
+                "file_name": "ExampleProject",
+                "platform": "iOS",
+                "target_type": "SOURCE",
+            }
+        }
+    )
+    assert "Source Code Vulnerability Assessment" in source_html
+    assert "Source Project Information" in source_html
+    assert "Project Name" in source_html
+    assert "IPA Binary Code Analysis" not in source_html
+    assert '<td class="k">MD5</td>' not in source_html
+    assert "Custom URL Schemes" in source_html
+
+    binary_html = _render_report_html(
+        {
+            "meta": {
+                "app_display_name": "Example",
+                "file_name": "Example.ipa",
+                "platform": "iOS",
+                "target_type": "BINARY",
+            }
+        }
+    )
+    assert "Application Vulnerability Assessment" in binary_html
+    assert "File Information" in binary_html
+    assert "IPA Binary Code Analysis" in binary_html
+    assert '<td class="k">MD5</td>' in binary_html
+
+
 def test_load_report_data_uses_imported_function_confidence_caveats_for_ios_arc_and_stack_canary() -> None:
     report = load_report_data(
         {
@@ -367,6 +473,8 @@ def test_load_report_data_uses_imported_function_confidence_caveats_for_ios_arc_
     code_section = next(section for section in report["vulnerability_sections"] if section["section_name"] == "Code")
     check_map = _check_map(code_section["checks"])
 
+    assert report["report_scope"]["target_type"] == "BINARY"
+    assert report["report_scope"]["show_ios_binary_analysis"] is True
     assert (
         check_map["Missing ARC Binary Protections"]["confidence_caveat"]
         == "Inferred from Mach-O imported-function presence (_objc_release/_swift_release), not a direct "

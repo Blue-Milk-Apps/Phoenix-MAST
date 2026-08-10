@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from ports.scan_output_loader_port import ScanOutputLoaderPort
+from ports.post_scan.scan_output_loader_port import ScanOutputLoaderPort
 
 
 class AndroidBinaryScanOutputLoader(ScanOutputLoaderPort):

@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ports.scan_detail_extractor_port import ScanDetailExtractorPort
-from ports.scan_output_loader_port import ScanOutputLoaderPort
+from ports.post_scan.scan_detail_extractor_port import ScanDetailExtractorPort
+from ports.post_scan.scan_output_loader_port import ScanOutputLoaderPort
 
 
 class PostScanProcessingService:

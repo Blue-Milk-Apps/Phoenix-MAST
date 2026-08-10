@@ -6,9 +6,189 @@ from adapters.post_scan import (
     AndroidBinaryScanOutputLoader,
     IOSBinaryScanDetailExtractor,
     IOSBinaryScanOutputLoader,
+    NativeIOSScanDetailExtractor,
 )
 from application.post_scan_processing_service import PostScanProcessingService
-from domain.post_scan.ios.network_evidence import IOSNetworkEvidence
+from domain.post_scan.ios.common.network_evidence import IOSNetworkEvidence
+
+
+def test_native_ios_scan_detail_extractor_identifies_source_assessment(tmp_path: Path) -> None:
+    result = NativeIOSScanDetailExtractor().extract_sections(
+        {
+            "scan_metadata": {
+                "platform": "IOS",
+                "project_path": str(tmp_path / "ExampleProject"),
+                "target_type": "SOURCE",
+            },
+            "plist_outputs": {
+                "Example/Info.json": {
+                    "app_meta": {
+                        "bundle_identifier": "com.example.app",
+                        "bundle_name": "Example",
+                    }
+                }
+            },
+        }
+    )
+
+    assert result["meta"]["platform"] == "iOS"
+    assert result["meta"]["target_type"] == "SOURCE"
+    assert result["meta"]["package_name"] == "com.example.app"
+
+
+def test_native_ios_code_evidence_uses_exact_opengrep_rule_ids() -> None:
+    result = NativeIOSScanDetailExtractor().extract_sections(
+        {
+            "opengrep": {
+                "results": [
+                    {
+                        "check_id": "ios-deprecated-api-uiwebview",
+                        "path": "Sources/WebView.swift",
+                        "extra": {"lines": "let view = UIWebView()"},
+                    },
+                    {
+                        "check_id": "ios-insecure-serialization-nskeyedunarchiver",
+                        "path": "Sources/Archive.swift",
+                        "extra": {"lines": "NSKeyedUnarchiver.unarchiveObject(with:)"},
+                    },
+                    {
+                        "check_id": "ios-pbkdf2-low-iterations",
+                        "path": "Sources/Password.swift",
+                        "extra": {"lines": "PBKDF2 iteration count: 5000"},
+                    },
+                    {
+                        "check_id": "ios.unrelated.documentation",
+                        "path": "Sources/Docs.swift",
+                        "extra": {
+                            "message": "UIWebView, NSKeyedUnarchiver, and PBKDF2 migration notes",
+                        },
+                    },
+                ]
+            }
+        }
+    )
+
+    assert result["code_evidence"]["uses_uiwebview"] == {
+        "present": True,
+        "evidence": "Sources/WebView.swift: let view = UIWebView()",
+    }
+    assert result["code_evidence"]["insecure_nskeyedunarchiver_usage"] == {
+        "present": True,
+        "evidence": "Sources/Archive.swift: NSKeyedUnarchiver.unarchiveObject(with:)",
+    }
+    assert result["code_evidence"]["pbkdf2_iteration_count_below_10k"] == {
+        "present": True,
+        "evidence": "Sources/Password.swift: PBKDF2 iteration count: 5000",
+    }
+
+
+def test_native_ios_code_evidence_ignores_keywords_from_unmapped_rules() -> None:
+    result = NativeIOSScanDetailExtractor().extract_sections(
+        {
+            "opengrep": {
+                "results": [
+                    {
+                        "check_id": "ios.unrelated.documentation",
+                        "path": "Sources/Docs.swift",
+                        "extra": {
+                            "message": ("UIWebView NSKeyedUnarchiver PBKDF2 MD5 SHA1 DES 3DES RC4 ECB migration notes"),
+                        },
+                    }
+                ]
+            }
+        }
+    )
+
+    evidence = result["code_evidence"]
+    assert evidence["uses_uiwebview"]["present"] is False
+    assert evidence["insecure_nskeyedunarchiver_usage"]["present"] is False
+    assert evidence["pbkdf2_iteration_count_below_10k"]["present"] is False
+    assert evidence["encodes_data_using_insecure_cryptography"]["present"] is False
+    assert evidence["utilizes_insecure_cryptography"]["present"] is False
+
+
+def test_native_ios_crypto_operation_rules_only_populate_encoding_evidence() -> None:
+    operation_rule_ids = (
+        "ios-weak-crypto-md5",
+        "ios-weak-crypto-operation-3des",
+        "ios-weak-crypto-operation-des",
+        "ios-weak-crypto-operation-ecb",
+        "ios-weak-crypto-operation-rc4",
+        "ios-weak-crypto-sha1",
+    )
+    findings = [
+        {
+            "check_id": rule_id,
+            "path": f"Sources/{index:02d}Crypto.swift",
+            "extra": {"lines": rule_id},
+        }
+        for index, rule_id in enumerate(reversed(operation_rule_ids))
+    ]
+    findings.append(findings[0])
+    result = NativeIOSScanDetailExtractor().extract_sections(
+        {
+            "opengrep": {
+                "results": findings,
+            }
+        }
+    )
+
+    assert result["code_evidence"]["encodes_data_using_insecure_cryptography"] == {
+        "present": True,
+        "evidence": "; ".join(
+            sorted(
+                f"Sources/{index:02d}Crypto.swift: {rule_id}"
+                for index, rule_id in enumerate(reversed(operation_rule_ids))
+            )
+        ),
+    }
+    assert result["code_evidence"]["utilizes_insecure_cryptography"] == {
+        "present": False,
+        "evidence": "no_utilizes_insecure_cryptography_hits",
+    }
+
+
+def test_native_ios_crypto_reference_rules_only_populate_utilization_evidence() -> None:
+    reference_rule_ids = (
+        "ios-weak-crypto-reference-3des",
+        "ios-weak-crypto-reference-des",
+        "ios-weak-crypto-reference-rc4",
+    )
+    result = NativeIOSScanDetailExtractor().extract_sections(
+        {
+            "opengrep": {
+                "results": [
+                    *[
+                        {
+                            "check_id": rule_id,
+                            "path": f"Sources/{index:02d}LegacyCrypto.swift",
+                            "extra": {"lines": rule_id},
+                        }
+                        for index, rule_id in enumerate(reversed(reference_rule_ids))
+                    ],
+                    {
+                        "check_id": "ios.unrelated.weak-crypto",
+                        "path": "Sources/Docs.swift",
+                        "extra": {"message": "Weak crypto DES reference documentation"},
+                    },
+                ]
+            }
+        }
+    )
+
+    assert result["code_evidence"]["encodes_data_using_insecure_cryptography"] == {
+        "present": False,
+        "evidence": "no_encodes_data_using_insecure_cryptography_hits",
+    }
+    assert result["code_evidence"]["utilizes_insecure_cryptography"] == {
+        "present": True,
+        "evidence": "; ".join(
+            sorted(
+                f"Sources/{index:02d}LegacyCrypto.swift: {rule_id}"
+                for index, rule_id in enumerate(reversed(reference_rule_ids))
+            )
+        ),
+    }
 
 
 def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() -> None:
@@ -521,6 +701,7 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
         "package_name": "com.highaltitudehacks.DVIAswiftv2",
         "scan_date": "2026-07-22 10:51:49",
         "platform": "iOS",
+        "target_type": "BINARY",
         "version_name": "2.0",
         "version_code": "1",
         "reviewer_org": "Phoenix Security Report",
@@ -632,6 +813,7 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
         "certificate_pinning_not_implemented",
     }
     assert set(result["data_storage_evidence"]) == {
+        "weak_file_protection",
         "deprecated_keychain_attributes",
         "advertiser_id_stored_insecurely",
         "imei_labeled_value_stored_insecurely",
@@ -1460,7 +1642,7 @@ def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
         "opengrep": {
             "results": [
                 {
-                    "check_id": "ios.secure.rng.usage.present",
+                    "check_id": "crypto-platform-drbg",
                     "extra": {
                         "metadata": {
                             "phoenix": {
@@ -1470,31 +1652,11 @@ def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
                     },
                 },
                 {
-                    "check_id": "ios.networking.usage.present",
+                    "check_id": "lowlevel-networking-usage",
                     "extra": {
                         "metadata": {
                             "phoenix": {
                                 "description": "Networking usage detected.",
-                            }
-                        }
-                    },
-                },
-                {
-                    "check_id": "ios.telephony.usage.present",
-                    "extra": {
-                        "metadata": {
-                            "phoenix": {
-                                "description": "Telephony usage detected.",
-                            }
-                        }
-                    },
-                },
-                {
-                    "check_id": "ios.usb.devices.usage.present",
-                    "extra": {
-                        "metadata": {
-                            "phoenix": {
-                                "description": "USB devices usage detected.",
                             }
                         }
                     },
@@ -1556,11 +1718,11 @@ def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
     }
     assert sections["functionality"]["Telephony"] == {
         "present": True,
-        "explanation": "URL schemes tel declared or queried. Telephony usage detected.",
+        "explanation": "URL schemes tel declared or queried.",
     }
     assert sections["functionality"]["USB Devices"] == {
         "present": True,
-        "explanation": "external accessory protocols declared: com.example.reader. USB devices usage detected.",
+        "explanation": "external accessory protocols declared: com.example.reader.",
     }
     assert sections["permissions"] == [
         {

@@ -504,6 +504,7 @@ def test_create_scan_config_for_native_android_source_includes_opengrep_when_rul
 
 def test_create_scan_config_for_native_ios_source(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(cli, "_resolve_opengrep_rules_path", lambda override, slug: None)
+    monkeypatch.setenv("MOBSF_URL", "http://localhost:8000")
     args = _scan_args(tmp_path, "--native-ios-source-path")
 
     config = cli._create_scan_config(args)
@@ -653,7 +654,7 @@ def test_scan_command_passes_syft_output_format(tmp_path: Path, monkeypatch) -> 
     assert captured["output_format"] == "spdx-json"
 
 
-def test_get_opengrep_scan_paths_for_source_returns_project_and_output(tmp_path: Path) -> None:
+def test_get_opengrep_scan_paths_for_source_returns_project_only(tmp_path: Path) -> None:
     config = ScanConfig(
         project_path=tmp_path / "project",
         output_path=tmp_path / "scan-results",
@@ -664,7 +665,7 @@ def test_get_opengrep_scan_paths_for_source_returns_project_and_output(tmp_path:
 
     paths = workflow.MobileScannerFactory()._get_opengrep_scan_paths(config)
 
-    assert paths == [config.project_path, config.output_path]
+    assert paths == [config.project_path]
 
 
 def test_get_opengrep_scan_paths_for_binary_returns_output_only(tmp_path: Path) -> None:

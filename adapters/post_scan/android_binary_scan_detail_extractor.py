@@ -21,7 +21,7 @@ from domain.post_scan.android.meta import AndroidMeta
 from domain.post_scan.android.network_evidence import NetworkEvidence
 from domain.post_scan.android.permissions import Permissions
 from domain.post_scan.android.resilience_evidence import ResilienceEvidence
-from ports.scan_detail_extractor_port import ScanDetailExtractorPort
+from ports.post_scan.scan_detail_extractor_port import ScanDetailExtractorPort
 
 
 class AndroidBinaryScanDetailExtractor(ScanDetailExtractorPort):
