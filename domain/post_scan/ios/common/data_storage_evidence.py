@@ -6,6 +6,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from domain.post_scan.ios.common.evidence import EvidenceEntry
+from domain.post_scan.ios.rule_registry import (
+    COMPLETE_FILE_PROTECTION_RULE_IDS as REGISTERED_COMPLETE_FILE_PROTECTION_RULE_IDS,
+)
+from domain.post_scan.ios.rule_registry import DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY
+from domain.post_scan.ios.rule_registry import WEAK_FILE_PROTECTION_RULE_IDS as REGISTERED_WEAK_FILE_PROTECTION_RULE_IDS
 
 # TODO(dynamic): Add sensitive-values-in-memory evidence when runtime memory inspection is available.
 # It is intentionally omitted from static scan results.
@@ -40,31 +45,37 @@ class IOSDataStorageEvidence:
         "kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly",
         "kSecAttrAccessibleAfterFirstUnlock",
     )
-    DEPRECATED_KEYCHAIN_ATTRIBUTES_RULE_ID = "ios.storage.deprecated-keychain-accessibility"
-    KEYCHAIN_ITEMS_ACCESSIBLE_AFTER_FIRST_UNLOCK_RULE_ID = "ios.storage.keychain-items-accessible-after-first-unlock"
-    ADVERTISER_ID_INSECURE_STORAGE_RULE_ID = "ios.storage.advertiser-id-insecure-storage"
-    IMEI_LABELED_VALUE_INSECURE_STORAGE_RULE_ID = "ios.storage.imei-labeled-value-insecure-storage"
-    GLOBAL_WRITE_PERMISSIONS_RULE_ID = "ios.storage.global-write-permissions"
-    LOCATION_DATA_INSECURE_STORAGE_RULE_ID = "ios.storage.location-data-insecure-storage"
-    HARDCODED_API_KEY_INSECURE_STORAGE_RULE_ID = "ios.storage.hardcoded-api-key-insecure-storage"
-    HARDCODED_PASSWORD_INSECURE_STORAGE_RULE_ID = "ios.storage.hardcoded-password-insecure-storage"
-    SENSITIVE_VALUE_INSECURE_STORAGE_RULE_ID = "ios.storage.sensitive-value-insecure-storage"
-    SENSITIVE_DATA_IN_USER_DEFAULTS_RULE_ID = "ios.storage.sensitive-data-in-user-defaults"
-    WIFI_IP_INSECURE_STORAGE_RULE_ID = "ios.storage.wifi-ip-insecure-storage"
-    ADVERTISER_ID_LOGGING_RULE_ID = "ios.storage.advertiser-id-logged-insecurely"
-    IMEI_LOGGING_RULE_ID = "ios.storage.imei-logged-insecurely"
-    LOCATION_DATA_LOGGING_RULE_ID = "ios.storage.location-data-logged-insecurely"
-    SENSITIVE_DATA_LOGGING_RULE_ID = "ios.storage.sensitive-data-logged-insecurely"
-    WIFI_MAC_LOGGING_RULE_ID = "ios.storage.wifi-mac-logged-insecurely"
-    KEYBOARD_CACHE_EXPOSURE_RULE_ID = "ios.storage.keyboard-cache-exposure"
-    WEAK_FILE_PROTECTION_RULE_IDS = frozenset(
-        f"fileprotection-{protection}-{scope}"
-        for protection in ("open", "firstunlock", "none")
-        for scope in ("applevel", "filelevel", "filemgr", "existingfile", "coredata")
-    )
-    COMPLETE_FILE_PROTECTION_RULE_IDS = frozenset(
-        f"fileprotection-complete-{scope}" for scope in ("applevel", "filelevel", "filemgr", "existingfile", "coredata")
-    )
+    DEPRECATED_KEYCHAIN_ATTRIBUTES_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY["deprecated_keychain_attributes"]
+    KEYCHAIN_ITEMS_ACCESSIBLE_AFTER_FIRST_UNLOCK_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY[
+        "keychain_items_accessible_after_first_unlock"
+    ]
+    ADVERTISER_ID_INSECURE_STORAGE_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY["advertiser_id_stored_insecurely"]
+    IMEI_LABELED_VALUE_INSECURE_STORAGE_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY[
+        "imei_labeled_value_stored_insecurely"
+    ]
+    GLOBAL_WRITE_PERMISSIONS_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY["global_write_permissions"]
+    LOCATION_DATA_INSECURE_STORAGE_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY["location_data_stored_insecurely"]
+    HARDCODED_API_KEY_INSECURE_STORAGE_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY[
+        "hardcoded_api_keys_stored_insecurely"
+    ]
+    HARDCODED_PASSWORD_INSECURE_STORAGE_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY[
+        "hardcoded_passwords_stored_insecurely"
+    ]
+    SENSITIVE_VALUE_INSECURE_STORAGE_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY[
+        "sensitive_values_stored_insecurely"
+    ]
+    SENSITIVE_DATA_IN_USER_DEFAULTS_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY[
+        "sensitive_data_stored_in_user_defaults"
+    ]
+    WIFI_IP_INSECURE_STORAGE_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY["wifi_ip_stored_insecurely"]
+    ADVERTISER_ID_LOGGING_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY["advertiser_id_logged_insecurely"]
+    IMEI_LOGGING_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY["imei_logged_insecurely"]
+    LOCATION_DATA_LOGGING_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY["location_data_logged_insecurely"]
+    SENSITIVE_DATA_LOGGING_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY["sensitive_data_logged_insecurely"]
+    WIFI_MAC_LOGGING_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY["wifi_mac_logged_insecurely"]
+    KEYBOARD_CACHE_EXPOSURE_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY["keyboard_cache_exposure"]
+    WEAK_FILE_PROTECTION_RULE_IDS = REGISTERED_WEAK_FILE_PROTECTION_RULE_IDS
+    COMPLETE_FILE_PROTECTION_RULE_IDS = REGISTERED_COMPLETE_FILE_PROTECTION_RULE_IDS
     ADVERTISER_ID_MARKERS = (
         "ASIdentifierManager",
         "advertisingIdentifier",

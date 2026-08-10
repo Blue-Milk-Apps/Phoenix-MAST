@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from domain.post_scan.ios.rule_registry import PERMISSION_RULE_ID_TO_KEYS
 from domain.post_scan.utilities import first_non_empty
 
 PERMISSION_DETAILS: dict[str, dict[str, str]] = {
@@ -113,6 +114,11 @@ PERMISSION_DETAILS: dict[str, dict[str, str]] = {
         "info": "Track User",
         "general_description": "Permits tracking the user or device across apps and websites.",
     },
+    "NSLocalNetworkUsageDescription": {
+        "status": "normal",
+        "info": "Access Local Network",
+        "general_description": "Permits discovering and communicating with devices on the local network.",
+    },
 }
 
 
@@ -148,6 +154,23 @@ class IOSPermissions:
                     continue
                 if not existing["usage_description"] and purpose:
                     existing["usage_description"] = purpose
+
+        for result in (loaded_outputs.get("opengrep") or {}).get("results") or []:
+            if not isinstance(result, dict):
+                continue
+            rule_id = str(result.get("check_id", "")).strip()
+            candidate_keys = PERMISSION_RULE_ID_TO_KEYS.get(rule_id)
+            if not candidate_keys:
+                continue
+            extra = result.get("extra") or {}
+            matched_text = str(extra.get("lines") or extra.get("message") or "")
+            matched_keys = (
+                candidate_keys
+                if len(candidate_keys) == 1
+                else tuple(key for key in candidate_keys if key in matched_text)
+            )
+            for key in matched_keys:
+                permissions_by_key.setdefault(key, cls._permission_row(key, ""))
 
         return [permissions_by_key[key] for key in sorted(permissions_by_key)]
 

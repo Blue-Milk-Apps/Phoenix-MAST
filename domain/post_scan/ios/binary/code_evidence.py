@@ -8,6 +8,7 @@ from typing import Any
 
 from domain.post_scan.ios.binary.ipa_binary_evidence import IOSIPABinaryEvidence
 from domain.post_scan.ios.common.evidence import EvidenceEntry
+from domain.post_scan.ios.rule_registry import CODE_RULE_IDS_BY_EVIDENCE_KEY
 from domain.post_scan.utilities import first_non_empty
 
 
@@ -69,6 +70,11 @@ class IOSCodeEvidence:
         "com.apple.security.cs.disable-executable-page-protection",
     )
     NANOPB_VULNERABLE_VERSION_PATTERN = re.compile(r"^(0\.|1\.)")
+    UIWEBVIEW_RULE_IDS = CODE_RULE_IDS_BY_EVIDENCE_KEY["uses_uiwebview"]
+    INSECURE_NSKEYEDUNARCHIVER_RULE_IDS = CODE_RULE_IDS_BY_EVIDENCE_KEY["insecure_nskeyedunarchiver_usage"]
+    INSECURE_CRYPTO_ENCODING_RULE_IDS = CODE_RULE_IDS_BY_EVIDENCE_KEY["encodes_data_using_insecure_cryptography"]
+    INSECURE_CRYPTO_REFERENCE_RULE_IDS = CODE_RULE_IDS_BY_EVIDENCE_KEY["utilizes_insecure_cryptography"]
+    LOW_PBKDF2_ITERATION_RULE_IDS = CODE_RULE_IDS_BY_EVIDENCE_KEY["pbkdf2_iteration_count_below_10k"]
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
         opengrep_results = (loaded_outputs.get("opengrep") or {}).get("results") or []
@@ -80,6 +86,7 @@ class IOSCodeEvidence:
             opengrep_results,
             "no_uses_uiwebview_hits",
             "uiwebview",
+            rule_ids=self.UIWEBVIEW_RULE_IDS,
         )
         self.insecure_nanopb_library = self._name_heuristic_entry(
             loaded_outputs,
@@ -90,6 +97,7 @@ class IOSCodeEvidence:
             opengrep_results,
             "no_insecure_nskeyedunarchiver_usage_hits",
             "nskeyedunarchiver",
+            rule_ids=self.INSECURE_NSKEYEDUNARCHIVER_RULE_IDS,
         )
         self.missing_arc = self._binary_protection_inverse_entry(
             ipa_binary_evidence.arc,
@@ -130,6 +138,7 @@ class IOSCodeEvidence:
             strings_outputs,
             "no_utilizes_insecure_cryptography_hits",
             opengrep_needles=("insecure cryptography", "weak crypto", "cipher"),
+            opengrep_rule_ids=self.INSECURE_CRYPTO_REFERENCE_RULE_IDS,
             term_candidates=self.OPERATIONAL_WEAK_CRYPTO_TERMS,
         )
         self.pbkdf2_iteration_count_below_10k = self._pbkdf2_entry(
@@ -155,6 +164,7 @@ class IOSCodeEvidence:
         results: list[Any],
         absent_evidence: str,
         *needles: str,
+        rule_ids: frozenset[str] = frozenset(),
     ) -> EvidenceEntry:
         lowered_needles = [needle.strip().lower() for needle in needles if needle.strip()]
         for result in results:
@@ -168,8 +178,11 @@ class IOSCodeEvidence:
                 str(metadata.get("description", "")).strip().lower(),
                 str(extra.get("message", "")).strip().lower(),
             ]
-            if lowered_needles and not all(
-                any(needle in haystack for haystack in haystacks) for needle in lowered_needles
+            exact_rule_match = str(result.get("check_id", "")).strip() in rule_ids
+            if (
+                not exact_rule_match
+                and lowered_needles
+                and not all(any(needle in haystack for haystack in haystacks) for needle in lowered_needles)
             ):
                 continue
             evidence = first_non_empty(
@@ -187,6 +200,7 @@ class IOSCodeEvidence:
         results: list[Any],
         absent_evidence: str,
         *needles: str,
+        rule_ids: frozenset[str] = frozenset(),
     ) -> EvidenceEntry:
         lowered_needles = [needle.strip().lower() for needle in needles if needle.strip()]
         for result in results:
@@ -200,8 +214,11 @@ class IOSCodeEvidence:
                 str(metadata.get("description", "")).strip().lower(),
                 str(extra.get("message", "")).strip().lower(),
             ]
-            if lowered_needles and not any(
-                any(needle in haystack for haystack in haystacks) for needle in lowered_needles
+            exact_rule_match = str(result.get("check_id", "")).strip() in rule_ids
+            if (
+                not exact_rule_match
+                and lowered_needles
+                and not any(any(needle in haystack for haystack in haystacks) for needle in lowered_needles)
             ):
                 continue
             evidence = first_non_empty(
@@ -256,6 +273,8 @@ class IOSCodeEvidence:
 
     @classmethod
     def _is_confirmed_insecure_crypto_result(cls, result: dict[str, Any]) -> bool:
+        if str(result.get("check_id", "")).strip() in cls.INSECURE_CRYPTO_ENCODING_RULE_IDS:
+            return True
         extra = result.get("extra") or {}
         metadata = (extra.get("metadata") or {}).get("phoenix") or {}
         haystack = " ".join(
@@ -286,12 +305,14 @@ class IOSCodeEvidence:
         absent_evidence: str,
         *,
         opengrep_needles: tuple[str, ...],
+        opengrep_rule_ids: frozenset[str],
         term_candidates: tuple[str, ...],
     ) -> EvidenceEntry:
         opengrep_entry = cls._opengrep_any_entry(
             opengrep_results,
             absent_evidence,
             *opengrep_needles,
+            rule_ids=opengrep_rule_ids,
         )
         if opengrep_entry.present:
             return opengrep_entry
@@ -321,6 +342,17 @@ class IOSCodeEvidence:
         for result in results:
             if not isinstance(result, dict):
                 continue
+            if str(result.get("check_id", "")).strip() in cls.LOW_PBKDF2_ITERATION_RULE_IDS:
+                extra = result.get("extra") or {}
+                metadata = (extra.get("metadata") or {}).get("phoenix") or {}
+                evidence = first_non_empty(
+                    cls._pbkdf2_count_evidence(result),
+                    metadata.get("description"),
+                    metadata.get("title"),
+                    extra.get("message"),
+                    result.get("check_id"),
+                )
+                return cls._entry(True, str(evidence), absent_evidence)
             extra = result.get("extra") or {}
             metadata = (extra.get("metadata") or {}).get("phoenix") or {}
             haystacks = [

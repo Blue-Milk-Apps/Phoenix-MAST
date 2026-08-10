@@ -1642,7 +1642,7 @@ def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
         "opengrep": {
             "results": [
                 {
-                    "check_id": "ios.secure.rng.usage.present",
+                    "check_id": "crypto-platform-drbg",
                     "extra": {
                         "metadata": {
                             "phoenix": {
@@ -1652,31 +1652,11 @@ def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
                     },
                 },
                 {
-                    "check_id": "ios.networking.usage.present",
+                    "check_id": "lowlevel-networking-usage",
                     "extra": {
                         "metadata": {
                             "phoenix": {
                                 "description": "Networking usage detected.",
-                            }
-                        }
-                    },
-                },
-                {
-                    "check_id": "ios.telephony.usage.present",
-                    "extra": {
-                        "metadata": {
-                            "phoenix": {
-                                "description": "Telephony usage detected.",
-                            }
-                        }
-                    },
-                },
-                {
-                    "check_id": "ios.usb.devices.usage.present",
-                    "extra": {
-                        "metadata": {
-                            "phoenix": {
-                                "description": "USB devices usage detected.",
                             }
                         }
                     },
@@ -1738,11 +1718,11 @@ def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
     }
     assert sections["functionality"]["Telephony"] == {
         "present": True,
-        "explanation": "URL schemes tel declared or queried. Telephony usage detected.",
+        "explanation": "URL schemes tel declared or queried.",
     }
     assert sections["functionality"]["USB Devices"] == {
         "present": True,
-        "explanation": "external accessory protocols declared: com.example.reader. USB devices usage detected.",
+        "explanation": "external accessory protocols declared: com.example.reader.",
     }
     assert sections["permissions"] == [
         {

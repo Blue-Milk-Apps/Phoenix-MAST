@@ -7,6 +7,7 @@ import re
 from dataclasses import dataclass
 
 from domain.post_scan.ios.native.scan_extraction_context import NativeIOSScanExtractionContext
+from domain.post_scan.ios.rule_registry import CODE_RULE_IDS_BY_EVIDENCE_KEY
 
 
 @dataclass
@@ -35,26 +36,11 @@ class NativeIOSCodeEvidence:
             "com.apple.security.cs.disable-library-validation",
         }
     )
-    UIWEBVIEW_RULE_IDS = frozenset({"ios-deprecated-api-uiwebview"})
-    INSECURE_NSKEYEDUNARCHIVER_RULE_IDS = frozenset({"ios-insecure-serialization-nskeyedunarchiver"})
-    INSECURE_CRYPTO_ENCODING_RULE_IDS = frozenset(
-        {
-            "ios-weak-crypto-md5",
-            "ios-weak-crypto-operation-3des",
-            "ios-weak-crypto-operation-des",
-            "ios-weak-crypto-operation-ecb",
-            "ios-weak-crypto-operation-rc4",
-            "ios-weak-crypto-sha1",
-        }
-    )
-    INSECURE_CRYPTO_REFERENCE_RULE_IDS = frozenset(
-        {
-            "ios-weak-crypto-reference-3des",
-            "ios-weak-crypto-reference-des",
-            "ios-weak-crypto-reference-rc4",
-        }
-    )
-    LOW_PBKDF2_ITERATION_RULE_IDS = frozenset({"ios-pbkdf2-low-iterations"})
+    UIWEBVIEW_RULE_IDS = CODE_RULE_IDS_BY_EVIDENCE_KEY["uses_uiwebview"]
+    INSECURE_NSKEYEDUNARCHIVER_RULE_IDS = CODE_RULE_IDS_BY_EVIDENCE_KEY["insecure_nskeyedunarchiver_usage"]
+    INSECURE_CRYPTO_ENCODING_RULE_IDS = CODE_RULE_IDS_BY_EVIDENCE_KEY["encodes_data_using_insecure_cryptography"]
+    INSECURE_CRYPTO_REFERENCE_RULE_IDS = CODE_RULE_IDS_BY_EVIDENCE_KEY["utilizes_insecure_cryptography"]
+    LOW_PBKDF2_ITERATION_RULE_IDS = CODE_RULE_IDS_BY_EVIDENCE_KEY["pbkdf2_iteration_count_below_10k"]
 
     def __init__(self, context: NativeIOSScanExtractionContext) -> None:
         self.uses_uiwebview = self._opengrep_entry_for_rule_ids(

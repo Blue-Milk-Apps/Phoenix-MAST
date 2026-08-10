@@ -6,6 +6,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from domain.post_scan.ios.rule_registry import FUNCTIONALITY_RULE_ID_TO_KEY
+
 
 @dataclass
 class FunctionalityEntry:
@@ -53,6 +55,7 @@ class IOSFunctionality:
         self.Camera = self._entry_from_sources(
             plist_keys={"NSCameraUsageDescription"},
             permission_keys=permission_keys,
+            opengrep_hits=opengrep_hits.get("Camera", []),
         )
         self.Biometric_Authentication = self._entry_from_sources(
             plist_keys={"NSFaceIDUsageDescription"},
@@ -75,10 +78,11 @@ class IOSFunctionality:
             background_mode_values={"remote-notification"},
             opengrep_hits=opengrep_hits.get("Push Notifications", []),
         )
-        self.Audio = self._entry_from_sources()
+        self.Audio = self._entry_from_sources(opengrep_hits=opengrep_hits.get("Audio", []))
         self.Contacts = self._entry_from_sources(
             plist_keys={"NSContactsUsageDescription"},
             permission_keys=permission_keys,
+            opengrep_hits=opengrep_hits.get("Contacts", []),
         )
         self.Geofencing = self._entry_from_sources()
         self.Health_Data = self._entry_from_sources(
@@ -94,6 +98,7 @@ class IOSFunctionality:
                 "NSLocationAlwaysUsageDescription",
             },
             permission_keys=permission_keys,
+            opengrep_hits=opengrep_hits.get("Location", []),
         )
         self.Maps = self._maps_entry(url_schemes)
         self.Payment_Services = self._entry_from_sources(
@@ -104,22 +109,26 @@ class IOSFunctionality:
         self.Bluetooth = self._entry_from_sources(
             plist_keys={"NSBluetoothAlwaysUsageDescription", "NSBluetoothPeripheralUsageDescription"},
             permission_keys=permission_keys,
+            opengrep_hits=opengrep_hits.get("Bluetooth", []),
         )
         self.Camera_Delegation = self._entry_from_sources()
         self.Calendar = self._entry_from_sources(
             plist_keys={"NSCalendarsUsageDescription"},
             permission_keys=permission_keys,
+            opengrep_hits=opengrep_hits.get("Calendar", []),
         )
         self.In_App_Purchases = self._entry_from_sources()
         self.Keychain = self._entry_from_sources(
             entitlements=entitlements,
             entitlement_keys={"keychain_access_groups"},
+            opengrep_hits=opengrep_hits.get("Keychain", []),
         )
         self.Microphone = self._entry_from_sources(
             plist_keys={"NSMicrophoneUsageDescription"},
             permission_keys=permission_keys,
+            opengrep_hits=opengrep_hits.get("Microphone", []),
         )
-        self.NFC = self._nfc_entry(permission_keys, required_capabilities)
+        self.NFC = self._nfc_entry(permission_keys, required_capabilities, opengrep_hits.get("NFC", []))
         self.Photos = self._entry_from_sources(
             plist_keys={"NSPhotoLibraryUsageDescription", "NSPhotoLibraryAddUsageDescription"},
             permission_keys=permission_keys,
@@ -138,6 +147,7 @@ class IOSFunctionality:
         self.Nearby_Interaction = self._entry_from_sources(
             plist_keys={"NSNearbyInteractionUsageDescription"},
             permission_keys=permission_keys,
+            opengrep_hits=opengrep_hits.get("Nearby Interaction", []),
         )
 
     def _entry_from_sources(
@@ -201,13 +211,18 @@ class IOSFunctionality:
             return self._entry(False, [])
         return self._entry(True, [f"queried URL schemes {', '.join(matched)} declared."])
 
-    def _nfc_entry(self, permission_keys: set[str], required_capabilities: set[str]) -> FunctionalityEntry:
+    def _nfc_entry(
+        self,
+        permission_keys: set[str],
+        required_capabilities: set[str],
+        opengrep_hits: list[str],
+    ) -> FunctionalityEntry:
         if "NFCReaderUsageDescription" in permission_keys:
             return self._entry(True, ["plist key NFCReaderUsageDescription present."])
         matched_caps = sorted(cap for cap in required_capabilities if "nfc" in cap.lower())
         if matched_caps:
             return self._entry(True, [f"required device capabilities include {', '.join(matched_caps)}."])
-        return self._entry(False, [])
+        return self._entry(bool(opengrep_hits), opengrep_hits)
 
     def _telephony_entry(
         self,
@@ -341,38 +356,25 @@ class IOSFunctionality:
 
     @staticmethod
     def _opengrep_descriptions_by_capability(loaded_outputs: dict[str, Any]) -> dict[str, list[str]]:
-        mapping: dict[str, list[str]] = {
-            "Biometric Authentication": [],
-            "Networking": [],
-            "Secure RNG": [],
-            "Push Notifications": [],
-            "Telephony": [],
-            "USB Devices": [],
-        }
+        mapping: dict[str, list[str]] = {capability: [] for capability in set(FUNCTIONALITY_RULE_ID_TO_KEY.values())}
         for result in (loaded_outputs.get("opengrep") or {}).get("results") or []:
+            if not isinstance(result, dict):
+                continue
+            capability = FUNCTIONALITY_RULE_ID_TO_KEY.get(str(result.get("check_id", "")).strip())
+            if capability is None:
+                continue
             extra = result.get("extra") if isinstance(result, dict) else {}
             phoenix = ((extra or {}).get("metadata") or {}).get("phoenix") or {}
-            candidates = [
-                str(result.get("check_id", "")).strip(),
-                str(phoenix.get("title", "")).strip(),
-                str(phoenix.get("description", "")).strip(),
-            ]
-            haystack = " ".join(text.lower() for text in candidates if text)
-            description = str(phoenix.get("description", "")).strip() or str(phoenix.get("title", "")).strip()
+            description = str(
+                phoenix.get("description")
+                or phoenix.get("title")
+                or (extra or {}).get("lines")
+                or (extra or {}).get("message")
+                or result.get("check_id")
+            ).strip()
             if not description:
                 continue
-            if any(token in haystack for token in ("secure rng", "secrandom", "random number")):
-                mapping["Secure RNG"].append(description)
-            if any(token in haystack for token in ("biometric", "face id", "touch id")):
-                mapping["Biometric Authentication"].append(description)
-            if any(token in haystack for token in ("push notification", "apns", "remote notification")):
-                mapping["Push Notifications"].append(description)
-            if any(token in haystack for token in ("network", "urlsession", "cfnetwork", "http", "https")):
-                mapping["Networking"].append(description)
-            if any(token in haystack for token in ("telephony", "coretelephony", "tel:", "sms:")):
-                mapping["Telephony"].append(description)
-            if any(token in haystack for token in ("usb", "external accessory", "eaaccessory", "accessory protocol")):
-                mapping["USB Devices"].append(description)
+            mapping[capability].append(description)
         return {key: list(dict.fromkeys(values)) for key, values in mapping.items()}
 
     @staticmethod
