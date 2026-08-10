@@ -6,9 +6,34 @@ from adapters.post_scan import (
     AndroidBinaryScanOutputLoader,
     IOSBinaryScanDetailExtractor,
     IOSBinaryScanOutputLoader,
+    NativeIOSScanDetailExtractor,
 )
 from application.post_scan_processing_service import PostScanProcessingService
 from domain.post_scan.ios.common.network_evidence import IOSNetworkEvidence
+
+
+def test_native_ios_scan_detail_extractor_identifies_source_assessment(tmp_path: Path) -> None:
+    result = NativeIOSScanDetailExtractor().extract_sections(
+        {
+            "scan_metadata": {
+                "platform": "IOS",
+                "project_path": str(tmp_path / "ExampleProject"),
+                "target_type": "SOURCE",
+            },
+            "plist_outputs": {
+                "Example/Info.json": {
+                    "app_meta": {
+                        "bundle_identifier": "com.example.app",
+                        "bundle_name": "Example",
+                    }
+                }
+            },
+        }
+    )
+
+    assert result["meta"]["platform"] == "iOS"
+    assert result["meta"]["target_type"] == "SOURCE"
+    assert result["meta"]["package_name"] == "com.example.app"
 
 
 def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() -> None:
@@ -521,6 +546,7 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
         "package_name": "com.highaltitudehacks.DVIAswiftv2",
         "scan_date": "2026-07-22 10:51:49",
         "platform": "iOS",
+        "target_type": "BINARY",
         "version_name": "2.0",
         "version_code": "1",
         "reviewer_org": "Phoenix Security Report",

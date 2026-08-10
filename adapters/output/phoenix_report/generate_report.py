@@ -19,8 +19,11 @@ import io
 import json
 import os
 import sys
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
+
+from adapters.output.phoenix_report.report_scope import ReportScope, resolve_report_scope
 
 BASE_DIR = Path(__file__).parent
 TEMPLATES_DIR = BASE_DIR / "templates"
@@ -662,6 +665,7 @@ IOS_CODE_CHECK_SPECS = (
     },
     {
         "check": "Missing ARC Binary Protections",
+        "applies_to": ("BINARY",),
         "severity": "Medium",
         "compliance": (
             "MASVS-CODE-4; no confirmed v2 replacement for ARC specifically (MASTG-TEST-0087 deprecated -- "
@@ -683,6 +687,7 @@ IOS_CODE_CHECK_SPECS = (
     },
     {
         "check": "Position-Independent Code (PIC) Not Enabled",
+        "applies_to": ("BINARY",),
         "severity": "Medium",
         "compliance": "MASVS-CODE-4; MASTG-TEST-0228 (active -- supersedes deprecated 0087); legacy MSTG-CODE-4",
         "present_explanation": (
@@ -697,6 +702,7 @@ IOS_CODE_CHECK_SPECS = (
     },
     {
         "check": "Stack Canaries Not Enabled",
+        "applies_to": ("BINARY",),
         "severity": "Medium",
         "compliance": "MASVS-CODE-4; MASTG-TEST-0229 (active -- supersedes deprecated 0087); legacy MSTG-CODE-4",
         "present_explanation": (
@@ -715,6 +721,7 @@ IOS_CODE_CHECK_SPECS = (
     },
     {
         "check": "Insecure API Usage in Binary",
+        "applies_to": ("BINARY",),
         "severity": "Medium",
         "compliance": "MASVS-CODE-4; no confirmed v2 replacement (MASTG-TEST-0086 deprecated); legacy MSTG-CODE-8",
         "present_explanation": (
@@ -731,6 +738,7 @@ IOS_CODE_CHECK_SPECS = (
     },
     {
         "check": "Usage of malloc Instead of calloc in Binary",
+        "applies_to": ("BINARY",),
         "severity": "Medium",
         "compliance": (
             "MASVS-CODE-4; no confirmed v2 replacement (subsumed under deprecated MASTG-TEST-0086); legacy MSTG-CODE-8"
@@ -1320,6 +1328,7 @@ IOS_RESILIENCE_CHECK_SPECS = (
     },
     {
         "check": "Components Contain Debug Symbols",
+        "applies_to": ("BINARY",),
         "severity": "Medium",
         "compliance": "MASVS-RESILIENCE-3; MASTG-TEST-0219 (active -- supersedes deprecated 0083); legacy MSTG-RESILIENCE-3",
         "present_explanation": (
@@ -1642,17 +1651,27 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     is_ios = _is_ios_platform(data)
     base_template = _ios_blank_template() if is_ios else _blank_template()
     report_data = _merge_nested(base_template, data)
+    report_scope = resolve_report_scope(report_data)
+    report_data["report_scope"] = asdict(report_scope)
     _normalize_data_storage_section_name(report_data)
+    _retain_assessed_sections(report_data, report_scope)
 
     if is_ios:
-        _canonicalize_ios_code_section(report_data)
-        _canonicalize_ios_network_section(report_data)
-        _canonicalize_ios_data_storage_section(report_data)
-        _canonicalize_ios_resilience_section(report_data)
-        _apply_ios_derived_checks(report_data)
-        _canonicalize_ios_binary_protections(report_data)
+        _canonicalize_ios_code_section(report_data, report_scope.target_type)
+        _canonicalize_ios_network_section(report_data, report_scope.target_type)
+        _canonicalize_ios_data_storage_section(report_data, report_scope.target_type)
+        _canonicalize_ios_resilience_section(report_data, report_scope.target_type)
+        if report_scope.show_ios_binary_analysis:
+            _apply_ios_derived_checks(report_data)
+            _canonicalize_ios_binary_protections(report_data)
+        else:
+            report_data["ipa_binary_protections"] = []
         _normalize_ios_url_schemes(report_data)
-        section_to_area = IOS_SECTION_TO_AREA
+        section_to_area = {
+            section_name: area
+            for section_name, area in IOS_SECTION_TO_AREA.items()
+            if section_name in report_scope.assessed_sections
+        }
     else:
         _canonicalize_code_section(report_data)
         _canonicalize_data_storage_section(report_data)
@@ -1674,6 +1693,22 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     report_data["findings_severity"] = _build_findings_severity(report_data)
 
     return _prune_placeholder_rows(report_data)
+
+
+def _retain_assessed_sections(report_data: dict[str, Any], report_scope: ReportScope) -> None:
+    if report_scope.target_type != "SOURCE":
+        return
+
+    sections = report_data.get("vulnerability_sections")
+    if not isinstance(sections, list):
+        return
+
+    assessed = set(report_scope.assessed_sections)
+    report_data["vulnerability_sections"] = [
+        section
+        for section in sections
+        if isinstance(section, dict) and str(section.get("section_name", "")).strip().lower() in assessed
+    ]
 
 
 def _normalize_data_storage_section_name(report_data: dict[str, Any]) -> None:
@@ -1843,26 +1878,27 @@ def _canonicalize_resilience_section(report_data: dict[str, Any]) -> None:
     ]
 
 
-def _canonicalize_ios_code_section(report_data: dict[str, Any]) -> None:
-    _canonicalize_ios_section(report_data, "code", IOS_CODE_CHECK_SPECS)
+def _canonicalize_ios_code_section(report_data: dict[str, Any], target_type: str) -> None:
+    _canonicalize_ios_section(report_data, "code", IOS_CODE_CHECK_SPECS, target_type)
 
 
-def _canonicalize_ios_network_section(report_data: dict[str, Any]) -> None:
-    _canonicalize_ios_section(report_data, "network", IOS_NETWORK_CHECK_SPECS)
+def _canonicalize_ios_network_section(report_data: dict[str, Any], target_type: str) -> None:
+    _canonicalize_ios_section(report_data, "network", IOS_NETWORK_CHECK_SPECS, target_type)
 
 
-def _canonicalize_ios_data_storage_section(report_data: dict[str, Any]) -> None:
-    _canonicalize_ios_section(report_data, "data storage", IOS_DATA_STORAGE_CHECK_SPECS)
+def _canonicalize_ios_data_storage_section(report_data: dict[str, Any], target_type: str) -> None:
+    _canonicalize_ios_section(report_data, "data storage", IOS_DATA_STORAGE_CHECK_SPECS, target_type)
 
 
-def _canonicalize_ios_resilience_section(report_data: dict[str, Any]) -> None:
-    _canonicalize_ios_section(report_data, "resilience", IOS_RESILIENCE_CHECK_SPECS)
+def _canonicalize_ios_resilience_section(report_data: dict[str, Any], target_type: str) -> None:
+    _canonicalize_ios_section(report_data, "resilience", IOS_RESILIENCE_CHECK_SPECS, target_type)
 
 
 def _canonicalize_ios_section(
     report_data: dict[str, Any],
     section_name: str,
     specs: tuple[dict[str, Any], ...],
+    target_type: str,
 ) -> None:
     """Shared iOS canonicalizer for the Code/Network/Data Storage/Resilience sections.
 
@@ -1899,7 +1935,11 @@ def _canonicalize_ios_section(
     evidence_dict = report_data.get(evidence_top_key) if evidence_top_key else None
     evidence_dict = evidence_dict if isinstance(evidence_dict, dict) else {}
 
-    section["checks"] = [_canonical_ios_check(spec, lookup, evidence_dict, evidence_map) for spec in specs]
+    section["checks"] = [
+        _canonical_ios_check(spec, lookup, evidence_dict, evidence_map)
+        for spec in specs
+        if target_type in spec.get("applies_to", ("SOURCE", "BINARY"))
+    ]
 
 
 def _canonical_ios_check(

@@ -226,6 +226,7 @@ class IOSMeta:
     platform: str
     reviewer_org: str
     scan_date: str
+    target_type: str
     version_code: str
     version_name: str
 
@@ -246,6 +247,7 @@ class IOSMeta:
             scan_metadata,
             Path(str(loaded_outputs.get("scan_output_path", ""))),
         )
+        self.target_type = str(scan_metadata.get("target_type") or "BINARY").strip().upper()
         self.version_code = first_non_empty(metadata.version_code)
         self.version_name = first_non_empty(metadata.version_name)
 

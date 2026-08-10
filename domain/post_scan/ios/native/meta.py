@@ -15,6 +15,7 @@ class NativeIOSMeta:
     platform: str
     reviewer_org: str
     scan_date: str
+    target_type: str
     version_code: str
     version_name: str
 
@@ -32,5 +33,6 @@ class NativeIOSMeta:
         self.platform = "iOS"
         self.reviewer_org = "Phoenix Security Report"
         self.scan_date = context.scan_date
+        self.target_type = str(context.scan_metadata.get("target_type") or "SOURCE").strip().upper()
         self.version_code = context.first_non_empty(app_meta.get("build"))
         self.version_name = context.first_non_empty(app_meta.get("version"))
