@@ -13,6 +13,7 @@ from domain.post_scan.ios.common.evidence import EvidenceEntry
 
 @dataclass
 class IOSDataStorageEvidence:
+    weak_file_protection: EvidenceEntry
     deprecated_keychain_attributes: EvidenceEntry
     advertiser_id_stored_insecurely: EvidenceEntry
     imei_labeled_value_stored_insecurely: EvidenceEntry
@@ -56,6 +57,14 @@ class IOSDataStorageEvidence:
     SENSITIVE_DATA_LOGGING_RULE_ID = "ios.storage.sensitive-data-logged-insecurely"
     WIFI_MAC_LOGGING_RULE_ID = "ios.storage.wifi-mac-logged-insecurely"
     KEYBOARD_CACHE_EXPOSURE_RULE_ID = "ios.storage.keyboard-cache-exposure"
+    WEAK_FILE_PROTECTION_RULE_IDS = frozenset(
+        f"fileprotection-{protection}-{scope}"
+        for protection in ("open", "firstunlock", "none")
+        for scope in ("applevel", "filelevel", "filemgr", "existingfile", "coredata")
+    )
+    COMPLETE_FILE_PROTECTION_RULE_IDS = frozenset(
+        f"fileprotection-complete-{scope}" for scope in ("applevel", "filelevel", "filemgr", "existingfile", "coredata")
+    )
     ADVERTISER_ID_MARKERS = (
         "ASIdentifierManager",
         "advertisingIdentifier",
@@ -93,6 +102,7 @@ class IOSDataStorageEvidence:
     NON_USER_DEFAULTS_STORAGE_MARKERS = ("writeToFile:", "writeToURL:", "NSKeyedArchiver")
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
+        self.weak_file_protection = self._weak_file_protection_entry(loaded_outputs)
         self.deprecated_keychain_attributes = self._deprecated_keychain_attributes_entry(loaded_outputs)
         self.advertiser_id_stored_insecurely = self._advertiser_id_stored_insecurely_entry(loaded_outputs)
         self.imei_labeled_value_stored_insecurely = self._imei_labeled_value_stored_insecurely_entry(loaded_outputs)
@@ -137,6 +147,34 @@ class IOSDataStorageEvidence:
             no_hit_evidence="no_wifi_mac_logged_insecurely_hits",
         )
         self.keyboard_cache_exposure = self._keyboard_cache_exposure_entry(loaded_outputs)
+
+    @classmethod
+    def _weak_file_protection_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        weak_evidence: list[str] = []
+        complete_evidence: list[str] = []
+        for result in (loaded_outputs.get("opengrep") or {}).get("results") or []:
+            if not isinstance(result, dict):
+                continue
+            rule_id = str(result.get("check_id", "")).strip()
+            if rule_id not in cls.WEAK_FILE_PROTECTION_RULE_IDS | cls.COMPLETE_FILE_PROTECTION_RULE_IDS:
+                continue
+            extra = result.get("extra") or {}
+            matched_text = str(extra.get("lines") or extra.get("message") or rule_id).strip()
+            path = str(result.get("path", "")).strip()
+            evidence = f"{rule_id}: {matched_text}"
+            if path:
+                evidence = f"{path}: {evidence}"
+            if rule_id in cls.WEAK_FILE_PROTECTION_RULE_IDS:
+                weak_evidence.append(evidence)
+            else:
+                complete_evidence.append(evidence)
+
+        if weak_evidence:
+            evidence = weak_evidence + [f"complete protection also observed: {item}" for item in complete_evidence]
+            return EvidenceEntry(True, "\n".join(dict.fromkeys(evidence)))
+        if complete_evidence:
+            return EvidenceEntry(False, "\n".join(dict.fromkeys(complete_evidence)))
+        return EvidenceEntry(False, "no_file_protection_configuration_hits")
 
     @classmethod
     def _deprecated_keychain_attributes_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:

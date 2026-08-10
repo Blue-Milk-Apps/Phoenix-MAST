@@ -35,70 +35,70 @@ class NativeIOSCodeEvidence:
             "com.apple.security.cs.disable-library-validation",
         }
     )
-    WEAK_CRYPTO_TERMS = (
-        "3des",
-        "des",
-        "ecb",
-        "insecure cryptography",
-        "md5",
-        "rc2",
-        "rc4",
-        "sha1",
-        "weak crypto",
+    UIWEBVIEW_RULE_IDS = frozenset({"ios-deprecated-api-uiwebview"})
+    INSECURE_NSKEYEDUNARCHIVER_RULE_IDS = frozenset({"ios-insecure-serialization-nskeyedunarchiver"})
+    INSECURE_CRYPTO_ENCODING_RULE_IDS = frozenset(
+        {
+            "ios-weak-crypto-md5",
+            "ios-weak-crypto-operation-3des",
+            "ios-weak-crypto-operation-des",
+            "ios-weak-crypto-operation-ecb",
+            "ios-weak-crypto-operation-rc4",
+            "ios-weak-crypto-sha1",
+        }
     )
+    INSECURE_CRYPTO_REFERENCE_RULE_IDS = frozenset(
+        {
+            "ios-weak-crypto-reference-3des",
+            "ios-weak-crypto-reference-des",
+            "ios-weak-crypto-reference-rc4",
+        }
+    )
+    LOW_PBKDF2_ITERATION_RULE_IDS = frozenset({"ios-pbkdf2-low-iterations"})
 
     def __init__(self, context: NativeIOSScanExtractionContext) -> None:
-        insecure_crypto = self._matching_opengrep_entry(
+        self.uses_uiwebview = self._opengrep_entry_for_rule_ids(
             context,
-            self.WEAK_CRYPTO_TERMS,
-            "no_utilizes_insecure_cryptography_hits",
-        )
-        self.uses_uiwebview = self._matching_opengrep_entry(
-            context,
-            ("uiwebview",),
+            self.UIWEBVIEW_RULE_IDS,
             "no_uses_uiwebview_hits",
         )
         self.insecure_nanopb_library = self._nanopb_evidence(context)
-        self.insecure_nskeyedunarchiver_usage = self._matching_opengrep_entry(
+        self.insecure_nskeyedunarchiver_usage = self._opengrep_entry_for_rule_ids(
             context,
-            ("nskeyedunarchiver",),
+            self.INSECURE_NSKEYEDUNARCHIVER_RULE_IDS,
             "no_insecure_nskeyedunarchiver_usage_hits",
         )
-        self.encodes_data_using_insecure_cryptography = insecure_crypto
-        self.utilizes_insecure_cryptography = NativeIOSEvidenceEntry(
-            insecure_crypto.present,
-            insecure_crypto.evidence,
-        )
-        self.pbkdf2_iteration_count_below_10k = self._matching_opengrep_entry(
+        self.encodes_data_using_insecure_cryptography = self._opengrep_entry_for_rule_ids(
             context,
-            ("pbkdf2",),
+            self.INSECURE_CRYPTO_ENCODING_RULE_IDS,
+            "no_encodes_data_using_insecure_cryptography_hits",
+        )
+        self.utilizes_insecure_cryptography = self._opengrep_entry_for_rule_ids(
+            context,
+            self.INSECURE_CRYPTO_REFERENCE_RULE_IDS,
+            "no_utilizes_insecure_cryptography_hits",
+        )
+        self.pbkdf2_iteration_count_below_10k = self._opengrep_entry_for_rule_ids(
+            context,
+            self.LOW_PBKDF2_ITERATION_RULE_IDS,
             "no_pbkdf2_iteration_count_below_10k_hits",
         )
         self.hardcoded_api_keys_in_bundle = self._secret_evidence(context)
         self.insecure_entitlements = self._entitlement_evidence(context)
 
-    @classmethod
-    def _matching_opengrep_entry(
-        cls,
+    @staticmethod
+    def _opengrep_entry_for_rule_ids(
         context: NativeIOSScanExtractionContext,
-        terms: tuple[str, ...],
+        rule_ids: frozenset[str],
         absent_evidence: str,
     ) -> NativeIOSEvidenceEntry:
+        matches: set[str] = set()
         for result in context.opengrep_results:
+            rule_id = str(result.get("check_id", "")).strip()
+            if rule_id not in rule_ids:
+                continue
             extra = result.get("extra") or {}
             phoenix = (extra.get("metadata") or {}).get("phoenix") or {}
-            haystack = " ".join(
-                str(value).lower()
-                for value in (
-                    result.get("check_id"),
-                    phoenix.get("title"),
-                    phoenix.get("description"),
-                    extra.get("message"),
-                )
-                if value
-            )
-            if not any(term in haystack for term in terms):
-                continue
             evidence = context.first_non_empty(
                 extra.get("lines"),
                 phoenix.get("description"),
@@ -107,7 +107,9 @@ class NativeIOSCodeEvidence:
                 result.get("check_id"),
             )
             path = str(result.get("path", "")).strip()
-            return NativeIOSEvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
+            matches.add(f"{path}: {evidence}" if path else evidence)
+        if matches:
+            return NativeIOSEvidenceEntry(True, "; ".join(sorted(matches)))
         return NativeIOSEvidenceEntry(False, absent_evidence)
 
     @staticmethod

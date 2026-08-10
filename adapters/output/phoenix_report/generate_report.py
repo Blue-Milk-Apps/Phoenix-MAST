@@ -100,6 +100,7 @@ IOS_NETWORK_EVIDENCE_KEY_BY_CHECK = {
     "certificate pinning not implemented": "certificate_pinning_not_implemented",
 }
 IOS_DATA_STORAGE_EVIDENCE_KEY_BY_CHECK = {
+    "application uses weak file protection": "weak_file_protection",
     "application utilizes deprecated keychain attributes": "deprecated_keychain_attributes",
     "local data exposure: advertiser id stored insecurely": "advertiser_id_stored_insecurely",
     "local data exposure: imei-labeled value stored insecurely": "imei_labeled_value_stored_insecurely",
@@ -1023,6 +1024,23 @@ IOS_NETWORK_CHECK_SPECS = (
     },
 )
 IOS_DATA_STORAGE_CHECK_SPECS = (
+    {
+        "check": "Application Uses Weak File Protection",
+        "severity": "Medium",
+        "compliance": "MASVS-STORAGE-1; NIAP: FDP_DAR_EXT.1.1, FMT_CFG_EXT.1.2",
+        "present_explanation": (
+            "One or more files, persistent stores, or app-level defaults use a file-protection class that may "
+            "leave data accessible while the device is locked."
+        ),
+        "not_present_explanation": (
+            "No weak file-protection configuration was identified; any observed configuration used complete protection."
+        ),
+        "confidence_caveat": (
+            "Static analysis assesses explicit file-protection declarations and calls; runtime defaults and "
+            "dynamically selected options may require verification."
+        ),
+        "aliases": (),
+    },
     {
         "check": "Application Utilizes Deprecated Keychain Attributes",
         "severity": "Medium",
