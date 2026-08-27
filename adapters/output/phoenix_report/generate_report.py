@@ -2721,6 +2721,8 @@ def _build_findings_severity(report_data: dict[str, Any]) -> dict[str, int]:
 
     for section in report_data.get("vulnerability_sections") or []:
         for check in section.get("checks") or []:
+            if str(check.get("result", "")).strip().lower() != "present":
+                continue
             severity = str(check.get("severity", "")).strip().lower()
             if severity in counts:
                 counts[severity] += 1

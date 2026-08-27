@@ -10,6 +10,8 @@ from adapters.post_scan import (
     AndroidBinaryScanOutputLoader,
     IOSBinaryScanDetailExtractor,
     IOSBinaryScanOutputLoader,
+    NativeAndroidScanDetailExtractor,
+    NativeAndroidScanOutputLoader,
     NativeIOSScanDetailExtractor,
     NativeIOSScanOutputLoader,
 )
@@ -19,6 +21,7 @@ from adapters.scanners.android import (
     ApkidScanner,
     ApksignerScanner,
     ApktoolScanner,
+    NativeAndroidSourceMetadataScanner,
 )
 from adapters.scanners.common import (
     GitleaksScanner,
@@ -83,6 +86,7 @@ class MobileScannerFactory:
                 ]
             case ("SOURCE", "ANDROID", "NATIVE_ANDROID"):
                 return [
+                    NativeAndroidSourceMetadataScanner(),
                     TrufflehogScanner(),
                     GitleaksScanner(),
                     SyftScanner(output_format=config.syft_output_format),
@@ -249,5 +253,14 @@ class MobileAnalysisWorkflowService:
                     scan_output_loader=NativeIOSScanOutputLoader(),
                     scan_detail_extractor=NativeIOSScanDetailExtractor(),
                 )
+            case ("SOURCE", "ANDROID", "NATIVE_ANDROID"):
+                return PostScanProcessingService(
+                    scan_output_loader=NativeAndroidScanOutputLoader(),
+                    scan_detail_extractor=NativeAndroidScanDetailExtractor(),
+                )
             case _:
+                print(
+                    f"Post-scan processing not supported for target_type={scan_config.target_type}, "
+                    f"platform={scan_config.platform}, stack={scan_config.stack}"
+                )
                 return None
