@@ -8,6 +8,10 @@ from adapters.post_scan import NativeAndroidScanOutputLoader
 def test_loads_known_native_android_source_artifacts(tmp_path: Path) -> None:
     scan_dir = tmp_path / "SAST_native_android_source_2026-08-27_12-00-00"
     _write_json(scan_dir / "scan_metadata.json", {"platform": "ANDROID"})
+    _write_json(
+        scan_dir / "native_android_source_metadata" / "project_metadata.json",
+        {"identity": {"package_name": "com.example.app"}},
+    )
     _write_json(scan_dir / "opengrep_source" / "opengrep_results.json", {"results": []})
     _write_json(scan_dir / "trufflehog" / "trufflehog_results.json", [{"DetectorName": "GCP"}])
     _write_json(scan_dir / "gitleaks" / "gitleaks_report.json", [{"RuleID": "generic-api-key"}])
@@ -18,6 +22,7 @@ def test_loads_known_native_android_source_artifacts(tmp_path: Path) -> None:
     assert loaded == {
         "scan_output_path": str(scan_dir),
         "scan_metadata": {"platform": "ANDROID"},
+        "source_metadata": {"identity": {"package_name": "com.example.app"}},
         "opengrep": {"results": []},
         "trufflehog_outputs": {"trufflehog_results.json": [{"DetectorName": "GCP"}]},
         "gitleaks_outputs": {"gitleaks_report.json": [{"RuleID": "generic-api-key"}]},
@@ -29,6 +34,7 @@ def test_missing_native_android_source_artifacts_use_empty_defaults(tmp_path: Pa
     loaded = NativeAndroidScanOutputLoader().load(tmp_path)
 
     assert loaded["scan_metadata"] is None
+    assert loaded["source_metadata"] is None
     assert loaded["opengrep"] is None
     assert loaded["trufflehog_outputs"] == {}
     assert loaded["gitleaks_outputs"] == {}
@@ -45,14 +51,30 @@ def test_malformed_known_json_is_retained_as_none(tmp_path: Path) -> None:
     assert loaded["gitleaks_outputs"] == {"gitleaks_report.json": None}
 
 
+def test_malformed_source_metadata_returns_none(tmp_path: Path) -> None:
+    report = tmp_path / "native_android_source_metadata" / "project_metadata.json"
+    report.parent.mkdir(parents=True)
+    report.write_text("not valid json", encoding="utf-8")
+
+    loaded = NativeAndroidScanOutputLoader().load(tmp_path)
+
+    assert loaded["source_metadata"] is None
+
+
 def test_unknown_and_nested_artifacts_are_ignored(tmp_path: Path) -> None:
     _write_json(tmp_path / "trufflehog" / "trufflehog_results.json", [])
     _write_json(tmp_path / "trufflehog" / "unknown.json", {"ignored": True})
     _write_json(tmp_path / "trufflehog" / "nested" / "secondary_results.json", {"ignored": True})
+    _write_json(tmp_path / "native_android_source_metadata" / "unknown.json", {"ignored": True})
+    _write_json(
+        tmp_path / "native_android_source_metadata" / "nested" / "project_metadata.json",
+        {"ignored": True},
+    )
 
     loaded = NativeAndroidScanOutputLoader().load(tmp_path)
 
     assert loaded["trufflehog_outputs"] == {"trufflehog_results.json": []}
+    assert loaded["source_metadata"] is None
 
 
 def _write_json(path: Path, payload: Any) -> None:

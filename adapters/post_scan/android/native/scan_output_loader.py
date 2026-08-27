@@ -17,6 +17,7 @@ class NativeAndroidScanOutputLoader(ScanOutputLoaderPort):
         return {
             "scan_output_path": str(root),
             "scan_metadata": self._load_json(root / "scan_metadata.json"),
+            "source_metadata": self._load_json(root / "native_android_source_metadata" / "project_metadata.json"),
             "opengrep": self._load_json(root / "opengrep_source" / "opengrep_results.json"),
             "trufflehog_outputs": self._load_known_json(root / "trufflehog" / "trufflehog_results.json"),
             "gitleaks_outputs": self._load_known_json(root / "gitleaks" / "gitleaks_report.json"),
