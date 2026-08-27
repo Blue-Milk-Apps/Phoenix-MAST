@@ -55,6 +55,7 @@ def test_extracts_native_android_source_metadata_sections() -> None:
         "app_components",
         "permissions",
         "deep_links",
+        "functionality",
     }
     assert sections["meta"] == {
         "app_display_name": "Example",
@@ -105,6 +106,10 @@ def test_extracts_native_android_source_metadata_sections() -> None:
     assert len(sections["permissions"]) == 2
     assert sections["deep_links"] == {
         "deep_links": [{"component": "com.example.app.MainActivity", "scheme": "example"}]
+    }
+    assert sections["functionality"]["Camera"] == {
+        "present": True,
+        "explanation": "Declared permission: android.permission.CAMERA.",
     }
 
 

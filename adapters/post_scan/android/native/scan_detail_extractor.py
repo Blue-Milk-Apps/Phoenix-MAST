@@ -10,7 +10,10 @@ from domain.post_scan.android.native import (
     NativeAndroidAppInfo,
     NativeAndroidApplication,
     NativeAndroidDeepLinks,
+    NativeAndroidEndpoints,
     NativeAndroidFileInfo,
+    NativeAndroidFunctionality,
+    NativeAndroidHardcodedValues,
     NativeAndroidMeta,
     NativeAndroidPermissions,
     NativeAndroidScanExtractionContext,
@@ -23,7 +26,7 @@ class NativeAndroidScanDetailExtractor(ScanDetailExtractorPort):
 
     def extract_sections(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
         context = NativeAndroidScanExtractionContext(loaded_outputs)
-        return {
+        sections = {
             "meta": asdict(NativeAndroidMeta(context)),
             "file_info": asdict(NativeAndroidFileInfo(context)),
             "app_info": asdict(NativeAndroidAppInfo(context)),
@@ -32,3 +35,16 @@ class NativeAndroidScanDetailExtractor(ScanDetailExtractorPort):
             "permissions": NativeAndroidPermissions(context).items,
             "deep_links": asdict(NativeAndroidDeepLinks(context)),
         }
+        functionality = NativeAndroidFunctionality(context)
+        if functionality.assessed:
+            sections["functionality"] = functionality.items
+
+        hardcoded_values = NativeAndroidHardcodedValues(context)
+        if hardcoded_values.assessed:
+            sections["hardcoded_values"] = {
+                "urls": hardcoded_values.urls,
+                "emails": hardcoded_values.emails,
+                "secrets": hardcoded_values.secrets,
+            }
+            sections["endpoints"] = NativeAndroidEndpoints(hardcoded_values).items
+        return sections

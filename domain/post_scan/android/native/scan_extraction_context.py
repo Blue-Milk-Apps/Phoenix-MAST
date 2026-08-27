@@ -73,6 +73,27 @@ class NativeAndroidScanExtractionContext:
         return self.string_list(self.extraction.get("warnings"))
 
     @property
+    def manifest_permissions_assessed(self) -> bool:
+        return isinstance(self.source_metadata.get("permissions"), list)
+
+    @property
+    def opengrep_assessed(self) -> bool:
+        opengrep = self.loaded_outputs.get("opengrep")
+        return (
+            isinstance(opengrep, dict)
+            and opengrep.get("success") is not False
+            and isinstance(opengrep.get("results"), list)
+        )
+
+    @property
+    def gitleaks_assessed(self) -> bool:
+        return isinstance(self._known_scanner_output("gitleaks_outputs", "gitleaks_report.json"), list)
+
+    @property
+    def trufflehog_assessed(self) -> bool:
+        return isinstance(self._known_scanner_output("trufflehog_outputs", "trufflehog_results.json"), list)
+
+    @property
     def opengrep_results(self) -> list[dict[str, Any]]:
         opengrep = self._mapping(self.loaded_outputs.get("opengrep"))
         return self._mapping_list(opengrep.get("results"))
@@ -135,6 +156,9 @@ class NativeAndroidScanExtractionContext:
 
     def _scanner_outputs(self, key: str) -> dict[str, Any]:
         return self._mapping(self.loaded_outputs.get(key))
+
+    def _known_scanner_output(self, key: str, filename: str) -> Any:
+        return self._scanner_outputs(key).get(filename)
 
     @staticmethod
     def _mapping(value: Any) -> dict[str, Any]:
