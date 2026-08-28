@@ -70,9 +70,7 @@ class FlutterSourceMetadataScanner(ScannerPort):
         pubspec: dict[str, Any],
     ) -> dict[str, Any]:
         lock_path = project_path / "pubspec.lock"
-        warnings = (
-            [] if lock_path.is_file() else ["No pubspec.lock file found; resolved dependencies were not assessed."]
-        )
+        resolved_dependencies, warnings = self._resolved_dependencies(lock_path)
         version, version_name, version_code = self._version_parts(pubspec.get("version"))
         environment = self._mapping(pubspec.get("environment"))
 
@@ -105,9 +103,57 @@ class FlutterSourceMetadataScanner(ScannerPort):
             "dependencies": {
                 "direct": self._declared_dependencies(pubspec.get("dependencies")),
                 "development": self._declared_dependencies(pubspec.get("dev_dependencies")),
-                "resolved": [],
+                "resolved": resolved_dependencies,
             },
         }
+
+    def _resolved_dependencies(self, lock_path: Path) -> tuple[list[dict[str, str]], list[str]]:
+        if not lock_path.is_file():
+            return [], ["No pubspec.lock file found; resolved dependencies were not assessed."]
+
+        try:
+            lock_data = yaml.safe_load(lock_path.read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError) as exc:
+            return [], [f"Unable to parse {lock_path.name}; resolved dependencies were not assessed: {exc}"]
+
+        if not isinstance(lock_data, dict) or not isinstance(lock_data.get("packages"), dict):
+            return [], [
+                f"{lock_path.name} does not contain a packages mapping; resolved dependencies were not assessed."
+            ]
+
+        dependencies: list[dict[str, str]] = []
+        warnings: list[str] = []
+        for name, value in sorted(lock_data["packages"].items()):
+            if not isinstance(value, dict):
+                warnings.append(f"Unable to read locked dependency metadata for {name}.")
+                continue
+            dependencies.append(self._resolved_dependency(str(name), value))
+        return dependencies, warnings
+
+    def _resolved_dependency(self, name: str, value: dict[str, Any]) -> dict[str, str]:
+        source = self._text(value.get("source")) or "unknown"
+        description = value.get("description")
+        details = self._mapping(description)
+        return {
+            "name": name,
+            "version": self._text(value.get("version")),
+            "dependency_kind": self._dependency_kind(value.get("dependency")),
+            "source": source,
+            "hosted_url": self._text(details.get("url")) if source == "hosted" else "",
+            "vcs_url": self._text(details.get("url")) if source == "git" else "",
+            "path": self._text(details.get("path")) if source == "path" else "",
+        }
+
+    @staticmethod
+    def _dependency_kind(value: object) -> str:
+        normalized = FlutterSourceMetadataScanner._text(value).lower()
+        if normalized == "direct main":
+            return "direct"
+        if normalized == "direct dev":
+            return "development"
+        if normalized == "transitive":
+            return "transitive"
+        return "unknown"
 
     def _declared_dependencies(self, value: object) -> list[dict[str, str]]:
         dependencies = self._mapping(value)
