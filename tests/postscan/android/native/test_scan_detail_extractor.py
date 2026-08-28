@@ -56,6 +56,8 @@ def test_extracts_native_android_source_metadata_sections() -> None:
         "permissions",
         "deep_links",
         "functionality",
+        "code_evidence",
+        "data_storage_evidence",
     }
     assert sections["meta"] == {
         "app_display_name": "Example",
@@ -111,6 +113,13 @@ def test_extracts_native_android_source_metadata_sections() -> None:
         "present": True,
         "explanation": "Declared permission: android.permission.CAMERA.",
     }
+    assert sections["code_evidence"]["app_is_debuggable"]["present"] is False
+    assert sections["code_evidence"]["activities_accessible_to_other_apps"] == {
+        "present": True,
+        "evidence": "exported_activities=1",
+        "details": ["com.example.app.MainActivity"],
+    }
+    assert sections["data_storage_evidence"]["accesses_external_storage"]["present"] is False
 
 
 def test_missing_source_metadata_preserves_unknown_values() -> None:

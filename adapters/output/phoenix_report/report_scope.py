@@ -33,6 +33,18 @@ def resolve_report_scope(data: dict[str, Any]) -> ReportScope:
 
     if is_ios and is_source:
         assessed_sections = ("code", "network", "data storage")
+    elif is_source:
+        section_evidence_keys = {
+            "code": "code_evidence",
+            "network": "network_evidence",
+            "data storage": "data_storage_evidence",
+            "resilience": "resilience_evidence",
+        }
+        assessed_sections = tuple(
+            section
+            for section, evidence_key in section_evidence_keys.items()
+            if _has_assessed_evidence(data.get(evidence_key))
+        )
     else:
         assessed_sections = ("code", "network", "data storage", "resilience")
 
@@ -63,3 +75,9 @@ def _target_type(data: dict[str, Any], meta: dict[str, Any]) -> str:
 
     # Existing reports predate target_type and were generated from binaries.
     return "BINARY"
+
+
+def _has_assessed_evidence(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    return any(isinstance(entry, dict) and isinstance(entry.get("present"), bool) for entry in value.values())
