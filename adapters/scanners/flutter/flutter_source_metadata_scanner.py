@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import plistlib
+import re
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -12,6 +14,7 @@ import yaml
 from adapters.scanners.android import NativeAndroidSourceMetadataScanner
 from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
+from utilities.plist_report import PlistReportBuilder
 
 
 class FlutterSourceMetadataScanner(ScannerPort):
@@ -20,6 +23,9 @@ class FlutterSourceMetadataScanner(ScannerPort):
     SCHEMA_VERSION = "1.0"
     REPORT_PATH = "project_metadata.json"
     PLATFORM_DIRECTORIES = ("android", "ios", "web", "linux", "macos", "windows")
+    IOS_EXCLUDED_DIRECTORIES = frozenset({".symlinks", "build", "deriveddata", "pods", "vendor"})
+    XCODE_BUILD_SETTING_PATTERN = re.compile(r"^\s*([A-Za-z0-9_]+)\s*=\s*(.*?)\s*;\s*$", re.MULTILINE)
+    XCODE_VARIABLE_PATTERN = re.compile(r"\$\(([^)]+)\)")
 
     @property
     def scan_type(self) -> ScanType:
@@ -83,6 +89,13 @@ class FlutterSourceMetadataScanner(ScannerPort):
             version_code=version_code,
         )
         warnings.extend(android_warnings)
+        ios, ios_warnings = self._ios_metadata(
+            project_path,
+            package_name=self._text(pubspec.get("name")),
+            version_name=version_name,
+            version_code=version_code,
+        )
+        warnings.extend(ios_warnings)
 
         return {
             "schema_version": self.SCHEMA_VERSION,
@@ -111,6 +124,7 @@ class FlutterSourceMetadataScanner(ScannerPort):
             },
             "platforms": {platform: (project_path / platform).is_dir() for platform in self.PLATFORM_DIRECTORIES},
             "android": android,
+            "ios": ios,
             "dependencies": {
                 "direct": self._declared_dependencies(pubspec.get("dependencies")),
                 "development": self._declared_dependencies(pubspec.get("dev_dependencies")),
@@ -167,6 +181,195 @@ class FlutterSourceMetadataScanner(ScannerPort):
             else []
         )
         return {"available": True, "project_path": "android", "metadata": metadata}, warnings
+
+    def _ios_metadata(
+        self,
+        project_path: Path,
+        *,
+        package_name: str,
+        version_name: str,
+        version_code: str,
+    ) -> tuple[dict[str, Any], list[str]]:
+        ios_path = project_path / "ios"
+        unavailable = {"available": False, "project_path": "", "metadata": None}
+        if not ios_path.is_dir():
+            return unavailable, []
+
+        warnings: list[str] = []
+        info_plist_path = self._ios_info_plist(ios_path)
+        if info_plist_path is None:
+            return (
+                {"available": True, "project_path": "ios", "metadata": None},
+                ["iOS metadata: No application Info.plist file was found."],
+            )
+
+        info_plist = self._load_ios_plist(info_plist_path, ios_path, warnings)
+        if info_plist is None:
+            return {"available": True, "project_path": "ios", "metadata": None}, warnings
+
+        xcode_project_path = self._xcode_project_file(ios_path)
+        xcode_settings = self._xcode_build_settings(xcode_project_path, ios_path, warnings)
+        product_name = self._xcode_setting(xcode_settings, "PRODUCT_NAME") or package_name
+        variables = {
+            "EXECUTABLE_NAME": self._xcode_setting(xcode_settings, "EXECUTABLE_NAME") or product_name,
+            "FLUTTER_BUILD_NAME": version_name,
+            "FLUTTER_BUILD_NUMBER": version_code,
+            "PRODUCT_BUNDLE_IDENTIFIER": self._xcode_setting(xcode_settings, "PRODUCT_BUNDLE_IDENTIFIER"),
+            "PRODUCT_NAME": product_name,
+        }
+
+        report_builder = PlistReportBuilder(
+            scanner_name=self.name,
+            scan_type=self.scan_type,
+            description=self.description,
+            base_path=ios_path,
+            output_format="json",
+        )
+        identity = report_builder._app_meta(info_plist)
+        for key, value in list(identity.items()):
+            if isinstance(value, str):
+                identity[key] = self._resolve_xcode_variables(value, variables, warnings, key)
+        if not self._text(identity.get("minimum_os")):
+            identity["minimum_os"] = self._xcode_setting(xcode_settings, "IPHONEOS_DEPLOYMENT_TARGET")
+
+        entitlements = self._ios_supporting_plists(
+            ios_path,
+            suffix=".entitlements",
+            detail_builder=report_builder._entitlement_details,
+            warnings=warnings,
+        )
+        privacy_manifests = self._ios_supporting_plists(
+            ios_path,
+            suffix=".xcprivacy",
+            detail_builder=report_builder._privacy_manifest_details,
+            warnings=warnings,
+        )
+        metadata = {
+            "info_plist_path": info_plist_path.relative_to(ios_path).as_posix(),
+            "xcode_project_path": (
+                xcode_project_path.relative_to(ios_path).as_posix() if xcode_project_path is not None else ""
+            ),
+            "identity": identity,
+            "permissions": report_builder._permission_details(info_plist),
+            "app_transport_security": report_builder._transport_security_details(info_plist),
+            "url_schemes": report_builder._url_scheme_details(info_plist),
+            "background_modes": report_builder._background_modes(info_plist),
+            "entitlements": entitlements,
+            "privacy_manifests": privacy_manifests,
+        }
+        return {"available": True, "project_path": "ios", "metadata": metadata}, warnings
+
+    def _ios_info_plist(self, ios_path: Path) -> Path | None:
+        runner_info = ios_path / "Runner" / "Info.plist"
+        if runner_info.is_file():
+            return runner_info
+        return next(
+            (
+                path
+                for path in sorted(ios_path.rglob("Info.plist"))
+                if path.is_file() and not self._excluded_ios_path(path, ios_path)
+            ),
+            None,
+        )
+
+    def _xcode_project_file(self, ios_path: Path) -> Path | None:
+        runner_project = ios_path / "Runner.xcodeproj" / "project.pbxproj"
+        if runner_project.is_file():
+            return runner_project
+        return next(
+            (path for path in sorted(ios_path.glob("*.xcodeproj/project.pbxproj")) if path.is_file()),
+            None,
+        )
+
+    def _xcode_build_settings(
+        self,
+        project_file: Path | None,
+        ios_path: Path,
+        warnings: list[str],
+    ) -> dict[str, list[str]]:
+        if project_file is None:
+            return {}
+        try:
+            content = project_file.read_text(encoding="utf-8")
+        except OSError as exc:
+            relative_path = project_file.relative_to(ios_path).as_posix()
+            warnings.append(f"iOS metadata: Unable to read {relative_path}: {exc}")
+            return {}
+
+        settings: dict[str, list[str]] = {}
+        for key, raw_value in self.XCODE_BUILD_SETTING_PATTERN.findall(content):
+            value = raw_value.strip().strip('"')
+            if value and value not in settings.setdefault(key, []):
+                settings[key].append(value)
+        return settings
+
+    @staticmethod
+    def _xcode_setting(settings: dict[str, list[str]], name: str) -> str:
+        values = settings.get(name, [])
+        return next((value for value in values if "$(" not in value), values[0] if values else "")
+
+    def _resolve_xcode_variables(
+        self,
+        value: str,
+        variables: dict[str, str],
+        warnings: list[str],
+        field_name: str,
+    ) -> str:
+        unresolved: set[str] = set()
+
+        def replacement(match: re.Match[str]) -> str:
+            expression = match.group(1)
+            name = expression.split(":", 1)[0]
+            replacement_value = variables.get(name, "")
+            if not replacement_value:
+                unresolved.add(expression)
+                return match.group(0)
+            return replacement_value
+
+        resolved = self.XCODE_VARIABLE_PATTERN.sub(replacement, value)
+        for expression in sorted(unresolved):
+            warnings.append(f"iOS metadata: Unable to resolve $({expression}) in {field_name}.")
+        return resolved
+
+    def _ios_supporting_plists(
+        self,
+        ios_path: Path,
+        *,
+        suffix: str,
+        detail_builder: Any,
+        warnings: list[str],
+    ) -> list[dict[str, Any]]:
+        artifacts: list[dict[str, Any]] = []
+        for path in sorted(ios_path.rglob(f"*{suffix}")):
+            if not path.is_file() or self._excluded_ios_path(path, ios_path):
+                continue
+            data = self._load_ios_plist(path, ios_path, warnings)
+            artifacts.append(
+                {
+                    "path": path.relative_to(ios_path).as_posix(),
+                    "metadata": detail_builder(data) if data is not None else None,
+                }
+            )
+        return artifacts
+
+    @staticmethod
+    def _load_ios_plist(path: Path, ios_path: Path, warnings: list[str]) -> dict[str, Any] | None:
+        try:
+            with path.open("rb") as handle:
+                data = plistlib.load(handle)
+        except (OSError, plistlib.InvalidFileException) as exc:
+            relative_path = path.relative_to(ios_path).as_posix()
+            warnings.append(f"iOS metadata: Unable to parse {relative_path}: {exc}")
+            return None
+        if not isinstance(data, dict):
+            relative_path = path.relative_to(ios_path).as_posix()
+            warnings.append(f"iOS metadata: {relative_path} does not contain a plist mapping.")
+            return None
+        return data
+
+    def _excluded_ios_path(self, path: Path, ios_path: Path) -> bool:
+        relative_parts = {part.lower() for part in path.relative_to(ios_path).parts}
+        return bool(relative_parts.intersection(self.IOS_EXCLUDED_DIRECTORIES))
 
     def _resolved_dependencies(self, lock_path: Path) -> tuple[list[dict[str, str]], list[str]]:
         if not lock_path.is_file():

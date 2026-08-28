@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import plistlib
 from pathlib import Path
 
 import pytest
@@ -49,8 +50,7 @@ dev_dependencies:
   test: ^1.25.0
 """,
     )
-    for platform in ("ios", "web"):
-        (project / platform).mkdir()
+    (project / "web").mkdir()
 
     result = FlutterSourceMetadataScanner().scan(_config(project, tmp_path))[0]
     payload = json.loads(result.raw_output)
@@ -84,13 +84,14 @@ dev_dependencies:
     }
     assert payload["platforms"] == {
         "android": False,
-        "ios": True,
+        "ios": False,
         "linux": False,
         "macos": False,
         "web": True,
         "windows": False,
     }
     assert payload["android"] == {"available": False, "metadata": None, "project_path": ""}
+    assert payload["ios"] == {"available": False, "metadata": None, "project_path": ""}
     assert payload["dependencies"] == {
         "development": [{"constraint": "^1.25.0", "name": "test", "source": "hosted"}],
         "direct": [
@@ -264,6 +265,118 @@ def test_android_metadata_failure_is_partial_flutter_metadata(tmp_path: Path) ->
     assert payload["extraction"]["warnings"][0].startswith("Android metadata: Unable to parse")
 
 
+def test_extracts_ios_metadata_and_resolves_flutter_build_values(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    _write(project / "pubspec.yaml", "name: example_app\nversion: 2.3.4+56\n")
+    _write(project / "pubspec.lock", "packages: {}\n")
+    _write_plist(
+        project / "ios/Runner/Info.plist",
+        {
+            "CFBundleDisplayName": "Example App",
+            "CFBundleExecutable": "$(EXECUTABLE_NAME)",
+            "CFBundleIdentifier": "$(PRODUCT_BUNDLE_IDENTIFIER)",
+            "CFBundleName": "$(PRODUCT_NAME)",
+            "CFBundlePackageType": "APPL",
+            "CFBundleShortVersionString": "$(FLUTTER_BUILD_NAME)",
+            "CFBundleURLTypes": [{"CFBundleURLSchemes": ["example-app"]}],
+            "CFBundleVersion": "$(FLUTTER_BUILD_NUMBER)",
+            "LSApplicationQueriesSchemes": ["partner-app"],
+            "LSRequiresIPhoneOS": True,
+            "NSAppTransportSecurity": {
+                "NSAllowsArbitraryLoads": False,
+                "NSExceptionDomains": {"legacy.example.com": {"NSExceptionAllowsInsecureHTTPLoads": True}},
+            },
+            "NSCameraUsageDescription": "Take profile photos",
+            "UIBackgroundModes": ["fetch", "remote-notification"],
+        },
+    )
+    _write(
+        project / "ios/Runner.xcodeproj/project.pbxproj",
+        """
+PRODUCT_BUNDLE_IDENTIFIER = com.example.app;
+PRODUCT_NAME = ExampleApp;
+IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+""",
+    )
+    _write_plist(
+        project / "ios/Runner/Runner.entitlements",
+        {
+            "aps-environment": "development",
+            "com.apple.developer.associated-domains": ["applinks:example.com"],
+        },
+    )
+    _write_plist(
+        project / "ios/Runner/PrivacyInfo.xcprivacy",
+        {
+            "NSPrivacyTracking": False,
+            "NSPrivacyAccessedAPITypes": [{"NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp"}],
+        },
+    )
+
+    result = FlutterSourceMetadataScanner().scan(_config(project, tmp_path))[0]
+    payload = json.loads(result.raw_output)
+    ios = payload["ios"]
+    metadata = ios["metadata"]
+
+    assert result.success is True
+    assert payload["platforms"]["ios"] is True
+    assert payload["extraction"] == {"status": "complete", "warnings": []}
+    assert ios["available"] is True
+    assert ios["project_path"] == "ios"
+    assert metadata["info_plist_path"] == "Runner/Info.plist"
+    assert metadata["xcode_project_path"] == "Runner.xcodeproj/project.pbxproj"
+    assert metadata["identity"]["bundle_identifier"] == "com.example.app"
+    assert metadata["identity"]["bundle_name"] == "ExampleApp"
+    assert metadata["identity"]["executable"] == "ExampleApp"
+    assert metadata["identity"]["version"] == "2.3.4"
+    assert metadata["identity"]["build"] == "56"
+    assert metadata["identity"]["minimum_os"] == "13.0"
+    assert metadata["permissions"] == [{"key": "NSCameraUsageDescription", "purpose": "Take profile photos"}]
+    assert metadata["background_modes"] == ["fetch", "remote-notification"]
+    assert metadata["url_schemes"] == {
+        "declared_schemes": ["example-app"],
+        "queried_schemes": ["partner-app"],
+    }
+    assert metadata["app_transport_security"]["exception_domains"][0] == {
+        "allows_insecure_http_loads": True,
+        "domain": "legacy.example.com",
+        "minimum_tls_version": "",
+        "requires_forward_secrecy": None,
+    }
+    assert metadata["entitlements"] == [
+        {
+            "metadata": {
+                "application_groups": [],
+                "application_identifier": "",
+                "aps_environment": "development",
+                "associated_domains": ["applinks:example.com"],
+                "healthkit": False,
+                "icloud_containers": [],
+                "in_app_payments": [],
+                "keychain_access_groups": [],
+            },
+            "path": "Runner/Runner.entitlements",
+        }
+    ]
+    assert metadata["privacy_manifests"][0]["path"] == "Runner/PrivacyInfo.xcprivacy"
+    assert metadata["privacy_manifests"][0]["metadata"]["tracking"] is False
+
+
+def test_invalid_ios_info_plist_returns_partial_flutter_metadata(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    _write(project / "pubspec.yaml", "name: example_app\n")
+    _write(project / "pubspec.lock", "packages: {}\n")
+    _write(project / "ios/Runner/Info.plist", "not a plist")
+
+    result = FlutterSourceMetadataScanner().scan(_config(project, tmp_path))[0]
+    payload = json.loads(result.raw_output)
+
+    assert result.success is True
+    assert payload["extraction"]["status"] == "partial"
+    assert payload["ios"] == {"available": True, "metadata": None, "project_path": "ios"}
+    assert payload["extraction"]["warnings"][0].startswith("iOS metadata: Unable to parse Runner/Info.plist")
+
+
 @pytest.mark.parametrize("content", ("packages: [\n", "sdks:\n  dart: '>=3.3.0 <4.0.0'\n"))
 def test_invalid_pubspec_lock_returns_partial_metadata(tmp_path: Path, content: str) -> None:
     project = tmp_path / "project"
@@ -350,3 +463,8 @@ def _config(project: Path, tmp_path: Path) -> ScanConfig:
 def _write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+
+
+def _write_plist(path: Path, content: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(plistlib.dumps(content))
