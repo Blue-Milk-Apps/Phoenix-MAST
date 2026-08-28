@@ -198,7 +198,49 @@ CODE_EVIDENCE_KEY_BY_CHECK = {
     "copies sensitive information into the clipboard without user consent": (
         "copies_sensitive_information_into_clipboard_without_user_consent"
     ),
+    "application data can be backed up": "application_data_can_be_backed_up",
+    "application uses custom url schemes / deep links": ("application_uses_custom_url_schemes_or_deep_links"),
 }
+ANDROID_SOURCE_CODE_CHECK_NAMES = frozenset(
+    {
+        "activities accessible to other apps",
+        "app is debuggable",
+        "application data can be backed up",
+        "application uses custom url schemes / deep links",
+        "contains hard-coded cryptographic key",
+        "contains potential hard-coded password",
+        "contains potential sql injection",
+        "contains reflection code",
+        "creates blowfish key with weak length",
+        "creates rsa keys with weak modulus length",
+        "receivers accessible to other apps",
+        "requests root access",
+        "services accessible to other apps",
+        "uses sha1 hashing algorithm",
+        "weakly configured xml parser",
+        "writes sensitive information to system log",
+        "uses spoofable values for authentication",
+        "copies sensitive information into the clipboard without user consent",
+    }
+)
+ANDROID_SOURCE_NETWORK_CHECK_NAMES = frozenset(
+    {
+        "allows cleartext traffic for all domains",
+        "contains hostnameverifier that accepts all hostnames",
+        "contains x509trustmanager that accepts all certificates",
+        "opens a listening port",
+        "sensitive information is unencrypted in transit",
+        "weak certificate validation enables mitm attacks",
+    }
+)
+ANDROID_SOURCE_DATA_STORAGE_CHECK_NAMES = frozenset(
+    {
+        "accesses external storage",
+        "sensitive information stored in world readable or writable file in internal storage",
+        "sensitive information stored in external storage",
+    }
+)
+ANDROID_SOURCE_RESILIENCE_CHECK_NAMES = frozenset({"biometric / local authentication bypass possible"})
 CODE_CHECK_SPECS = (
     {
         "check": "Accesses Unique Identifiers",
@@ -371,6 +413,24 @@ CODE_CHECK_SPECS = (
         "compliance": "OWASP: 2016-M2-Insecure Data Storage; HIPAA: 164.312(a)(2)(iv)",
         "present_explanation": "The app copies sensitive information into the clipboard without the user's consent.",
         "not_present_explanation": "This app does not copy sensitive information into the clipboard without the user's consent.",
+        "aliases": (),
+    },
+)
+ANDROID_SOURCE_CODE_EXTRA_CHECK_SPECS = (
+    {
+        "check": "Application Data can be Backed Up",
+        "severity": "Medium",
+        "compliance": "OWASP: 2016-M2-Insecure Data Storage",
+        "present_explanation": "The manifest allows application data backup.",
+        "not_present_explanation": "The manifest does not enable application data backup.",
+        "aliases": (),
+    },
+    {
+        "check": "Application Uses Custom URL Schemes / Deep Links",
+        "severity": "Medium",
+        "compliance": "OWASP: 2016-M1-Improper Platform Usage",
+        "present_explanation": "The manifest declares one or more custom URL schemes or deep links.",
+        "not_present_explanation": "No custom URL schemes or deep links were declared.",
         "aliases": (),
     },
 )
@@ -1490,7 +1550,11 @@ def result_badge(result):
     from markupsafe import Markup
 
     key = (result or "").strip().lower()
-    css_class = "badge-present" if key == "present" else "badge-notpresent"
+    css_class = {
+        "present": "badge-present",
+        "not present": "badge-notpresent",
+        "not evaluated": "badge-na",
+    }.get(key, "badge-na")
     return Markup(f'<span class="badge {css_class}">{result}</span>')
 
 
@@ -1524,6 +1588,24 @@ def make_overall_risk_polar_chart(risk_summary):
     categories = [(pretty_label(k), risk_summary.get(k, "Low")) for k in keys]
 
     n = len(categories)
+    if n == 0:
+        fig, ax = plt.subplots(figsize=(5.6, 4.8))
+        ax.axis("off")
+        ax.text(
+            0.5,
+            0.5,
+            "No security sections were evaluated",
+            ha="center",
+            va="center",
+            fontsize=12,
+            color="#667085",
+        )
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=200, bbox_inches="tight", transparent=True)
+        plt.close(fig)
+        buf.seek(0)
+        return base64.b64encode(buf.read()).decode("ascii")
+
     theta = np.linspace(0.0, 2 * np.pi, n, endpoint=False) + (np.pi / 2)
     width = (2 * np.pi / n) * 0.92
 
@@ -1691,12 +1773,16 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
             if section_name in report_scope.assessed_sections
         }
     else:
-        _canonicalize_code_section(report_data)
-        _canonicalize_data_storage_section(report_data)
-        _canonicalize_network_section(report_data)
-        _canonicalize_resilience_section(report_data)
+        _canonicalize_code_section(report_data, report_scope.target_type)
+        _canonicalize_data_storage_section(report_data, report_scope.target_type)
+        _canonicalize_network_section(report_data, report_scope.target_type)
+        _canonicalize_resilience_section(report_data, report_scope.target_type)
         _apply_derived_vulnerability_checks(report_data)
-        section_to_area = SECTION_TO_AREA
+        section_to_area = {
+            section_name: area
+            for section_name, area in SECTION_TO_AREA.items()
+            if report_scope.target_type != "SOURCE" or section_name in report_scope.assessed_sections
+        }
 
     _add_permission_display_names(report_data)
     _ensure_functionality_details(report_data)
@@ -1800,7 +1886,7 @@ def _permission_display_name(permission: object) -> str:
     return text
 
 
-def _canonicalize_code_section(report_data: dict[str, Any]) -> None:
+def _canonicalize_code_section(report_data: dict[str, Any], target_type: str) -> None:
     sections = report_data.get("vulnerability_sections")
     if not isinstance(sections, list):
         return
@@ -1819,10 +1905,17 @@ def _canonicalize_code_section(report_data: dict[str, Any]) -> None:
         for check in incoming_checks
         if isinstance(check, dict) and str(check.get("check", "")).strip()
     }
-    code_section["checks"] = [_canonical_code_check(report_data, spec, lookup) for spec in CODE_CHECK_SPECS]
+    specs = (*CODE_CHECK_SPECS, *ANDROID_SOURCE_CODE_EXTRA_CHECK_SPECS)
+    if target_type == "SOURCE":
+        specs = tuple(
+            spec for spec in specs if _normalized_check_name(spec["check"]) in ANDROID_SOURCE_CODE_CHECK_NAMES
+        )
+    else:
+        specs = CODE_CHECK_SPECS
+    code_section["checks"] = [_canonical_code_check(report_data, spec, lookup, target_type) for spec in specs]
 
 
-def _canonicalize_network_section(report_data: dict[str, Any]) -> None:
+def _canonicalize_network_section(report_data: dict[str, Any], target_type: str) -> None:
     sections = report_data.get("vulnerability_sections")
     if not isinstance(sections, list):
         return
@@ -1842,11 +1935,16 @@ def _canonicalize_network_section(report_data: dict[str, Any]) -> None:
         if isinstance(check, dict) and str(check.get("check", "")).strip()
     }
 
-    canonical_checks = [_canonical_network_check(report_data, spec, lookup) for spec in NETWORK_CHECK_SPECS]
+    specs = NETWORK_CHECK_SPECS
+    if target_type == "SOURCE":
+        specs = tuple(
+            spec for spec in specs if _normalized_check_name(spec["check"]) in ANDROID_SOURCE_NETWORK_CHECK_NAMES
+        )
+    canonical_checks = [_canonical_network_check(report_data, spec, lookup, target_type) for spec in specs]
     network_section["checks"] = canonical_checks
 
 
-def _canonicalize_data_storage_section(report_data: dict[str, Any]) -> None:
+def _canonicalize_data_storage_section(report_data: dict[str, Any], target_type: str) -> None:
     sections = report_data.get("vulnerability_sections")
     if not isinstance(sections, list):
         return
@@ -1866,12 +1964,17 @@ def _canonicalize_data_storage_section(report_data: dict[str, Any]) -> None:
         if isinstance(check, dict) and str(check.get("check", "")).strip()
     }
 
+    specs = DATA_STORAGE_CHECK_SPECS
+    if target_type == "SOURCE":
+        specs = tuple(
+            spec for spec in specs if _normalized_check_name(spec["check"]) in ANDROID_SOURCE_DATA_STORAGE_CHECK_NAMES
+        )
     data_storage_section["checks"] = [
-        _canonical_data_storage_check(report_data, spec, lookup) for spec in DATA_STORAGE_CHECK_SPECS
+        _canonical_data_storage_check(report_data, spec, lookup, target_type) for spec in specs
     ]
 
 
-def _canonicalize_resilience_section(report_data: dict[str, Any]) -> None:
+def _canonicalize_resilience_section(report_data: dict[str, Any], target_type: str) -> None:
     sections = report_data.get("vulnerability_sections")
     if not isinstance(sections, list):
         return
@@ -1891,8 +1994,13 @@ def _canonicalize_resilience_section(report_data: dict[str, Any]) -> None:
         if isinstance(check, dict) and str(check.get("check", "")).strip()
     }
 
+    specs = RESILIENCE_CHECK_SPECS
+    if target_type == "SOURCE":
+        specs = tuple(
+            spec for spec in specs if _normalized_check_name(spec["check"]) in ANDROID_SOURCE_RESILIENCE_CHECK_NAMES
+        )
     resilience_section["checks"] = [
-        _canonical_resilience_check(report_data, spec, lookup) for spec in RESILIENCE_CHECK_SPECS
+        _canonical_resilience_check(report_data, spec, lookup, target_type) for spec in specs
     ]
 
 
@@ -2140,15 +2248,16 @@ def _canonical_data_storage_check(
     report_data: dict[str, Any],
     spec: dict[str, Any],
     lookup: dict[str, dict[str, Any]],
+    target_type: str = "BINARY",
 ) -> dict[str, Any]:
-    result = "Not Present"
-    explanation = spec["not_present_explanation"]
+    result = "Not Evaluated" if target_type == "SOURCE" else "Not Present"
+    explanation = _initial_check_explanation(spec, target_type)
     compliance = spec["compliance"]
     evidence = ""
     remediation_link = ""
 
     canonical_name = _normalized_check_name(spec["check"])
-    source = lookup.get(canonical_name)
+    source = None if target_type == "SOURCE" else lookup.get(canonical_name)
     data_storage_evidence = _data_storage_evidence_entry(report_data, canonical_name)
 
     if data_storage_evidence is not None and data_storage_evidence.get("present") is not None:
@@ -2164,7 +2273,7 @@ def _canonical_data_storage_check(
         compliance = _non_empty_string(source.get("compliance")) or compliance
         evidence = _non_empty_string(source.get("evidence"))
         remediation_link = _non_empty_string(source.get("remediation_link"))
-    else:
+    elif target_type != "SOURCE":
         alias_source = _first_matching_alias(spec, lookup)
         if alias_source is not None:
             result = _present_not_present(alias_source.get("result")) or result
@@ -2188,15 +2297,16 @@ def _canonical_code_check(
     report_data: dict[str, Any],
     spec: dict[str, Any],
     lookup: dict[str, dict[str, Any]],
+    target_type: str = "BINARY",
 ) -> dict[str, Any]:
-    result = "Not Present"
-    explanation = spec["not_present_explanation"]
+    result = "Not Evaluated" if target_type == "SOURCE" else "Not Present"
+    explanation = _initial_check_explanation(spec, target_type)
     compliance = spec["compliance"]
     evidence = ""
     remediation_link = ""
 
     canonical_name = _normalized_check_name(spec["check"])
-    source = lookup.get(canonical_name)
+    source = None if target_type == "SOURCE" else lookup.get(canonical_name)
     code_evidence = _code_evidence_entry(report_data, canonical_name)
 
     if code_evidence is not None and code_evidence.get("present") is not None:
@@ -2212,7 +2322,7 @@ def _canonical_code_check(
         compliance = _non_empty_string(source.get("compliance")) or compliance
         evidence = _non_empty_string(source.get("evidence"))
         remediation_link = _non_empty_string(source.get("remediation_link"))
-    else:
+    elif target_type != "SOURCE":
         alias_source = _first_matching_alias(spec, lookup)
         if alias_source is not None:
             result = _present_not_present(alias_source.get("result")) or result
@@ -2236,15 +2346,16 @@ def _canonical_network_check(
     report_data: dict[str, Any],
     spec: dict[str, Any],
     lookup: dict[str, dict[str, Any]],
+    target_type: str = "BINARY",
 ) -> dict[str, Any]:
-    result = "Not Present"
-    explanation = spec["not_present_explanation"]
+    result = "Not Evaluated" if target_type == "SOURCE" else "Not Present"
+    explanation = _initial_check_explanation(spec, target_type)
     compliance = spec["compliance"]
     evidence = ""
     remediation_link = ""
 
     canonical_name = _normalized_check_name(spec["check"])
-    source = lookup.get(canonical_name)
+    source = None if target_type == "SOURCE" else lookup.get(canonical_name)
     network_evidence = _network_evidence_entry(report_data, canonical_name)
 
     if network_evidence is not None and network_evidence.get("present") is not None:
@@ -2260,7 +2371,7 @@ def _canonical_network_check(
         compliance = _non_empty_string(source.get("compliance")) or compliance
         evidence = _non_empty_string(source.get("evidence"))
         remediation_link = _non_empty_string(source.get("remediation_link"))
-    else:
+    elif target_type != "SOURCE":
         alias_source = _first_matching_network_alias(spec, lookup)
         if alias_source is not None:
             result = _present_not_present(alias_source.get("result")) or result
@@ -2306,15 +2417,16 @@ def _canonical_resilience_check(
     report_data: dict[str, Any],
     spec: dict[str, Any],
     lookup: dict[str, dict[str, Any]],
+    target_type: str = "BINARY",
 ) -> dict[str, Any]:
-    result = "Not Present"
-    explanation = spec["not_present_explanation"]
+    result = "Not Evaluated" if target_type == "SOURCE" else "Not Present"
+    explanation = _initial_check_explanation(spec, target_type)
     compliance = spec["compliance"]
     evidence = ""
     remediation_link = ""
 
     canonical_name = _normalized_check_name(spec["check"])
-    source = lookup.get(canonical_name)
+    source = None if target_type == "SOURCE" else lookup.get(canonical_name)
     resilience_evidence = _resilience_evidence_entry(report_data, canonical_name)
 
     if resilience_evidence is not None and resilience_evidence.get("present") is not None:
@@ -2672,6 +2784,12 @@ def _network_explanation(spec: dict[str, Any], result: str) -> str:
     return spec["not_present_explanation"]
 
 
+def _initial_check_explanation(spec: dict[str, Any], target_type: str) -> str:
+    if target_type == "SOURCE":
+        return "This check was not evaluated because the required source evidence was unavailable."
+    return spec["not_present_explanation"]
+
+
 def _data_storage_explanation(spec: dict[str, Any], result: str) -> str:
     if _normalized_check_name(result) == "present":
         return spec["present_explanation"]
@@ -2721,6 +2839,8 @@ def _build_findings_severity(report_data: dict[str, Any]) -> dict[str, int]:
 
     for section in report_data.get("vulnerability_sections") or []:
         for check in section.get("checks") or []:
+            if str(check.get("result", "")).strip().lower() != "present":
+                continue
             severity = str(check.get("severity", "")).strip().lower()
             if severity in counts:
                 counts[severity] += 1
@@ -2831,6 +2951,8 @@ def _present_not_present(value: object) -> str:
         return "Present"
     if text == "not present":
         return "Not Present"
+    if text == "not evaluated":
+        return "Not Evaluated"
     return ""
 
 
