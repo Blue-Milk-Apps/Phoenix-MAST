@@ -51,6 +51,7 @@ packages = [
     "domain.post_scan",
     "domain.post_scan.android",
     "domain.post_scan.android.native",
+    "domain.post_scan.flutter",
     "domain.post_scan.ios",
     "domain.post_scan.ios.binary",
     "domain.post_scan.ios.common",
