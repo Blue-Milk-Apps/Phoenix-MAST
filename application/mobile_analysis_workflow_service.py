@@ -31,6 +31,7 @@ from adapters.scanners.common import (
     SyftScanner,
     TrufflehogScanner,
 )
+from adapters.scanners.flutter import FlutterSourceMetadataScanner
 from adapters.scanners.ios import (
     IpswScanner,
     LIEFScanner,
@@ -77,7 +78,15 @@ class MobileScannerFactory:
                     StringsScanner(),
                     PlistBinaryScanner(),
                 ]
-            case ("SOURCE", _, "FLUTTER") | ("SOURCE", _, "REACT_NATIVE"):
+            case ("SOURCE", _, "FLUTTER"):
+                return [
+                    FlutterSourceMetadataScanner(),
+                    TrufflehogScanner(),
+                    GitleaksScanner(),
+                    PlistSourceScanner(),
+                    SyftScanner(output_format=config.syft_output_format),
+                ]
+            case ("SOURCE", _, "REACT_NATIVE"):
                 return [
                     TrufflehogScanner(),
                     GitleaksScanner(),

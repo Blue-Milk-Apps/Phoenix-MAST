@@ -15,6 +15,7 @@ dependencies = [
     "markupsafe>=3.0.3",
     "matplotlib>=3.10.9",
     "numpy>=2.4.5",
+    "pyyaml>=6.0",
     "weasyprint>=69.0",
 ]
 
@@ -42,6 +43,7 @@ packages = [
     "adapters.scanners",
     "adapters.scanners.android",
     "adapters.scanners.common",
+    "adapters.scanners.flutter",
     "adapters.scanners.ios",
     "adapters.storage",
     "application",
