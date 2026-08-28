@@ -8,6 +8,8 @@ import pytest
 from adapters.scanners.flutter import FlutterSourceMetadataScanner
 from domain.models import ScanConfig, ScanType
 
+ANDROID_NS = "http://schemas.android.com/apk/res/android"
+
 
 def test_scanner_metadata() -> None:
     scanner = FlutterSourceMetadataScanner()
@@ -47,7 +49,7 @@ dev_dependencies:
   test: ^1.25.0
 """,
     )
-    for platform in ("android", "ios", "web"):
+    for platform in ("ios", "web"):
         (project / platform).mkdir()
 
     result = FlutterSourceMetadataScanner().scan(_config(project, tmp_path))[0]
@@ -81,13 +83,14 @@ dev_dependencies:
         "flutter_constraint": ">=3.22.0",
     }
     assert payload["platforms"] == {
-        "android": True,
+        "android": False,
         "ios": True,
         "linux": False,
         "macos": False,
         "web": True,
         "windows": False,
     }
+    assert payload["android"] == {"available": False, "metadata": None, "project_path": ""}
     assert payload["dependencies"] == {
         "development": [{"constraint": "^1.25.0", "name": "test", "source": "hosted"}],
         "direct": [
@@ -184,6 +187,81 @@ packages:
             "version": "0.5.0",
         },
     ]
+
+
+def test_extracts_android_metadata_and_uses_pubspec_version_fallback(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    _write(project / "pubspec.yaml", "name: example_app\nversion: 3.4.5+67\n")
+    _write(project / "pubspec.lock", "packages: {}\n")
+    _write(
+        project / "android/app/build.gradle",
+        """
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.example.namespace'
+    compileSdk flutter.compileSdkVersion
+    defaultConfig {
+        applicationId 'com.example.app'
+        minSdk flutter.minSdkVersion
+        targetSdk flutter.targetSdkVersion
+        versionName flutterVersionName
+        versionCode flutterVersionCode.toInteger()
+    }
+}
+""",
+    )
+    _write(
+        project / "android/app/src/main/res/values/strings.xml",
+        '<resources><string name="app_name">Example App</string></resources>',
+    )
+    _write(
+        project / "android/app/src/main/AndroidManifest.xml",
+        f"""<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="{ANDROID_NS}">
+    <uses-permission android:name="android.permission.CAMERA" />
+    <application android:label="@string/app_name" android:allowBackup="false">
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+""",
+    )
+
+    result = FlutterSourceMetadataScanner().scan(_config(project, tmp_path))[0]
+    payload = json.loads(result.raw_output)
+    android = payload["android"]
+
+    assert result.success is True
+    assert payload["platforms"]["android"] is True
+    assert payload["extraction"]["status"] == "partial"
+    assert any(warning.startswith("Android metadata:") for warning in payload["extraction"]["warnings"])
+    assert android["available"] is True
+    assert android["project_path"] == "android"
+    assert android["metadata"]["identity"]["app_name"] == "Example App"
+    assert android["metadata"]["identity"]["package_name"] == "com.example.app"
+    assert android["metadata"]["identity"]["version_name"] == "3.4.5"
+    assert android["metadata"]["identity"]["version_code"] == "67"
+    assert android["metadata"]["permissions"] == [{"max_sdk_version": "", "name": "android.permission.CAMERA"}]
+    assert android["metadata"]["components"]["activities"][0]["name"] == "com.example.app.MainActivity"
+
+
+def test_android_metadata_failure_is_partial_flutter_metadata(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    _write(project / "pubspec.yaml", "name: example_app\n")
+    _write(project / "pubspec.lock", "packages: {}\n")
+    _write(project / "android/app/src/main/AndroidManifest.xml", "<manifest>")
+
+    result = FlutterSourceMetadataScanner().scan(_config(project, tmp_path))[0]
+    payload = json.loads(result.raw_output)
+
+    assert result.success is True
+    assert payload["extraction"]["status"] == "partial"
+    assert payload["android"] == {"available": True, "metadata": None, "project_path": "android"}
+    assert payload["extraction"]["warnings"][0].startswith("Android metadata: Unable to parse")
 
 
 @pytest.mark.parametrize("content", ("packages: [\n", "sdks:\n  dart: '>=3.3.0 <4.0.0'\n"))

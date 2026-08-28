@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import yaml
 
+from adapters.scanners.android import NativeAndroidSourceMetadataScanner
 from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
 
@@ -51,7 +53,7 @@ class FlutterSourceMetadataScanner(ScannerPort):
         if not isinstance(pubspec, dict):
             return [self._failure(f"Flutter pubspec must contain a YAML mapping: {pubspec_path}")]
 
-        payload = self._metadata_payload(project_path, pubspec_path, pubspec)
+        payload = self._metadata_payload(config, project_path, pubspec_path, pubspec)
         return [
             ScanResult(
                 scanner_name=self.name,
@@ -65,6 +67,7 @@ class FlutterSourceMetadataScanner(ScannerPort):
 
     def _metadata_payload(
         self,
+        config: ScanConfig,
         project_path: Path,
         pubspec_path: Path,
         pubspec: dict[str, Any],
@@ -73,6 +76,13 @@ class FlutterSourceMetadataScanner(ScannerPort):
         resolved_dependencies, warnings = self._resolved_dependencies(lock_path)
         version, version_name, version_code = self._version_parts(pubspec.get("version"))
         environment = self._mapping(pubspec.get("environment"))
+        android, android_warnings = self._android_metadata(
+            config,
+            project_path,
+            version_name=version_name,
+            version_code=version_code,
+        )
+        warnings.extend(android_warnings)
 
         return {
             "schema_version": self.SCHEMA_VERSION,
@@ -100,12 +110,63 @@ class FlutterSourceMetadataScanner(ScannerPort):
                 "flutter_constraint": self._text(environment.get("flutter")),
             },
             "platforms": {platform: (project_path / platform).is_dir() for platform in self.PLATFORM_DIRECTORIES},
+            "android": android,
             "dependencies": {
                 "direct": self._declared_dependencies(pubspec.get("dependencies")),
                 "development": self._declared_dependencies(pubspec.get("dev_dependencies")),
                 "resolved": resolved_dependencies,
             },
         }
+
+    def _android_metadata(
+        self,
+        config: ScanConfig,
+        project_path: Path,
+        *,
+        version_name: str,
+        version_code: str,
+    ) -> tuple[dict[str, Any], list[str]]:
+        android_path = project_path / "android"
+        if not android_path.is_dir():
+            return {"available": False, "project_path": "", "metadata": None}, []
+
+        android_config = replace(config, project_path=android_path)
+        result = NativeAndroidSourceMetadataScanner().scan(android_config)[0]
+        if not result.success:
+            reason = result.error_message or "Android source metadata extraction did not complete."
+            return (
+                {"available": True, "project_path": "android", "metadata": None},
+                [f"Android metadata: {reason}"],
+            )
+
+        try:
+            metadata = json.loads(result.raw_output)
+        except json.JSONDecodeError as exc:
+            return (
+                {"available": True, "project_path": "android", "metadata": None},
+                [f"Android metadata output was not valid JSON: {exc}"],
+            )
+        if not isinstance(metadata, dict):
+            return (
+                {"available": True, "project_path": "android", "metadata": None},
+                ["Android metadata output was not a JSON mapping."],
+            )
+
+        identity = self._mapping(metadata.get("identity"))
+        if not self._text(identity.get("version_name")):
+            identity["version_name"] = version_name
+        if not self._text(identity.get("version_code")):
+            identity["version_code"] = version_code
+        metadata["identity"] = identity
+
+        extraction = self._mapping(metadata.get("extraction"))
+        nested_warnings = extraction.get("warnings")
+        warnings = (
+            [f"Android metadata: {self._text(item)}" for item in nested_warnings if self._text(item)]
+            if isinstance(nested_warnings, list)
+            else []
+        )
+        return {"available": True, "project_path": "android", "metadata": metadata}, warnings
 
     def _resolved_dependencies(self, lock_path: Path) -> tuple[list[dict[str, str]], list[str]]:
         if not lock_path.is_file():
