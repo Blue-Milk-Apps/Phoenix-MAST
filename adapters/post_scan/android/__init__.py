@@ -1,0 +1,1 @@
+"""Android post-scan adapters."""

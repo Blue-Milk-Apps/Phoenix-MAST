@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -14,6 +15,7 @@ from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
 
 REPORT_PATH = "opengrep_results.json"
+RULE_ID_PATTERN = re.compile(r"^\s*-\s+id:\s*([^\s#]+)")
 
 
 class OpenGrepScanner(ScannerPort):
@@ -245,6 +247,19 @@ class OpenGrepScanner(ScannerPort):
                 "project_path": str(scan_paths[0]),
                 "scan_paths": [str(path) for path in scan_paths],
                 "rules_path": str(rules_path),
+                "configured_rule_ids": self._configured_rule_ids(rules_path),
             }
 
         return json.dumps(payload, indent=2, sort_keys=True)
+
+    @staticmethod
+    def _configured_rule_ids(rules_path: Path) -> list[str]:
+        rule_ids: set[str] = set()
+        for path in sorted(rules_path.rglob("*")):
+            if not path.is_file() or path.suffix.lower() not in {".yml", ".yaml"}:
+                continue
+            for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+                match = RULE_ID_PATTERN.match(line)
+                if match:
+                    rule_ids.add(match.group(1).strip("\"'"))
+        return sorted(rule_ids)

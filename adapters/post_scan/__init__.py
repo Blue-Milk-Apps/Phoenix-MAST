@@ -1,5 +1,6 @@
 """Adapters for post-scan processing."""
 
+from adapters.post_scan.android.native import NativeAndroidScanDetailExtractor, NativeAndroidScanOutputLoader
 from adapters.post_scan.android_binary_scan_detail_extractor import (
     AndroidBinaryScanDetailExtractor,
 )
@@ -14,6 +15,8 @@ __all__ = [
     "AndroidBinaryScanOutputLoader",
     "IOSBinaryScanDetailExtractor",
     "IOSBinaryScanOutputLoader",
+    "NativeAndroidScanDetailExtractor",
+    "NativeAndroidScanOutputLoader",
     "NativeIOSScanDetailExtractor",
     "NativeIOSScanOutputLoader",
 ]
