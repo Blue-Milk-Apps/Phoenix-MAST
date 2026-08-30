@@ -419,6 +419,98 @@ def test_load_report_data_limits_ios_source_reports_to_assessed_content() -> Non
     assert set(report["risk_summary"]) == {"code_vulnerability", "data_storage", "networking"}
 
 
+def test_load_report_data_uses_flutter_source_scope_and_assessed_sections() -> None:
+    report = load_report_data(
+        {
+            "meta": {
+                "app_display_name": "Example",
+                "file_name": "example_app",
+                "platform": "Flutter",
+                "target_type": "SOURCE",
+            },
+            "code_evidence": {"contains_potential_sql_injection": {"present": True, "evidence": "lib/db.dart:10"}},
+            "network_evidence": {
+                "sensitive_information_unencrypted_in_transit": {
+                    "present": False,
+                    "evidence": "no_cleartext_http_hits",
+                }
+            },
+            "data_storage_evidence": {"sensitive_values_stored_insecurely": {"present": None, "evidence": ""}},
+        }
+    )
+
+    assert report["report_scope"]["platform"] == "Flutter"
+    assert report["report_scope"]["assessment_label"] == "Flutter Source Code"
+    assert report["report_scope"]["assessment_title"] == ("Flutter Source Code Vulnerability Assessment")
+    assert report["report_scope"]["target_information_heading"] == "Flutter Project Information"
+    assert report["report_scope"]["assessed_sections"] == ("code", "network")
+    assert [section["section_name"] for section in report["vulnerability_sections"]] == [
+        "Code",
+        "Network",
+    ]
+
+
+def test_load_report_data_maps_flutter_android_and_ios_source_evidence() -> None:
+    report = load_report_data(
+        {
+            "meta": {"platform": "Flutter", "target_type": "SOURCE"},
+            "code_evidence": {
+                "contains_potential_sql_injection": {"present": True, "evidence": "lib/db.dart:10"},
+                "encodes_data_using_insecure_cryptography": {
+                    "present": True,
+                    "evidence": "lib/crypto.dart:12",
+                },
+                "insecure_entitlements": {"present": False, "evidence": "no_insecure_entitlements_hits"},
+                "uses_sha1_hashing_algorithm": {"present": None, "evidence": ""},
+            },
+            "network_evidence": {
+                "sensitive_information_unencrypted_in_transit": {
+                    "present": True,
+                    "evidence": "lib/client.dart:20",
+                },
+                "ats_disabled": {"present": True, "evidence": "NSAllowsArbitraryLoads=true"},
+                "cookie_missing_secure_flag": {
+                    "present": False,
+                    "evidence": "no_cookie_missing_secure_flag_hits",
+                },
+            },
+            "data_storage_evidence": {
+                "sensitive_values_stored_insecurely": {
+                    "present": True,
+                    "evidence": "lib/storage.dart:30",
+                },
+                "deprecated_keychain_attributes": {
+                    "present": True,
+                    "evidence": "ios/Runner/Keychain.swift:40",
+                },
+                "sensitive_information_stored_in_external_storage": {
+                    "present": False,
+                    "evidence": "no_sensitive_external_storage_hits",
+                },
+            },
+            "resilience_evidence": {
+                "biometric_local_authentication_bypass_possible": {
+                    "present": True,
+                    "evidence": "android/app/Auth.kt:50",
+                }
+            },
+        }
+    )
+
+    sections = {section["section_name"]: _check_map(section["checks"]) for section in report["vulnerability_sections"]}
+    assert sections["Code"]["Contains Potential SQL Injection"]["result"] == "Present"
+    assert sections["Code"]["Application Encodes Data Using Insecure Cryptography"]["result"] == "Present"
+    assert sections["Code"]["Potentially Insecure iOS Entitlements"]["result"] == "Not Present"
+    assert sections["Code"]["Uses SHA1 Hashing Algorithm"]["result"] == "Not Evaluated"
+    assert sections["Network"]["Sensitive Information is Unencrypted in Transit"]["result"] == "Present"
+    assert sections["Network"]["App Transport Security (ATS) Disabled"]["result"] == "Present"
+    assert sections["Network"]["Cookie missing 'Secure' flag"]["result"] == "Not Present"
+    assert sections["Data Storage"]["Local Data Exposure: Sensitive Values Stored Insecurely"]["result"] == ("Present")
+    assert sections["Data Storage"]["Application Utilizes Deprecated Keychain Attributes"]["result"] == ("Present")
+    assert sections["Data Storage"]["Sensitive Information Stored in External Storage"]["result"] == ("Not Present")
+    assert sections["Resilience"]["Biometric / Local Authentication Bypass Possible"]["result"] == "Present"
+
+
 def test_report_template_switches_between_ios_source_and_binary_presentation() -> None:
     source_html = _render_report_html(
         {

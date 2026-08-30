@@ -30,6 +30,7 @@ def resolve_report_scope(data: dict[str, Any]) -> ReportScope:
     target_type = _target_type(data, meta)
     is_source = target_type == "SOURCE"
     is_ios = platform.lower() == "ios"
+    is_flutter = platform.lower() == "flutter"
 
     if is_ios and is_source:
         assessed_sections = ("code", "network", "data storage")
@@ -51,12 +52,26 @@ def resolve_report_scope(data: dict[str, Any]) -> ReportScope:
     return ReportScope(
         platform=platform,
         target_type=target_type,
-        assessment_label="Source Code" if is_source else "Binary",
+        assessment_label="Flutter Source Code"
+        if is_flutter and is_source
+        else "Source Code"
+        if is_source
+        else "Binary",
         assessment_title=(
-            "Source Code Vulnerability Assessment" if is_source else "Application Vulnerability Assessment"
+            "Flutter Source Code Vulnerability Assessment"
+            if is_flutter and is_source
+            else "Source Code Vulnerability Assessment"
+            if is_source
+            else "Application Vulnerability Assessment"
         ),
         target_label="Project Name" if is_source else "File Name",
-        target_information_heading="Source Project Information" if is_source else "File Information",
+        target_information_heading=(
+            "Flutter Project Information"
+            if is_flutter and is_source
+            else "Source Project Information"
+            if is_source
+            else "File Information"
+        ),
         show_file_hashes=not is_source,
         show_ios_binary_analysis=is_ios and not is_source,
         assessed_sections=assessed_sections,
