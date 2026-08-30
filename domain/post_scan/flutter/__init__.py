@@ -1,4 +1,4 @@
-"""Flutter post-scan rule contracts."""
+"""Flutter post-scan domain models and rule contracts."""
 
 from domain.post_scan.flutter.app_info import FlutterAppInfo
 from domain.post_scan.flutter.dependency_inventory import (
