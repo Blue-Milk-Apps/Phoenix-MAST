@@ -28,6 +28,12 @@ from domain.post_scan.flutter.rule_registry import (
     unclassified_flutter_rule_ids,
 )
 from domain.post_scan.flutter.scan_extraction_context import FlutterScanExtractionContext
+from domain.post_scan.flutter.security_evidence import (
+    FlutterEvidenceEntry,
+    combine_evidence_entries,
+    optional_bool_entry,
+    scoped_opengrep_entry,
+)
 
 __all__ = [
     "FLUTTER_RULE_IDS",
@@ -37,6 +43,7 @@ __all__ = [
     "FlutterAndroidPlatformInventory",
     "FlutterDeclaredDependency",
     "FlutterDependencyInventory",
+    "FlutterEvidenceEntry",
     "FlutterFileInfo",
     "FlutterIOSPlatformInventory",
     "FlutterMeta",
@@ -49,5 +56,8 @@ __all__ = [
     "FlutterScanExtractionContext",
     "FlutterSdkInventory",
     "FlutterSbomPackage",
+    "combine_evidence_entries",
+    "optional_bool_entry",
+    "scoped_opengrep_entry",
     "unclassified_flutter_rule_ids",
 ]
