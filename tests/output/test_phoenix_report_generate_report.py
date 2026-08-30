@@ -1,5 +1,8 @@
+import importlib
 import json
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 from adapters.output.phoenix_report.generate_report import (
     _build_overall_evaluation,
@@ -9,6 +12,7 @@ from adapters.output.phoenix_report.generate_report import (
 )
 
 BASE_DIR = Path(__file__).resolve().parents[2] / "adapters" / "output" / "phoenix_report" / "data"
+REPORT_GENERATOR = importlib.import_module("adapters.output.phoenix_report.generate_report")
 CANONICAL_NETWORK_CHECKS = [
     "Allows Cleartext Traffic for All Domains",
     "Contains HostnameVerifier That Accepts All Hostnames",
@@ -564,6 +568,76 @@ def test_report_template_renders_flutter_inventory_links_and_manual_review() -> 
     assert "Not Evaluated" in html
     assert "Certificate Information" not in html
     assert "App Components" not in html
+
+
+def test_report_template_handles_unassessed_flutter_presentation() -> None:
+    html = _render_report_html(
+        {
+            "meta": {"platform": "Flutter", "target_type": "SOURCE"},
+            "app_components": {
+                "activities": None,
+                "services": None,
+                "receivers": None,
+                "providers": None,
+                "exported_activities": None,
+                "exported_services": None,
+                "exported_receivers": None,
+                "exported_providers": None,
+            },
+            "platform_inventory": {
+                "source_metadata_assessed": False,
+                "sdk": {},
+                "android": {"detected": True, "metadata_assessed": False},
+                "ios": {"detected": True, "metadata_assessed": False},
+                "warnings": [],
+            },
+            "dependency_inventory": {
+                "metadata_assessed": False,
+                "sbom_assessed": False,
+                "declared": [],
+                "resolved": [],
+                "sbom_packages": [],
+            },
+            "deep_links": {"deep_links": None},
+            "url_schemes": [],
+            "queried_url_schemes": [],
+        }
+    )
+
+    assert 'Metadata Extraction</td><td class="v">Not Assessed' in html
+    assert "Android deep links were not assessed." in html
+    assert "iOS URL schemes were not assessed." in html
+    assert "Declared metadata: Not Assessed" in html
+    assert "Manual Review" not in html
+
+
+def test_generate_report_renders_flutter_html_and_writes_pdf_path(tmp_path: Path, monkeypatch) -> None:
+    rendered: dict[str, str] = {}
+
+    class FakeHTML:
+        def __init__(self, *, string: str, base_url: str) -> None:
+            rendered["html"] = string
+            rendered["base_url"] = base_url
+
+        def write_pdf(self, target: str) -> None:
+            Path(target).write_bytes(b"%PDF-fake")
+
+    monkeypatch.setitem(sys.modules, "weasyprint", SimpleNamespace(HTML=FakeHTML))
+    monkeypatch.setattr(
+        REPORT_GENERATOR,
+        "build_charts",
+        lambda data: {"overall_risk_polar": ""},
+    )
+
+    output_path = tmp_path / "reports" / "flutter.pdf"
+    result = REPORT_GENERATOR.generate_report(_flutter_presentation_data(), output_path)
+
+    assert result == output_path
+    assert output_path.read_bytes() == b"%PDF-fake"
+    assert "Flutter Source Code Vulnerability Assessment" in rendered["html"]
+    assert "Flutter Project Inventory" in rendered["html"]
+    assert "flutter.source.unsafe-platform-channel" in rendered["html"]
+    assert rendered["base_url"].endswith("adapters/output/phoenix_report")
 
 
 def _flutter_presentation_data() -> dict:
