@@ -8,6 +8,7 @@ from domain.post_scan.flutter.dependency_inventory import (
     FlutterSbomPackage,
 )
 from domain.post_scan.flutter.file_info import FlutterFileInfo
+from domain.post_scan.flutter.hardcoded_values import FlutterHardcodedValues
 from domain.post_scan.flutter.meta import FlutterMeta
 from domain.post_scan.flutter.opengrep_assessment import (
     FlutterOpenGrepAssessment,
@@ -45,6 +46,7 @@ __all__ = [
     "FlutterDependencyInventory",
     "FlutterEvidenceEntry",
     "FlutterFileInfo",
+    "FlutterHardcodedValues",
     "FlutterIOSPlatformInventory",
     "FlutterMeta",
     "FlutterOpenGrepAssessment",
