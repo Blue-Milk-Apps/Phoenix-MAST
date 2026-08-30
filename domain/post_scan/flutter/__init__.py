@@ -2,6 +2,7 @@
 
 from domain.post_scan.flutter.app_info import FlutterAppInfo
 from domain.post_scan.flutter.code_evidence import FlutterCodeEvidence
+from domain.post_scan.flutter.data_storage_evidence import FlutterDataStorageEvidence
 from domain.post_scan.flutter.dependency_inventory import (
     FlutterDeclaredDependency,
     FlutterDependencyInventory,
@@ -47,6 +48,7 @@ __all__ = [
     "FlutterAndroidPlatformInventory",
     "FlutterDeclaredDependency",
     "FlutterCodeEvidence",
+    "FlutterDataStorageEvidence",
     "FlutterDependencyInventory",
     "FlutterEvidenceEntry",
     "FlutterFileInfo",
