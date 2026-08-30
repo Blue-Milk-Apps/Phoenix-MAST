@@ -23,6 +23,7 @@ from domain.post_scan.flutter.platform_inventory import (
     FlutterPlatformInventory,
     FlutterSdkInventory,
 )
+from domain.post_scan.flutter.resilience_evidence import FlutterResilienceEvidence
 from domain.post_scan.flutter.rule_registry import (
     FLUTTER_RULE_IDS,
     FLUTTER_RULE_REGISTRY,
@@ -59,6 +60,7 @@ __all__ = [
     "FlutterOpenGrepAssessment",
     "FlutterPlatformInventory",
     "FlutterResolvedDependency",
+    "FlutterResilienceEvidence",
     "FlutterRuleDisposition",
     "FlutterRuleMapping",
     "FlutterRuleAssessment",
