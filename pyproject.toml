@@ -37,6 +37,7 @@ packages = [
     "adapters.post_scan",
     "adapters.post_scan.android",
     "adapters.post_scan.android.native",
+    "adapters.post_scan.flutter",
     "adapters.post_scan.ios",
     "adapters.post_scan.ios.binary",
     "adapters.post_scan.ios.native",
