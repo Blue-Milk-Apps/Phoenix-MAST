@@ -511,6 +511,166 @@ def test_load_report_data_maps_flutter_android_and_ios_source_evidence() -> None
     assert sections["Resilience"]["Biometric / Local Authentication Bypass Possible"]["result"] == "Present"
 
 
+def test_load_report_data_normalizes_flutter_presentation_inventory() -> None:
+    report = load_report_data(_flutter_presentation_data())
+    presentation = report["flutter_presentation"]
+
+    assert presentation["extraction_status"] == "Partial"
+    assert presentation["warnings"] == ["Android metadata could not be parsed."]
+    assert presentation["dart_sdk_constraint"] == ">=3.3.0 <4.0.0"
+    assert presentation["flutter_sdk_constraint"] == ">=3.22.0"
+    assert presentation["android_application_id"] == "com.example.android"
+    assert presentation["ios_bundle_identifier"] == "com.example.ios"
+    assert presentation["platforms"][0] == {
+        "name": "Android",
+        "detected": True,
+        "metadata_status": "Not Assessed",
+        "identifier": "com.example.android",
+        "version": "1.2.3",
+        "requirements": "Min SDK: 24, Target SDK: 35",
+    }
+    assert presentation["platforms"][1]["metadata_status"] == "Assessed"
+    assert presentation["dependencies"]["metadata_status"] == "Assessed"
+    assert presentation["dependencies"]["sbom_status"] == "Assessed"
+    assert presentation["deep_links"] == [
+        {
+            "uri": "example://open/item",
+            "component": "com.example.MainActivity",
+            "mime_type": "",
+        }
+    ]
+    assert presentation["url_schemes"] == [{"url_name": "Example App", "schemes": ["example-app"]}]
+    assert presentation["queried_url_schemes"] == ["partner-app"]
+    assert presentation["manual_review_status"] == "Not Assessed"
+    assert report["permissions"][0]["status"] == "declared"
+    assert report["permissions"][0]["platform"] == "Android"
+
+
+def test_report_template_renders_flutter_inventory_links_and_manual_review() -> None:
+    html = _render_report_html(_flutter_presentation_data())
+
+    assert "Flutter Project Inventory" in html
+    assert "Flutter Dependency Inventory" in html
+    assert "Application Links and URL Schemes" in html
+    assert "Manual Review" in html
+    assert "Android metadata could not be parsed." in html
+    assert "com.example.android" in html
+    assert "com.example.ios" in html
+    assert "http" in html
+    assert "example://open/item" in html
+    assert "example-app" in html
+    assert "partner-app" in html
+    assert "flutter.source.unsafe-platform-channel" in html
+    assert "Not Evaluated" in html
+    assert "Certificate Information" not in html
+    assert "App Components" not in html
+
+
+def _flutter_presentation_data() -> dict:
+    return {
+        "meta": {
+            "app_display_name": "Example App",
+            "file_name": "example_app",
+            "platform": "Flutter",
+            "target_type": "SOURCE",
+        },
+        "app_info": {
+            "name": "Example App",
+            "package_name": "example_app",
+            "description": "Example Flutter application",
+            "homepage": "https://example.com",
+            "repository": "https://example.com/source",
+        },
+        "app_components": {
+            "activities": None,
+            "services": None,
+            "receivers": None,
+            "providers": None,
+            "exported_activities": None,
+            "exported_services": None,
+            "exported_receivers": None,
+            "exported_providers": None,
+        },
+        "platform_inventory": {
+            "source_metadata_assessed": True,
+            "sdk": {
+                "dart_constraint": ">=3.3.0 <4.0.0",
+                "flutter_constraint": ">=3.22.0",
+            },
+            "android": {
+                "detected": True,
+                "metadata_assessed": False,
+                "package_name": "com.example.android",
+                "version_name": "1.2.3",
+                "min_sdk": "24",
+                "target_sdk": "35",
+            },
+            "ios": {
+                "detected": True,
+                "metadata_assessed": True,
+                "bundle_identifier": "com.example.ios",
+                "version_name": "1.2.3",
+                "minimum_os": "13.0",
+            },
+            "web_detected": True,
+            "linux_detected": False,
+            "macos_detected": False,
+            "windows_detected": False,
+            "warnings": ["Android metadata could not be parsed."],
+        },
+        "dependency_inventory": {
+            "metadata_assessed": True,
+            "sbom_assessed": True,
+            "declared": [{"name": "http", "constraint": "^1.2.0", "source": "hosted", "scope": "direct"}],
+            "resolved": [
+                {
+                    "name": "http",
+                    "version": "1.2.0",
+                    "source": "hosted",
+                    "dependency_kind": "direct",
+                }
+            ],
+            "sbom_packages": [{"name": "http", "version": "1.2.0", "output_path": "sbom.json"}],
+        },
+        "deep_links": {
+            "deep_links": [
+                {
+                    "scheme": "example",
+                    "host": "open",
+                    "path_prefix": "/item",
+                    "component": "com.example.MainActivity",
+                }
+            ]
+        },
+        "url_schemes": [{"url_name": "Example App", "schemes": ["example-app"]}],
+        "queried_url_schemes": ["partner-app"],
+        "manual_review": {
+            "findings": [
+                {
+                    "rule_id": "flutter.source.unsafe-platform-channel",
+                    "scope": "flutter",
+                    "severity": "Medium",
+                    "location": "lib/channel.dart:40",
+                    "reason": "Review privileged channel operations.",
+                    "message": "Sensitive platform channel handler",
+                }
+            ],
+            "assessed_scopes": [],
+            "assessed": False,
+            "fully_assessed": False,
+        },
+        "permissions": [
+            {
+                "permission": "android.permission.CAMERA",
+                "status": "",
+                "general_description": "Camera access.",
+                "usage_description": "",
+            }
+        ],
+        "functionality": {"Camera": {"present": None, "explanation": "Camera functionality was not fully assessed."}},
+    }
+
+
 def test_report_template_switches_between_ios_source_and_binary_presentation() -> None:
     source_html = _render_report_html(
         {
