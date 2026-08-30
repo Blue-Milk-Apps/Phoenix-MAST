@@ -50,6 +50,13 @@ class FlutterScanExtractionContext:
         return {key: self._mapping_list(values.get(key)) for key in ("direct", "development", "resolved")}
 
     @property
+    def dependencies_assessed(self) -> bool:
+        values = self.source_metadata.get("dependencies")
+        return isinstance(values, dict) and all(
+            isinstance(values.get(key), list) for key in ("direct", "development", "resolved")
+        )
+
+    @property
     def project_path(self) -> Path:
         value = self.first_non_empty(
             self.scan_metadata.get("project_path"),

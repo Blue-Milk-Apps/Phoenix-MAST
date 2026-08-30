@@ -65,6 +65,7 @@ def test_exposes_flutter_and_embedded_platform_metadata() -> None:
         "development": [{"name": "test"}],
         "resolved": [{"name": "http", "version": "1.2.0"}],
     }
+    assert context.dependencies_assessed is True
     assert context.warnings == ["first", "second"]
     assert context.source_metadata_assessed is True
     assert context.android_available is True
@@ -216,6 +217,7 @@ def test_missing_or_malformed_outputs_remain_unassessed() -> None:
     assert context.identity == {}
     assert context.source_metadata_assessed is False
     assert context.dependencies == {"direct": [], "development": [], "resolved": []}
+    assert context.dependencies_assessed is False
     assert context.android_available is False
     assert context.android_metadata_assessed is False
     assert context.ios_available is False

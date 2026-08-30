@@ -1,6 +1,12 @@
 """Flutter post-scan rule contracts."""
 
 from domain.post_scan.flutter.app_info import FlutterAppInfo
+from domain.post_scan.flutter.dependency_inventory import (
+    FlutterDeclaredDependency,
+    FlutterDependencyInventory,
+    FlutterResolvedDependency,
+    FlutterSbomPackage,
+)
 from domain.post_scan.flutter.file_info import FlutterFileInfo
 from domain.post_scan.flutter.meta import FlutterMeta
 from domain.post_scan.flutter.opengrep_assessment import (
@@ -29,15 +35,19 @@ __all__ = [
     "REPORT_RULE_IDS_BY_SECTION",
     "FlutterAppInfo",
     "FlutterAndroidPlatformInventory",
+    "FlutterDeclaredDependency",
+    "FlutterDependencyInventory",
     "FlutterFileInfo",
     "FlutterIOSPlatformInventory",
     "FlutterMeta",
     "FlutterOpenGrepAssessment",
     "FlutterPlatformInventory",
+    "FlutterResolvedDependency",
     "FlutterRuleDisposition",
     "FlutterRuleMapping",
     "FlutterRuleAssessment",
     "FlutterScanExtractionContext",
     "FlutterSdkInventory",
+    "FlutterSbomPackage",
     "unclassified_flutter_rule_ids",
 ]
