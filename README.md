@@ -60,6 +60,21 @@ By default, phoenix looks for OpenGrep rules in these folders:
 
 The bundled Flutter rules cover cleartext HTTP, certificate-validation bypasses, sensitive logging, sensitive SharedPreferences and Hive writes, weak hashes and ciphers, dynamic raw SQL, WebView SSL bypasses, and sensitive platform-channel handlers. The OpenGrep report records configured rule IDs and execution status per scope so a missing finding is not treated as a clean assessment unless the relevant rules completed successfully.
 
+### Flutter source analysis
+
+Flutter source scans statically extract project identity, version, Dart and Flutter SDK constraints, declared and resolved dependencies, and generated-platform availability from `pubspec.yaml`, `pubspec.lock`, and the project layout. When present, the Android project is inspected for manifest and Gradle metadata, and the iOS project is inspected for plist, Xcode, entitlement, privacy-manifest, permission, App Transport Security, and URL-scheme metadata. Project code is not executed during metadata extraction.
+
+The Flutter post-scan pipeline combines these metadata artifacts with scoped OpenGrep, Gitleaks, TruffleHog, plist, and Syft output. It writes `post_scan_processing.json` and generates a Flutter-aware PDF report containing:
+
+- Flutter project, SDK, platform, and dependency inventories
+- Android and iOS application identifiers and platform requirements
+- Permissions, Android deep links, iOS URL schemes, and queried schemes
+- Code, network, data-storage, and resilience evidence from Dart and embedded native source
+- Redacted hardcoded-value findings and raw-only findings that require manual review
+- Extraction warnings and assessment status for partial scans
+
+Assessment status is evidence-aware. A positive finding is retained even when a scanner or embedded-platform scope only partially completed. A missing finding is reported as `Not Present` only when the relevant configured rules completed successfully; otherwise it remains `Not Evaluated`. Missing external scanner binaries are recorded as skipped scanner results rather than being treated as clean assessments.
+
 You can override the default rules location per scan target with these flags:
 
 - `--ios-binary-opengrep-rules-path`

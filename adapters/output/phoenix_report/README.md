@@ -7,6 +7,11 @@ functionality table & SDK inventory -> permissions -> one section per
 vulnerability category with findings + checks-conducted table -> hardcoded
 values -> endpoint connections.
 
+The generator also supports source-oriented report scope. Flutter source
+payloads receive Flutter-specific project, generated-platform, dependency,
+application-link, and manual-review sections in addition to the applicable
+vulnerability sections.
+
 ## Files
 
 - `generate_report.py` - the generator. Renders `templates/report.html.jinja`
@@ -47,6 +52,31 @@ values -> endpoint connections.
 ```bash
 python3 generate_report.py data/<your_scan>.json output/<report_name>.pdf
 ```
+
+## Flutter source reports
+
+A Flutter report is selected when `meta.platform` is `"Flutter"` and
+`meta.target_type` is `"SOURCE"`. The post-scan extractor supplies the
+following additional objects:
+
+- `platform_inventory` - metadata assessment, SDK constraints, generated
+  Android/iOS/web/desktop targets, embedded-platform identifiers, and
+  extraction warnings.
+- `dependency_inventory` - declared dependencies, resolved lockfile
+  dependencies, and packages observed in the Syft SBOM.
+- `deep_links`, `url_schemes`, and `queried_url_schemes` - Android and iOS
+  application-link declarations.
+- `manual_review` - raw-only OpenGrep findings that require human validation,
+  together with the scopes that were successfully assessed.
+- `code_evidence`, `network_evidence`, `data_storage_evidence`, and
+  `resilience_evidence` - structured findings from Dart and applicable
+  embedded Android/iOS source.
+
+Flutter vulnerability sections are included only when their evidence bundle
+contains an assessed result. Individual checks with incomplete evidence render
+as `Not Evaluated`; they are not converted into clean `Not Present` results.
+Positive findings from partial scans remain visible. Source reports omit
+binary-only certificate and file-hash presentation.
 
 ## Native library requirements
 
