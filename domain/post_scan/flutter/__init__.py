@@ -1,6 +1,7 @@
 """Flutter post-scan domain models and rule contracts."""
 
 from domain.post_scan.flutter.app_info import FlutterAppInfo
+from domain.post_scan.flutter.code_evidence import FlutterCodeEvidence
 from domain.post_scan.flutter.dependency_inventory import (
     FlutterDeclaredDependency,
     FlutterDependencyInventory,
@@ -43,6 +44,7 @@ __all__ = [
     "FlutterAppInfo",
     "FlutterAndroidPlatformInventory",
     "FlutterDeclaredDependency",
+    "FlutterCodeEvidence",
     "FlutterDependencyInventory",
     "FlutterEvidenceEntry",
     "FlutterFileInfo",
