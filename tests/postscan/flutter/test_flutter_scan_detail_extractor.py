@@ -85,6 +85,12 @@ def test_extracts_core_flutter_metadata_and_inventory_sections() -> None:
         "app_info",
         "platform_inventory",
         "dependency_inventory",
+        "application",
+        "app_components",
+        "permissions",
+        "deep_links",
+        "url_schemes",
+        "queried_url_schemes",
     }
     assert sections["meta"] == {
         "app_display_name": "Example App",
@@ -119,6 +125,16 @@ def test_extracts_core_flutter_metadata_and_inventory_sections() -> None:
     assert sections["dependency_inventory"]["sbom_packages"] == [
         {"name": "http", "version": "1.2.0", "output_path": "sbom.json"}
     ]
+    assert sections["application"] == {
+        "debuggable": None,
+        "allow_backup": None,
+        "uses_cleartext_traffic": None,
+    }
+    assert all(value is None for value in sections["app_components"].values())
+    assert sections["permissions"] == []
+    assert sections["deep_links"] == {"deep_links": None}
+    assert sections["url_schemes"] == []
+    assert sections["queried_url_schemes"] == []
     json.dumps(sections)
 
 
@@ -149,3 +165,6 @@ def test_missing_flutter_metadata_preserves_empty_unassessed_core_sections() -> 
         "resolved": [],
         "sbom_packages": [],
     }
+    assert all(value is None for value in sections["app_components"].values())
+    assert sections["permissions"] == []
+    assert sections["deep_links"] == {"deep_links": None}
