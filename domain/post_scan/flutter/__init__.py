@@ -12,6 +12,7 @@ from domain.post_scan.flutter.rule_registry import (
     FlutterRuleMapping,
     unclassified_flutter_rule_ids,
 )
+from domain.post_scan.flutter.scan_extraction_context import FlutterScanExtractionContext
 
 __all__ = [
     "FLUTTER_RULE_IDS",
@@ -21,5 +22,6 @@ __all__ = [
     "FlutterRuleDisposition",
     "FlutterRuleMapping",
     "FlutterRuleAssessment",
+    "FlutterScanExtractionContext",
     "unclassified_flutter_rule_ids",
 ]
