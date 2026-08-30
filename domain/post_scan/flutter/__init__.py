@@ -10,7 +10,12 @@ from domain.post_scan.flutter.dependency_inventory import (
     FlutterSbomPackage,
 )
 from domain.post_scan.flutter.file_info import FlutterFileInfo
+from domain.post_scan.flutter.functionality import FlutterFunctionality
 from domain.post_scan.flutter.hardcoded_values import FlutterHardcodedValues
+from domain.post_scan.flutter.manual_review import (
+    FlutterManualReviewFinding,
+    FlutterManualReviewInventory,
+)
 from domain.post_scan.flutter.meta import FlutterMeta
 from domain.post_scan.flutter.network_evidence import FlutterNetworkEvidence
 from domain.post_scan.flutter.opengrep_assessment import (
@@ -53,8 +58,11 @@ __all__ = [
     "FlutterDependencyInventory",
     "FlutterEvidenceEntry",
     "FlutterFileInfo",
+    "FlutterFunctionality",
     "FlutterHardcodedValues",
     "FlutterIOSPlatformInventory",
+    "FlutterManualReviewFinding",
+    "FlutterManualReviewInventory",
     "FlutterMeta",
     "FlutterNetworkEvidence",
     "FlutterOpenGrepAssessment",
