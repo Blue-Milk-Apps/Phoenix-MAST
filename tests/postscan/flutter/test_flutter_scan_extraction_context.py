@@ -68,6 +68,7 @@ def test_exposes_flutter_and_embedded_platform_metadata() -> None:
     assert context.warnings == ["first", "second"]
     assert context.source_metadata_assessed is True
     assert context.android_available is True
+    assert context.android_metadata_assessed is True
     assert context.android_identity == {"package_name": "com.example.android"}
     assert context.android_application == {"debuggable": False}
     assert context.android_permissions == [{"name": "android.permission.CAMERA"}]
@@ -79,6 +80,7 @@ def test_exposes_flutter_and_embedded_platform_metadata() -> None:
     }
     assert context.android_deep_links == [{"scheme": "example"}]
     assert context.ios_available is True
+    assert context.ios_metadata_assessed is True
     assert context.ios_identity == {"bundle_identifier": "com.example.ios"}
     assert context.ios_permissions == [{"key": "NSCameraUsageDescription", "purpose": "Take photos"}]
     assert context.ios_app_transport_security == {"allows_arbitrary_loads": False}
@@ -215,7 +217,9 @@ def test_missing_or_malformed_outputs_remain_unassessed() -> None:
     assert context.source_metadata_assessed is False
     assert context.dependencies == {"direct": [], "development": [], "resolved": []}
     assert context.android_available is False
+    assert context.android_metadata_assessed is False
     assert context.ios_available is False
+    assert context.ios_metadata_assessed is False
     assert context.plist_outputs == {}
     assert context.plist_assessed is False
     assert context.opengrep_results == []

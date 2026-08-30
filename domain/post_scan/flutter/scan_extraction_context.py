@@ -78,6 +78,10 @@ class FlutterScanExtractionContext:
         return self._mapping(self.android.get("metadata"))
 
     @property
+    def android_metadata_assessed(self) -> bool:
+        return self.android_available and isinstance(self.android.get("metadata"), dict)
+
+    @property
     def android_identity(self) -> dict[str, Any]:
         return self._mapping(self.android_metadata.get("identity"))
 
@@ -109,6 +113,10 @@ class FlutterScanExtractionContext:
     @property
     def ios_metadata(self) -> dict[str, Any]:
         return self._mapping(self.ios.get("metadata"))
+
+    @property
+    def ios_metadata_assessed(self) -> bool:
+        return self.ios_available and isinstance(self.ios.get("metadata"), dict)
 
     @property
     def ios_identity(self) -> dict[str, Any]:
