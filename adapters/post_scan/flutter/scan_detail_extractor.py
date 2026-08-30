@@ -29,7 +29,7 @@ from ports.post_scan.scan_detail_extractor_port import ScanDetailExtractorPort
 
 
 class FlutterScanDetailExtractor(ScanDetailExtractorPort):
-    """Assemble Flutter source metadata and inventory report sections."""
+    """Assemble report-ready Flutter source sections."""
 
     def extract_sections(self, loaded_outputs: dict[str, Any]) -> dict[str, Any]:
         context = FlutterScanExtractionContext(loaded_outputs)

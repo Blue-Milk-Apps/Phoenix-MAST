@@ -8,6 +8,8 @@ from adapters.output.phoenix_report.generate_report import generate_report
 from adapters.post_scan import (
     AndroidBinaryScanDetailExtractor,
     AndroidBinaryScanOutputLoader,
+    FlutterScanDetailExtractor,
+    FlutterScanOutputLoader,
     IOSBinaryScanDetailExtractor,
     IOSBinaryScanOutputLoader,
     NativeAndroidScanDetailExtractor,
@@ -261,6 +263,11 @@ class MobileAnalysisWorkflowService:
                 return PostScanProcessingService(
                     scan_output_loader=IOSBinaryScanOutputLoader(),
                     scan_detail_extractor=IOSBinaryScanDetailExtractor(),
+                )
+            case ("SOURCE", _, "FLUTTER"):
+                return PostScanProcessingService(
+                    scan_output_loader=FlutterScanOutputLoader(),
+                    scan_detail_extractor=FlutterScanDetailExtractor(),
                 )
             case ("SOURCE", "IOS", "NATIVE_IOS"):
                 return PostScanProcessingService(
