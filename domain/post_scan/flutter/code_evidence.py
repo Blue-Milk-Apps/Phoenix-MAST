@@ -12,6 +12,7 @@ from domain.post_scan.flutter.scan_extraction_context import FlutterScanExtracti
 from domain.post_scan.flutter.security_evidence import (
     FlutterEvidenceEntry,
     combine_evidence_entries,
+    opengrep_scope_applicable,
     optional_bool_entry,
     scoped_opengrep_entry,
 )
@@ -118,22 +119,9 @@ class FlutterCodeEvidence:
                 absent_evidence=f"no_{evidence_key}_{scope}_hits",
             )
             for scope, rule_ids in rules_by_scope.items()
-            if rule_ids and cls._scope_applicable(context, scope)
+            if rule_ids and opengrep_scope_applicable(context, scope)
         ]
         return combine_evidence_entries(entries, absent_evidence=f"no_{evidence_key}_hits")
-
-    @staticmethod
-    def _scope_applicable(context: FlutterScanExtractionContext, scope: str) -> bool:
-        if scope == "flutter":
-            return True
-        if scope == "android" and (context.platforms.get("android", False) or context.android_available):
-            return True
-        if scope == "ios" and (context.platforms.get("ios", False) or context.ios_available):
-            return True
-        if context.opengrep_results_for_scope(scope):
-            return True
-        scope_metadata = context.opengrep_scope(scope)
-        return bool(scope_metadata) and scope_metadata.get("status") != "skipped"
 
     @staticmethod
     def _component_entry(context: FlutterScanExtractionContext, key: str) -> FlutterEvidenceEntry:
@@ -209,7 +197,7 @@ class FlutterCodeEvidence:
 
     @classmethod
     def _entitlement_entry(cls, context: FlutterScanExtractionContext) -> FlutterEvidenceEntry:
-        if not cls._scope_applicable(context, "ios"):
+        if not opengrep_scope_applicable(context, "ios"):
             return FlutterEvidenceEntry(None)
         detected: set[str] = set()
         for document in context.plist_outputs_for_role("entitlements").values():

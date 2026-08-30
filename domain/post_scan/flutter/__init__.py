@@ -11,6 +11,7 @@ from domain.post_scan.flutter.dependency_inventory import (
 from domain.post_scan.flutter.file_info import FlutterFileInfo
 from domain.post_scan.flutter.hardcoded_values import FlutterHardcodedValues
 from domain.post_scan.flutter.meta import FlutterMeta
+from domain.post_scan.flutter.network_evidence import FlutterNetworkEvidence
 from domain.post_scan.flutter.opengrep_assessment import (
     FlutterOpenGrepAssessment,
     FlutterRuleAssessment,
@@ -33,6 +34,7 @@ from domain.post_scan.flutter.scan_extraction_context import FlutterScanExtracti
 from domain.post_scan.flutter.security_evidence import (
     FlutterEvidenceEntry,
     combine_evidence_entries,
+    opengrep_scope_applicable,
     optional_bool_entry,
     scoped_opengrep_entry,
 )
@@ -51,6 +53,7 @@ __all__ = [
     "FlutterHardcodedValues",
     "FlutterIOSPlatformInventory",
     "FlutterMeta",
+    "FlutterNetworkEvidence",
     "FlutterOpenGrepAssessment",
     "FlutterPlatformInventory",
     "FlutterResolvedDependency",
@@ -61,6 +64,7 @@ __all__ = [
     "FlutterSdkInventory",
     "FlutterSbomPackage",
     "combine_evidence_entries",
+    "opengrep_scope_applicable",
     "optional_bool_entry",
     "scoped_opengrep_entry",
     "unclassified_flutter_rule_ids",

@@ -73,6 +73,21 @@ def optional_bool_entry(
     return FlutterEvidenceEntry(present, f"{label}={str(value).lower()}", [])
 
 
+def opengrep_scope_applicable(context: FlutterScanExtractionContext, scope: str) -> bool:
+    """Return whether a scoped scan is relevant or was actually attempted."""
+
+    if scope == "flutter":
+        return True
+    if scope == "android" and (context.platforms.get("android", False) or context.android_available):
+        return True
+    if scope == "ios" and (context.platforms.get("ios", False) or context.ios_available):
+        return True
+    if context.opengrep_results_for_scope(scope):
+        return True
+    scope_metadata = context.opengrep_scope(scope)
+    return bool(scope_metadata) and scope_metadata.get("status") != "skipped"
+
+
 def _opengrep_evidence(
     context: FlutterScanExtractionContext,
     result: dict[str, Any],
