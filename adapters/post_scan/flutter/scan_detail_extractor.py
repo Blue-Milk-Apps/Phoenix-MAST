@@ -9,6 +9,8 @@ from domain.post_scan.flutter import (
     FlutterAppComponents,
     FlutterAppInfo,
     FlutterApplication,
+    FlutterCodeEvidence,
+    FlutterDataStorageEvidence,
     FlutterDeepLinks,
     FlutterDependencyInventory,
     FlutterFileInfo,
@@ -16,8 +18,10 @@ from domain.post_scan.flutter import (
     FlutterHardcodedValues,
     FlutterManualReviewInventory,
     FlutterMeta,
+    FlutterNetworkEvidence,
     FlutterPermissions,
     FlutterPlatformInventory,
+    FlutterResilienceEvidence,
     FlutterScanExtractionContext,
     FlutterURLSchemes,
 )
@@ -60,5 +64,18 @@ class FlutterScanDetailExtractor(ScanDetailExtractorPort):
         manual_review = FlutterManualReviewInventory(context)
         if manual_review.assessed or manual_review.findings:
             sections["manual_review"] = asdict(manual_review)
+
+        evidence_models = (
+            ("code_evidence", FlutterCodeEvidence(context)),
+            ("network_evidence", FlutterNetworkEvidence(context)),
+            ("data_storage_evidence", FlutterDataStorageEvidence(context)),
+            ("resilience_evidence", FlutterResilienceEvidence(context)),
+        )
+        for section_name, model in evidence_models:
+            if not model.assessed:
+                continue
+            evidence = asdict(model)
+            evidence.pop("assessed", None)
+            sections[section_name] = evidence
 
         return sections

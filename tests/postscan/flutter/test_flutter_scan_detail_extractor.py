@@ -91,6 +91,7 @@ def test_extracts_core_flutter_metadata_and_inventory_sections() -> None:
         "deep_links",
         "url_schemes",
         "queried_url_schemes",
+        "code_evidence",
     }
     assert sections["meta"] == {
         "app_display_name": "Example App",
@@ -125,6 +126,11 @@ def test_extracts_core_flutter_metadata_and_inventory_sections() -> None:
     assert sections["dependency_inventory"]["sbom_packages"] == [
         {"name": "http", "version": "1.2.0", "output_path": "sbom.json"}
     ]
+    assert sections["code_evidence"]["insecure_nanopb_library"] == {
+        "present": False,
+        "evidence": "no_insecure_nanopb_library_hits",
+        "details": [],
+    }
     assert sections["application"] == {
         "debuggable": None,
         "allow_backup": None,

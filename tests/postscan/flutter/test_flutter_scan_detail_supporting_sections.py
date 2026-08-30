@@ -46,10 +46,6 @@ def test_emits_assessed_functionality_secrets_and_manual_review_sections() -> No
         "assessed": True,
         "fully_assessed": True,
     }
-    assert "code_evidence" not in sections
-    assert "network_evidence" not in sections
-    assert "data_storage_evidence" not in sections
-    assert "resilience_evidence" not in sections
     json.dumps(sections)
 
 
