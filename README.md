@@ -49,7 +49,7 @@ Source scans run Gitleaks, TruffleHog, and Syft, with plist extraction included 
 
 Binary scans run Strings, with LIEF, ipsw, and plist extraction for iOS binaries and Androguard, Apktool, Apksigner, and APKiD for Android binaries. MobSF runs for binary scans only when `MOBSF_URL` is configured.
 
-OpenGrep runs only when a rules path is available. For source targets, OpenGrep scans the project directory directly. For binary targets, phoenix first generates `strings` output from the IPA or APK contents and then runs OpenGrep over those generated text artifacts.
+OpenGrep runs only when a rules path is available. Native source targets scan the project directory directly. Flutter source scans are scoped: Flutter rules scan production Dart paths, Android rules scan only `android/`, and iOS rules scan only `ios/`. Missing embedded-platform directories are recorded as skipped scopes. For binary targets, phoenix first generates `strings` output from the IPA or APK contents and then runs OpenGrep over those generated text artifacts.
 
 By default, phoenix looks for OpenGrep rules in these folders:
 
@@ -57,6 +57,8 @@ By default, phoenix looks for OpenGrep rules in these folders:
 - `rules/android` for `--android-binary-path` and `--native-android-source-path`
 - `rules/flutter` for `--flutter-source-path`
 - `rules/react_native` for `--react-native-source-path`
+
+The bundled Flutter rules cover cleartext HTTP, certificate-validation bypasses, sensitive logging, sensitive SharedPreferences and Hive writes, weak hashes and ciphers, dynamic raw SQL, WebView SSL bypasses, and sensitive platform-channel handlers. The OpenGrep report records configured rule IDs and execution status per scope so a missing finding is not treated as a clean assessment unless the relevant rules completed successfully.
 
 You can override the default rules location per scan target with these flags:
 

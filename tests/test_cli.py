@@ -350,7 +350,7 @@ def test_create_scan_config_for_flutter_source(tmp_path: Path) -> None:
     assert config.target_type == "SOURCE"
     assert config.platform == "ANY"
     assert config.stack == "FLUTTER"
-    assert config.opengrep_rules_path is None
+    assert config.opengrep_rules_path == (Path(__file__).parent.parent / "rules" / "flutter").resolve()
     assert config.syft_output_format == "syft-json"
     assert config.output_path.name.startswith("SAST_flutter_source_")
     _assert_scanner_types(

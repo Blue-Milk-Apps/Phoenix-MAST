@@ -31,7 +31,7 @@ from adapters.scanners.common import (
     SyftScanner,
     TrufflehogScanner,
 )
-from adapters.scanners.flutter import FlutterSourceMetadataScanner
+from adapters.scanners.flutter import FlutterOpenGrepScanner, FlutterSourceMetadataScanner
 from adapters.scanners.ios import (
     IpswScanner,
     LIEFScanner,
@@ -191,10 +191,15 @@ class MobileAnalysisWorkflowService:
         print(f"OpenGrep scan paths: {opengrep_scan_paths}")
         opengrep_results = []
         if open_grep_rules_path:
-            opengrep_scanner = OpenGrepScanner(
-                rules_path=Path(open_grep_rules_path),
-                scan_paths=opengrep_scan_paths,
-            )
+            if scan_config.stack == "FLUTTER":
+                opengrep_scanner = FlutterOpenGrepScanner(
+                    flutter_rules_path=Path(open_grep_rules_path),
+                )
+            else:
+                opengrep_scanner = OpenGrepScanner(
+                    rules_path=Path(open_grep_rules_path),
+                    scan_paths=opengrep_scan_paths,
+                )
             results = opengrep_scanner.scan(scan_config)
             opengrep_results.extend(results)
         return opengrep_results

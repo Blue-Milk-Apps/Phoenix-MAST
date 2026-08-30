@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import yaml
+
 from domain.post_scan.flutter.rule_registry import (
     FLUTTER_RULE_IDS,
     FLUTTER_RULE_REGISTRY,
@@ -58,3 +62,24 @@ def test_unsafe_platform_channel_rule_remains_manual_review_only() -> None:
     assert mapping.severity == "Medium"
     assert mapping.evidence_key == ""
     assert "manual review" in mapping.reason
+
+
+def test_bundled_flutter_rules_match_the_registry_contract() -> None:
+    rules_root = Path(__file__).parents[3] / "rules" / "flutter"
+    bundled_rules: dict[str, dict[str, object]] = {}
+    for rules_path in sorted(rules_root.glob("*.yml")):
+        document = yaml.safe_load(rules_path.read_text(encoding="utf-8"))
+        for rule in document["rules"]:
+            rule_id = str(rule["id"])
+            assert rule_id not in bundled_rules
+            bundled_rules[rule_id] = rule
+
+    assert set(bundled_rules) == set(FLUTTER_RULE_IDS)
+    for rule_id, mapping in FLUTTER_RULE_REGISTRY.items():
+        phoenix = bundled_rules[rule_id]["metadata"]["phoenix"]
+        assert phoenix["severity"] == mapping.severity
+        assert phoenix["report_section"] == mapping.section
+        if mapping.disposition is FlutterRuleDisposition.REPORT_VULNERABILITY:
+            assert phoenix["evidence_key"] == mapping.evidence_key
+        else:
+            assert phoenix["disposition"] == mapping.disposition.value
