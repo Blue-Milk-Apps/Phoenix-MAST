@@ -8,6 +8,8 @@ from adapters.output.phoenix_report.generate_report import generate_report
 from adapters.post_scan import (
     AndroidBinaryScanDetailExtractor,
     AndroidBinaryScanOutputLoader,
+    FlutterScanDetailExtractor,
+    FlutterScanOutputLoader,
     IOSBinaryScanDetailExtractor,
     IOSBinaryScanOutputLoader,
     NativeAndroidScanDetailExtractor,
@@ -31,6 +33,7 @@ from adapters.scanners.common import (
     SyftScanner,
     TrufflehogScanner,
 )
+from adapters.scanners.flutter import FlutterOpenGrepScanner, FlutterSourceMetadataScanner
 from adapters.scanners.ios import (
     IpswScanner,
     LIEFScanner,
@@ -77,7 +80,15 @@ class MobileScannerFactory:
                     StringsScanner(),
                     PlistBinaryScanner(),
                 ]
-            case ("SOURCE", _, "FLUTTER") | ("SOURCE", _, "REACT_NATIVE"):
+            case ("SOURCE", _, "FLUTTER"):
+                return [
+                    FlutterSourceMetadataScanner(),
+                    TrufflehogScanner(),
+                    GitleaksScanner(),
+                    PlistSourceScanner(),
+                    SyftScanner(output_format=config.syft_output_format),
+                ]
+            case ("SOURCE", _, "REACT_NATIVE"):
                 return [
                     TrufflehogScanner(),
                     GitleaksScanner(),
@@ -182,10 +193,15 @@ class MobileAnalysisWorkflowService:
         print(f"OpenGrep scan paths: {opengrep_scan_paths}")
         opengrep_results = []
         if open_grep_rules_path:
-            opengrep_scanner = OpenGrepScanner(
-                rules_path=Path(open_grep_rules_path),
-                scan_paths=opengrep_scan_paths,
-            )
+            if scan_config.stack == "FLUTTER":
+                opengrep_scanner = FlutterOpenGrepScanner(
+                    flutter_rules_path=Path(open_grep_rules_path),
+                )
+            else:
+                opengrep_scanner = OpenGrepScanner(
+                    rules_path=Path(open_grep_rules_path),
+                    scan_paths=opengrep_scan_paths,
+                )
             results = opengrep_scanner.scan(scan_config)
             opengrep_results.extend(results)
         return opengrep_results
@@ -247,6 +263,11 @@ class MobileAnalysisWorkflowService:
                 return PostScanProcessingService(
                     scan_output_loader=IOSBinaryScanOutputLoader(),
                     scan_detail_extractor=IOSBinaryScanDetailExtractor(),
+                )
+            case ("SOURCE", _, "FLUTTER"):
+                return PostScanProcessingService(
+                    scan_output_loader=FlutterScanOutputLoader(),
+                    scan_detail_extractor=FlutterScanDetailExtractor(),
                 )
             case ("SOURCE", "IOS", "NATIVE_IOS"):
                 return PostScanProcessingService(
