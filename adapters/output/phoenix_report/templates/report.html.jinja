@@ -87,7 +87,7 @@
 
 <!-- ===================== CERTIFICATE / FILE / APP INFO ===================== -->
 <div class="section">
-  {% if data.meta.platform != 'iOS' %}
+  {% if data.report_scope.target_type != 'SOURCE' and data.meta.platform != 'iOS' %}
   <h2>Certificate Information</h2>
   <table class="kv-table">
     <tr><td class="k">Owner Name</td><td class="v">{{ data.certificate.owner_name }}</td></tr>
@@ -160,14 +160,14 @@
   {% else %}
   <p class="small">No custom URL schemes were declared by this app.</p>
   {% endif %}
-  {% else %}
+  {% elif data.meta.platform != 'Flutter' or data.app_components.activities is not none or data.app_components.services is not none or data.app_components.receivers is not none or data.app_components.providers is not none %}
   <h2>App Components</h2>
   <div class="components-bars">
     {% set component_rows = [
-      ('Activities', data.app_components.activities, data.app_components.exported_activities),
-      ('Services', data.app_components.services, data.app_components.exported_services),
-      ('Receivers', data.app_components.receivers, data.app_components.exported_receivers),
-      ('Providers', data.app_components.providers, data.app_components.exported_providers)
+      ('Activities', data.app_components.activities or 0, data.app_components.exported_activities or 0),
+      ('Services', data.app_components.services or 0, data.app_components.exported_services or 0),
+      ('Receivers', data.app_components.receivers or 0, data.app_components.exported_receivers or 0),
+      ('Providers', data.app_components.providers or 0, data.app_components.exported_providers or 0)
     ] %}
     {% set max_total = (component_rows | map(attribute=1) | list | max) or 1 %}
     {% for label, total, exported in component_rows %}
@@ -192,6 +192,126 @@
   {% endif %}
 </div>
 
+{% if data.meta.platform == 'Flutter' %}
+<!-- ===================== FLUTTER PROJECT INVENTORY ===================== -->
+<div class="section">
+  <h2>Flutter Project Inventory</h2>
+  <table class="kv-table">
+    <tr><td class="k">Metadata Extraction</td><td class="v">{{ data.flutter_presentation.extraction_status }}</td></tr>
+    <tr><td class="k">Dart SDK Constraint</td><td class="v mono">{{ data.flutter_presentation.dart_sdk_constraint or 'Not declared' }}</td></tr>
+    <tr><td class="k">Flutter SDK Constraint</td><td class="v mono">{{ data.flutter_presentation.flutter_sdk_constraint or 'Not declared' }}</td></tr>
+    <tr><td class="k">Android Application ID</td><td class="v mono">{{ data.flutter_presentation.android_application_id or 'Not available' }}</td></tr>
+    <tr><td class="k">iOS Bundle Identifier</td><td class="v mono">{{ data.flutter_presentation.ios_bundle_identifier or 'Not available' }}</td></tr>
+    {% if data.flutter_presentation.description %}<tr><td class="k">Description</td><td class="v">{{ data.flutter_presentation.description }}</td></tr>{% endif %}
+    {% if data.flutter_presentation.homepage %}<tr><td class="k">Homepage</td><td class="v mono">{{ data.flutter_presentation.homepage }}</td></tr>{% endif %}
+    {% if data.flutter_presentation.repository %}<tr><td class="k">Repository</td><td class="v mono">{{ data.flutter_presentation.repository }}</td></tr>{% endif %}
+  </table>
+
+  {% if data.flutter_presentation.warnings %}
+  <h3>Extraction Warnings</h3>
+  <ul>{% for warning in data.flutter_presentation.warnings %}<li>{{ warning }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  <h3>Generated Platforms</h3>
+  <table class="compact">
+    <tr><th>Platform</th><th>Detected</th><th>Metadata</th><th>Identifier</th><th>Version</th><th>Requirements</th></tr>
+    {% for platform in data.flutter_presentation.platforms %}
+    <tr>
+      <td>{{ platform.name }}</td>
+      <td>{{ 'Yes' if platform.detected else 'No' }}</td>
+      <td>{{ platform.metadata_status }}</td>
+      <td class="mono">{{ platform.identifier }}</td>
+      <td>{{ platform.version }}</td>
+      <td>{{ platform.requirements }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<!-- ===================== FLUTTER DEPENDENCIES ===================== -->
+<div class="section">
+  <h2>Flutter Dependency Inventory</h2>
+  <p class="small">Declared metadata: {{ data.flutter_presentation.dependencies.metadata_status }} &middot; SBOM: {{ data.flutter_presentation.dependencies.sbom_status }}</p>
+
+  <h3>Declared Dependencies</h3>
+  {% if data.flutter_presentation.dependencies.declared %}
+  <table class="compact">
+    <tr><th>Name</th><th>Constraint</th><th>Scope</th><th>Source</th></tr>
+    {% for dependency in data.flutter_presentation.dependencies.declared %}
+    <tr><td class="mono">{{ dependency.name }}</td><td class="mono">{{ dependency.constraint }}</td><td>{{ dependency.scope }}</td><td>{{ dependency.source }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="small">No declared dependency records were available.</p>{% endif %}
+
+  <h3>Resolved Dependencies</h3>
+  {% if data.flutter_presentation.dependencies.resolved %}
+  <table class="compact">
+    <tr><th>Name</th><th>Version</th><th>Kind</th><th>Source</th></tr>
+    {% for dependency in data.flutter_presentation.dependencies.resolved %}
+    <tr><td class="mono">{{ dependency.name }}</td><td class="mono">{{ dependency.version }}</td><td>{{ dependency.dependency_kind }}</td><td>{{ dependency.source }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="small">No resolved dependency records were available.</p>{% endif %}
+
+  <h3>SBOM Packages</h3>
+  {% if data.flutter_presentation.dependencies.sbom_packages %}
+  <table class="compact">
+    <tr><th>Name</th><th>Version</th><th>Artifact</th></tr>
+    {% for package in data.flutter_presentation.dependencies.sbom_packages %}
+    <tr><td class="mono">{{ package.name }}</td><td class="mono">{{ package.version }}</td><td class="mono">{{ package.output_path }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="small">No SBOM package records were available.</p>{% endif %}
+</div>
+
+<!-- ===================== FLUTTER LINKS ===================== -->
+<div class="section">
+  <h2>Application Links and URL Schemes</h2>
+  <h3>Android Deep Links</h3>
+  {% if data.flutter_presentation.deep_links %}
+  <table class="compact">
+    <tr><th>URI Pattern</th><th>Component</th><th>MIME Type</th></tr>
+    {% for link in data.flutter_presentation.deep_links %}
+    <tr><td class="mono">{{ link.uri }}</td><td class="mono">{{ link.component }}</td><td>{{ link.mime_type }}</td></tr>
+    {% endfor %}
+  </table>
+  {% elif data.flutter_presentation.deep_links_assessed %}<p class="small">No Android deep links were declared.</p>
+  {% else %}<p class="small">Android deep links were not assessed.</p>{% endif %}
+
+  <h3>iOS URL Schemes</h3>
+  {% if data.flutter_presentation.url_schemes %}
+  <table class="compact">
+    <tr><th>Application</th><th>Declared Schemes</th></tr>
+    {% for item in data.flutter_presentation.url_schemes %}
+    <tr><td>{{ item.url_name }}</td><td class="mono">{{ item.schemes | join(', ') }}</td></tr>
+    {% endfor %}
+  </table>
+  {% elif data.flutter_presentation.url_schemes_assessed %}<p class="small">No iOS URL schemes were declared.</p>
+  {% else %}<p class="small">iOS URL schemes were not assessed.</p>{% endif %}
+
+  <h3>Queried iOS Schemes</h3>
+  {% if data.flutter_presentation.queried_url_schemes %}<p class="mono">{{ data.flutter_presentation.queried_url_schemes | join(', ') }}</p>
+  {% elif data.flutter_presentation.url_schemes_assessed %}<p class="small">No queried iOS schemes were declared.</p>
+  {% else %}<p class="small">Queried iOS schemes were not assessed.</p>{% endif %}
+</div>
+
+{% if data.flutter_presentation.manual_review_available %}
+<!-- ===================== FLUTTER MANUAL REVIEW ===================== -->
+<div class="section">
+  <h2>Manual Review</h2>
+  <p class="small">Assessment status: {{ data.flutter_presentation.manual_review_status }}</p>
+  {% if data.flutter_presentation.manual_review_findings %}
+  <table>
+    <tr><th>Rule</th><th>Scope</th><th>Severity</th><th>Location</th><th>Reason</th><th>Finding</th></tr>
+    {% for finding in data.flutter_presentation.manual_review_findings %}
+    <tr><td class="mono">{{ finding.rule_id }}</td><td>{{ finding.scope }}</td><td>{{ finding.severity }}</td><td class="mono">{{ finding.location }}</td><td>{{ finding.reason }}</td><td>{{ finding.message }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="small">No manual-review findings were identified by the assessed rules.</p>{% endif %}
+</div>
+{% endif %}
+{% endif %}
+
 <!-- ===================== FUNCTIONALITY ===================== -->
 <div class="section">
   <h2>Functionality</h2>
@@ -200,7 +320,7 @@
     {% for name, f in data.functionality.items() %}
     <tr>
       <td>{{ name }}</td>
-      <td>{{ risk_badge('Info' if f.present else 'N/A', label=('Present' if f.present else 'Not Present')) }}</td>
+      <td>{% if f.present is none %}{{ risk_badge('N/A', label='Not Evaluated') }}{% else %}{{ risk_badge('Info' if f.present else 'N/A', label=('Present' if f.present else 'Not Present')) }}{% endif %}</td>
       <td>{{ f.explanation }}</td>
     </tr>
     {% endfor %}
@@ -228,9 +348,10 @@
 <div class="section">
   <h2>Permissions Requested</h2>
   <table>
-    <tr><th>Permission</th><th>Status</th><th>Description</th></tr>
+    <tr>{% if data.meta.platform == 'Flutter' %}<th>Platform</th>{% endif %}<th>Permission</th><th>Status</th><th>Description</th></tr>
     {% for p in data.permissions %}
     <tr>
+      {% if data.meta.platform == 'Flutter' %}<td>{{ p.platform }}</td>{% endif %}
       <td class="mono">{{ p.display_permission or p.permission }}</td>
       <td>{{ risk_badge('High' if p.status == 'dangerous' else 'Info', label=p.status) }}</td>
       <td>{{ p.general_description }}{% if p.usage_description %}<br><span class="small">{{ p.usage_description }}</span>{% endif %}</td>

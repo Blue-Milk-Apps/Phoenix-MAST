@@ -1,5 +1,8 @@
+import importlib
 import json
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 from adapters.output.phoenix_report.generate_report import (
     _build_overall_evaluation,
@@ -9,6 +12,7 @@ from adapters.output.phoenix_report.generate_report import (
 )
 
 BASE_DIR = Path(__file__).resolve().parents[2] / "adapters" / "output" / "phoenix_report" / "data"
+REPORT_GENERATOR = importlib.import_module("adapters.output.phoenix_report.generate_report")
 CANONICAL_NETWORK_CHECKS = [
     "Allows Cleartext Traffic for All Domains",
     "Contains HostnameVerifier That Accepts All Hostnames",
@@ -417,6 +421,328 @@ def test_load_report_data_limits_ios_source_reports_to_assessed_content() -> Non
     assert "Usage of malloc Instead of calloc in Binary" not in check_map
     assert report["ipa_binary_protections"] == []
     assert set(report["risk_summary"]) == {"code_vulnerability", "data_storage", "networking"}
+
+
+def test_load_report_data_uses_flutter_source_scope_and_assessed_sections() -> None:
+    report = load_report_data(
+        {
+            "meta": {
+                "app_display_name": "Example",
+                "file_name": "example_app",
+                "platform": "Flutter",
+                "target_type": "SOURCE",
+            },
+            "code_evidence": {"contains_potential_sql_injection": {"present": True, "evidence": "lib/db.dart:10"}},
+            "network_evidence": {
+                "sensitive_information_unencrypted_in_transit": {
+                    "present": False,
+                    "evidence": "no_cleartext_http_hits",
+                }
+            },
+            "data_storage_evidence": {"sensitive_values_stored_insecurely": {"present": None, "evidence": ""}},
+        }
+    )
+
+    assert report["report_scope"]["platform"] == "Flutter"
+    assert report["report_scope"]["assessment_label"] == "Flutter Source Code"
+    assert report["report_scope"]["assessment_title"] == ("Flutter Source Code Vulnerability Assessment")
+    assert report["report_scope"]["target_information_heading"] == "Flutter Project Information"
+    assert report["report_scope"]["assessed_sections"] == ("code", "network")
+    assert [section["section_name"] for section in report["vulnerability_sections"]] == [
+        "Code",
+        "Network",
+    ]
+
+
+def test_load_report_data_maps_flutter_android_and_ios_source_evidence() -> None:
+    report = load_report_data(
+        {
+            "meta": {"platform": "Flutter", "target_type": "SOURCE"},
+            "code_evidence": {
+                "contains_potential_sql_injection": {"present": True, "evidence": "lib/db.dart:10"},
+                "encodes_data_using_insecure_cryptography": {
+                    "present": True,
+                    "evidence": "lib/crypto.dart:12",
+                },
+                "insecure_entitlements": {"present": False, "evidence": "no_insecure_entitlements_hits"},
+                "uses_sha1_hashing_algorithm": {"present": None, "evidence": ""},
+            },
+            "network_evidence": {
+                "sensitive_information_unencrypted_in_transit": {
+                    "present": True,
+                    "evidence": "lib/client.dart:20",
+                },
+                "ats_disabled": {"present": True, "evidence": "NSAllowsArbitraryLoads=true"},
+                "cookie_missing_secure_flag": {
+                    "present": False,
+                    "evidence": "no_cookie_missing_secure_flag_hits",
+                },
+            },
+            "data_storage_evidence": {
+                "sensitive_values_stored_insecurely": {
+                    "present": True,
+                    "evidence": "lib/storage.dart:30",
+                },
+                "deprecated_keychain_attributes": {
+                    "present": True,
+                    "evidence": "ios/Runner/Keychain.swift:40",
+                },
+                "sensitive_information_stored_in_external_storage": {
+                    "present": False,
+                    "evidence": "no_sensitive_external_storage_hits",
+                },
+            },
+            "resilience_evidence": {
+                "biometric_local_authentication_bypass_possible": {
+                    "present": True,
+                    "evidence": "android/app/Auth.kt:50",
+                }
+            },
+        }
+    )
+
+    sections = {section["section_name"]: _check_map(section["checks"]) for section in report["vulnerability_sections"]}
+    assert sections["Code"]["Contains Potential SQL Injection"]["result"] == "Present"
+    assert sections["Code"]["Application Encodes Data Using Insecure Cryptography"]["result"] == "Present"
+    assert sections["Code"]["Potentially Insecure iOS Entitlements"]["result"] == "Not Present"
+    assert sections["Code"]["Uses SHA1 Hashing Algorithm"]["result"] == "Not Evaluated"
+    assert sections["Network"]["Sensitive Information is Unencrypted in Transit"]["result"] == "Present"
+    assert sections["Network"]["App Transport Security (ATS) Disabled"]["result"] == "Present"
+    assert sections["Network"]["Cookie missing 'Secure' flag"]["result"] == "Not Present"
+    assert sections["Data Storage"]["Local Data Exposure: Sensitive Values Stored Insecurely"]["result"] == ("Present")
+    assert sections["Data Storage"]["Application Utilizes Deprecated Keychain Attributes"]["result"] == ("Present")
+    assert sections["Data Storage"]["Sensitive Information Stored in External Storage"]["result"] == ("Not Present")
+    assert sections["Resilience"]["Biometric / Local Authentication Bypass Possible"]["result"] == "Present"
+
+
+def test_load_report_data_normalizes_flutter_presentation_inventory() -> None:
+    report = load_report_data(_flutter_presentation_data())
+    presentation = report["flutter_presentation"]
+
+    assert presentation["extraction_status"] == "Partial"
+    assert presentation["warnings"] == ["Android metadata could not be parsed."]
+    assert presentation["dart_sdk_constraint"] == ">=3.3.0 <4.0.0"
+    assert presentation["flutter_sdk_constraint"] == ">=3.22.0"
+    assert presentation["android_application_id"] == "com.example.android"
+    assert presentation["ios_bundle_identifier"] == "com.example.ios"
+    assert presentation["platforms"][0] == {
+        "name": "Android",
+        "detected": True,
+        "metadata_status": "Not Assessed",
+        "identifier": "com.example.android",
+        "version": "1.2.3",
+        "requirements": "Min SDK: 24, Target SDK: 35",
+    }
+    assert presentation["platforms"][1]["metadata_status"] == "Assessed"
+    assert presentation["dependencies"]["metadata_status"] == "Assessed"
+    assert presentation["dependencies"]["sbom_status"] == "Assessed"
+    assert presentation["deep_links"] == [
+        {
+            "uri": "example://open/item",
+            "component": "com.example.MainActivity",
+            "mime_type": "",
+        }
+    ]
+    assert presentation["url_schemes"] == [{"url_name": "Example App", "schemes": ["example-app"]}]
+    assert presentation["queried_url_schemes"] == ["partner-app"]
+    assert presentation["manual_review_status"] == "Not Assessed"
+    assert report["permissions"][0]["status"] == "declared"
+    assert report["permissions"][0]["platform"] == "Android"
+
+
+def test_report_template_renders_flutter_inventory_links_and_manual_review() -> None:
+    html = _render_report_html(_flutter_presentation_data())
+
+    assert "Flutter Project Inventory" in html
+    assert "Flutter Dependency Inventory" in html
+    assert "Application Links and URL Schemes" in html
+    assert "Manual Review" in html
+    assert "Android metadata could not be parsed." in html
+    assert "com.example.android" in html
+    assert "com.example.ios" in html
+    assert "http" in html
+    assert "example://open/item" in html
+    assert "example-app" in html
+    assert "partner-app" in html
+    assert "flutter.source.unsafe-platform-channel" in html
+    assert "Not Evaluated" in html
+    assert "Certificate Information" not in html
+    assert "App Components" not in html
+
+
+def test_report_template_handles_unassessed_flutter_presentation() -> None:
+    html = _render_report_html(
+        {
+            "meta": {"platform": "Flutter", "target_type": "SOURCE"},
+            "app_components": {
+                "activities": None,
+                "services": None,
+                "receivers": None,
+                "providers": None,
+                "exported_activities": None,
+                "exported_services": None,
+                "exported_receivers": None,
+                "exported_providers": None,
+            },
+            "platform_inventory": {
+                "source_metadata_assessed": False,
+                "sdk": {},
+                "android": {"detected": True, "metadata_assessed": False},
+                "ios": {"detected": True, "metadata_assessed": False},
+                "warnings": [],
+            },
+            "dependency_inventory": {
+                "metadata_assessed": False,
+                "sbom_assessed": False,
+                "declared": [],
+                "resolved": [],
+                "sbom_packages": [],
+            },
+            "deep_links": {"deep_links": None},
+            "url_schemes": [],
+            "queried_url_schemes": [],
+        }
+    )
+
+    assert 'Metadata Extraction</td><td class="v">Not Assessed' in html
+    assert "Android deep links were not assessed." in html
+    assert "iOS URL schemes were not assessed." in html
+    assert "Declared metadata: Not Assessed" in html
+    assert "Manual Review" not in html
+
+
+def test_generate_report_renders_flutter_html_and_writes_pdf_path(tmp_path: Path, monkeypatch) -> None:
+    rendered: dict[str, str] = {}
+
+    class FakeHTML:
+        def __init__(self, *, string: str, base_url: str) -> None:
+            rendered["html"] = string
+            rendered["base_url"] = base_url
+
+        def write_pdf(self, target: str) -> None:
+            Path(target).write_bytes(b"%PDF-fake")
+
+    monkeypatch.setitem(sys.modules, "weasyprint", SimpleNamespace(HTML=FakeHTML))
+    monkeypatch.setattr(
+        REPORT_GENERATOR,
+        "build_charts",
+        lambda data: {"overall_risk_polar": ""},
+    )
+
+    output_path = tmp_path / "reports" / "flutter.pdf"
+    result = REPORT_GENERATOR.generate_report(_flutter_presentation_data(), output_path)
+
+    assert result == output_path
+    assert output_path.read_bytes() == b"%PDF-fake"
+    assert "Flutter Source Code Vulnerability Assessment" in rendered["html"]
+    assert "Flutter Project Inventory" in rendered["html"]
+    assert "flutter.source.unsafe-platform-channel" in rendered["html"]
+    assert rendered["base_url"].endswith("adapters/output/phoenix_report")
+
+
+def _flutter_presentation_data() -> dict:
+    return {
+        "meta": {
+            "app_display_name": "Example App",
+            "file_name": "example_app",
+            "platform": "Flutter",
+            "target_type": "SOURCE",
+        },
+        "app_info": {
+            "name": "Example App",
+            "package_name": "example_app",
+            "description": "Example Flutter application",
+            "homepage": "https://example.com",
+            "repository": "https://example.com/source",
+        },
+        "app_components": {
+            "activities": None,
+            "services": None,
+            "receivers": None,
+            "providers": None,
+            "exported_activities": None,
+            "exported_services": None,
+            "exported_receivers": None,
+            "exported_providers": None,
+        },
+        "platform_inventory": {
+            "source_metadata_assessed": True,
+            "sdk": {
+                "dart_constraint": ">=3.3.0 <4.0.0",
+                "flutter_constraint": ">=3.22.0",
+            },
+            "android": {
+                "detected": True,
+                "metadata_assessed": False,
+                "package_name": "com.example.android",
+                "version_name": "1.2.3",
+                "min_sdk": "24",
+                "target_sdk": "35",
+            },
+            "ios": {
+                "detected": True,
+                "metadata_assessed": True,
+                "bundle_identifier": "com.example.ios",
+                "version_name": "1.2.3",
+                "minimum_os": "13.0",
+            },
+            "web_detected": True,
+            "linux_detected": False,
+            "macos_detected": False,
+            "windows_detected": False,
+            "warnings": ["Android metadata could not be parsed."],
+        },
+        "dependency_inventory": {
+            "metadata_assessed": True,
+            "sbom_assessed": True,
+            "declared": [{"name": "http", "constraint": "^1.2.0", "source": "hosted", "scope": "direct"}],
+            "resolved": [
+                {
+                    "name": "http",
+                    "version": "1.2.0",
+                    "source": "hosted",
+                    "dependency_kind": "direct",
+                }
+            ],
+            "sbom_packages": [{"name": "http", "version": "1.2.0", "output_path": "sbom.json"}],
+        },
+        "deep_links": {
+            "deep_links": [
+                {
+                    "scheme": "example",
+                    "host": "open",
+                    "path_prefix": "/item",
+                    "component": "com.example.MainActivity",
+                }
+            ]
+        },
+        "url_schemes": [{"url_name": "Example App", "schemes": ["example-app"]}],
+        "queried_url_schemes": ["partner-app"],
+        "manual_review": {
+            "findings": [
+                {
+                    "rule_id": "flutter.source.unsafe-platform-channel",
+                    "scope": "flutter",
+                    "severity": "Medium",
+                    "location": "lib/channel.dart:40",
+                    "reason": "Review privileged channel operations.",
+                    "message": "Sensitive platform channel handler",
+                }
+            ],
+            "assessed_scopes": [],
+            "assessed": False,
+            "fully_assessed": False,
+        },
+        "permissions": [
+            {
+                "permission": "android.permission.CAMERA",
+                "status": "",
+                "general_description": "Camera access.",
+                "usage_description": "",
+            }
+        ],
+        "functionality": {"Camera": {"present": None, "explanation": "Camera functionality was not fully assessed."}},
+    }
 
 
 def test_report_template_switches_between_ios_source_and_binary_presentation() -> None:

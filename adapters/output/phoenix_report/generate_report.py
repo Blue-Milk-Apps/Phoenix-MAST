@@ -201,6 +201,23 @@ CODE_EVIDENCE_KEY_BY_CHECK = {
     "application data can be backed up": "application_data_can_be_backed_up",
     "application uses custom url schemes / deep links": ("application_uses_custom_url_schemes_or_deep_links"),
 }
+FLUTTER_CODE_EVIDENCE_KEY_BY_CHECK = {
+    **CODE_EVIDENCE_KEY_BY_CHECK,
+    **IOS_CODE_EVIDENCE_KEY_BY_CHECK,
+}
+FLUTTER_NETWORK_EVIDENCE_KEY_BY_CHECK = {
+    **NETWORK_EVIDENCE_KEY_BY_CHECK,
+    **IOS_NETWORK_EVIDENCE_KEY_BY_CHECK,
+}
+FLUTTER_DATA_STORAGE_EVIDENCE_KEY_BY_CHECK = {
+    **DATA_STORAGE_EVIDENCE_KEY_BY_CHECK,
+    **IOS_DATA_STORAGE_EVIDENCE_KEY_BY_CHECK,
+}
+FLUTTER_RESILIENCE_EVIDENCE_KEY_BY_CHECK = {
+    **RESILIENCE_EVIDENCE_KEY_BY_CHECK,
+    **IOS_RESILIENCE_EVIDENCE_KEY_BY_CHECK,
+    "biometric / local authentication bypass possible": ("biometric_local_authentication_bypass_possible"),
+}
 ANDROID_SOURCE_CODE_CHECK_NAMES = frozenset(
     {
         "activities accessible to other apps",
@@ -1418,6 +1435,67 @@ IOS_RESILIENCE_CHECK_SPECS = (
         "aliases": (),
     },
 )
+
+
+def _flutter_check_specs(
+    specs: tuple[dict[str, Any], ...],
+    evidence_map: dict[str, str],
+) -> tuple[dict[str, Any], ...]:
+    selected: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for spec in specs:
+        check_name = str(spec["check"]).strip().lower()
+        if check_name not in evidence_map or check_name in seen:
+            continue
+        selected.append(spec)
+        seen.add(check_name)
+    return tuple(selected)
+
+
+FLUTTER_CODE_CHECK_SPECS = _flutter_check_specs(
+    (
+        *(
+            spec
+            for spec in (*CODE_CHECK_SPECS, *ANDROID_SOURCE_CODE_EXTRA_CHECK_SPECS)
+            if str(spec["check"]).strip().lower() in ANDROID_SOURCE_CODE_CHECK_NAMES
+        ),
+        *(spec for spec in IOS_CODE_CHECK_SPECS if "SOURCE" in spec.get("applies_to", ("SOURCE", "BINARY"))),
+    ),
+    FLUTTER_CODE_EVIDENCE_KEY_BY_CHECK,
+)
+FLUTTER_NETWORK_CHECK_SPECS = _flutter_check_specs(
+    (
+        *(
+            spec
+            for spec in NETWORK_CHECK_SPECS
+            if str(spec["check"]).strip().lower() in ANDROID_SOURCE_NETWORK_CHECK_NAMES
+        ),
+        *(spec for spec in IOS_NETWORK_CHECK_SPECS if "SOURCE" in spec.get("applies_to", ("SOURCE", "BINARY"))),
+    ),
+    FLUTTER_NETWORK_EVIDENCE_KEY_BY_CHECK,
+)
+FLUTTER_DATA_STORAGE_CHECK_SPECS = _flutter_check_specs(
+    (
+        *(
+            spec
+            for spec in DATA_STORAGE_CHECK_SPECS
+            if str(spec["check"]).strip().lower() in ANDROID_SOURCE_DATA_STORAGE_CHECK_NAMES
+        ),
+        *(spec for spec in IOS_DATA_STORAGE_CHECK_SPECS if "SOURCE" in spec.get("applies_to", ("SOURCE", "BINARY"))),
+    ),
+    FLUTTER_DATA_STORAGE_EVIDENCE_KEY_BY_CHECK,
+)
+FLUTTER_RESILIENCE_CHECK_SPECS = _flutter_check_specs(
+    (
+        *(
+            spec
+            for spec in RESILIENCE_CHECK_SPECS
+            if str(spec["check"]).strip().lower() in ANDROID_SOURCE_RESILIENCE_CHECK_NAMES
+        ),
+        *(spec for spec in IOS_RESILIENCE_CHECK_SPECS if "SOURCE" in spec.get("applies_to", ("SOURCE", "BINARY"))),
+    ),
+    FLUTTER_RESILIENCE_EVIDENCE_KEY_BY_CHECK,
+)
 IPA_BINARY_PROTECTION_SPECS = (
     {
         "protection": "NX",
@@ -1747,8 +1825,14 @@ def _is_ios_platform(data: dict[str, Any]) -> bool:
     return str(meta.get("platform") or "").strip().lower() == "ios"
 
 
+def _is_flutter_platform(data: dict[str, Any]) -> bool:
+    meta = data.get("meta") if isinstance(data.get("meta"), dict) else {}
+    return str(meta.get("platform") or "").strip().lower() == "flutter"
+
+
 def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     is_ios = _is_ios_platform(data)
+    is_flutter = _is_flutter_platform(data)
     base_template = _ios_blank_template() if is_ios else _blank_template()
     report_data = _merge_nested(base_template, data)
     report_scope = resolve_report_scope(report_data)
@@ -1756,7 +1840,15 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     _normalize_data_storage_section_name(report_data)
     _retain_assessed_sections(report_data, report_scope)
 
-    if is_ios:
+    if is_flutter:
+        _normalize_flutter_presentation(report_data)
+        _canonicalize_flutter_sections(report_data, report_scope.target_type)
+        section_to_area = {
+            section_name: area
+            for section_name, area in SECTION_TO_AREA.items()
+            if section_name in report_scope.assessed_sections
+        }
+    elif is_ios:
         _canonicalize_ios_code_section(report_data, report_scope.target_type)
         _canonicalize_ios_network_section(report_data, report_scope.target_type)
         _canonicalize_ios_data_storage_section(report_data, report_scope.target_type)
@@ -2020,6 +2112,94 @@ def _canonicalize_ios_resilience_section(report_data: dict[str, Any], target_typ
     _canonicalize_ios_section(report_data, "resilience", IOS_RESILIENCE_CHECK_SPECS, target_type)
 
 
+def _canonicalize_flutter_sections(report_data: dict[str, Any], target_type: str) -> None:
+    section_configs = {
+        "code": (
+            "code_evidence",
+            FLUTTER_CODE_EVIDENCE_KEY_BY_CHECK,
+            FLUTTER_CODE_CHECK_SPECS,
+        ),
+        "network": (
+            "network_evidence",
+            FLUTTER_NETWORK_EVIDENCE_KEY_BY_CHECK,
+            FLUTTER_NETWORK_CHECK_SPECS,
+        ),
+        "data storage": (
+            "data_storage_evidence",
+            FLUTTER_DATA_STORAGE_EVIDENCE_KEY_BY_CHECK,
+            FLUTTER_DATA_STORAGE_CHECK_SPECS,
+        ),
+        "resilience": (
+            "resilience_evidence",
+            FLUTTER_RESILIENCE_EVIDENCE_KEY_BY_CHECK,
+            FLUTTER_RESILIENCE_CHECK_SPECS,
+        ),
+    }
+    sections = report_data.get("vulnerability_sections")
+    if not isinstance(sections, list):
+        return
+
+    for section in sections:
+        section_name = str(section.get("section_name", "")).strip().lower()
+        config = section_configs.get(section_name)
+        if config is None:
+            continue
+        evidence_key, evidence_map, specs = config
+        evidence = report_data.get(evidence_key)
+        evidence = evidence if isinstance(evidence, dict) else {}
+        incoming_checks = list(section.get("checks") or [])
+        lookup = {
+            _normalized_check_name(check.get("check")): check
+            for check in incoming_checks
+            if isinstance(check, dict) and str(check.get("check", "")).strip()
+        }
+        section["checks"] = [
+            _canonical_flutter_check(spec, lookup, evidence, evidence_map)
+            for spec in specs
+            if target_type in spec.get("applies_to", ("SOURCE", "BINARY"))
+        ]
+
+
+def _canonical_flutter_check(
+    spec: dict[str, Any],
+    lookup: dict[str, dict[str, Any]],
+    evidence: dict[str, Any],
+    evidence_map: dict[str, str],
+) -> dict[str, Any]:
+    canonical_name = _normalized_check_name(spec["check"])
+    evidence_key = evidence_map.get(canonical_name)
+    evidence_entry = evidence.get(evidence_key) if evidence_key else None
+    evidence_entry = evidence_entry if isinstance(evidence_entry, dict) else None
+    source = lookup.get(canonical_name) or _first_matching_alias(spec, lookup)
+
+    result = "Not Evaluated"
+    explanation = _initial_check_explanation(spec, "SOURCE")
+    compliance = spec["compliance"]
+    evidence_text = ""
+    remediation_link = ""
+    if evidence_entry is not None and isinstance(evidence_entry.get("present"), bool):
+        result = "Present" if evidence_entry["present"] else "Not Present"
+        explanation = spec["present_explanation"] if result == "Present" else spec["not_present_explanation"]
+        evidence_text = _non_empty_string(evidence_entry.get("evidence"))
+    elif source is not None:
+        result = _present_not_present(source.get("result")) or result
+        explanation = _non_empty_string(source.get("explanation")) or explanation
+        compliance = _non_empty_string(source.get("compliance")) or compliance
+        evidence_text = _non_empty_string(source.get("evidence"))
+        remediation_link = _non_empty_string(source.get("remediation_link"))
+
+    return {
+        "check": spec["check"],
+        "result": result,
+        "explanation": explanation,
+        "compliance": compliance,
+        "remediation_link": remediation_link,
+        "evidence": evidence_text,
+        "severity": spec["severity"],
+        "confidence_caveat": spec.get("confidence_caveat"),
+    }
+
+
 def _canonicalize_ios_section(
     report_data: dict[str, Any],
     section_name: str,
@@ -2242,6 +2422,191 @@ def _normalize_ios_url_schemes(report_data: dict[str, Any]) -> None:
         normalized.append({"url_name": url_name, "schemes": scheme_list})
 
     report_data["url_schemes"] = normalized
+
+
+def _normalize_flutter_presentation(report_data: dict[str, Any]) -> None:
+    app_info = report_data.get("app_info")
+    app_info = app_info if isinstance(app_info, dict) else {}
+    platform_inventory = report_data.get("platform_inventory")
+    platform_inventory = platform_inventory if isinstance(platform_inventory, dict) else {}
+    sdk = platform_inventory.get("sdk")
+    sdk = sdk if isinstance(sdk, dict) else {}
+    android = platform_inventory.get("android")
+    android = android if isinstance(android, dict) else {}
+    ios = platform_inventory.get("ios")
+    ios = ios if isinstance(ios, dict) else {}
+
+    warnings = platform_inventory.get("warnings")
+    warnings = (
+        _dedupe_preserve_order([str(item).strip() for item in warnings if str(item).strip()])
+        if isinstance(warnings, list)
+        else []
+    )
+    metadata_assessed = platform_inventory.get("source_metadata_assessed") is True
+    extraction_status = "Not Assessed"
+    if metadata_assessed:
+        extraction_status = "Partial" if warnings else "Complete"
+
+    platform_rows = [
+        _flutter_platform_row(
+            "Android",
+            android.get("detected") is True,
+            android.get("metadata_assessed") is True,
+            _non_empty_string(android.get("package_name")),
+            _non_empty_string(android.get("version_name")),
+            _join_non_empty(
+                (
+                    ("Min SDK", android.get("min_sdk")),
+                    ("Target SDK", android.get("target_sdk")),
+                    ("Compile SDK", android.get("compile_sdk")),
+                )
+            ),
+        ),
+        _flutter_platform_row(
+            "iOS",
+            ios.get("detected") is True,
+            ios.get("metadata_assessed") is True,
+            _non_empty_string(ios.get("bundle_identifier")),
+            _non_empty_string(ios.get("version_name")),
+            _join_non_empty((("Minimum iOS", ios.get("minimum_os")),)),
+        ),
+    ]
+    for name, key in (
+        ("Web", "web_detected"),
+        ("Linux", "linux_detected"),
+        ("macOS", "macos_detected"),
+        ("Windows", "windows_detected"),
+    ):
+        platform_rows.append(
+            {
+                "name": name,
+                "detected": platform_inventory.get(key) is True,
+                "metadata_status": "Not Applicable",
+                "identifier": "",
+                "version": "",
+                "requirements": "",
+            }
+        )
+
+    dependency_inventory = report_data.get("dependency_inventory")
+    dependency_inventory = dependency_inventory if isinstance(dependency_inventory, dict) else {}
+    dependencies = {
+        "metadata_status": "Assessed" if dependency_inventory.get("metadata_assessed") is True else "Not Assessed",
+        "sbom_status": "Assessed" if dependency_inventory.get("sbom_assessed") is True else "Not Assessed",
+        "declared": _mapping_rows(dependency_inventory.get("declared")),
+        "resolved": _mapping_rows(dependency_inventory.get("resolved")),
+        "sbom_packages": _mapping_rows(dependency_inventory.get("sbom_packages")),
+    }
+
+    deep_link_container = report_data.get("deep_links")
+    deep_link_container = deep_link_container if isinstance(deep_link_container, dict) else {}
+    raw_deep_links = deep_link_container.get("deep_links")
+    deep_links = [_flutter_deep_link_row(item) for item in _mapping_rows(raw_deep_links)]
+    _normalize_ios_url_schemes(report_data)
+    queried_schemes = report_data.get("queried_url_schemes")
+    queried_schemes = (
+        _dedupe_preserve_order([str(item).strip() for item in queried_schemes if str(item).strip()])
+        if isinstance(queried_schemes, list)
+        else []
+    )
+
+    manual_review = report_data.get("manual_review")
+    manual_review = manual_review if isinstance(manual_review, dict) else None
+    manual_findings = _mapping_rows(manual_review.get("findings")) if manual_review is not None else []
+    if manual_review is None:
+        manual_status = "Not Assessed"
+    elif manual_review.get("fully_assessed") is True:
+        manual_status = "Fully Assessed"
+    elif manual_review.get("assessed") is True:
+        manual_status = "Partially Assessed"
+    else:
+        manual_status = "Not Assessed"
+
+    permissions = report_data.get("permissions")
+    if isinstance(permissions, list):
+        for permission in permissions:
+            if not isinstance(permission, dict):
+                continue
+            if not _non_empty_string(permission.get("status")):
+                permission["status"] = "declared"
+            if not _non_empty_string(permission.get("platform")):
+                permission_name = _non_empty_string(permission.get("permission"))
+                permission["platform"] = "iOS" if permission_name.startswith("NS") else "Android"
+
+    report_data["flutter_presentation"] = {
+        "description": _non_empty_string(app_info.get("description")),
+        "homepage": _non_empty_string(app_info.get("homepage")),
+        "repository": _non_empty_string(app_info.get("repository")),
+        "dart_sdk_constraint": _non_empty_string(sdk.get("dart_constraint") or app_info.get("dart_sdk_constraint")),
+        "flutter_sdk_constraint": _non_empty_string(
+            sdk.get("flutter_constraint") or app_info.get("flutter_sdk_constraint")
+        ),
+        "android_application_id": _non_empty_string(
+            android.get("package_name") or app_info.get("android_application_id")
+        ),
+        "ios_bundle_identifier": _non_empty_string(
+            ios.get("bundle_identifier") or app_info.get("ios_bundle_identifier")
+        ),
+        "extraction_status": extraction_status,
+        "warnings": warnings,
+        "platforms": platform_rows,
+        "dependencies": dependencies,
+        "deep_links_assessed": isinstance(raw_deep_links, list),
+        "deep_links": deep_links,
+        "url_schemes_assessed": ios.get("metadata_assessed") is True,
+        "url_schemes": report_data["url_schemes"],
+        "queried_url_schemes": queried_schemes,
+        "manual_review_available": manual_review is not None,
+        "manual_review_status": manual_status,
+        "manual_review_findings": manual_findings,
+    }
+
+
+def _flutter_platform_row(
+    name: str,
+    detected: bool,
+    metadata_assessed: bool,
+    identifier: str,
+    version: str,
+    requirements: str,
+) -> dict[str, Any]:
+    return {
+        "name": name,
+        "detected": detected,
+        "metadata_status": "Assessed" if metadata_assessed else "Not Assessed" if detected else "Not Applicable",
+        "identifier": identifier,
+        "version": version,
+        "requirements": requirements,
+    }
+
+
+def _flutter_deep_link_row(item: dict[str, Any]) -> dict[str, str]:
+    scheme = _non_empty_string(item.get("scheme"))
+    host = _non_empty_string(item.get("host"))
+    port = _non_empty_string(item.get("port"))
+    path = _non_empty_string(item.get("path") or item.get("path_prefix") or item.get("path_pattern"))
+    authority = f"{host}:{port}" if host and port else host
+    if scheme and authority:
+        uri = f"{scheme}://{authority}{path}"
+    elif scheme:
+        uri = f"{scheme}:{path}"
+    else:
+        uri = f"{authority}{path}"
+    return {
+        "uri": uri,
+        "component": _non_empty_string(item.get("component")),
+        "mime_type": _non_empty_string(item.get("mime_type")),
+    }
+
+
+def _mapping_rows(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, dict)]
+
+
+def _join_non_empty(values: tuple[tuple[str, object], ...]) -> str:
+    return ", ".join(f"{label}: {text}" for label, value in values if (text := _non_empty_string(value)))
 
 
 def _canonical_data_storage_check(

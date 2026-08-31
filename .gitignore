@@ -9,6 +9,7 @@ scan-results/
 phoenix/
 rules/ios/*
 rules/android/*
+rules/flutter/*
 
 sample-project/
 nvd-owasp-data/
