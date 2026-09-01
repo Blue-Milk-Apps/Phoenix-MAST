@@ -32,7 +32,9 @@ def resolve_report_scope(data: dict[str, Any]) -> ReportScope:
     is_ios = platform.lower() == "ios"
     is_flutter = platform.lower() == "flutter"
 
-    if is_ios and is_source:
+    if is_flutter and is_source:
+        assessed_sections = ("code", "network", "data storage", "resilience")
+    elif is_ios and is_source:
         assessed_sections = ("code", "network", "data storage")
     elif is_source:
         section_evidence_keys = {

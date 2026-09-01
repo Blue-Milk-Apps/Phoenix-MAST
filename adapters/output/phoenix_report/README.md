@@ -72,11 +72,13 @@ following additional objects:
   `resilience_evidence` - structured findings from Dart and applicable
   embedded Android/iOS source.
 
-Flutter vulnerability sections are included only when their evidence bundle
-contains an assessed result. Individual checks with incomplete evidence render
-as `Not Evaluated`; they are not converted into clean `Not Present` results.
-Positive findings from partial scans remain visible. Source reports omit
-binary-only certificate and file-hash presentation.
+Flutter reports always include Code, Network, Data Storage, and Resilience.
+Individual checks with incomplete evidence render as `Not Evaluated`; they are
+not converted into clean `Not Present` results. A wholly unassessed section is
+also labeled `Not Evaluated` in the risk chart and overall evaluation rather
+than receiving a Low rating. Positive findings from partial scans remain
+visible. Source reports omit binary-only certificate and file-hash
+presentation.
 
 ## Native library requirements
 

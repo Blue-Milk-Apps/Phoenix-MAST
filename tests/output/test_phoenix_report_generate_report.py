@@ -423,7 +423,7 @@ def test_load_report_data_limits_ios_source_reports_to_assessed_content() -> Non
     assert set(report["risk_summary"]) == {"code_vulnerability", "data_storage", "networking"}
 
 
-def test_load_report_data_uses_flutter_source_scope_and_assessed_sections() -> None:
+def test_load_report_data_always_uses_all_flutter_source_sections() -> None:
     report = load_report_data(
         {
             "meta": {
@@ -447,11 +447,24 @@ def test_load_report_data_uses_flutter_source_scope_and_assessed_sections() -> N
     assert report["report_scope"]["assessment_label"] == "Flutter Source Code"
     assert report["report_scope"]["assessment_title"] == ("Flutter Source Code Vulnerability Assessment")
     assert report["report_scope"]["target_information_heading"] == "Flutter Project Information"
-    assert report["report_scope"]["assessed_sections"] == ("code", "network")
-    assert [section["section_name"] for section in report["vulnerability_sections"]] == [
+    assert report["report_scope"]["assessed_sections"] == (
+        "code",
+        "network",
+        "data storage",
+        "resilience",
+    )
+    assert {section["section_name"] for section in report["vulnerability_sections"]} == {
         "Code",
         "Network",
-    ]
+        "Data Storage",
+        "Resilience",
+    }
+    assert report["risk_summary"] == {
+        "code_vulnerability": "High",
+        "data_storage": "Not Evaluated",
+        "networking": "Low",
+        "resilience": "Not Evaluated",
+    }
 
 
 def test_load_report_data_maps_flutter_android_and_ios_source_evidence() -> None:
@@ -571,44 +584,57 @@ def test_report_template_renders_flutter_inventory_links_and_manual_review() -> 
 
 
 def test_report_template_handles_unassessed_flutter_presentation() -> None:
-    html = _render_report_html(
-        {
-            "meta": {"platform": "Flutter", "target_type": "SOURCE"},
-            "app_components": {
-                "activities": None,
-                "services": None,
-                "receivers": None,
-                "providers": None,
-                "exported_activities": None,
-                "exported_services": None,
-                "exported_receivers": None,
-                "exported_providers": None,
-            },
-            "platform_inventory": {
-                "source_metadata_assessed": False,
-                "sdk": {},
-                "android": {"detected": True, "metadata_assessed": False},
-                "ios": {"detected": True, "metadata_assessed": False},
-                "warnings": [],
-            },
-            "dependency_inventory": {
-                "metadata_assessed": False,
-                "sbom_assessed": False,
-                "declared": [],
-                "resolved": [],
-                "sbom_packages": [],
-            },
-            "deep_links": {"deep_links": None},
-            "url_schemes": [],
-            "queried_url_schemes": [],
-        }
-    )
+    data = {
+        "meta": {"platform": "Flutter", "target_type": "SOURCE"},
+        "app_components": {
+            "activities": None,
+            "services": None,
+            "receivers": None,
+            "providers": None,
+            "exported_activities": None,
+            "exported_services": None,
+            "exported_receivers": None,
+            "exported_providers": None,
+        },
+        "platform_inventory": {
+            "source_metadata_assessed": False,
+            "sdk": {},
+            "android": {"detected": True, "metadata_assessed": False},
+            "ios": {"detected": True, "metadata_assessed": False},
+            "warnings": [],
+        },
+        "dependency_inventory": {
+            "metadata_assessed": False,
+            "sbom_assessed": False,
+            "declared": [],
+            "resolved": [],
+            "sbom_packages": [],
+        },
+        "deep_links": {"deep_links": None},
+        "url_schemes": [],
+        "queried_url_schemes": [],
+    }
+    report = load_report_data(data)
+    html = _render_report_html(data)
 
+    assert {section["section_name"] for section in report["vulnerability_sections"]} == {
+        "Code",
+        "Network",
+        "Data Storage",
+        "Resilience",
+    }
+    assert set(report["risk_summary"].values()) == {"Not Evaluated"}
+    assert all(
+        check["result"] == "Not Evaluated"
+        for section in report["vulnerability_sections"]
+        for check in section["checks"]
+    )
     assert 'Metadata Extraction</td><td class="v">Not Assessed' in html
     assert "Android deep links were not assessed." in html
     assert "iOS URL schemes were not assessed." in html
     assert "Declared metadata: Not Assessed" in html
     assert "Manual Review" not in html
+    assert html.count("This section was not evaluated in the current scan") == 4
 
 
 def test_generate_report_renders_flutter_html_and_writes_pdf_path(tmp_path: Path, monkeypatch) -> None:

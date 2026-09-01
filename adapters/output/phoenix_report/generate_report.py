@@ -30,8 +30,13 @@ TEMPLATES_DIR = BASE_DIR / "templates"
 BLANK_TEMPLATE_PATH = BASE_DIR / "data" / "blank_template.json"
 IOS_BLANK_TEMPLATE_PATH = BASE_DIR / "data" / "ios_blank_template.json"
 
-RISK_LEVEL_ORDER = {"low": 1, "medium": 2, "high": 3}
-RISK_LEVEL_COLOR = {"low": "#2980b9", "medium": "#e08e0b", "high": "#c0392b"}
+RISK_LEVEL_ORDER = {"not evaluated": 1, "low": 1, "medium": 2, "high": 3}
+RISK_LEVEL_COLOR = {
+    "not evaluated": "#999999",
+    "low": "#2980b9",
+    "medium": "#e08e0b",
+    "high": "#c0392b",
+}
 FINDINGS_SEVERITY_KEYS = ("critical", "high", "medium", "low", "info", "secure")
 SECTION_TO_AREA = {
     "code": ("Code Vulnerability", "code_vulnerability"),
@@ -1617,6 +1622,7 @@ def risk_badge(rating, label=None):
         "hotspot": "badge-hotspot",
         "variable": "badge-variable",
         "n/a": "badge-na",
+        "not evaluated": "badge-na",
         "dangerous": "badge-high",
         "normal": "badge-info",
     }.get(key, "badge-info")
@@ -2170,7 +2176,7 @@ def _canonical_flutter_check(
     evidence_key = evidence_map.get(canonical_name)
     evidence_entry = evidence.get(evidence_key) if evidence_key else None
     evidence_entry = evidence_entry if isinstance(evidence_entry, dict) else None
-    source = lookup.get(canonical_name) or _first_matching_alias(spec, lookup)
+    source = None if evidence_key else lookup.get(canonical_name) or _first_matching_alias(spec, lookup)
 
     result = "Not Evaluated"
     explanation = _initial_check_explanation(spec, "SOURCE")
@@ -3236,7 +3242,18 @@ def _build_overall_evaluation(
             for check in present_checks
             if str(check.get("severity", "")).strip().lower() in SECTION_SEVERITY_ORDER
         ]
-        risk_rating = _highest_present_severity(summary_checks) if summary_checks else "Low"
+        evaluated_checks = [
+            check
+            for check in (section.get("checks") or [])
+            if str(check.get("result", "")).strip().lower() in {"present", "not present"}
+        ]
+        risk_rating = (
+            _highest_present_severity(summary_checks)
+            if summary_checks
+            else "Low"
+            if evaluated_checks
+            else "Not Evaluated"
+        )
         highest_severity = risk_rating.lower()
         summary_findings = [
             str(check.get("check", "")).strip()
@@ -3244,6 +3261,9 @@ def _build_overall_evaluation(
             if str(check.get("severity", "")).strip().lower() == highest_severity
             and str(check.get("check", "")).strip()
         ]
+
+        if risk_rating == "Not Evaluated":
+            summary_findings = ["This section was not evaluated in the current scan"]
 
         rows_by_area[area_label] = {
             "area_of_concern": area_label,
@@ -3264,7 +3284,7 @@ def _build_risk_summary(
     report_data: dict[str, Any],
     section_to_area: dict[str, tuple[str, str]] = SECTION_TO_AREA,
 ) -> dict[str, str]:
-    summary = {risk_key: "Low" for _area_label, risk_key in section_to_area.values()}
+    summary = {risk_key: "Not Evaluated" for _area_label, risk_key in section_to_area.values()}
 
     for row in report_data.get("overall_evaluation") or []:
         area_name = str(row.get("area_of_concern", "")).strip().lower()
@@ -3294,6 +3314,8 @@ def _highest_present_severity(present_checks: list[dict[str, Any]]) -> str:
 
 def _normalize_risk_level(value: object) -> str:
     text = str(value or "").strip().lower()
+    if text == "not evaluated":
+        return "Not Evaluated"
     if text in {"critical", "high"}:
         return "High"
     if text == "medium":
