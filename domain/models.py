@@ -39,6 +39,7 @@ class ScanType(str, Enum):
     PLIST_BINARY = "plist_binary"
     NATIVE_ANDROID_SOURCE_METADATA = "native_android_source_metadata"
     FLUTTER_SOURCE_METADATA = "flutter_source_metadata"
+    REACT_NATIVE_METADATA = "react_native_metadata"
     SYFT = "syft"
 
 
