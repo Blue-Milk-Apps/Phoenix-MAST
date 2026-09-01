@@ -71,6 +71,8 @@ class ReactNativeMetadataScanner(ScannerPort):
                 "app_json_path": app_json_path.relative_to(project_path).as_posix() if app_json_path.is_file() else "",
             },
             "identity": identity,
+            "framework": self._framework(package_json, project_path),
+            "engines": self._engines(package_json),
         }
         return [
             ScanResult(
@@ -106,10 +108,7 @@ class ReactNativeMetadataScanner(ScannerPort):
         package_json: dict[str, Any],
         app_json: dict[str, Any],
     ) -> bool:
-        dependencies = {
-            **cls._mapping(package_json.get("dependencies")),
-            **cls._mapping(package_json.get("devDependencies")),
-        }
+        dependencies = cls._declared_packages(package_json)
         return bool({"expo", "react-native"}.intersection(dependencies)) or isinstance(app_json.get("expo"), dict)
 
     @classmethod
@@ -138,6 +137,38 @@ class ReactNativeMetadataScanner(ScannerPort):
             "version": cls._first_non_empty(package_json.get("version"), expo.get("version")),
             "private": package_json.get("private") is True,
         }
+
+    @classmethod
+    def _framework(
+        cls,
+        package_json: dict[str, Any],
+        project_path: Path,
+    ) -> dict[str, object]:
+        packages = cls._declared_packages(package_json)
+        return {
+            "react_native_version": cls._text(packages.get("react-native")),
+            "react_version": cls._text(packages.get("react")),
+            "expo_version": cls._text(packages.get("expo")),
+            "typescript": cls._uses_typescript(project_path, packages),
+        }
+
+    @classmethod
+    def _engines(cls, package_json: dict[str, Any]) -> dict[str, str]:
+        engines = cls._mapping(package_json.get("engines"))
+        return {name: cls._text(engines.get(name)) for name in ("node", "npm", "yarn", "pnpm")}
+
+    @classmethod
+    def _declared_packages(cls, package_json: dict[str, Any]) -> dict[str, Any]:
+        return {
+            **cls._mapping(package_json.get("devDependencies")),
+            **cls._mapping(package_json.get("dependencies")),
+        }
+
+    @staticmethod
+    def _uses_typescript(project_path: Path, packages: dict[str, Any]) -> bool:
+        if (project_path / "tsconfig.json").is_file() or "typescript" in packages:
+            return True
+        return any((project_path / file_name).is_file() for file_name in ("index.ts", "index.tsx", "App.ts", "App.tsx"))
 
     @classmethod
     def _first_non_empty(cls, *values: object) -> str:
