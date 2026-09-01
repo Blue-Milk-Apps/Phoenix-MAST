@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+from adapters.scanners.android import NativeAndroidSourceMetadataScanner
 from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
 
@@ -71,6 +73,8 @@ class ReactNativeMetadataScanner(ScannerPort):
             project_path,
         )
         warnings.extend(package_manager_warnings)
+        android, android_warnings = self._android_metadata(config, project_path)
+        warnings.extend(android_warnings)
         payload = {
             "schema_version": self.SCHEMA_VERSION,
             "extraction": {
@@ -96,6 +100,7 @@ class ReactNativeMetadataScanner(ScannerPort):
                 "direct": self._declared_dependencies(package_json.get("dependencies")),
                 "development": self._declared_dependencies(package_json.get("devDependencies")),
             },
+            "android": android,
         }
         return [
             ScanResult(
@@ -256,6 +261,54 @@ class ReactNativeMetadataScanner(ScannerPort):
             return ""
         package_manager = value.split("@", 1)[0].strip().lower()
         return package_manager if package_manager in {"npm", "pnpm", "yarn"} else ""
+
+    @classmethod
+    def _android_metadata(
+        cls,
+        config: ScanConfig,
+        project_path: Path,
+    ) -> tuple[dict[str, object], list[str]]:
+        android_path = project_path / "android"
+        if not android_path.is_dir():
+            return {"available": False, "project_path": "", "metadata": None}, []
+
+        android_config = replace(config, project_path=android_path)
+        results = NativeAndroidSourceMetadataScanner().scan(android_config)
+        if not results:
+            return (
+                {"available": True, "project_path": "android", "metadata": None},
+                ["Android metadata: Metadata extraction returned no result."],
+            )
+
+        result = results[0]
+        if not result.success:
+            reason = result.error_message or "Android source metadata extraction did not complete."
+            return (
+                {"available": True, "project_path": "android", "metadata": None},
+                [f"Android metadata: {reason}"],
+            )
+
+        try:
+            metadata = json.loads(result.raw_output)
+        except json.JSONDecodeError as exc:
+            return (
+                {"available": True, "project_path": "android", "metadata": None},
+                [f"Android metadata output was not valid JSON: {exc}"],
+            )
+        if not isinstance(metadata, dict):
+            return (
+                {"available": True, "project_path": "android", "metadata": None},
+                ["Android metadata output was not a JSON mapping."],
+            )
+
+        extraction = cls._mapping(metadata.get("extraction"))
+        nested_warnings = extraction.get("warnings")
+        warnings = (
+            [f"Android metadata: {cls._text(item)}" for item in nested_warnings if cls._text(item)]
+            if isinstance(nested_warnings, list)
+            else []
+        )
+        return {"available": True, "project_path": "android", "metadata": metadata}, warnings
 
     @classmethod
     def _entrypoints(cls, package_json: dict[str, Any], project_path: Path) -> dict[str, object]:
