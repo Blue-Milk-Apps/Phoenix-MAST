@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -73,6 +74,10 @@ class ReactNativeMetadataScanner(ScannerPort):
             "identity": identity,
             "framework": self._framework(package_json, project_path),
             "engines": self._engines(package_json),
+            "dependencies": {
+                "direct": self._declared_dependencies(package_json.get("dependencies")),
+                "development": self._declared_dependencies(package_json.get("devDependencies")),
+            },
         }
         return [
             ScanResult(
@@ -163,6 +168,39 @@ class ReactNativeMetadataScanner(ScannerPort):
             **cls._mapping(package_json.get("devDependencies")),
             **cls._mapping(package_json.get("dependencies")),
         }
+
+    @classmethod
+    def _declared_dependencies(cls, value: object) -> list[dict[str, str]]:
+        dependencies = cls._mapping(value)
+        return [
+            {
+                "name": str(name),
+                "constraint": cls._text(constraint),
+                "source": cls._dependency_source(constraint),
+            }
+            for name, constraint in sorted(dependencies.items(), key=lambda item: str(item[0]))
+        ]
+
+    @classmethod
+    def _dependency_source(cls, value: object) -> str:
+        constraint = cls._text(value)
+        if not constraint:
+            return "unknown"
+
+        lowered = constraint.lower()
+        if lowered.startswith("workspace:"):
+            return "workspace"
+        if lowered.startswith(("file:", "link:", "./", "../", "/")):
+            return "path"
+        if (
+            lowered.startswith(("git+", "git://", "git@", "ssh://", "github:", "gitlab:", "bitbucket:"))
+            or re.search(r"\.git(?:#\S*)?$", lowered) is not None
+            or re.fullmatch(r"[^/@\s]+/[^/\s]+(?:#\S+)?", constraint) is not None
+        ):
+            return "git"
+        if lowered.startswith(("http://", "https://")):
+            return "url"
+        return "registry"
 
     @staticmethod
     def _uses_typescript(project_path: Path, packages: dict[str, Any]) -> bool:
