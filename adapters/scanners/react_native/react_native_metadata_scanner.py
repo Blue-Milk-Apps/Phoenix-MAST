@@ -65,6 +65,7 @@ class ReactNativeMetadataScanner(ScannerPort):
             ]
 
         identity = self._identity(package_json, app_json)
+        entrypoints = self._entrypoints(package_json, project_path)
         package_manager, lockfiles, package_manager_warnings = self._package_manager_metadata(
             package_json,
             project_path,
@@ -84,8 +85,13 @@ class ReactNativeMetadataScanner(ScannerPort):
                 "package_manager": package_manager,
             },
             "identity": identity,
-            "framework": self._framework(package_json, project_path),
+            "framework": self._framework(package_json, project_path, entrypoints),
             "engines": self._engines(package_json),
+            "platforms": {
+                "android": (project_path / "android").is_dir(),
+                "ios": (project_path / "ios").is_dir(),
+            },
+            "entrypoints": entrypoints,
             "dependencies": {
                 "direct": self._declared_dependencies(package_json.get("dependencies")),
                 "development": self._declared_dependencies(package_json.get("devDependencies")),
@@ -160,13 +166,14 @@ class ReactNativeMetadataScanner(ScannerPort):
         cls,
         package_json: dict[str, Any],
         project_path: Path,
+        entrypoints: dict[str, object],
     ) -> dict[str, object]:
         packages = cls._declared_packages(package_json)
         return {
             "react_native_version": cls._text(packages.get("react-native")),
             "react_version": cls._text(packages.get("react")),
             "expo_version": cls._text(packages.get("expo")),
-            "typescript": cls._uses_typescript(project_path, packages),
+            "typescript": cls._uses_typescript(project_path, packages, entrypoints),
         }
 
     @classmethod
@@ -250,11 +257,68 @@ class ReactNativeMetadataScanner(ScannerPort):
         package_manager = value.split("@", 1)[0].strip().lower()
         return package_manager if package_manager in {"npm", "pnpm", "yarn"} else ""
 
+    @classmethod
+    def _entrypoints(cls, package_json: dict[str, Any], project_path: Path) -> dict[str, object]:
+        package_main = cls._existing_relative_file(project_path, package_json.get("main"))
+        files = [
+            relative_path
+            for file_name in (
+                "index.js",
+                "index.jsx",
+                "index.ts",
+                "index.tsx",
+                "App.js",
+                "App.jsx",
+                "App.ts",
+                "App.tsx",
+            )
+            if (relative_path := cls._existing_relative_file(project_path, file_name))
+        ]
+        if package_main and package_main not in files:
+            files.insert(0, package_main)
+        return {
+            "package_main": package_main,
+            "files": files,
+            "expo_router_path": cls._existing_relative_directory(project_path, "app"),
+        }
+
     @staticmethod
-    def _uses_typescript(project_path: Path, packages: dict[str, Any]) -> bool:
+    def _existing_relative_file(project_path: Path, value: object) -> str:
+        if not isinstance(value, str) or not value.strip():
+            return ""
+        candidate = (project_path / value.strip()).resolve()
+        try:
+            relative_path = candidate.relative_to(project_path)
+        except ValueError:
+            return ""
+        return relative_path.as_posix() if candidate.is_file() else ""
+
+    @staticmethod
+    def _existing_relative_directory(project_path: Path, value: str) -> str:
+        candidate = (project_path / value).resolve()
+        try:
+            relative_path = candidate.relative_to(project_path)
+        except ValueError:
+            return ""
+        return relative_path.as_posix() if candidate.is_dir() else ""
+
+    @staticmethod
+    def _uses_typescript(
+        project_path: Path,
+        packages: dict[str, Any],
+        entrypoints: dict[str, object],
+    ) -> bool:
         if (project_path / "tsconfig.json").is_file() or "typescript" in packages:
             return True
-        return any((project_path / file_name).is_file() for file_name in ("index.ts", "index.tsx", "App.ts", "App.tsx"))
+        files = entrypoints.get("files")
+        if isinstance(files, list) and any(str(path).endswith((".ts", ".tsx")) for path in files):
+            return True
+        expo_router_path = entrypoints.get("expo_router_path")
+        expo_router = project_path / str(expo_router_path) if expo_router_path else None
+        return bool(
+            expo_router
+            and any(path.is_file() and path.suffix.lower() in {".ts", ".tsx"} for path in expo_router.rglob("*"))
+        )
 
     @classmethod
     def _first_non_empty(cls, *values: object) -> str:
