@@ -16,6 +16,11 @@ class ReactNativeMetadataScanner(ScannerPort):
 
     SCHEMA_VERSION = "1.0"
     REPORT_PATH = "project_metadata.json"
+    LOCKFILE_PACKAGE_MANAGERS = (
+        ("pnpm-lock.yaml", "pnpm"),
+        ("yarn.lock", "yarn"),
+        ("package-lock.json", "npm"),
+    )
 
     @property
     def scan_type(self) -> ScanType:
@@ -60,6 +65,11 @@ class ReactNativeMetadataScanner(ScannerPort):
             ]
 
         identity = self._identity(package_json, app_json)
+        package_manager, lockfiles, package_manager_warnings = self._package_manager_metadata(
+            package_json,
+            project_path,
+        )
+        warnings.extend(package_manager_warnings)
         payload = {
             "schema_version": self.SCHEMA_VERSION,
             "extraction": {
@@ -70,6 +80,8 @@ class ReactNativeMetadataScanner(ScannerPort):
                 "project_path": str(project_path),
                 "package_json_path": package_json_path.relative_to(project_path).as_posix(),
                 "app_json_path": app_json_path.relative_to(project_path).as_posix() if app_json_path.is_file() else "",
+                "lockfiles": lockfiles,
+                "package_manager": package_manager,
             },
             "identity": identity,
             "framework": self._framework(package_json, project_path),
@@ -201,6 +213,42 @@ class ReactNativeMetadataScanner(ScannerPort):
         if lowered.startswith(("http://", "https://")):
             return "url"
         return "registry"
+
+    @classmethod
+    def _package_manager_metadata(
+        cls,
+        package_json: dict[str, Any],
+        project_path: Path,
+    ) -> tuple[str, list[str], list[str]]:
+        detected = [
+            (lockfile, package_manager)
+            for lockfile, package_manager in cls.LOCKFILE_PACKAGE_MANAGERS
+            if (project_path / lockfile).is_file()
+        ]
+        lockfiles = [lockfile for lockfile, _package_manager in detected]
+        warnings: list[str] = []
+        if len(detected) > 1:
+            warnings.append("Multiple package-manager lockfiles found: " + ", ".join(lockfiles) + ".")
+
+        declared_spec = cls._text(package_json.get("packageManager"))
+        declared_manager = cls._package_manager_from_spec(declared_spec)
+        if declared_spec and not declared_manager:
+            warnings.append(f"Unsupported packageManager declaration: {declared_spec}.")
+
+        lockfile_manager = detected[0][1] if detected else ""
+        detected_managers = {package_manager for _lockfile, package_manager in detected}
+        if declared_manager and detected_managers and declared_manager not in detected_managers:
+            warnings.append(
+                f"packageManager declares {declared_manager}, but the selected lockfile belongs to {lockfile_manager}."
+            )
+        return declared_manager or lockfile_manager, lockfiles, warnings
+
+    @staticmethod
+    def _package_manager_from_spec(value: str) -> str:
+        if not value:
+            return ""
+        package_manager = value.split("@", 1)[0].strip().lower()
+        return package_manager if package_manager in {"npm", "pnpm", "yarn"} else ""
 
     @staticmethod
     def _uses_typescript(project_path: Path, packages: dict[str, Any]) -> bool:
