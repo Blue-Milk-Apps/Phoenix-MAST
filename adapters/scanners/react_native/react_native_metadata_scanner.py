@@ -83,12 +83,10 @@ class ReactNativeMetadataScanner(ScannerPort):
         warnings.extend(android_warnings)
         ios, ios_warnings = self._ios_metadata(project_path)
         warnings.extend(ios_warnings)
+        extraction = self._extraction(warnings)
         payload = {
             "schema_version": self.SCHEMA_VERSION,
-            "extraction": {
-                "status": "partial" if warnings else "complete",
-                "warnings": warnings,
-            },
+            "extraction": extraction,
             "project": {
                 "project_path": str(project_path),
                 "package_json_path": package_json_path.relative_to(project_path).as_posix(),
@@ -121,6 +119,14 @@ class ReactNativeMetadataScanner(ScannerPort):
                 description=self.description,
             )
         ]
+
+    @classmethod
+    def _extraction(cls, warnings: list[str]) -> dict[str, object]:
+        unique_warnings = list(dict.fromkeys(text for warning in warnings if (text := cls._text(warning))))
+        return {
+            "status": "partial" if unique_warnings else "complete",
+            "warnings": unique_warnings,
+        }
 
     @staticmethod
     def _load_json_mapping(path: Path) -> dict[str, Any] | None:
