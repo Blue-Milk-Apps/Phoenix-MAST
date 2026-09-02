@@ -429,6 +429,7 @@ def test_create_scan_config_for_react_native_source(tmp_path: Path) -> None:
     _assert_scanner_types(
         config,
         {
+            ScanType.REACT_NATIVE_METADATA,
             ScanType.TRUFFLEHOG,
             ScanType.GITLEAKS,
             ScanType.PLIST_SOURCE,
@@ -452,6 +453,7 @@ def test_create_scan_config_for_react_native_source_includes_opengrep_when_rules
 
     assert config.opengrep_rules_path == rules_path.resolve()
     assert {scanner.scan_type for scanner in _build_scanners(config)} == {
+        ScanType.REACT_NATIVE_METADATA,
         ScanType.TRUFFLEHOG,
         ScanType.GITLEAKS,
         ScanType.PLIST_SOURCE,
