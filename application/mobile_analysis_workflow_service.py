@@ -16,6 +16,8 @@ from adapters.post_scan import (
     NativeAndroidScanOutputLoader,
     NativeIOSScanDetailExtractor,
     NativeIOSScanOutputLoader,
+    ReactNativeScanDetailExtractor,
+    ReactNativeScanOutputLoader,
 )
 from adapters.scanners.android import (
     Aapt2Scanner,
@@ -270,6 +272,11 @@ class MobileAnalysisWorkflowService:
                 return PostScanProcessingService(
                     scan_output_loader=FlutterScanOutputLoader(),
                     scan_detail_extractor=FlutterScanDetailExtractor(),
+                )
+            case ("SOURCE", _, "REACT_NATIVE"):
+                return PostScanProcessingService(
+                    scan_output_loader=ReactNativeScanOutputLoader(),
+                    scan_detail_extractor=ReactNativeScanDetailExtractor(),
                 )
             case ("SOURCE", "IOS", "NATIVE_IOS"):
                 return PostScanProcessingService(
