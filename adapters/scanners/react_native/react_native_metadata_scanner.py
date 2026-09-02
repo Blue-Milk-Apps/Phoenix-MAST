@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import plistlib
 import re
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -338,7 +339,8 @@ class ReactNativeMetadataScanner(ScannerPort):
         if plist is None:
             return {"available": True, "project_path": "ios", "metadata": None}, warnings
 
-        identity = cls._ios_identity(plist, ios_path)
+        report_builder = cls._plist_report_builder(ios_path)
+        identity = report_builder._app_meta(plist)
         variables = cls._ios_identity_variables(settings)
         for key, value in list(identity.items()):
             if isinstance(value, str):
@@ -362,6 +364,22 @@ class ReactNativeMetadataScanner(ScannerPort):
             "xcode_project_path": cls._relative(ios_path, project_file) if project_file else "",
             "info_plist_path": cls._relative(ios_path, info_plist),
             "identity": identity,
+            "permissions": report_builder._permission_details(plist),
+            "app_transport_security": report_builder._transport_security_details(plist),
+            "url_schemes": report_builder._url_scheme_details(plist),
+            "background_modes": report_builder._background_modes(plist),
+            "entitlements": cls._ios_supporting_plists(
+                ios_path,
+                suffix=".entitlements",
+                detail_builder=report_builder._entitlement_details,
+                warnings=warnings,
+            ),
+            "privacy_manifests": cls._ios_supporting_plists(
+                ios_path,
+                suffix=".xcprivacy",
+                detail_builder=report_builder._privacy_manifest_details,
+                warnings=warnings,
+            ),
         }
         return {"available": True, "project_path": "ios", "metadata": metadata}, warnings
 
@@ -384,20 +402,39 @@ class ReactNativeMetadataScanner(ScannerPort):
         return value
 
     @classmethod
-    def _ios_identity(
+    def _plist_report_builder(
         cls,
-        plist: dict[str, Any],
         ios_path: Path,
-    ) -> dict[str, object]:
-        builder = PlistReportBuilder(
+    ) -> PlistReportBuilder:
+        return PlistReportBuilder(
             scanner_name="React Native Metadata Scanner",
             scan_type=ScanType.REACT_NATIVE_METADATA,
-            description="",
+            description="Static iOS metadata embedded in a React Native project.",
             base_path=ios_path,
             output_format="json",
         )
-        identity = builder._app_meta(plist)
-        return identity if isinstance(identity, dict) else {}
+
+    @classmethod
+    def _ios_supporting_plists(
+        cls,
+        ios_path: Path,
+        *,
+        suffix: str,
+        detail_builder: Callable[[object], dict[str, object]],
+        warnings: list[str],
+    ) -> list[dict[str, object]]:
+        artifacts: list[dict[str, object]] = []
+        for path in sorted(ios_path.rglob("*")):
+            if not path.is_file() or not path.name.lower().endswith(suffix) or cls._excluded_ios_path(path, ios_path):
+                continue
+            data = cls._load_ios_plist(path, ios_path, warnings)
+            artifacts.append(
+                {
+                    "path": cls._relative(ios_path, path),
+                    "metadata": detail_builder(data) if data is not None else None,
+                }
+            )
+        return artifacts
 
     @classmethod
     def _ios_identity_variables(cls, settings: dict[str, list[str]]) -> dict[str, str]:
