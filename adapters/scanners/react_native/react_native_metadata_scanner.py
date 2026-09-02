@@ -23,6 +23,8 @@ class ReactNativeMetadataScanner(ScannerPort):
         ("yarn.lock", "yarn"),
         ("package-lock.json", "npm"),
     )
+    IOS_EXCLUDED_DIRECTORIES = frozenset({"build", "deriveddata", "pods", "vendor"})
+    XCODE_BUILD_SETTING_PATTERN = re.compile(r"^\s*([A-Za-z0-9_]+)\s*=\s*(.*?)\s*;\s*$", re.MULTILINE)
 
     @property
     def scan_type(self) -> ScanType:
@@ -75,6 +77,8 @@ class ReactNativeMetadataScanner(ScannerPort):
         warnings.extend(package_manager_warnings)
         android, android_warnings = self._android_metadata(config, project_path)
         warnings.extend(android_warnings)
+        ios, ios_warnings = self._ios_metadata(project_path)
+        warnings.extend(ios_warnings)
         payload = {
             "schema_version": self.SCHEMA_VERSION,
             "extraction": {
@@ -101,6 +105,7 @@ class ReactNativeMetadataScanner(ScannerPort):
                 "development": self._declared_dependencies(package_json.get("devDependencies")),
             },
             "android": android,
+            "ios": ios,
         }
         return [
             ScanResult(
@@ -309,6 +314,130 @@ class ReactNativeMetadataScanner(ScannerPort):
             else []
         )
         return {"available": True, "project_path": "android", "metadata": metadata}, warnings
+
+    @classmethod
+    def _ios_metadata(cls, project_path: Path) -> tuple[dict[str, object], list[str]]:
+        ios_path = project_path / "ios"
+        if not ios_path.is_dir():
+            return {"available": False, "project_path": "", "metadata": None}, []
+
+        warnings: list[str] = []
+        project_file = cls._ios_project_file(ios_path)
+        settings = cls._xcode_build_settings(project_file, ios_path, warnings)
+        info_plist = cls._ios_info_plist(ios_path, settings)
+        if project_file is None:
+            warnings.append("iOS metadata: No Xcode project file was found.")
+        if info_plist is None:
+            warnings.append("iOS metadata: No application Info.plist file was found.")
+            return {"available": True, "project_path": "ios", "metadata": None}, warnings
+
+        metadata = {
+            "xcode_project_path": cls._relative(ios_path, project_file) if project_file else "",
+            "info_plist_path": cls._relative(ios_path, info_plist),
+        }
+        return {"available": True, "project_path": "ios", "metadata": metadata}, warnings
+
+    @classmethod
+    def _ios_project_file(cls, ios_path: Path) -> Path | None:
+        candidates = [
+            path
+            for path in sorted(ios_path.rglob("project.pbxproj"))
+            if path.is_file() and path.parent.suffix == ".xcodeproj" and not cls._excluded_ios_path(path, ios_path)
+        ]
+        return min(
+            candidates, key=lambda path: (len(path.relative_to(ios_path).parts), str(path).lower()), default=None
+        )
+
+    @classmethod
+    def _xcode_build_settings(
+        cls,
+        project_file: Path | None,
+        ios_path: Path,
+        warnings: list[str],
+    ) -> dict[str, list[str]]:
+        if project_file is None:
+            return {}
+        try:
+            content = project_file.read_text(encoding="utf-8")
+        except OSError as exc:
+            warnings.append(f"iOS metadata: Unable to read {cls._relative(ios_path, project_file)}: {exc}")
+            return {}
+
+        settings: dict[str, list[str]] = {}
+        for key, raw_value in cls.XCODE_BUILD_SETTING_PATTERN.findall(content):
+            value = raw_value.strip().strip('"')
+            if value and value not in settings.setdefault(key, []):
+                settings[key].append(value)
+        return settings
+
+    @classmethod
+    def _ios_info_plist(cls, ios_path: Path, settings: dict[str, list[str]]) -> Path | None:
+        product_names = cls._xcode_setting_values(settings, "PRODUCT_NAME")
+        variables = {
+            "PRODUCT_NAME": next((name for name in product_names if "$" not in name), ""),
+        }
+        for raw_path in cls._xcode_setting_values(settings, "INFOPLIST_FILE"):
+            candidate = cls._resolve_ios_path_setting(ios_path, raw_path, variables)
+            if candidate is not None and candidate.is_file() and not cls._excluded_ios_path(candidate, ios_path):
+                return candidate
+
+        candidates = [
+            path
+            for path in sorted(ios_path.rglob("Info.plist"))
+            if path.is_file() and not cls._excluded_ios_path(path, ios_path)
+        ]
+        preferred_names = {name.lower() for name in product_names if "$" not in name}
+        return min(
+            candidates,
+            key=lambda path: (
+                int(not preferred_names.intersection(part.lower() for part in path.relative_to(ios_path).parts)),
+                len(path.relative_to(ios_path).parts),
+                str(path).lower(),
+            ),
+            default=None,
+        )
+
+    @staticmethod
+    def _xcode_setting_values(settings: dict[str, list[str]], name: str) -> list[str]:
+        return settings.get(name, [])
+
+    @classmethod
+    def _resolve_ios_path_setting(
+        cls,
+        ios_path: Path,
+        value: str,
+        variables: dict[str, str],
+    ) -> Path | None:
+        resolved = value
+        for expression in ("$(SRCROOT)", "${SRCROOT}", "$(PROJECT_DIR)", "${PROJECT_DIR}"):
+            resolved = resolved.replace(expression, str(ios_path))
+        for name, replacement in variables.items():
+            if replacement:
+                resolved = resolved.replace(f"$({name})", replacement).replace(f"${{{name}}}", replacement)
+        if "$(" in resolved or "${" in resolved:
+            return None
+
+        candidate = Path(resolved)
+        if not candidate.is_absolute():
+            candidate = ios_path / candidate
+        candidate = candidate.resolve()
+        try:
+            candidate.relative_to(ios_path)
+        except ValueError:
+            return None
+        return candidate
+
+    @classmethod
+    def _excluded_ios_path(cls, path: Path, ios_path: Path) -> bool:
+        try:
+            relative_parts = {part.lower() for part in path.resolve().relative_to(ios_path.resolve()).parts}
+        except ValueError:
+            return True
+        return bool(relative_parts.intersection(cls.IOS_EXCLUDED_DIRECTORIES))
+
+    @staticmethod
+    def _relative(base_path: Path, path: Path) -> str:
+        return path.relative_to(base_path).as_posix()
 
     @classmethod
     def _entrypoints(cls, package_json: dict[str, Any], project_path: Path) -> dict[str, object]:
