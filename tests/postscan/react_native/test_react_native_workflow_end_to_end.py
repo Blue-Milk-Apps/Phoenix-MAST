@@ -7,6 +7,7 @@ from pathlib import Path
 
 from application import mobile_analysis_workflow_service as workflow
 from domain.models import ScanConfig, ScanResult, ScanType
+from domain.post_scan.react_native import REACT_NATIVE_RULE_IDS
 
 
 class _ArtifactScanner:
@@ -96,6 +97,34 @@ def test_react_native_workflow_persists_post_scan_output_and_requests_report(
             relative_target_path="sbom.json",
         ),
     ]
+    opengrep_result = ScanResult(
+        scanner_name="React Native Scoped OpenGrep Scanner",
+        scan_type=ScanType.OPENGREP_SOURCE,
+        raw_output=json.dumps(
+            {
+                "success": True,
+                "results": [
+                    {
+                        "check_id": "react-native.source.cleartext-http",
+                        "phoenix_scope": "react_native",
+                        "path": str(project_path / "src" / "api.ts"),
+                        "start": {"line": 12},
+                        "extra": {"message": "Cleartext HTTP endpoint"},
+                    }
+                ],
+                "errors": [],
+                "scan_metadata": {
+                    "scopes": {
+                        "react_native": {
+                            "status": "success",
+                            "configured_rule_ids": sorted(REACT_NATIVE_RULE_IDS),
+                        }
+                    }
+                },
+            }
+        ),
+        relative_target_path="opengrep_results.json",
+    )
     generated_reports: list[tuple[dict, Path]] = []
 
     monkeypatch.setattr(
@@ -106,7 +135,7 @@ def test_react_native_workflow_persists_post_scan_output_and_requests_report(
     monkeypatch.setattr(
         workflow.MobileAnalysisWorkflowService,
         "_perform_opengrep_scan",
-        lambda self, scan_config, scan_output_method: [],
+        lambda self, scan_config, scan_output_method: [opengrep_result],
     )
 
     def fake_generate_report(data: dict, report_path: Path) -> Path:
@@ -130,6 +159,12 @@ def test_react_native_workflow_persists_post_scan_output_and_requests_report(
         {"name": "react-native", "output_path": "sbom.json", "version": "0.81.0"}
     ]
     assert post_scan["hardcoded_values"] == {"emails": [], "secrets": [], "urls": []}
+    assert post_scan["network_evidence"]["sensitive_information_unencrypted_in_transit"] == {
+        "details": ["src/api.ts:12: Cleartext HTTP endpoint"],
+        "evidence": "src/api.ts:12: Cleartext HTTP endpoint",
+        "present": True,
+    }
+    assert post_scan["code_evidence"]["contains_potential_sql_injection"]["present"] is False
     assert len(generated_reports) == 1
     report_data, report_path = generated_reports[0]
     assert report_data == post_scan

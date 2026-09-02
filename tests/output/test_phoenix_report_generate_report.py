@@ -644,6 +644,18 @@ def test_load_report_data_normalizes_react_native_presentation() -> None:
     assert report["report_scope"]["assessment_label"] == "React Native Source Code"
     assert report["report_scope"]["assessment_title"] == ("React Native Source Code Vulnerability Assessment")
     assert report["report_scope"]["target_information_heading"] == ("React Native Project Information")
+    assert report["report_scope"]["assessed_sections"] == (
+        "code",
+        "network",
+        "data storage",
+        "resilience",
+    )
+    assert {section["section_name"] for section in report["vulnerability_sections"]} == {
+        "Code",
+        "Network",
+        "Data Storage",
+        "Resilience",
+    }
     assert presentation["extraction_status"] == "Complete"
     assert presentation["react_native_version"] == "0.81.0"
     assert presentation["react_version"] == "19.1.0"
@@ -675,6 +687,10 @@ def test_report_template_renders_react_native_inventory_dependencies_and_links()
     assert "React Native Source Code Vulnerability Assessment" in html
     assert "React Native Project Inventory" in html
     assert "React Native Dependency Inventory" in html
+    assert "Code Vulnerabilities" in html or ">Code<" in html
+    assert ">Network<" in html
+    assert ">Data Storage<" in html
+    assert ">Resilience<" in html
     assert "Embedded Platforms" in html
     assert "Application Links and URL Schemes" in html
     assert "0.81.0" in html
@@ -688,6 +704,35 @@ def test_report_template_renders_react_native_inventory_dependencies_and_links()
     assert "<td>Android</td>" in html
     assert "Certificate Information" not in html
     assert "App Components" not in html
+
+
+def test_load_report_data_maps_react_native_evidence_into_vulnerability_checks() -> None:
+    data = _react_native_presentation_data()
+    data["code_evidence"] = {
+        "contains_potential_sql_injection": {
+            "present": False,
+            "evidence": "no_contains_potential_sql_injection_hits",
+            "details": [],
+        }
+    }
+    data["network_evidence"] = {
+        "sensitive_information_unencrypted_in_transit": {
+            "present": True,
+            "evidence": "src/api.ts:12: Cleartext HTTP endpoint",
+            "details": ["src/api.ts:12: Cleartext HTTP endpoint"],
+        }
+    }
+
+    report = load_report_data(data)
+    sections = {section["section_name"]: _check_map(section["checks"]) for section in report["vulnerability_sections"]}
+
+    assert sections["Code"]["Contains Potential SQL Injection"]["result"] == "Not Present"
+    assert sections["Network"]["Sensitive Information is Unencrypted in Transit"]["result"] == "Present"
+    assert sections["Network"]["Sensitive Information is Unencrypted in Transit"]["evidence"] == (
+        "src/api.ts:12: Cleartext HTTP endpoint"
+    )
+    assert sections["Data Storage"]
+    assert sections["Resilience"]
 
 
 def test_generate_report_renders_flutter_html_and_writes_pdf_path(tmp_path: Path, monkeypatch) -> None:

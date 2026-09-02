@@ -160,6 +160,15 @@ class OpenGrepScanner(ScannerPort):
                 "--disable-version-check",
             ]
 
+            if config.target_type == "SOURCE" and config.project_path.is_dir():
+                cmd.extend(
+                    [
+                        "--experimental",
+                        "--project-root",
+                        str(config.project_path.resolve()),
+                    ]
+                )
+
             if config.ignore_file and config.ignore_file.exists():
                 cmd.extend(["--exclude-rules", str(config.ignore_file)])
             for pattern in config.ignore_patterns:

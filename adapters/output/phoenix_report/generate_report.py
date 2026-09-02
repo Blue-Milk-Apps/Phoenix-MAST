@@ -1855,8 +1855,9 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     if is_react_native:
         _normalize_react_native_presentation(report_data)
 
-    if is_flutter:
-        _normalize_flutter_presentation(report_data)
+    if is_flutter or is_react_native:
+        if is_flutter:
+            _normalize_flutter_presentation(report_data)
         _canonicalize_flutter_sections(report_data, report_scope.target_type)
         section_to_area = {
             section_name: area

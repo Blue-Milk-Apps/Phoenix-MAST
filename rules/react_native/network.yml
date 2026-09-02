@@ -1,0 +1,22 @@
+rules:
+  - id: react-native.source.cleartext-http
+    message: A cleartext HTTP endpoint is used by React Native application code.
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: '(?i)["'']http://(?!localhost\b|127\.0\.0\.1\b|10\.0\.2\.2\b)[^"''\s]+'
+    metadata:
+      phoenix:
+        report_section: Network
+        evidence_key: sensitive_information_unencrypted_in_transit
+        severity: High
+
+  - id: react-native.source.disabled-tls-validation
+    message: TLS certificate validation is explicitly disabled.
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: '(?i)\brejectUnauthorized\s*:\s*false\b'
+    metadata:
+      phoenix:
+        report_section: Network
+        evidence_key: weak_certificate_validation_enables_mitm
+        severity: High

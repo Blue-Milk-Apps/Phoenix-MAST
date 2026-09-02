@@ -9,6 +9,12 @@ from domain.post_scan.react_native.app_components import ReactNativeAppComponent
 from domain.post_scan.react_native.app_info import ReactNativeAppInfo
 from domain.post_scan.react_native.application import ReactNativeApplication
 from domain.post_scan.react_native.dependency_inventory import ReactNativeDependencyInventory
+from domain.post_scan.react_native.evidence import (
+    ReactNativeCodeEvidence,
+    ReactNativeDataStorageEvidence,
+    ReactNativeNetworkEvidence,
+    ReactNativeResilienceEvidence,
+)
 from domain.post_scan.react_native.file_info import ReactNativeFileInfo
 from domain.post_scan.react_native.hardcoded_values import ReactNativeHardcodedValues
 from domain.post_scan.react_native.links import ReactNativeDeepLinks, ReactNativeURLSchemes
@@ -47,5 +53,16 @@ class ReactNativeScanDetailExtractor(ScanDetailExtractorPort):
                 "secrets": hardcoded_values.secrets,
             }
             sections["endpoints"] = []
+
+        evidence_models = (
+            ("code_evidence", ReactNativeCodeEvidence(context)),
+            ("network_evidence", ReactNativeNetworkEvidence(context)),
+            ("data_storage_evidence", ReactNativeDataStorageEvidence(context)),
+            ("resilience_evidence", ReactNativeResilienceEvidence(context)),
+        )
+        for section_name, model in evidence_models:
+            evidence = asdict(model)
+            evidence.pop("assessed", None)
+            sections[section_name] = evidence
 
         return sections

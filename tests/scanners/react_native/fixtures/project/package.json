@@ -1,0 +1,16 @@
+{
+  "name": "phoenix-react-native-fixture",
+  "version": "1.0.0",
+  "main": "index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "react": "19.1.0",
+    "react-native": "0.81.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}

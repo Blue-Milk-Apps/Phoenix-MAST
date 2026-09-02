@@ -116,6 +116,10 @@ def test_extracts_react_native_report_sections() -> None:
         "queried_url_schemes",
         "hardcoded_values",
         "endpoints",
+        "code_evidence",
+        "network_evidence",
+        "data_storage_evidence",
+        "resilience_evidence",
     }
     assert sections["meta"] == {
         "app_display_name": "Example App",
@@ -181,6 +185,20 @@ def test_extracts_react_native_report_sections() -> None:
     assert sections["queried_url_schemes"] == ["partner-app"]
     assert sections["hardcoded_values"] == {"urls": [], "emails": [], "secrets": []}
     assert sections["endpoints"] == []
+    assert sections["code_evidence"]["app_is_debuggable"] == {
+        "present": False,
+        "evidence": "debuggable=false",
+        "details": [],
+    }
+    assert sections["code_evidence"]["activities_accessible_to_other_apps"] == {
+        "present": True,
+        "evidence": "exported_activities=1",
+        "details": [".MainActivity"],
+    }
+    assert sections["code_evidence"]["application_data_can_be_backed_up"]["present"] is True
+    assert sections["network_evidence"]["allows_cleartext_traffic_for_all_domains"]["present"] is False
+    assert sections["data_storage_evidence"]["accesses_external_storage"]["present"] is False
+    assert all(entry["present"] is None for entry in sections["resilience_evidence"].values())
     json.dumps(sections)
 
 
@@ -214,6 +232,14 @@ def test_missing_metadata_preserves_unassessed_report_sections() -> None:
     assert sections["deep_links"] == {"deep_links": None}
     assert "hardcoded_values" not in sections
     assert "endpoints" not in sections
+    for section_name in (
+        "code_evidence",
+        "network_evidence",
+        "data_storage_evidence",
+        "resilience_evidence",
+    ):
+        assert section_name in sections
+        assert all(entry["present"] is None for entry in sections[section_name].values())
 
 
 def test_extracts_redacted_secret_evidence_without_exposing_raw_secret() -> None:

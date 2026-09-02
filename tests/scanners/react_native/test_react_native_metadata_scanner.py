@@ -21,6 +21,20 @@ def test_scanner_metadata() -> None:
     assert "metadata" in scanner.description.lower()
 
 
+def test_recognizes_committed_react_native_project_fixture(tmp_path: Path) -> None:
+    project = Path(__file__).parent / "fixtures" / "project"
+
+    result = ReactNativeMetadataScanner().scan(_config(project, tmp_path))[0]
+    payload = json.loads(result.raw_output)
+
+    assert result.success is True
+    assert result.skipped is False
+    assert payload["identity"]["package_name"] == "phoenix-react-native-fixture"
+    assert payload["identity"]["display_name"] == "Phoenix React Native Fixture"
+    assert payload["framework"]["react_native_version"] == "0.81.0"
+    assert payload["framework"]["typescript"] is True
+
+
 def test_extracts_javascript_project_metadata(tmp_path: Path) -> None:
     project = tmp_path / "project"
     _write_json(

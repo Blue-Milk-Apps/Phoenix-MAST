@@ -1,0 +1,46 @@
+rules:
+  - id: react-native.source.sensitive-log
+    message: A logging call appears to contain a sensitive value.
+    severity: WARNING
+    languages: [generic]
+    pattern-regex: '(?i)\b(?:console\.(?:log|debug|info|warn)|logger\.(?:log|debug|info|warn))\s*\([^\n)]*(?:api[_-]?key|auth|credential|pass(?:word|code|wd)?|pin|secret|session|token)'
+    metadata:
+      phoenix:
+        report_section: Code
+        evidence_key: writes_sensitive_information_to_system_log
+        severity: Medium
+
+  - id: react-native.source.sql-injection
+    message: A SQL execution call appears to use string concatenation or interpolation.
+    severity: ERROR
+    languages: [generic]
+    pattern-either:
+      - pattern-regex: '(?i)\b(?:executeSql|execute|query)\s*\([^\n)]*`[^`]*\$\{'
+      - pattern-regex: '(?i)\b(?:executeSql|execute|query)\s*\([^\n)]*["''][^"'']*["'']\s*\+'
+    metadata:
+      phoenix:
+        report_section: Code
+        evidence_key: contains_potential_sql_injection
+        severity: High
+
+  - id: react-native.source.weak-hash
+    message: A weak MD5 or SHA-1 digest algorithm is selected.
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: '(?i)\b(?:createHash|CryptoJS\.(?:MD5|SHA1)|digestStringAsync)\s*\([^\n)]*["'']?(?:md5|sha-?1)\b'
+    metadata:
+      phoenix:
+        report_section: Code
+        evidence_key: encodes_data_using_insecure_cryptography
+        severity: High
+
+  - id: react-native.source.weak-cipher
+    message: A weak DES, 3DES, RC2, or RC4 cipher algorithm is selected.
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: '(?i)\b(?:createCipheriv|createDecipheriv|CryptoJS\.(?:DES|TripleDES|RC4))\s*\([^\n)]*["'']?(?:des|3des|des-ede3|rc2|rc4)\b'
+    metadata:
+      phoenix:
+        report_section: Code
+        evidence_key: utilizes_insecure_cryptography
+        severity: High

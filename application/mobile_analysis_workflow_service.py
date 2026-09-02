@@ -42,10 +42,10 @@ from adapters.scanners.ios import (
     PlistBinaryScanner,
     PlistSourceScanner,
 )
-from adapters.scanners.react_native import ReactNativeMetadataScanner
+from adapters.scanners.react_native import ReactNativeMetadataScanner, ReactNativeOpenGrepScanner
 from application.post_scan_processing_service import PostScanProcessingService
 from application.scanner_service import ScannerService
-from domain.models import ExtractedBinary, ScanConfig
+from domain.models import ExtractedBinary, ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
 from utilities.apk_utils import extract_apk, is_apk_file
 from utilities.ipa_utils import extract_ipa, is_ipa_file
@@ -156,6 +156,7 @@ class MobileAnalysisWorkflowService:
             scan_results = scanner_service.scan_project(scan_config)
             for result in scan_results:
                 scan_output_method.write_result(result)
+            self._validate_required_metadata(scan_config, scan_results)
 
             opengrep_results = self._perform_opengrep_scan(scan_config, scan_output_method)
             scan_results.extend(opengrep_results)
@@ -190,6 +191,25 @@ class MobileAnalysisWorkflowService:
             return extract_apk(scan_config.project_path)
         return None
 
+    @staticmethod
+    def _validate_required_metadata(scan_config: ScanConfig, scan_results: list[ScanResult]) -> None:
+        if scan_config.target_type != "SOURCE" or scan_config.stack != "REACT_NATIVE":
+            return
+
+        metadata_result = next(
+            (result for result in scan_results if result.scan_type is ScanType.REACT_NATIVE_METADATA),
+            None,
+        )
+        if metadata_result is not None and metadata_result.success:
+            return
+
+        reason = (
+            metadata_result.error_message
+            if metadata_result is not None and metadata_result.error_message
+            else "React Native metadata was not produced."
+        )
+        raise ValueError(f"React Native target validation failed: {reason}")
+
     def _perform_opengrep_scan(self, scan_config: ScanConfig, scan_output_method: FileScanOutput):
         open_grep_rules_path = self._get_opengrep_rules_path(scan_config)
         opengrep_scan_paths = self._get_opengrep_scan_paths(scan_config)
@@ -200,6 +220,10 @@ class MobileAnalysisWorkflowService:
             if scan_config.stack == "FLUTTER":
                 opengrep_scanner = FlutterOpenGrepScanner(
                     flutter_rules_path=Path(open_grep_rules_path),
+                )
+            elif scan_config.stack == "REACT_NATIVE":
+                opengrep_scanner = ReactNativeOpenGrepScanner(
+                    react_native_rules_path=Path(open_grep_rules_path),
                 )
             else:
                 opengrep_scanner = OpenGrepScanner(

@@ -1,0 +1,11 @@
+rules:
+  - id: react-native.source.sensitive-async-storage
+    message: A sensitive-looking value is stored in plaintext AsyncStorage.
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: '(?i)\bAsyncStorage\.setItem\s*\(\s*["''][^"'']*(?:api[_-]?key|auth|credential|pass(?:word|code|wd)?|pin|secret|session|token)[^"'']*["'']\s*,'
+    metadata:
+      phoenix:
+        report_section: Data Storage
+        evidence_key: sensitive_values_stored_insecurely
+        severity: High
