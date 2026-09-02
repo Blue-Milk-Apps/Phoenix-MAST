@@ -637,6 +637,59 @@ def test_report_template_handles_unassessed_flutter_presentation() -> None:
     assert html.count("This section was not evaluated in the current scan") == 4
 
 
+def test_load_report_data_normalizes_react_native_presentation() -> None:
+    report = load_report_data(_react_native_presentation_data())
+    presentation = report["react_native_presentation"]
+
+    assert report["report_scope"]["assessment_label"] == "React Native Source Code"
+    assert report["report_scope"]["assessment_title"] == ("React Native Source Code Vulnerability Assessment")
+    assert report["report_scope"]["target_information_heading"] == ("React Native Project Information")
+    assert presentation["extraction_status"] == "Complete"
+    assert presentation["react_native_version"] == "0.81.0"
+    assert presentation["react_version"] == "19.1.0"
+    assert presentation["expo_version"] == "~54.0.0"
+    assert presentation["typescript"] is True
+    assert presentation["package_manager"] == "yarn"
+    assert presentation["lockfiles"] == ["yarn.lock"]
+    assert presentation["entrypoint_files"] == ["src/main.tsx", "index.js"]
+    assert presentation["platforms"][0] == {
+        "name": "Android",
+        "detected": True,
+        "metadata_status": "Assessed",
+        "identifier": "com.example.android",
+        "version": "1.2.3",
+        "requirements": "Min SDK: 24, Target SDK: 35, Compile SDK: 35",
+    }
+    assert presentation["platforms"][1]["identifier"] == "com.example.ios"
+    assert presentation["dependencies"]["metadata_status"] == "Assessed"
+    assert presentation["dependencies"]["sbom_status"] == "Assessed"
+    assert presentation["deep_links"][0]["uri"] == "example://open/item"
+    assert presentation["url_schemes"] == [{"url_name": "Example App", "schemes": ["example-app"]}]
+    assert presentation["queried_url_schemes"] == ["partner-app"]
+    assert report["permissions"][0]["status"] == "declared"
+
+
+def test_report_template_renders_react_native_inventory_dependencies_and_links() -> None:
+    html = _render_report_html(_react_native_presentation_data())
+
+    assert "React Native Source Code Vulnerability Assessment" in html
+    assert "React Native Project Inventory" in html
+    assert "React Native Dependency Inventory" in html
+    assert "Embedded Platforms" in html
+    assert "Application Links and URL Schemes" in html
+    assert "0.81.0" in html
+    assert "com.example.android" in html
+    assert "com.example.ios" in html
+    assert "react-native" in html
+    assert "example://open/item" in html
+    assert "example-app" in html
+    assert "partner-app" in html
+    assert "<th>Platform</th>" in html
+    assert "<td>Android</td>" in html
+    assert "Certificate Information" not in html
+    assert "App Components" not in html
+
+
 def test_generate_report_renders_flutter_html_and_writes_pdf_path(tmp_path: Path, monkeypatch) -> None:
     rendered: dict[str, str] = {}
 
@@ -663,6 +716,39 @@ def test_generate_report_renders_flutter_html_and_writes_pdf_path(tmp_path: Path
     assert "Flutter Source Code Vulnerability Assessment" in rendered["html"]
     assert "Flutter Project Inventory" in rendered["html"]
     assert "flutter.source.unsafe-platform-channel" in rendered["html"]
+    assert rendered["base_url"].endswith("adapters/output/phoenix_report")
+
+
+def test_generate_report_renders_react_native_html_and_writes_pdf_path(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    rendered: dict[str, str] = {}
+
+    class FakeHTML:
+        def __init__(self, *, string: str, base_url: str) -> None:
+            rendered["html"] = string
+            rendered["base_url"] = base_url
+
+        def write_pdf(self, target: str) -> None:
+            Path(target).write_bytes(b"%PDF-fake")
+
+    monkeypatch.setitem(sys.modules, "weasyprint", SimpleNamespace(HTML=FakeHTML))
+    monkeypatch.setattr(
+        REPORT_GENERATOR,
+        "build_charts",
+        lambda data: {"overall_risk_polar": ""},
+    )
+
+    output_path = tmp_path / "reports" / "react-native.pdf"
+    result = REPORT_GENERATOR.generate_report(_react_native_presentation_data(), output_path)
+
+    assert result == output_path
+    assert output_path.read_bytes() == b"%PDF-fake"
+    assert "React Native Source Code Vulnerability Assessment" in rendered["html"]
+    assert "React Native Project Inventory" in rendered["html"]
+    assert "React Native Dependency Inventory" in rendered["html"]
+    assert "example://open/item" in rendered["html"]
     assert rendered["base_url"].endswith("adapters/output/phoenix_report")
 
 
@@ -768,6 +854,109 @@ def _flutter_presentation_data() -> dict:
             }
         ],
         "functionality": {"Camera": {"present": None, "explanation": "Camera functionality was not fully assessed."}},
+    }
+
+
+def _react_native_presentation_data() -> dict:
+    return {
+        "meta": {
+            "app_display_name": "Example App",
+            "file_name": "example-app",
+            "platform": "React Native",
+            "target_type": "SOURCE",
+        },
+        "file_info": {
+            "filename": "example-app",
+            "package_json_path": "package.json",
+            "app_json_path": "app.json",
+            "lockfiles": ["yarn.lock"],
+            "package_manager": "yarn",
+        },
+        "app_info": {
+            "name": "Example App",
+            "package_name": "example-app",
+            "description": "Example React Native application",
+            "react_native_version": "0.81.0",
+            "react_version": "19.1.0",
+            "expo_version": "~54.0.0",
+            "node_engine": ">=20",
+        },
+        "app_components": {
+            "activities": None,
+            "services": None,
+            "receivers": None,
+            "providers": None,
+            "exported_activities": None,
+            "exported_services": None,
+            "exported_receivers": None,
+            "exported_providers": None,
+        },
+        "platform_inventory": {
+            "source_metadata_assessed": True,
+            "framework": {
+                "react_native_version": "0.81.0",
+                "react_version": "19.1.0",
+                "expo_version": "~54.0.0",
+                "typescript": True,
+                "node_engine": ">=20",
+                "yarn_engine": ">=4",
+                "package_manager": "yarn",
+                "package_main": "src/main.tsx",
+                "entrypoint_files": ["src/main.tsx", "index.js"],
+                "expo_router_path": "app",
+            },
+            "android": {
+                "detected": True,
+                "metadata_assessed": True,
+                "package_name": "com.example.android",
+                "version_name": "1.2.3",
+                "min_sdk": "24",
+                "target_sdk": "35",
+                "compile_sdk": "35",
+            },
+            "ios": {
+                "detected": True,
+                "metadata_assessed": True,
+                "bundle_identifier": "com.example.ios",
+                "version_name": "1.2.3",
+                "minimum_os": "15.0",
+            },
+            "warnings": [],
+        },
+        "dependency_inventory": {
+            "metadata_assessed": True,
+            "sbom_assessed": True,
+            "declared": [
+                {
+                    "name": "react-native",
+                    "constraint": "0.81.0",
+                    "source": "registry",
+                    "scope": "direct",
+                }
+            ],
+            "sbom_packages": [{"name": "react-native", "version": "0.81.0", "output_path": "sbom.json"}],
+        },
+        "deep_links": {
+            "deep_links": [
+                {
+                    "scheme": "example",
+                    "host": "open",
+                    "path_prefix": "/item",
+                    "component": "com.example.MainActivity",
+                }
+            ]
+        },
+        "url_schemes": [{"url_name": "Example App", "schemes": ["example-app"]}],
+        "queried_url_schemes": ["partner-app"],
+        "permissions": [
+            {
+                "platform": "Android",
+                "permission": "android.permission.CAMERA",
+                "status": "",
+                "general_description": "Camera access.",
+                "usage_description": "",
+            }
+        ],
     }
 
 

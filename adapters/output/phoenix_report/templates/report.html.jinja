@@ -160,7 +160,7 @@
   {% else %}
   <p class="small">No custom URL schemes were declared by this app.</p>
   {% endif %}
-  {% elif data.meta.platform != 'Flutter' or data.app_components.activities is not none or data.app_components.services is not none or data.app_components.receivers is not none or data.app_components.providers is not none %}
+  {% elif data.meta.platform not in ['Flutter', 'React Native'] or data.app_components.activities is not none or data.app_components.services is not none or data.app_components.receivers is not none or data.app_components.providers is not none %}
   <h2>App Components</h2>
   <div class="components-bars">
     {% set component_rows = [
@@ -312,6 +312,108 @@
 {% endif %}
 {% endif %}
 
+{% if data.meta.platform == 'React Native' %}
+<!-- ===================== REACT NATIVE PROJECT INVENTORY ===================== -->
+<div class="section">
+  <h2>React Native Project Inventory</h2>
+  <table class="kv-table">
+    <tr><td class="k">Metadata Extraction</td><td class="v">{{ data.react_native_presentation.extraction_status }}</td></tr>
+    <tr><td class="k">React Native Version</td><td class="v mono">{{ data.react_native_presentation.react_native_version or 'Not declared' }}</td></tr>
+    <tr><td class="k">React Version</td><td class="v mono">{{ data.react_native_presentation.react_version or 'Not declared' }}</td></tr>
+    <tr><td class="k">Expo Version</td><td class="v mono">{{ data.react_native_presentation.expo_version or 'Not declared' }}</td></tr>
+    <tr><td class="k">TypeScript</td><td class="v">{{ 'Yes' if data.react_native_presentation.typescript else 'No' }}</td></tr>
+    <tr><td class="k">Node Engine</td><td class="v mono">{{ data.react_native_presentation.node_engine or 'Not declared' }}</td></tr>
+    <tr><td class="k">Package Manager</td><td class="v">{{ data.react_native_presentation.package_manager or 'Not detected' }}</td></tr>
+    <tr><td class="k">Package Manifest</td><td class="v mono">{{ data.react_native_presentation.package_json_path or 'Not detected' }}</td></tr>
+    <tr><td class="k">App Manifest</td><td class="v mono">{{ data.react_native_presentation.app_json_path or 'Not detected' }}</td></tr>
+    <tr><td class="k">Lockfiles</td><td class="v mono">{{ data.react_native_presentation.lockfiles | join(', ') if data.react_native_presentation.lockfiles else 'None detected' }}</td></tr>
+    <tr><td class="k">Package Entrypoint</td><td class="v mono">{{ data.react_native_presentation.package_main or 'Not declared' }}</td></tr>
+    <tr><td class="k">Entrypoint Files</td><td class="v mono">{{ data.react_native_presentation.entrypoint_files | join(', ') if data.react_native_presentation.entrypoint_files else 'None detected' }}</td></tr>
+    {% if data.react_native_presentation.expo_router_path %}<tr><td class="k">Expo Router Path</td><td class="v mono">{{ data.react_native_presentation.expo_router_path }}</td></tr>{% endif %}
+    <tr><td class="k">Android Application ID</td><td class="v mono">{{ data.react_native_presentation.android_application_id or 'Not available' }}</td></tr>
+    <tr><td class="k">iOS Bundle Identifier</td><td class="v mono">{{ data.react_native_presentation.ios_bundle_identifier or 'Not available' }}</td></tr>
+    {% if data.react_native_presentation.description %}<tr><td class="k">Description</td><td class="v">{{ data.react_native_presentation.description }}</td></tr>{% endif %}
+  </table>
+
+  {% if data.react_native_presentation.warnings %}
+  <h3>Extraction Warnings</h3>
+  <ul>{% for warning in data.react_native_presentation.warnings %}<li>{{ warning }}</li>{% endfor %}</ul>
+  {% endif %}
+
+  <h3>Embedded Platforms</h3>
+  <table class="compact">
+    <tr><th>Platform</th><th>Detected</th><th>Metadata</th><th>Identifier</th><th>Version</th><th>Requirements</th></tr>
+    {% for platform in data.react_native_presentation.platforms %}
+    <tr>
+      <td>{{ platform.name }}</td>
+      <td>{{ 'Yes' if platform.detected else 'No' }}</td>
+      <td>{{ platform.metadata_status }}</td>
+      <td class="mono">{{ platform.identifier }}</td>
+      <td>{{ platform.version }}</td>
+      <td>{{ platform.requirements }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<!-- ===================== REACT NATIVE DEPENDENCIES ===================== -->
+<div class="section">
+  <h2>React Native Dependency Inventory</h2>
+  <p class="small">Declared metadata: {{ data.react_native_presentation.dependencies.metadata_status }} &middot; SBOM: {{ data.react_native_presentation.dependencies.sbom_status }}</p>
+
+  <h3>Declared Dependencies</h3>
+  {% if data.react_native_presentation.dependencies.declared %}
+  <table class="compact">
+    <tr><th>Name</th><th>Constraint</th><th>Scope</th><th>Source</th></tr>
+    {% for dependency in data.react_native_presentation.dependencies.declared %}
+    <tr><td class="mono">{{ dependency.name }}</td><td class="mono">{{ dependency.constraint }}</td><td>{{ dependency.scope }}</td><td>{{ dependency.source }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="small">No declared dependency records were available.</p>{% endif %}
+
+  <h3>SBOM Packages</h3>
+  {% if data.react_native_presentation.dependencies.sbom_packages %}
+  <table class="compact">
+    <tr><th>Name</th><th>Version</th><th>Artifact</th></tr>
+    {% for package in data.react_native_presentation.dependencies.sbom_packages %}
+    <tr><td class="mono">{{ package.name }}</td><td class="mono">{{ package.version }}</td><td class="mono">{{ package.output_path }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="small">No SBOM package records were available.</p>{% endif %}
+</div>
+
+<!-- ===================== REACT NATIVE LINKS ===================== -->
+<div class="section">
+  <h2>Application Links and URL Schemes</h2>
+  <h3>Android Deep Links</h3>
+  {% if data.react_native_presentation.deep_links %}
+  <table class="compact">
+    <tr><th>URI Pattern</th><th>Component</th><th>MIME Type</th></tr>
+    {% for link in data.react_native_presentation.deep_links %}
+    <tr><td class="mono">{{ link.uri }}</td><td class="mono">{{ link.component }}</td><td>{{ link.mime_type }}</td></tr>
+    {% endfor %}
+  </table>
+  {% elif data.react_native_presentation.deep_links_assessed %}<p class="small">No Android deep links were declared.</p>
+  {% else %}<p class="small">Android deep links were not assessed.</p>{% endif %}
+
+  <h3>iOS URL Schemes</h3>
+  {% if data.react_native_presentation.url_schemes %}
+  <table class="compact">
+    <tr><th>Application</th><th>Declared Schemes</th></tr>
+    {% for item in data.react_native_presentation.url_schemes %}
+    <tr><td>{{ item.url_name }}</td><td class="mono">{{ item.schemes | join(', ') }}</td></tr>
+    {% endfor %}
+  </table>
+  {% elif data.react_native_presentation.url_schemes_assessed %}<p class="small">No iOS URL schemes were declared.</p>
+  {% else %}<p class="small">iOS URL schemes were not assessed.</p>{% endif %}
+
+  <h3>Queried iOS Schemes</h3>
+  {% if data.react_native_presentation.queried_url_schemes %}<p class="mono">{{ data.react_native_presentation.queried_url_schemes | join(', ') }}</p>
+  {% elif data.react_native_presentation.url_schemes_assessed %}<p class="small">No queried iOS schemes were declared.</p>
+  {% else %}<p class="small">Queried iOS schemes were not assessed.</p>{% endif %}
+</div>
+{% endif %}
+
 <!-- ===================== FUNCTIONALITY ===================== -->
 <div class="section">
   <h2>Functionality</h2>
@@ -348,10 +450,10 @@
 <div class="section">
   <h2>Permissions Requested</h2>
   <table>
-    <tr>{% if data.meta.platform == 'Flutter' %}<th>Platform</th>{% endif %}<th>Permission</th><th>Status</th><th>Description</th></tr>
+    <tr>{% if data.meta.platform in ['Flutter', 'React Native'] %}<th>Platform</th>{% endif %}<th>Permission</th><th>Status</th><th>Description</th></tr>
     {% for p in data.permissions %}
     <tr>
-      {% if data.meta.platform == 'Flutter' %}<td>{{ p.platform }}</td>{% endif %}
+      {% if data.meta.platform in ['Flutter', 'React Native'] %}<td>{{ p.platform }}</td>{% endif %}
       <td class="mono">{{ p.display_permission or p.permission }}</td>
       <td>{{ risk_badge('High' if p.status == 'dangerous' else 'Info', label=p.status) }}</td>
       <td>{{ p.general_description }}{% if p.usage_description %}<br><span class="small">{{ p.usage_description }}</span>{% endif %}</td>

@@ -1836,15 +1836,24 @@ def _is_flutter_platform(data: dict[str, Any]) -> bool:
     return str(meta.get("platform") or "").strip().lower() == "flutter"
 
 
+def _is_react_native_platform(data: dict[str, Any]) -> bool:
+    meta = data.get("meta") if isinstance(data.get("meta"), dict) else {}
+    return str(meta.get("platform") or "").strip().lower() == "react native"
+
+
 def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     is_ios = _is_ios_platform(data)
     is_flutter = _is_flutter_platform(data)
+    is_react_native = _is_react_native_platform(data)
     base_template = _ios_blank_template() if is_ios else _blank_template()
     report_data = _merge_nested(base_template, data)
     report_scope = resolve_report_scope(report_data)
     report_data["report_scope"] = asdict(report_scope)
     _normalize_data_storage_section_name(report_data)
     _retain_assessed_sections(report_data, report_scope)
+
+    if is_react_native:
+        _normalize_react_native_presentation(report_data)
 
     if is_flutter:
         _normalize_flutter_presentation(report_data)
@@ -2454,7 +2463,7 @@ def _normalize_flutter_presentation(report_data: dict[str, Any]) -> None:
         extraction_status = "Partial" if warnings else "Complete"
 
     platform_rows = [
-        _flutter_platform_row(
+        _source_platform_row(
             "Android",
             android.get("detected") is True,
             android.get("metadata_assessed") is True,
@@ -2468,7 +2477,7 @@ def _normalize_flutter_presentation(report_data: dict[str, Any]) -> None:
                 )
             ),
         ),
-        _flutter_platform_row(
+        _source_platform_row(
             "iOS",
             ios.get("detected") is True,
             ios.get("metadata_assessed") is True,
@@ -2507,7 +2516,7 @@ def _normalize_flutter_presentation(report_data: dict[str, Any]) -> None:
     deep_link_container = report_data.get("deep_links")
     deep_link_container = deep_link_container if isinstance(deep_link_container, dict) else {}
     raw_deep_links = deep_link_container.get("deep_links")
-    deep_links = [_flutter_deep_link_row(item) for item in _mapping_rows(raw_deep_links)]
+    deep_links = [_source_deep_link_row(item) for item in _mapping_rows(raw_deep_links)]
     _normalize_ios_url_schemes(report_data)
     queried_schemes = report_data.get("queried_url_schemes")
     queried_schemes = (
@@ -2568,7 +2577,134 @@ def _normalize_flutter_presentation(report_data: dict[str, Any]) -> None:
     }
 
 
-def _flutter_platform_row(
+def _normalize_react_native_presentation(report_data: dict[str, Any]) -> None:
+    app_info = report_data.get("app_info")
+    app_info = app_info if isinstance(app_info, dict) else {}
+    file_info = report_data.get("file_info")
+    file_info = file_info if isinstance(file_info, dict) else {}
+    platform_inventory = report_data.get("platform_inventory")
+    platform_inventory = platform_inventory if isinstance(platform_inventory, dict) else {}
+    framework = platform_inventory.get("framework")
+    framework = framework if isinstance(framework, dict) else {}
+    android = platform_inventory.get("android")
+    android = android if isinstance(android, dict) else {}
+    ios = platform_inventory.get("ios")
+    ios = ios if isinstance(ios, dict) else {}
+
+    warnings = platform_inventory.get("warnings")
+    warnings = (
+        _dedupe_preserve_order([str(item).strip() for item in warnings if str(item).strip()])
+        if isinstance(warnings, list)
+        else []
+    )
+    metadata_assessed = platform_inventory.get("source_metadata_assessed") is True
+    extraction_status = "Not Assessed"
+    if metadata_assessed:
+        extraction_status = "Partial" if warnings else "Complete"
+
+    platform_rows = [
+        _source_platform_row(
+            "Android",
+            android.get("detected") is True,
+            android.get("metadata_assessed") is True,
+            _non_empty_string(android.get("package_name")),
+            _non_empty_string(android.get("version_name")),
+            _join_non_empty(
+                (
+                    ("Min SDK", android.get("min_sdk")),
+                    ("Target SDK", android.get("target_sdk")),
+                    ("Compile SDK", android.get("compile_sdk")),
+                )
+            ),
+        ),
+        _source_platform_row(
+            "iOS",
+            ios.get("detected") is True,
+            ios.get("metadata_assessed") is True,
+            _non_empty_string(ios.get("bundle_identifier")),
+            _non_empty_string(ios.get("version_name")),
+            _join_non_empty((("Minimum iOS", ios.get("minimum_os")),)),
+        ),
+    ]
+
+    dependency_inventory = report_data.get("dependency_inventory")
+    dependency_inventory = dependency_inventory if isinstance(dependency_inventory, dict) else {}
+    dependencies = {
+        "metadata_status": "Assessed" if dependency_inventory.get("metadata_assessed") is True else "Not Assessed",
+        "sbom_status": "Assessed" if dependency_inventory.get("sbom_assessed") is True else "Not Assessed",
+        "declared": _mapping_rows(dependency_inventory.get("declared")),
+        "sbom_packages": _mapping_rows(dependency_inventory.get("sbom_packages")),
+    }
+
+    deep_link_container = report_data.get("deep_links")
+    deep_link_container = deep_link_container if isinstance(deep_link_container, dict) else {}
+    raw_deep_links = deep_link_container.get("deep_links")
+    deep_links = [_source_deep_link_row(item) for item in _mapping_rows(raw_deep_links)]
+    _normalize_ios_url_schemes(report_data)
+    queried_schemes = report_data.get("queried_url_schemes")
+    queried_schemes = (
+        _dedupe_preserve_order([str(item).strip() for item in queried_schemes if str(item).strip()])
+        if isinstance(queried_schemes, list)
+        else []
+    )
+
+    permissions = report_data.get("permissions")
+    if isinstance(permissions, list):
+        for permission in permissions:
+            if not isinstance(permission, dict):
+                continue
+            if not _non_empty_string(permission.get("status")):
+                permission["status"] = "declared"
+            if not _non_empty_string(permission.get("platform")):
+                permission_name = _non_empty_string(permission.get("permission"))
+                permission["platform"] = "iOS" if permission_name.startswith("NS") else "Android"
+
+    report_data["react_native_presentation"] = {
+        "description": _non_empty_string(app_info.get("description")),
+        "react_native_version": _non_empty_string(
+            framework.get("react_native_version") or app_info.get("react_native_version")
+        ),
+        "react_version": _non_empty_string(framework.get("react_version") or app_info.get("react_version")),
+        "expo_version": _non_empty_string(framework.get("expo_version") or app_info.get("expo_version")),
+        "typescript": framework.get("typescript") is True,
+        "node_engine": _non_empty_string(framework.get("node_engine") or app_info.get("node_engine")),
+        "npm_engine": _non_empty_string(framework.get("npm_engine")),
+        "yarn_engine": _non_empty_string(framework.get("yarn_engine")),
+        "pnpm_engine": _non_empty_string(framework.get("pnpm_engine")),
+        "package_manager": _non_empty_string(framework.get("package_manager") or file_info.get("package_manager")),
+        "package_main": _non_empty_string(framework.get("package_main")),
+        "entrypoint_files": _dedupe_preserve_order(
+            [str(item).strip() for item in framework.get("entrypoint_files", []) if str(item).strip()]
+        )
+        if isinstance(framework.get("entrypoint_files"), list)
+        else [],
+        "expo_router_path": _non_empty_string(framework.get("expo_router_path")),
+        "package_json_path": _non_empty_string(file_info.get("package_json_path")),
+        "app_json_path": _non_empty_string(file_info.get("app_json_path")),
+        "lockfiles": _dedupe_preserve_order(
+            [str(item).strip() for item in file_info.get("lockfiles", []) if str(item).strip()]
+        )
+        if isinstance(file_info.get("lockfiles"), list)
+        else [],
+        "android_application_id": _non_empty_string(
+            android.get("package_name") or app_info.get("android_application_id")
+        ),
+        "ios_bundle_identifier": _non_empty_string(
+            ios.get("bundle_identifier") or app_info.get("ios_bundle_identifier")
+        ),
+        "extraction_status": extraction_status,
+        "warnings": warnings,
+        "platforms": platform_rows,
+        "dependencies": dependencies,
+        "deep_links_assessed": isinstance(raw_deep_links, list),
+        "deep_links": deep_links,
+        "url_schemes_assessed": ios.get("metadata_assessed") is True,
+        "url_schemes": report_data["url_schemes"],
+        "queried_url_schemes": queried_schemes,
+    }
+
+
+def _source_platform_row(
     name: str,
     detected: bool,
     metadata_assessed: bool,
@@ -2586,7 +2722,7 @@ def _flutter_platform_row(
     }
 
 
-def _flutter_deep_link_row(item: dict[str, Any]) -> dict[str, str]:
+def _source_deep_link_row(item: dict[str, Any]) -> dict[str, str]:
     scheme = _non_empty_string(item.get("scheme"))
     host = _non_empty_string(item.get("host"))
     port = _non_empty_string(item.get("port"))
