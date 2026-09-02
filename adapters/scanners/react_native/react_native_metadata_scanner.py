@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import plistlib
 import re
 from dataclasses import replace
 from pathlib import Path
@@ -11,6 +12,7 @@ from typing import Any
 from adapters.scanners.android import NativeAndroidSourceMetadataScanner
 from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
+from utilities.plist_report import PlistReportBuilder
 
 
 class ReactNativeMetadataScanner(ScannerPort):
@@ -25,6 +27,7 @@ class ReactNativeMetadataScanner(ScannerPort):
     )
     IOS_EXCLUDED_DIRECTORIES = frozenset({"build", "deriveddata", "pods", "vendor"})
     XCODE_BUILD_SETTING_PATTERN = re.compile(r"^\s*([A-Za-z0-9_]+)\s*=\s*(.*?)\s*;\s*$", re.MULTILINE)
+    XCODE_VARIABLE_PATTERN = re.compile(r"\$\(([^)]+)\)|\$\{([^}]+)\}")
 
     @property
     def scan_type(self) -> ScanType:
@@ -331,11 +334,118 @@ class ReactNativeMetadataScanner(ScannerPort):
             warnings.append("iOS metadata: No application Info.plist file was found.")
             return {"available": True, "project_path": "ios", "metadata": None}, warnings
 
+        plist = cls._load_ios_plist(info_plist, ios_path, warnings)
+        if plist is None:
+            return {"available": True, "project_path": "ios", "metadata": None}, warnings
+
+        identity = cls._ios_identity(plist, ios_path)
+        variables = cls._ios_identity_variables(settings)
+        for key, value in list(identity.items()):
+            if isinstance(value, str):
+                identity[key] = cls._resolve_xcode_variables(value, variables, warnings, f"identity.{key}")
+        if not cls._text(identity.get("bundle_identifier")):
+            identity["bundle_identifier"] = variables["PRODUCT_BUNDLE_IDENTIFIER"]
+        if not cls._text(identity.get("bundle_name")):
+            identity["bundle_name"] = variables["PRODUCT_NAME"]
+        if not cls._text(identity.get("display_name")):
+            identity["display_name"] = variables["PRODUCT_NAME"]
+        if not cls._text(identity.get("executable")):
+            identity["executable"] = variables["EXECUTABLE_NAME"]
+        if not cls._text(identity.get("version")):
+            identity["version"] = variables["MARKETING_VERSION"]
+        if not cls._text(identity.get("build")):
+            identity["build"] = variables["CURRENT_PROJECT_VERSION"]
+        if not cls._text(identity.get("minimum_os")):
+            identity["minimum_os"] = variables["IPHONEOS_DEPLOYMENT_TARGET"]
+
         metadata = {
             "xcode_project_path": cls._relative(ios_path, project_file) if project_file else "",
             "info_plist_path": cls._relative(ios_path, info_plist),
+            "identity": identity,
         }
         return {"available": True, "project_path": "ios", "metadata": metadata}, warnings
+
+    @classmethod
+    def _load_ios_plist(
+        cls,
+        path: Path,
+        ios_path: Path,
+        warnings: list[str],
+    ) -> dict[str, Any] | None:
+        try:
+            with path.open("rb") as handle:
+                value = plistlib.load(handle)
+        except (OSError, plistlib.InvalidFileException) as exc:
+            warnings.append(f"iOS metadata: Unable to parse {cls._relative(ios_path, path)}: {exc}")
+            return None
+        if not isinstance(value, dict):
+            warnings.append(f"iOS metadata: {cls._relative(ios_path, path)} does not contain a plist mapping.")
+            return None
+        return value
+
+    @classmethod
+    def _ios_identity(
+        cls,
+        plist: dict[str, Any],
+        ios_path: Path,
+    ) -> dict[str, object]:
+        builder = PlistReportBuilder(
+            scanner_name="React Native Metadata Scanner",
+            scan_type=ScanType.REACT_NATIVE_METADATA,
+            description="",
+            base_path=ios_path,
+            output_format="json",
+        )
+        identity = builder._app_meta(plist)
+        return identity if isinstance(identity, dict) else {}
+
+    @classmethod
+    def _ios_identity_variables(cls, settings: dict[str, list[str]]) -> dict[str, str]:
+        variables = {
+            name: cls._static_xcode_setting(settings, name)
+            for name in (
+                "CURRENT_PROJECT_VERSION",
+                "EXECUTABLE_NAME",
+                "IPHONEOS_DEPLOYMENT_TARGET",
+                "MARKETING_VERSION",
+                "PRODUCT_BUNDLE_IDENTIFIER",
+                "PRODUCT_MODULE_NAME",
+                "PRODUCT_NAME",
+            )
+        }
+        if not variables["EXECUTABLE_NAME"]:
+            variables["EXECUTABLE_NAME"] = variables["PRODUCT_NAME"]
+        if not variables["PRODUCT_MODULE_NAME"]:
+            variables["PRODUCT_MODULE_NAME"] = variables["PRODUCT_NAME"]
+        return variables
+
+    @staticmethod
+    def _static_xcode_setting(settings: dict[str, list[str]], name: str) -> str:
+        return next((value for value in settings.get(name, []) if "$" not in value), "")
+
+    @classmethod
+    def _resolve_xcode_variables(
+        cls,
+        value: str,
+        variables: dict[str, str],
+        warnings: list[str],
+        field_name: str,
+    ) -> str:
+        unresolved: set[str] = set()
+
+        def replacement(match: re.Match[str]) -> str:
+            expression = match.group(1) or match.group(2) or ""
+            name = expression.split(":", 1)[0]
+            replacement_value = variables.get(name, "")
+            if not replacement_value:
+                unresolved.add(expression)
+                return match.group(0)
+            return replacement_value
+
+        resolved = cls.XCODE_VARIABLE_PATTERN.sub(replacement, value)
+        for expression in sorted(unresolved):
+            warnings.append(f"iOS metadata: Unable to resolve $({expression}) in {field_name}.")
+        return resolved
 
     @classmethod
     def _ios_project_file(cls, ios_path: Path) -> Path | None:
