@@ -40,10 +40,10 @@ from adapters.scanners.ios import (
     PlistBinaryScanner,
     PlistSourceScanner,
 )
-from adapters.scanners.react_native import ReactNativeSourceMetadataScanner
+from adapters.scanners.react_native import ReactNativeOpenGrepScanner, ReactNativeSourceMetadataScanner
 from application.post_scan_processing_service import PostScanProcessingService
 from application.scanner_service import ScannerService
-from domain.models import ExtractedBinary, ScanConfig
+from domain.models import ExtractedBinary, ScanConfig, ScanType
 from ports.scanner_port import ScannerPort
 from utilities.apk_utils import extract_apk, is_apk_file
 from utilities.ipa_utils import extract_ipa, is_ipa_file
@@ -126,7 +126,10 @@ class MobileScannerFactory:
         if config.target_type == "SOURCE":
             return [config.project_path]
         if config.target_type == "BINARY":
-            return [config.output_path]
+            strings_output_path = config.output_path / ScanType.STRINGS.value
+            if not strings_output_path.is_dir():
+                return []
+            return sorted(path for path in strings_output_path.rglob("*.txt") if path.is_file())
         raise ValueError(f"Unsupported target type for OpenGrep scan paths: {config.target_type}")
 
 
@@ -194,10 +197,14 @@ class MobileAnalysisWorkflowService:
         print(f"OpenGrep rules path: {open_grep_rules_path}")
         print(f"OpenGrep scan paths: {opengrep_scan_paths}")
         opengrep_results = []
-        if open_grep_rules_path:
+        if open_grep_rules_path and opengrep_scan_paths:
             if scan_config.stack == "FLUTTER":
                 opengrep_scanner = FlutterOpenGrepScanner(
                     flutter_rules_path=Path(open_grep_rules_path),
+                )
+            elif scan_config.stack == "REACT_NATIVE":
+                opengrep_scanner = ReactNativeOpenGrepScanner(
+                    react_native_rules_path=Path(open_grep_rules_path),
                 )
             else:
                 opengrep_scanner = OpenGrepScanner(
