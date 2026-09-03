@@ -415,7 +415,8 @@ def test_resolve_opengrep_rules_path_uses_app_rules_fallback(monkeypatch) -> Non
     assert resolved == app_rules_path
 
 
-def test_create_scan_config_for_react_native_source(tmp_path: Path) -> None:
+def test_create_scan_config_for_react_native_source(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(cli, "_resolve_opengrep_rules_path", lambda override, slug: None)
     args = _scan_args(tmp_path, "--react-native-source-path")
 
     config = cli._create_scan_config(args)
