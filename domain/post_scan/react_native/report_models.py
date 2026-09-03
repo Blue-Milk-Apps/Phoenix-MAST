@@ -175,14 +175,28 @@ def _permissions(context: ReactNativeScanExtractionContext) -> list[dict[str, st
 def _evidence_section(context: ReactNativeScanExtractionContext, section: str) -> dict[str, dict[str, Any]]:
     assessment = ReactNativeOpenGrepAssessment(context)
     registries = {"react_native": REACT_NATIVE_RULES, "android": ANDROID_RULES, "ios": IOS_RULES}
-    keys = set().union(*(registry.get(section, {}) for registry in registries.values()))
+    preferred_sections = {
+        evidence_key: report_section for report_section, groups in REACT_NATIVE_RULES.items() for evidence_key in groups
+    }
+    scoped_groups: dict[str, dict[str, frozenset[str]]] = {}
+    for scope, registry in registries.items():
+        groups: dict[str, frozenset[str]] = {}
+        for registry_section, registry_groups in registry.items():
+            for evidence_key, rule_ids in registry_groups.items():
+                if preferred_sections.get(evidence_key, registry_section) == section:
+                    groups[evidence_key] = groups.get(evidence_key, frozenset()) | rule_ids
+        scoped_groups[scope] = groups
+
+    keys = set().union(*(groups for groups in scoped_groups.values()))
     output: dict[str, dict[str, Any]] = {}
     for key in sorted(keys):
         entries = [
-            assessment.assess(scope, registry[section][key], key)
-            for scope, registry in registries.items()
-            if key in registry.get(section, {}) and context.opengrep_scope_applicable(scope)
+            assessment.assess(scope, groups[key], key)
+            for scope, groups in scoped_groups.items()
+            if key in groups and context.opengrep_scope_applicable(scope)
         ]
+        if not entries:
+            continue
         present = (
             True
             if any(item.present is True for item in entries)

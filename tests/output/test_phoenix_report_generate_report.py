@@ -515,6 +515,60 @@ def test_load_report_data_maps_flutter_android_and_ios_source_evidence() -> None
     assert sections["Resilience"]["Biometric / Local Authentication Bypass Possible"]["result"] == "Present"
 
 
+def test_load_report_data_maps_only_supplied_react_native_evidence() -> None:
+    report = load_report_data(
+        {
+            "meta": {"platform": "React Native", "target_type": "SOURCE"},
+            "code_evidence": {
+                "contains_potential_sql_injection": {"present": True, "evidence": "src/db.ts:10"},
+                "encodes_data_using_insecure_cryptography": {"present": False, "evidence": ""},
+                "utilizes_insecure_cryptography": {"present": False, "evidence": ""},
+                "uses_dynamic_code_execution": {"present": True, "evidence": "src/runtime.ts:12"},
+                "writes_sensitive_information_to_system_log": {"present": False, "evidence": ""},
+            },
+            "network_evidence": {
+                "insecure_webview_configuration": {"present": True, "evidence": "src/Web.tsx:20"},
+                "sensitive_information_unencrypted_in_transit": {"present": False, "evidence": ""},
+                "weak_certificate_validation_enables_mitm": {"present": None, "evidence": ""},
+            },
+            "data_storage_evidence": {
+                "copies_sensitive_information_into_clipboard_without_user_consent": {
+                    "present": True,
+                    "evidence": "src/Copy.ts:30",
+                },
+                "sensitive_values_stored_insecurely": {"present": False, "evidence": ""},
+            },
+        }
+    )
+
+    sections = {section["section_name"]: _check_map(section["checks"]) for section in report["vulnerability_sections"]}
+    assert report["report_scope"]["assessment_label"] == "React Native Source Code"
+    assert report["report_scope"]["assessment_title"] == "React Native Source Code Vulnerability Assessment"
+    assert report["report_scope"]["target_information_heading"] == "React Native Project Information"
+    assert sum(len(checks) for checks in sections.values()) == 10
+    assert sections["Code"]["Uses Dynamic Code Execution"]["result"] == "Present"
+    assert sections["Code"]["Application Encodes Data Using Insecure Cryptography"]["result"] == "Not Present"
+    assert sections["Network"]["Insecure WebView Configuration"]["result"] == "Present"
+    assert sections["Network"]["Weak Certificate Validation Enables MitM Attacks"]["result"] == "Not Evaluated"
+    assert (
+        sections["Data Storage"]["Copies Sensitive Information into the Clipboard Without User Consent"]["result"]
+        == "Present"
+    )
+    assert "App Transport Security (ATS) Disabled" not in sections["Network"]
+
+
+def test_react_web_platform_does_not_use_react_native_report_scope() -> None:
+    report = load_report_data(
+        {
+            "meta": {"platform": "React", "target_type": "SOURCE"},
+            "code_evidence": {"contains_potential_sql_injection": {"present": False, "evidence": ""}},
+        }
+    )
+
+    assert report["report_scope"]["assessment_label"] == "Source Code"
+    assert report["report_scope"]["target_information_heading"] == "Source Project Information"
+
+
 def test_load_report_data_normalizes_flutter_presentation_inventory() -> None:
     report = load_report_data(_flutter_presentation_data())
     presentation = report["flutter_presentation"]

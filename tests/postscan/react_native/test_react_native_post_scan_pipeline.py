@@ -87,6 +87,9 @@ def test_react_native_extractor_builds_mobile_only_report_and_pdf(tmp_path: Path
     assert report["network_evidence"]["sensitive_information_unencrypted_in_transit"]["present"] is True
     assert report["code_evidence"]["contains_potential_sql_injection"]["present"] is None
     assert report["code_evidence"]["uses_dynamic_code_execution"]["present"] is False
+    assert "uses_uiwebview" not in report["code_evidence"]
+    assert "copies_sensitive_information_into_clipboard_without_user_consent" not in report["code_evidence"]
+    assert "copies_sensitive_information_into_clipboard_without_user_consent" in report["data_storage_evidence"]
     assert report["manual_review"]["findings"][0]["rule_id"] == "react-native.source.webview-message-bridge"
 
     pdf_path = generate_report(report, tmp_path / "react-native-report.pdf")
