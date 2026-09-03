@@ -46,6 +46,7 @@ packages = [
     "adapters.scanners.common",
     "adapters.scanners.flutter",
     "adapters.scanners.ios",
+    "adapters.scanners.react_native",
     "adapters.storage",
     "application",
     "domain",

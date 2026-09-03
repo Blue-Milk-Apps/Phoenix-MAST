@@ -40,6 +40,7 @@ from adapters.scanners.ios import (
     PlistBinaryScanner,
     PlistSourceScanner,
 )
+from adapters.scanners.react_native import ReactNativeSourceMetadataScanner
 from application.post_scan_processing_service import PostScanProcessingService
 from application.scanner_service import ScannerService
 from domain.models import ExtractedBinary, ScanConfig
@@ -90,6 +91,7 @@ class MobileScannerFactory:
                 ]
             case ("SOURCE", _, "REACT_NATIVE"):
                 return [
+                    ReactNativeSourceMetadataScanner(),
                     TrufflehogScanner(),
                     GitleaksScanner(),
                     PlistSourceScanner(),
