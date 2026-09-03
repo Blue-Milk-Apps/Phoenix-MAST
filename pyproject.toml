@@ -41,6 +41,7 @@ packages = [
     "adapters.post_scan.ios",
     "adapters.post_scan.ios.binary",
     "adapters.post_scan.ios.native",
+    "adapters.post_scan.react_native",
     "adapters.scanners",
     "adapters.scanners.android",
     "adapters.scanners.common",
