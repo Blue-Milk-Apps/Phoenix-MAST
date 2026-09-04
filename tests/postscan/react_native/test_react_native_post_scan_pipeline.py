@@ -9,7 +9,7 @@ from adapters.scanners.react_native.react_native_source_metadata_scanner import 
 )
 from application.mobile_analysis_workflow_service import MobileAnalysisWorkflowService
 from domain.models import ScanConfig
-from domain.post_scan.react_native import REACT_NATIVE_RULE_IDS
+from domain.post_scan.react_native import INVENTORY_RULE_ID_TO_KEY, REACT_NATIVE_RULE_IDS
 
 
 def test_react_native_extractor_builds_mobile_only_report_and_pdf(tmp_path: Path) -> None:
@@ -278,6 +278,93 @@ def test_react_native_metadata_preserves_risky_entitlement_names(tmp_path: Path)
         "com.apple.private.example",
         "get-task-allow",
     ]
+
+
+def test_react_native_endpoint_inventory_redacts_classifies_and_deduplicates(tmp_path: Path) -> None:
+    project = tmp_path / "mobile"
+    findings = [
+        {
+            "check_id": "react-native.inventory.url-literal",
+            "phoenix_scope": "react_native",
+            "path": str(project / "src" / "api.ts"),
+            "start": {"line": 4},
+            "extra": {
+                "lines": 'fetch("https://user:password@api.example.com/users?token=secret&limit=5")'  # pragma: allowlist secret
+            },  # pragma: allowlist secret
+        },
+        {
+            "check_id": "react-native.inventory.url-literal",
+            "phoenix_scope": "react_native",
+            "path": str(project / "src" / "socket.ts"),
+            "start": {"line": 8},
+            "extra": {"lines": 'new WebSocket("ws://stream.example.com/events")'},
+        },
+        {
+            "check_id": "react-native.inventory.url-literal",
+            "phoenix_scope": "react_native",
+            "path": str(project / "src" / "dev.ts"),
+            "start": {"line": 3},
+            "extra": {"lines": 'fetch("http://localhost:8080/health")'},
+        },
+        {
+            "check_id": "react-native.inventory.environment-endpoint",
+            "phoenix_scope": "react_native",
+            "path": str(project / "src" / "config.ts"),
+            "start": {"line": 2},
+            "extra": {"lines": "const endpoint = process.env.API_URL"},
+        },
+        {
+            "check_id": "react-native.inventory.dynamic-base-url",
+            "phoenix_scope": "react_native",
+            "path": str(project / "src" / "client.ts"),
+            "start": {"line": 6},
+            "extra": {"lines": "axios.create({ baseURL: API_BASE })"},
+        },
+    ]
+    loaded = {
+        "scan_metadata": {"project_path": str(project), "target_type": "SOURCE"},
+        "source_metadata": {
+            "project": {"project_path": str(project)},
+            "runtime": {"react_native_constraint": "0.80.0"},
+            "platforms": {"android": False, "ios": False},
+            "dependencies": {"declared": [], "resolved": []},
+        },
+        "opengrep": {
+            "results": findings,
+            "scan_metadata": {
+                "scopes": {
+                    "react_native": {
+                        "status": "success",
+                        "applicable": True,
+                        "configured_rule_ids": sorted(INVENTORY_RULE_ID_TO_KEY),
+                    }
+                }
+            },
+        },
+    }
+
+    report = ReactNativeScanDetailExtractor().extract_sections(loaded)
+    endpoints = {item["endpoint"]: item for item in report["endpoints"]}
+
+    redacted = "https://[REDACTED]@api.example.com/users?token=[REDACTED]&limit=5"
+    assert set(endpoints) == {
+        redacted,
+        "ws://stream.example.com/events",
+        "http://localhost:8080/health",
+        "process.env.API_URL",
+        "API_BASE",
+    }
+    assert "password" not in redacted and "secret" not in redacted
+    assert endpoints[redacted]["connection_type"] == "fetch"
+    assert endpoints[redacted]["transport_security"] == "encrypted"
+    assert endpoints["ws://stream.example.com/events"]["transport_security"] == "cleartext"
+    assert endpoints["http://localhost:8080/health"]["transport_security"] == "local"
+    assert endpoints["process.env.API_URL"]["confidence"] == "dynamic"
+    assert {item["url"] for item in report["hardcoded_values"]["urls"]} == {
+        redacted,
+        "ws://stream.example.com/events",
+        "http://localhost:8080/health",
+    }
 
 
 def test_workflow_registers_react_native_post_scan_service(tmp_path: Path) -> None:

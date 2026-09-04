@@ -1,6 +1,7 @@
 from domain.post_scan.react_native import ReactNativeFunctionality
 from domain.post_scan.react_native.rule_registry import (
     FUNCTIONALITY_RULE_ID_TO_KEY,
+    INVENTORY_RULE_ID_TO_KEY,
     REACT_NATIVE_RULE_IDS,
     REACT_NATIVE_RULE_REGISTRY,
     RULE_SEVERITIES,
@@ -38,4 +39,13 @@ def test_functionality_rules_map_to_mobile_capabilities() -> None:
     assert all(
         REACT_NATIVE_RULE_REGISTRY[rule_id].disposition is ReactNativeRuleDisposition.FUNCTIONALITY
         for rule_id in FUNCTIONALITY_RULE_ID_TO_KEY
+    )
+
+
+def test_inventory_rules_do_not_map_to_vulnerability_sections() -> None:
+    assert INVENTORY_RULE_ID_TO_KEY
+    assert all(
+        REACT_NATIVE_RULE_REGISTRY[rule_id].disposition is ReactNativeRuleDisposition.INVENTORY
+        and REACT_NATIVE_RULE_REGISTRY[rule_id].section == "Endpoints"
+        for rule_id in INVENTORY_RULE_ID_TO_KEY
     )

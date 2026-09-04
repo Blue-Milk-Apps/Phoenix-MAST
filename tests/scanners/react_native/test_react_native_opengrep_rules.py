@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from adapters.scanners.common.opengrep_scanner import OpenGrepScanner
-from domain.post_scan.react_native import REACT_NATIVE_RULE_IDS
+from domain.post_scan.react_native import INVENTORY_RULE_ID_TO_KEY, REACT_NATIVE_RULE_IDS
 
 ROOT = Path(__file__).parents[3]
 RULES_PATH = ROOT / "rules" / "react_native"
@@ -29,7 +29,9 @@ def test_react_native_rules_match_positive_fixture_and_ignore_negative_fixture()
     negative = _scan(FIXTURES_PATH / "negative.tsx")
 
     assert {finding["check_id"] for finding in positive["results"]} == set(REACT_NATIVE_RULE_IDS)
-    assert negative["results"] == []
+    assert {finding["check_id"] for finding in negative["results"]} == {
+        rule_id for rule_id, key in INVENTORY_RULE_ID_TO_KEY.items() if key == "url_literal"
+    }
 
 
 def _scan(source_path: Path) -> dict[str, object]:

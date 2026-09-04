@@ -54,6 +54,8 @@ const secureLatitude = "https://api.example.com/device?latitude=value";
 const secureLongitude = "https://api.example.com/device?longitude=value";
 const secureToken = "https://api.example.com/device?token=value";
 const secureWifiMac = "https://api.example.com/device?wifi_mac=value";
+const configuredEndpoint = process.env.API_URL;
+const apiClient = axios.create({ baseURL: API_BASE });
 
 console.log("auth token", token);
 console.log("advertising_id", advertiserId);

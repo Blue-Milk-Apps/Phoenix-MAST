@@ -9,6 +9,7 @@ from enum import StrEnum
 class ReactNativeRuleDisposition(StrEnum):
     REPORT_VULNERABILITY = "report_vulnerability"
     FUNCTIONALITY = "functionality"
+    INVENTORY = "inventory"
     RAW_ONLY = "raw_only"
 
 
@@ -124,7 +125,14 @@ FUNCTIONALITY_RULE_ID_TO_KEY: dict[str, str] = {
     "react-native.functionality.usb-devices": "USB Devices",
 }
 
+INVENTORY_RULE_ID_TO_KEY: dict[str, str] = {
+    "react-native.inventory.url-literal": "url_literal",
+    "react-native.inventory.environment-endpoint": "environment_reference",
+    "react-native.inventory.dynamic-base-url": "base_url_reference",
+}
+
 RULE_SEVERITIES: dict[str, str] = {
+    **{rule_id: "Info" for rule_id in INVENTORY_RULE_ID_TO_KEY},
     "react-native.source.advertiser-id-log": "Medium",
     "react-native.source.advertiser-id-storage": "High",
     "react-native.source.cleartext-http-advertiser-id": "High",
@@ -208,6 +216,17 @@ def _report_mappings() -> dict[str, ReactNativeRuleMapping]:
 
 def _build_registry() -> dict[str, ReactNativeRuleMapping]:
     registry = _report_mappings()
+    registry.update(
+        {
+            rule_id: ReactNativeRuleMapping(
+                disposition=ReactNativeRuleDisposition.INVENTORY,
+                section="Endpoints",
+                severity=RULE_SEVERITIES[rule_id],
+                evidence_key=evidence_key,
+            )
+            for rule_id, evidence_key in INVENTORY_RULE_ID_TO_KEY.items()
+        }
+    )
     registry.update(
         {
             rule_id: ReactNativeRuleMapping(

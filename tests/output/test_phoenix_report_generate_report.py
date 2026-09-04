@@ -70,6 +70,32 @@ def _data_storage_checks(path: Path) -> list[dict[str, str]]:
     raise AssertionError("Data Storage section missing")
 
 
+def test_react_native_endpoint_inventory_renders_source_connection_and_security() -> None:
+    html = _render_report_html(
+        {
+            "meta": {"platform": "React Native", "target_type": "SOURCE"},
+            "endpoints": [
+                {
+                    "endpoint": "https://api.example.com/users?token=[REDACTED]",
+                    "tags": "fetch, encrypted",
+                    "source": "src/api.ts:4",
+                    "connection_type": "fetch",
+                    "transport_security": "encrypted",
+                    "ip_address": "",
+                    "country": "",
+                }
+            ],
+        }
+    )
+
+    assert "network destinations were identified" in html
+    assert "Source" in html
+    assert "Connection" in html
+    assert "Security" in html
+    assert "src/api.ts:4" in html
+    assert "token=[REDACTED]" in html
+
+
 def test_overall_evaluation_summarizes_only_the_highest_present_severity() -> None:
     section_to_area = {"network": ("Networking", "networking")}
 
