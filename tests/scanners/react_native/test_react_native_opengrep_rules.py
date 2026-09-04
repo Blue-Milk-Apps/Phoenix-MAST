@@ -21,8 +21,8 @@ def test_local_react_native_rule_ids_match_registry() -> None:
 
 
 @pytest.mark.skipif(
-    not RULES_PATH.is_dir() or shutil.which("opengrep") is None or shutil.which("opengrep-core") is None,
-    reason="Local React Native rules or OpenGrep executables are not installed",
+    not RULES_PATH.is_dir() or shutil.which("opengrep") is None,
+    reason="Local React Native rules or the OpenGrep executable are not installed",
 )
 def test_react_native_rules_match_positive_fixture_and_ignore_negative_fixture() -> None:
     positive = _scan(FIXTURES_PATH / "positive.tsx")

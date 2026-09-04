@@ -33,7 +33,10 @@ def test_react_native_extractor_builds_mobile_only_report_and_pdf(tmp_path: Path
                         "target_sdk": "35",
                     },
                     "application": {"debuggable": False},
-                    "permissions": [{"name": "android.permission.INTERNET"}],
+                    "permissions": [
+                        {"name": "android.permission.INTERNET"},
+                        {"name": "android.permission.CAMERA"},
+                    ],
                     "components": {"activities": [], "services": [], "receivers": [], "providers": []},
                     "deep_links": [],
                 },
@@ -90,6 +93,8 @@ def test_react_native_extractor_builds_mobile_only_report_and_pdf(tmp_path: Path
     assert "uses_uiwebview" not in report["code_evidence"]
     assert "copies_sensitive_information_into_clipboard_without_user_consent" not in report["code_evidence"]
     assert "copies_sensitive_information_into_clipboard_without_user_consent" in report["data_storage_evidence"]
+    assert report["functionality"]["Camera"]["present"] is True
+    assert report["functionality"]["SMS"]["present"] is None
     assert report["manual_review"]["findings"][0]["rule_id"] == "react-native.source.webview-message-bridge"
 
     pdf_path = generate_report(report, tmp_path / "react-native-report.pdf")

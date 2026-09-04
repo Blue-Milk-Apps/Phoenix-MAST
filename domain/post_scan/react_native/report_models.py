@@ -8,6 +8,7 @@ from typing import Any
 
 from domain.post_scan.android.rule_registry import REPORT_RULE_IDS_BY_SECTION as ANDROID_RULES
 from domain.post_scan.ios.rule_registry import REPORT_RULE_IDS_BY_SECTION as IOS_RULES
+from domain.post_scan.react_native.functionality import ReactNativeFunctionality
 from domain.post_scan.react_native.opengrep_assessment import ReactNativeOpenGrepAssessment
 from domain.post_scan.react_native.rule_registry import (
     REACT_NATIVE_RULE_REGISTRY,
@@ -93,6 +94,9 @@ def build_report_sections(context: ReactNativeScanExtractionContext) -> dict[str
     if hardcoded["assessed"] or hardcoded["secrets"]:
         sections["hardcoded_values"] = {key: hardcoded[key] for key in ("urls", "emails", "secrets")}
         sections["endpoints"] = []
+    functionality = ReactNativeFunctionality(context)
+    if functionality.applicable or functionality.assessed:
+        sections["functionality"] = functionality.items
     manual_review = _manual_review(context)
     if manual_review["assessed"] or manual_review["findings"]:
         sections["manual_review"] = manual_review

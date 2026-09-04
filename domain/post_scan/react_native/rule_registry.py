@@ -8,6 +8,7 @@ from enum import StrEnum
 
 class ReactNativeRuleDisposition(StrEnum):
     REPORT_VULNERABILITY = "report_vulnerability"
+    FUNCTIONALITY = "functionality"
     RAW_ONLY = "raw_only"
 
 
@@ -53,6 +54,40 @@ REPORT_RULE_IDS_BY_SECTION: dict[str, dict[str, frozenset[str]]] = {
     "Resilience": {},
 }
 
+FUNCTIONALITY_RULE_ID_TO_KEY: dict[str, str] = {
+    "react-native.functionality.audio": "Audio",
+    "react-native.functionality.background-execution": "Background Execution",
+    "react-native.functionality.biometric-authentication": "Biometric Authentication",
+    "react-native.functionality.bluetooth": "Bluetooth",
+    "react-native.functionality.calendar": "Calendar",
+    "react-native.functionality.camera": "Camera",
+    "react-native.functionality.camera-delegation": "Camera Delegation",
+    "react-native.functionality.contacts": "Contacts",
+    "react-native.functionality.device-administrator": "Device Administrator",
+    "react-native.functionality.fingerprint": "Fingerprint",
+    "react-native.functionality.geofencing": "Geofencing",
+    "react-native.functionality.google-cloud-messaging": "Google Cloud Messaging",
+    "react-native.functionality.health-data": "Health Data",
+    "react-native.functionality.in-app-purchases": "In-App Purchases",
+    "react-native.functionality.infrared-led": "Infrared LED",
+    "react-native.functionality.keychain": "Keychain",
+    "react-native.functionality.keystore": "Keystore",
+    "react-native.functionality.location": "Location",
+    "react-native.functionality.maps": "Maps",
+    "react-native.functionality.microphone": "Microphone",
+    "react-native.functionality.nearby-interaction": "Nearby Interaction",
+    "react-native.functionality.networking": "Networking",
+    "react-native.functionality.nfc": "NFC",
+    "react-native.functionality.payment-services": "Payment Services",
+    "react-native.functionality.photos": "Photos",
+    "react-native.functionality.push-notifications": "Push Notifications",
+    "react-native.functionality.secure-rng": "Secure RNG",
+    "react-native.functionality.sensors": "Sensors",
+    "react-native.functionality.sms": "SMS",
+    "react-native.functionality.telephony": "Telephony",
+    "react-native.functionality.usb-devices": "USB Devices",
+}
+
 RULE_SEVERITIES: dict[str, str] = {
     "react-native.source.cleartext-http": "High",
     "react-native.source.dynamic-code-execution": "High",
@@ -69,6 +104,7 @@ RULE_SEVERITIES: dict[str, str] = {
     "react-native.source.webview-message-bridge": "Medium",
     "react-native.source.webview-mixed-content": "High",
     "react-native.source.webview-wildcard-origin": "High",
+    **{rule_id: "Info" for rule_id in FUNCTIONALITY_RULE_ID_TO_KEY},
 }
 
 RAW_ONLY_RULE_REASONS: dict[str, str] = {
@@ -100,6 +136,17 @@ def _report_mappings() -> dict[str, ReactNativeRuleMapping]:
 
 def _build_registry() -> dict[str, ReactNativeRuleMapping]:
     registry = _report_mappings()
+    registry.update(
+        {
+            rule_id: ReactNativeRuleMapping(
+                disposition=ReactNativeRuleDisposition.FUNCTIONALITY,
+                section="Functionality",
+                severity=RULE_SEVERITIES[rule_id],
+                evidence_key=capability,
+            )
+            for rule_id, capability in FUNCTIONALITY_RULE_ID_TO_KEY.items()
+        }
+    )
     registry.update(
         {
             rule_id: ReactNativeRuleMapping(
