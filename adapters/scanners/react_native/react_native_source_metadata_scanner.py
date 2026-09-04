@@ -232,7 +232,12 @@ class ReactNativeSourceMetadataScanner(ScannerPort):
             "app_transport_security": builder._transport_security_details(info),
             "url_schemes": builder._url_scheme_details(info),
             "background_modes": builder._background_modes(info),
-            "entitlements": self._supporting_plists(ios_path, ".entitlements", builder._entitlement_details, warnings),
+            "entitlements": self._supporting_plists(
+                ios_path,
+                ".entitlements",
+                lambda data: self._entitlement_metadata(builder, data),
+                warnings,
+            ),
             "privacy_manifests": self._supporting_plists(
                 ios_path, ".xcprivacy", builder._privacy_manifest_details, warnings
             ),
@@ -302,6 +307,23 @@ class ReactNativeSourceMetadataScanner(ScannerPort):
                 }
             )
         return artifacts
+
+    @staticmethod
+    def _entitlement_metadata(builder: PlistReportBuilder, data: dict[str, Any]) -> dict[str, Any]:
+        metadata = builder._entitlement_details(data)
+        risky_keys = {
+            "get-task-allow",
+            "com.apple.security.cs.allow-dyld-environment-variables",
+            "com.apple.security.cs.allow-unsigned-executable-memory",
+            "com.apple.security.cs.disable-executable-page-protection",
+            "com.apple.security.cs.disable-library-validation",
+        }
+        metadata["security_risk_keys"] = sorted(
+            key
+            for key, value in data.items()
+            if (key in risky_keys and value is True) or str(key).startswith("com.apple.private.")
+        )
+        return metadata
 
     @staticmethod
     def _load_plist(path: Path, ios_path: Path, warnings: list[str]) -> dict[str, Any] | None:

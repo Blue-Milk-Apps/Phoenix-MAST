@@ -35,6 +35,18 @@ def resolve_report_scope(data: dict[str, Any]) -> ReportScope:
 
     if is_ios and is_source:
         assessed_sections = ("code", "network", "data storage")
+    elif is_react_native and is_source:
+        section_evidence_keys = {
+            "code": "code_evidence",
+            "network": "network_evidence",
+            "data storage": "data_storage_evidence",
+            "resilience": "resilience_evidence",
+        }
+        assessed_sections = tuple(
+            section
+            for section, evidence_key in section_evidence_keys.items()
+            if isinstance(data.get(evidence_key), dict) and bool(data[evidence_key])
+        )
     elif is_source:
         section_evidence_keys = {
             "code": "code_evidence",

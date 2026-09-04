@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -18,13 +18,12 @@ from domain.post_scan.react_native.rule_registry import (
     REPORT_RULE_IDS_BY_SECTION as REACT_NATIVE_RULES,
 )
 from domain.post_scan.react_native.scan_extraction_context import ReactNativeScanExtractionContext
-
-
-@dataclass(frozen=True)
-class ReactNativeEvidenceEntry:
-    present: bool | None
-    evidence: str = ""
-    details: list[str] | None = None
+from domain.post_scan.react_native.security_evidence import (
+    ReactNativeEvidenceEntry,
+    combine_evidence_entries,
+    derived_evidence,
+    scope_catalog_applicable,
+)
 
 
 def build_report_sections(context: ReactNativeScanExtractionContext) -> dict[str, Any]:
@@ -87,7 +86,7 @@ def build_report_sections(context: ReactNativeScanExtractionContext) -> dict[str
         ("Resilience", "resilience_evidence"),
     ):
         evidence = _evidence_section(context, section)
-        if any(item.get("present") is not None for item in evidence.values()):
+        if evidence:
             sections[output_key] = evidence
 
     hardcoded = _hardcoded_values(context)
@@ -197,7 +196,7 @@ def _evidence_section(context: ReactNativeScanExtractionContext, section: str) -
         entries = [
             assessment.assess(scope, groups[key], key)
             for scope, groups in scoped_groups.items()
-            if key in groups and context.opengrep_scope_applicable(scope)
+            if key in groups and scope_catalog_applicable(context, scope)
         ]
         if not entries:
             continue
@@ -211,6 +210,24 @@ def _evidence_section(context: ReactNativeScanExtractionContext, section: str) -
         details = list(dict.fromkeys(detail for item in entries for detail in item.details))
         evidence = "; ".join(item.evidence for item in entries if item.evidence)
         output[key] = asdict(ReactNativeEvidenceEntry(present, evidence, details))
+
+    for key, derived in derived_evidence(context, section).items():
+        existing = output.get(key)
+        if existing is None:
+            output[key] = asdict(derived)
+            continue
+        combined = combine_evidence_entries(
+            [
+                ReactNativeEvidenceEntry(
+                    existing.get("present"),
+                    str(existing.get("evidence") or ""),
+                    [str(item) for item in existing.get("details") or []],
+                ),
+                derived,
+            ],
+            absent_evidence=f"no_{key}_hits",
+        )
+        output[key] = asdict(combined)
     return output
 
 
