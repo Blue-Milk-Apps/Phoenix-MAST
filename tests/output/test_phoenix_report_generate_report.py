@@ -70,6 +70,58 @@ def _data_storage_checks(path: Path) -> list[dict[str, str]]:
     raise AssertionError("Data Storage section missing")
 
 
+def test_react_native_endpoint_inventory_renders_source_connection_and_security() -> None:
+    html = _render_report_html(
+        {
+            "meta": {"platform": "React Native", "target_type": "SOURCE"},
+            "endpoints": [
+                {
+                    "endpoint": "https://api.example.com/users?token=[REDACTED]",
+                    "tags": "fetch, encrypted",
+                    "source": "src/api.ts:4",
+                    "connection_type": "fetch",
+                    "transport_security": "encrypted",
+                    "ip_address": "",
+                    "country": "",
+                }
+            ],
+        }
+    )
+
+    assert "network destinations were identified" in html
+    assert "Source" in html
+    assert "Connection" in html
+    assert "Security" in html
+    assert "src/api.ts:4" in html
+    assert "token=[REDACTED]" in html
+
+
+def test_react_native_permission_inventory_renders_source_disclaimer_and_platform() -> None:
+    html = _render_report_html(
+        {
+            "meta": {"platform": "React Native", "target_type": "SOURCE"},
+            "permissions_disclaimer": (
+                "This React Native source assessment cannot determine the final permissions in the packaged "
+                "application."
+            ),
+            "permissions": [
+                {
+                    "platform": "Android",
+                    "permission": "android.permission.CAMERA",
+                    "status": "Declared and Requested",
+                    "general_description": "Declared by Android manifest. Requested at src/camera.ts:4.",
+                    "usage_description": "",
+                }
+            ],
+        }
+    )
+
+    assert "Permission Inventory" in html
+    assert "cannot determine the final permissions" in html
+    assert "Platform" in html
+    assert "Declared and Requested" in html
+
+
 def test_overall_evaluation_summarizes_only_the_highest_present_severity() -> None:
     section_to_area = {"network": ("Networking", "networking")}
 
@@ -513,6 +565,60 @@ def test_load_report_data_maps_flutter_android_and_ios_source_evidence() -> None
     assert sections["Data Storage"]["Application Utilizes Deprecated Keychain Attributes"]["result"] == ("Present")
     assert sections["Data Storage"]["Sensitive Information Stored in External Storage"]["result"] == ("Not Present")
     assert sections["Resilience"]["Biometric / Local Authentication Bypass Possible"]["result"] == "Present"
+
+
+def test_load_report_data_maps_only_supplied_react_native_evidence() -> None:
+    report = load_report_data(
+        {
+            "meta": {"platform": "React Native", "target_type": "SOURCE"},
+            "code_evidence": {
+                "contains_potential_sql_injection": {"present": True, "evidence": "src/db.ts:10"},
+                "encodes_data_using_insecure_cryptography": {"present": False, "evidence": ""},
+                "utilizes_insecure_cryptography": {"present": False, "evidence": ""},
+                "uses_dynamic_code_execution": {"present": True, "evidence": "src/runtime.ts:12"},
+                "writes_sensitive_information_to_system_log": {"present": False, "evidence": ""},
+            },
+            "network_evidence": {
+                "insecure_webview_configuration": {"present": True, "evidence": "src/Web.tsx:20"},
+                "sensitive_information_unencrypted_in_transit": {"present": False, "evidence": ""},
+                "weak_certificate_validation_enables_mitm": {"present": None, "evidence": ""},
+            },
+            "data_storage_evidence": {
+                "copies_sensitive_information_into_clipboard_without_user_consent": {
+                    "present": True,
+                    "evidence": "src/Copy.ts:30",
+                },
+                "sensitive_values_stored_insecurely": {"present": False, "evidence": ""},
+            },
+        }
+    )
+
+    sections = {section["section_name"]: _check_map(section["checks"]) for section in report["vulnerability_sections"]}
+    assert report["report_scope"]["assessment_label"] == "React Native Source Code"
+    assert report["report_scope"]["assessment_title"] == "React Native Source Code Vulnerability Assessment"
+    assert report["report_scope"]["target_information_heading"] == "React Native Project Information"
+    assert sum(len(checks) for checks in sections.values()) == 10
+    assert sections["Code"]["Uses Dynamic Code Execution"]["result"] == "Present"
+    assert sections["Code"]["Application Encodes Data Using Insecure Cryptography"]["result"] == "Not Present"
+    assert sections["Network"]["Insecure WebView Configuration"]["result"] == "Present"
+    assert sections["Network"]["Weak Certificate Validation Enables MitM Attacks"]["result"] == "Not Evaluated"
+    assert (
+        sections["Data Storage"]["Copies Sensitive Information into the Clipboard Without User Consent"]["result"]
+        == "Present"
+    )
+    assert "App Transport Security (ATS) Disabled" not in sections["Network"]
+
+
+def test_react_web_platform_does_not_use_react_native_report_scope() -> None:
+    report = load_report_data(
+        {
+            "meta": {"platform": "React", "target_type": "SOURCE"},
+            "code_evidence": {"contains_potential_sql_injection": {"present": False, "evidence": ""}},
+        }
+    )
+
+    assert report["report_scope"]["assessment_label"] == "Source Code"
+    assert report["report_scope"]["target_information_heading"] == "Source Project Information"
 
 
 def test_load_report_data_normalizes_flutter_presentation_inventory() -> None:
