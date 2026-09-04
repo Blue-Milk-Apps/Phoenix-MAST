@@ -218,6 +218,23 @@ FLUTTER_RESILIENCE_EVIDENCE_KEY_BY_CHECK = {
     **IOS_RESILIENCE_EVIDENCE_KEY_BY_CHECK,
     "biometric / local authentication bypass possible": ("biometric_local_authentication_bypass_possible"),
 }
+REACT_NATIVE_CODE_EVIDENCE_KEY_BY_CHECK = {
+    **FLUTTER_CODE_EVIDENCE_KEY_BY_CHECK,
+    "uses dynamic code execution": "uses_dynamic_code_execution",
+}
+REACT_NATIVE_NETWORK_EVIDENCE_KEY_BY_CHECK = {
+    **FLUTTER_NETWORK_EVIDENCE_KEY_BY_CHECK,
+    "insecure webview configuration": "insecure_webview_configuration",
+}
+REACT_NATIVE_DATA_STORAGE_EVIDENCE_KEY_BY_CHECK = {
+    **FLUTTER_DATA_STORAGE_EVIDENCE_KEY_BY_CHECK,
+    "copies sensitive information into the clipboard without user consent": (
+        "copies_sensitive_information_into_clipboard_without_user_consent"
+    ),
+}
+REACT_NATIVE_RESILIENCE_EVIDENCE_KEY_BY_CHECK = {
+    **FLUTTER_RESILIENCE_EVIDENCE_KEY_BY_CHECK,
+}
 ANDROID_SOURCE_CODE_CHECK_NAMES = frozenset(
     {
         "activities accessible to other apps",
@@ -1496,6 +1513,49 @@ FLUTTER_RESILIENCE_CHECK_SPECS = _flutter_check_specs(
     ),
     FLUTTER_RESILIENCE_EVIDENCE_KEY_BY_CHECK,
 )
+REACT_NATIVE_CODE_CHECK_SPECS = _flutter_check_specs(
+    (
+        *FLUTTER_CODE_CHECK_SPECS,
+        {
+            "check": "Uses Dynamic Code Execution",
+            "severity": "High",
+            "compliance": "MASVS-CODE-4; CWE-95",
+            "present_explanation": "The application dynamically evaluates source-controlled code.",
+            "not_present_explanation": "No dynamic code-evaluation usage was identified in the assessed source.",
+            "confidence_caveat": "Detected through static source patterns.",
+            "aliases": (),
+        },
+    ),
+    REACT_NATIVE_CODE_EVIDENCE_KEY_BY_CHECK,
+)
+REACT_NATIVE_NETWORK_CHECK_SPECS = _flutter_check_specs(
+    (
+        *FLUTTER_NETWORK_CHECK_SPECS,
+        {
+            "check": "Insecure WebView Configuration",
+            "severity": "High",
+            "compliance": "MASVS-PLATFORM-2; CWE-749",
+            "present_explanation": "A React Native WebView is configured with unsafe content or origin controls.",
+            "not_present_explanation": "No unsafe React Native WebView configuration was identified.",
+            "confidence_caveat": "Detected through static source patterns.",
+            "aliases": (),
+        },
+    ),
+    REACT_NATIVE_NETWORK_EVIDENCE_KEY_BY_CHECK,
+)
+REACT_NATIVE_DATA_STORAGE_CHECK_SPECS = _flutter_check_specs(
+    (
+        *FLUTTER_DATA_STORAGE_CHECK_SPECS,
+        *(
+            spec
+            for spec in CODE_CHECK_SPECS
+            if str(spec["check"]).strip().lower()
+            == "copies sensitive information into the clipboard without user consent"
+        ),
+    ),
+    REACT_NATIVE_DATA_STORAGE_EVIDENCE_KEY_BY_CHECK,
+)
+REACT_NATIVE_RESILIENCE_CHECK_SPECS = FLUTTER_RESILIENCE_CHECK_SPECS
 IPA_BINARY_PROTECTION_SPECS = (
     {
         "protection": "NX",
@@ -1830,9 +1890,15 @@ def _is_flutter_platform(data: dict[str, Any]) -> bool:
     return str(meta.get("platform") or "").strip().lower() == "flutter"
 
 
+def _is_react_native_platform(data: dict[str, Any]) -> bool:
+    meta = data.get("meta") if isinstance(data.get("meta"), dict) else {}
+    return str(meta.get("platform") or "").strip().lower() == "react native"
+
+
 def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     is_ios = _is_ios_platform(data)
     is_flutter = _is_flutter_platform(data)
+    is_react_native = _is_react_native_platform(data)
     base_template = _ios_blank_template() if is_ios else _blank_template()
     report_data = _merge_nested(base_template, data)
     report_scope = resolve_report_scope(report_data)
@@ -1843,6 +1909,13 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     if is_flutter:
         _normalize_flutter_presentation(report_data)
         _canonicalize_flutter_sections(report_data, report_scope.target_type)
+        section_to_area = {
+            section_name: area
+            for section_name, area in SECTION_TO_AREA.items()
+            if section_name in report_scope.assessed_sections
+        }
+    elif is_react_native:
+        _canonicalize_react_native_sections(report_data, report_scope.target_type)
         section_to_area = {
             section_name: area
             for section_name, area in SECTION_TO_AREA.items()
@@ -2160,6 +2233,55 @@ def _canonicalize_flutter_sections(report_data: dict[str, Any], target_type: str
         ]
 
 
+def _canonicalize_react_native_sections(report_data: dict[str, Any], target_type: str) -> None:
+    section_configs = {
+        "code": (
+            "code_evidence",
+            REACT_NATIVE_CODE_EVIDENCE_KEY_BY_CHECK,
+            REACT_NATIVE_CODE_CHECK_SPECS,
+        ),
+        "network": (
+            "network_evidence",
+            REACT_NATIVE_NETWORK_EVIDENCE_KEY_BY_CHECK,
+            REACT_NATIVE_NETWORK_CHECK_SPECS,
+        ),
+        "data storage": (
+            "data_storage_evidence",
+            REACT_NATIVE_DATA_STORAGE_EVIDENCE_KEY_BY_CHECK,
+            REACT_NATIVE_DATA_STORAGE_CHECK_SPECS,
+        ),
+        "resilience": (
+            "resilience_evidence",
+            REACT_NATIVE_RESILIENCE_EVIDENCE_KEY_BY_CHECK,
+            REACT_NATIVE_RESILIENCE_CHECK_SPECS,
+        ),
+    }
+    sections = report_data.get("vulnerability_sections")
+    if not isinstance(sections, list):
+        return
+
+    for section in sections:
+        section_name = str(section.get("section_name", "")).strip().lower()
+        config = section_configs.get(section_name)
+        if config is None:
+            continue
+        evidence_key, evidence_map, specs = config
+        evidence = report_data.get(evidence_key)
+        evidence = evidence if isinstance(evidence, dict) else {}
+        incoming_checks = list(section.get("checks") or [])
+        lookup = {
+            _normalized_check_name(check.get("check")): check
+            for check in incoming_checks
+            if isinstance(check, dict) and str(check.get("check", "")).strip()
+        }
+        section["checks"] = [
+            _canonical_flutter_check(spec, lookup, evidence, evidence_map)
+            for spec in specs
+            if target_type in spec.get("applies_to", ("SOURCE", "BINARY"))
+            and evidence_map.get(_normalized_check_name(spec["check"])) in evidence
+        ]
+
+
 def _canonical_flutter_check(
     spec: dict[str, Any],
     lookup: dict[str, dict[str, Any]],
@@ -2181,7 +2303,7 @@ def _canonical_flutter_check(
         result = "Present" if evidence_entry["present"] else "Not Present"
         explanation = spec["present_explanation"] if result == "Present" else spec["not_present_explanation"]
         evidence_text = _non_empty_string(evidence_entry.get("evidence"))
-    elif source is not None:
+    elif evidence_entry is None and source is not None:
         result = _present_not_present(source.get("result")) or result
         explanation = _non_empty_string(source.get("explanation")) or explanation
         compliance = _non_empty_string(source.get("compliance")) or compliance
