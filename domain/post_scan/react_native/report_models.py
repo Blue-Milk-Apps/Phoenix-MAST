@@ -216,6 +216,8 @@ def _evidence_section(context: ReactNativeScanExtractionContext, section: str) -
         if existing is None:
             output[key] = asdict(derived)
             continue
+        if derived.present is None:
+            continue
         combined = combine_evidence_entries(
             [
                 ReactNativeEvidenceEntry(

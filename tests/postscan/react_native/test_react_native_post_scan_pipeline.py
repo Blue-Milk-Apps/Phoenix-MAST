@@ -175,7 +175,37 @@ def test_react_native_extractor_derives_native_metadata_secret_and_sbom_evidence
                 },
             },
         },
-        "opengrep": {"results": [], "scan_metadata": {"scopes": {}}},
+        "opengrep": {
+            "results": [
+                {
+                    "check_id": "react-native.source.sha1-hash",
+                    "phoenix_scope": "react_native",
+                    "path": str(project / "src" / "crypto.ts"),
+                    "start": {"line": 5},
+                },
+                {
+                    "check_id": "react-native.source.cookie-missing-secure",
+                    "phoenix_scope": "react_native",
+                    "path": str(project / "src" / "cookies.ts"),
+                    "start": {"line": 8},
+                },
+                {
+                    "check_id": "react-native.source.keyboard-cache-exposure",
+                    "phoenix_scope": "react_native",
+                    "path": str(project / "src" / "Login.tsx"),
+                    "start": {"line": 13},
+                },
+            ],
+            "scan_metadata": {
+                "scopes": {
+                    "react_native": {
+                        "status": "success",
+                        "applicable": True,
+                        "configured_rule_ids": sorted(REACT_NATIVE_RULE_IDS),
+                    }
+                }
+            },
+        },
         "gitleaks_outputs": {
             "gitleaks_report.json": [
                 {
@@ -204,11 +234,14 @@ def test_react_native_extractor_derives_native_metadata_secret_and_sbom_evidence
     assert report["code_evidence"]["hardcoded_api_keys_in_bundle"]["present"] is True
     assert report["code_evidence"]["insecure_nanopb_library"]["present"] is True
     assert report["code_evidence"]["insecure_entitlements"]["present"] is True
+    assert report["code_evidence"]["uses_sha1_hashing_algorithm"]["present"] is True
     assert report["network_evidence"]["allows_cleartext_traffic_for_all_domains"]["present"] is True
     assert report["network_evidence"]["ats_disabled"]["present"] is True
     assert report["network_evidence"]["ats_exceptions_configured"]["present"] is True
+    assert report["network_evidence"]["cookie_missing_secure_flag"]["present"] is True
     assert report["network_evidence"]["certificate_pinning_not_implemented"]["present"] is None
     assert report["data_storage_evidence"]["accesses_external_storage"]["present"] is True
+    assert report["data_storage_evidence"]["keyboard_cache_exposure"]["present"] is True
 
 
 def test_react_native_metadata_preserves_risky_entitlement_names(tmp_path: Path) -> None:
