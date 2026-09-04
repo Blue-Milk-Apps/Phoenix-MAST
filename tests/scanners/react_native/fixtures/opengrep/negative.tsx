@@ -5,6 +5,7 @@ const endpoint = "https://api.example.com/session";
 
 await EncryptedStorage.setItem("profile", JSON.stringify({ theme: "dark" }));
 database.executeSql("SELECT * FROM users WHERE id = ?", [userId]);
+Location.getForegroundPermissionsAsync();
 
 export const Example = () => (
   <WebView

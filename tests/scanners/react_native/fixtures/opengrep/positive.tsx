@@ -81,6 +81,9 @@ const agent = { rejectUnauthorized: false };
 const legacyKeychain = { accessible: ACCESSIBLE.ALWAYS };
 const unlockedKeychain = { accessible: ACCESSIBLE.AFTER_FIRST_UNLOCK };
 NativeModules.Payments.deleteCredential(token);
+PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+request(PERMISSIONS.IOS.MICROPHONE);
+Location.requestForegroundPermissionsAsync();
 Location.startGeofencingAsync("region", []);
 const insecurePasswordInput = (
   <TextInput accessibilityLabel="password" secureTextEntry={false} />

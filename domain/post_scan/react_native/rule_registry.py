@@ -125,10 +125,19 @@ FUNCTIONALITY_RULE_ID_TO_KEY: dict[str, str] = {
     "react-native.functionality.usb-devices": "USB Devices",
 }
 
-INVENTORY_RULE_ID_TO_KEY: dict[str, str] = {
+ENDPOINT_INVENTORY_RULE_ID_TO_KEY: dict[str, str] = {
     "react-native.inventory.url-literal": "url_literal",
     "react-native.inventory.environment-endpoint": "environment_reference",
     "react-native.inventory.dynamic-base-url": "base_url_reference",
+}
+PERMISSION_INVENTORY_RULE_ID_TO_KEY: dict[str, str] = {
+    "react-native.inventory.android-permission-request": "android_runtime_request",
+    "react-native.inventory.cross-platform-permission-request": "cross_platform_runtime_request",
+    "react-native.inventory.expo-permission-request": "expo_runtime_request",
+}
+INVENTORY_RULE_ID_TO_KEY: dict[str, str] = {
+    **ENDPOINT_INVENTORY_RULE_ID_TO_KEY,
+    **PERMISSION_INVENTORY_RULE_ID_TO_KEY,
 }
 
 RULE_SEVERITIES: dict[str, str] = {
@@ -224,7 +233,18 @@ def _build_registry() -> dict[str, ReactNativeRuleMapping]:
                 severity=RULE_SEVERITIES[rule_id],
                 evidence_key=evidence_key,
             )
-            for rule_id, evidence_key in INVENTORY_RULE_ID_TO_KEY.items()
+            for rule_id, evidence_key in ENDPOINT_INVENTORY_RULE_ID_TO_KEY.items()
+        }
+    )
+    registry.update(
+        {
+            rule_id: ReactNativeRuleMapping(
+                disposition=ReactNativeRuleDisposition.INVENTORY,
+                section="Permissions",
+                severity=RULE_SEVERITIES[rule_id],
+                evidence_key=evidence_key,
+            )
+            for rule_id, evidence_key in PERMISSION_INVENTORY_RULE_ID_TO_KEY.items()
         }
     )
     registry.update(

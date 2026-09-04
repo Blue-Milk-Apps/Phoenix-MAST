@@ -280,6 +280,49 @@ def test_react_native_metadata_preserves_risky_entitlement_names(tmp_path: Path)
     ]
 
 
+def test_react_native_metadata_preserves_expo_permission_configuration(tmp_path: Path) -> None:
+    project = tmp_path / "mobile"
+    project.mkdir()
+    (project / "package.json").write_text(
+        json.dumps({"name": "mobile", "dependencies": {"react-native": "0.80.0"}}),
+        encoding="utf-8",
+    )
+    (project / "app.json").write_text(
+        json.dumps(
+            {
+                "expo": {
+                    "name": "Mobile",
+                    "plugins": ["expo-location", ["expo-camera", {"cameraPermission": "Take photos"}]],
+                    "android": {
+                        "permissions": ["CAMERA"],
+                        "blockedPermissions": ["android.permission.RECORD_AUDIO"],
+                    },
+                    "ios": {"infoPlist": {"NSCameraUsageDescription": "Take photos"}},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    config = ScanConfig(
+        project_path=project,
+        output_path=tmp_path / "output",
+        mode="source",
+        platform="ANY",
+        stack="REACT_NATIVE",
+    )
+
+    result = ReactNativeSourceMetadataScanner().scan(config)[0]
+    expo = json.loads(result.raw_output)["expo"]
+
+    assert expo["plugins"] == [
+        {"name": "expo-location", "options": {}},
+        {"name": "expo-camera", "options": {"cameraPermission": "Take photos"}},
+    ]
+    assert expo["android"]["permissions"] == ["CAMERA"]
+    assert expo["android"]["blocked_permissions"] == ["android.permission.RECORD_AUDIO"]
+    assert expo["ios"]["info_plist"] == {"NSCameraUsageDescription": "Take photos"}
+
+
 def test_react_native_endpoint_inventory_redacts_classifies_and_deduplicates(tmp_path: Path) -> None:
     project = tmp_path / "mobile"
     findings = [

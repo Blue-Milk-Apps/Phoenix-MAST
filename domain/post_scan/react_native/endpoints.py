@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import SplitResult, urlsplit, urlunsplit
 
-from domain.post_scan.react_native.rule_registry import INVENTORY_RULE_ID_TO_KEY
+from domain.post_scan.react_native.rule_registry import ENDPOINT_INVENTORY_RULE_ID_TO_KEY
 from domain.post_scan.react_native.scan_extraction_context import ReactNativeScanExtractionContext
 
 
@@ -26,12 +26,12 @@ class ReactNativeEndpoints:
     LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "10.0.2.2", "::1"})
 
     def __init__(self, context: ReactNativeScanExtractionContext) -> None:
-        inventory_rule_ids = frozenset(INVENTORY_RULE_ID_TO_KEY)
+        inventory_rule_ids = frozenset(ENDPOINT_INVENTORY_RULE_ID_TO_KEY)
         self.assessed = context.opengrep_scope_assessed("react_native", inventory_rule_ids)
         candidates: list[dict[str, str]] = []
         for finding in context.opengrep_results_for_scope("react_native"):
             rule_id = context.first_non_empty(finding.get("check_id"))
-            inventory_key = INVENTORY_RULE_ID_TO_KEY.get(rule_id)
+            inventory_key = ENDPOINT_INVENTORY_RULE_ID_TO_KEY.get(rule_id)
             if inventory_key is None:
                 continue
             candidates.extend(self._finding_candidates(context, finding, inventory_key))

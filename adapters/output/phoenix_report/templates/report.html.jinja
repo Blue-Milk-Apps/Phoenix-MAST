@@ -346,12 +346,15 @@
 
 <!-- ===================== PERMISSIONS ===================== -->
 <div class="section">
-  <h2>Permissions Requested</h2>
+  <h2>{{ 'Permission Inventory' if data.meta.platform == 'React Native' else 'Permissions Requested' }}</h2>
+  {% if data.meta.platform == 'React Native' and data.permissions_disclaimer %}
+  <p class="small">{{ data.permissions_disclaimer }}</p>
+  {% endif %}
   <table>
-    <tr>{% if data.meta.platform == 'Flutter' %}<th>Platform</th>{% endif %}<th>Permission</th><th>Status</th><th>Description</th></tr>
+    <tr>{% if data.meta.platform in ['Flutter', 'React Native'] %}<th>Platform</th>{% endif %}<th>Permission</th><th>Status</th><th>Description</th></tr>
     {% for p in data.permissions %}
     <tr>
-      {% if data.meta.platform == 'Flutter' %}<td>{{ p.platform }}</td>{% endif %}
+      {% if data.meta.platform in ['Flutter', 'React Native'] %}<td>{{ p.platform }}</td>{% endif %}
       <td class="mono">{{ p.display_permission or p.permission }}</td>
       <td>{{ risk_badge('High' if p.status == 'dangerous' else 'Info', label=p.status) }}</td>
       <td>{{ p.general_description }}{% if p.usage_description %}<br><span class="small">{{ p.usage_description }}</span>{% endif %}</td>

@@ -441,18 +441,34 @@ class ReactNativeSourceMetadataScanner(ScannerPort):
         android = expo.get("android") if isinstance(expo.get("android"), dict) else {}
         ios = expo.get("ios") if isinstance(expo.get("ios"), dict) else {}
         platforms = expo.get("platforms") if isinstance(expo.get("platforms"), list) else []
+        plugins: list[dict[str, Any]] = []
+        for value in expo.get("plugins", []) if isinstance(expo.get("plugins"), list) else []:
+            if isinstance(value, str) and value.strip():
+                plugins.append({"name": value.strip(), "options": {}})
+            elif isinstance(value, list) and value and isinstance(value[0], str):
+                plugins.append(
+                    {
+                        "name": value[0].strip(),
+                        "options": value[1] if len(value) > 1 and isinstance(value[1], dict) else {},
+                    }
+                )
         return {
             "assessed": assessed,
             "platforms": [value for value in platforms if value in {"android", "ios"}],
+            "plugins": plugins,
             "android": {
                 "package": str(android.get("package") or "").strip(),
                 "version_code": str(android.get("versionCode") or "").strip(),
                 "permissions": android.get("permissions") if isinstance(android.get("permissions"), list) else [],
+                "blocked_permissions": (
+                    android.get("blockedPermissions") if isinstance(android.get("blockedPermissions"), list) else []
+                ),
             },
             "ios": {
                 "bundle_identifier": str(ios.get("bundleIdentifier") or "").strip(),
                 "build_number": str(ios.get("buildNumber") or "").strip(),
                 "supports_tablet": ios.get("supportsTablet") if isinstance(ios.get("supportsTablet"), bool) else None,
+                "info_plist": ios.get("infoPlist") if isinstance(ios.get("infoPlist"), dict) else {},
             },
         }
 

@@ -11,6 +11,7 @@ from domain.post_scan.ios.rule_registry import REPORT_RULE_IDS_BY_SECTION as IOS
 from domain.post_scan.react_native.endpoints import ReactNativeEndpoints
 from domain.post_scan.react_native.functionality import ReactNativeFunctionality
 from domain.post_scan.react_native.opengrep_assessment import ReactNativeOpenGrepAssessment
+from domain.post_scan.react_native.permissions import ReactNativePermissions
 from domain.post_scan.react_native.rule_registry import (
     REACT_NATIVE_RULE_REGISTRY,
     ReactNativeRuleDisposition,
@@ -44,6 +45,7 @@ def build_report_sections(context: ReactNativeScanExtractionContext) -> dict[str
     )
     version_code = context.first_non_empty(android_identity.get("version_code"), ios_identity.get("build"))
 
+    permissions = ReactNativePermissions(context)
     sections: dict[str, Any] = {
         "meta": {
             "app_display_name": app_name,
@@ -75,7 +77,8 @@ def build_report_sections(context: ReactNativeScanExtractionContext) -> dict[str
         "dependency_inventory": _dependency_inventory(context),
         "application": context.mapping(context.android_metadata.get("application")),
         "app_components": _component_counts(context),
-        "permissions": _permissions(context),
+        "permissions": permissions.items,
+        "permissions_disclaimer": permissions.DISCLAIMER,
         "deep_links": context.mapping_list(context.android_metadata.get("deep_links")),
         "url_schemes": context.mapping(context.ios_metadata.get("url_schemes")).get("declared", []),
     }
@@ -145,37 +148,6 @@ def _component_counts(context: ReactNativeScanExtractionContext) -> dict[str, in
             sum(item.get("exported") is True for item in records) if records is not None else None
         )
     return result
-
-
-def _permissions(context: ReactNativeScanExtractionContext) -> list[dict[str, str]]:
-    permissions: list[dict[str, str]] = []
-    for item in context.mapping_list(context.android_metadata.get("permissions")):
-        name = context.first_non_empty(item.get("name"))
-        if name:
-            permissions.append(
-                {
-                    "platform": "Android",
-                    "permission": name,
-                    "status": "",
-                    "info": "",
-                    "usage_description": "",
-                    "general_description": "",
-                }
-            )
-    for item in context.mapping_list(context.ios_metadata.get("permissions")):
-        name = context.first_non_empty(item.get("key"))
-        if name:
-            permissions.append(
-                {
-                    "platform": "iOS",
-                    "permission": name,
-                    "status": "",
-                    "info": "",
-                    "usage_description": context.first_non_empty(item.get("purpose")),
-                    "general_description": "",
-                }
-            )
-    return permissions
 
 
 def _evidence_section(context: ReactNativeScanExtractionContext, section: str) -> dict[str, dict[str, Any]]:

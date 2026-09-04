@@ -96,6 +96,32 @@ def test_react_native_endpoint_inventory_renders_source_connection_and_security(
     assert "token=[REDACTED]" in html
 
 
+def test_react_native_permission_inventory_renders_source_disclaimer_and_platform() -> None:
+    html = _render_report_html(
+        {
+            "meta": {"platform": "React Native", "target_type": "SOURCE"},
+            "permissions_disclaimer": (
+                "This React Native source assessment cannot determine the final permissions in the packaged "
+                "application."
+            ),
+            "permissions": [
+                {
+                    "platform": "Android",
+                    "permission": "android.permission.CAMERA",
+                    "status": "Declared and Requested",
+                    "general_description": "Declared by Android manifest. Requested at src/camera.ts:4.",
+                    "usage_description": "",
+                }
+            ],
+        }
+    )
+
+    assert "Permission Inventory" in html
+    assert "cannot determine the final permissions" in html
+    assert "Platform" in html
+    assert "Declared and Requested" in html
+
+
 def test_overall_evaluation_summarizes_only_the_highest_present_severity() -> None:
     section_to_area = {"network": ("Networking", "networking")}
 
