@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import plistlib
 from pathlib import Path
+from typing import Callable
 
 from domain.models import ScanResult, ScanType
 from utilities.json_utils import json_safe
@@ -31,12 +32,14 @@ class PlistReportBuilder:
         description: str,
         base_path: Path,
         output_format: str,
+        plist_transform: Callable[[object], object] | None = None,
     ) -> None:
         self.scanner_name = scanner_name
         self.scan_type = scan_type
         self.description = description
         self.base_path = base_path
         self.output_format = output_format
+        self.plist_transform = plist_transform
 
     def build(self, plist_files: list[Path]) -> list[ScanResult]:
         if self.output_format == "xml":
@@ -52,7 +55,7 @@ class PlistReportBuilder:
             relative_target = self._output_path_for_plist(plist_file)
             source_path = self._source_path(plist_file)
             try:
-                data = self._load_plist(plist_file)
+                data = self._transform_plist(self._load_plist(plist_file))
                 plist_type = self._classify_plist(plist_file, data)
                 role = self._artifact_role(plist_type, plist_file, data)
                 if not self._should_emit_plist(plist_type, plist_file, data):
@@ -153,7 +156,7 @@ class PlistReportBuilder:
         for plist_file in plist_files:
             relative_target = self._output_path_for_plist(plist_file)
             try:
-                data = self._load_plist(plist_file)
+                data = self._transform_plist(self._load_plist(plist_file))
                 results.append(
                     ScanResult(
                         scanner_name=self.scanner_name,
@@ -187,6 +190,11 @@ class PlistReportBuilder:
     def _load_plist(self, plist_file: Path) -> object:
         with plist_file.open("rb") as handle:
             return plistlib.load(handle)
+
+    def _transform_plist(self, data: object) -> object:
+        if self.plist_transform is None:
+            return data
+        return self.plist_transform(data)
 
     def _output_path_for_plist(self, plist_file: Path) -> Path:
         try:
