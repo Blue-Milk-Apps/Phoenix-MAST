@@ -51,6 +51,7 @@ packages = [
     "adapters.storage",
     "application",
     "domain",
+    "domain.report",
     "domain.post_scan",
     "domain.post_scan.android",
     "domain.post_scan.android.native",
