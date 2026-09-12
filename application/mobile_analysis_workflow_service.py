@@ -1,6 +1,7 @@
 import json
 import os
 import time
+from dataclasses import asdict
 from pathlib import Path
 
 from adapters.output.file_output import FileScanOutput
@@ -46,6 +47,7 @@ from adapters.scanners.react_native import ReactNativeOpenGrepScanner, ReactNati
 from application.post_scan_processing_service import PostScanProcessingService
 from application.scanner_service import ScannerService
 from domain.models import ExtractedBinary, ScanConfig, ScanType
+from domain.report import ReportTargetFactory
 from ports.scanner_port import ScannerPort
 from utilities.apk_utils import extract_apk, is_apk_file
 from utilities.ipa_utils import extract_ipa, is_ipa_file
@@ -166,6 +168,8 @@ class MobileAnalysisWorkflowService:
                 scan_output_method.write_result(result)
 
             post_scan_output = self._run_post_scan_processing(scan_config.output_path, scan_config)
+            if post_scan_output:
+                post_scan_output["target_information"] = asdict(ReportTargetFactory.from_scan_config(scan_config))
             target = scan_config.output_path / self.POST_SCAN_OUTPUT_FILE_NAME
             target.write_text(
                 json.dumps(post_scan_output, indent=2, sort_keys=True),

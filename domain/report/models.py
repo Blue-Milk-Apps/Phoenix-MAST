@@ -38,7 +38,6 @@ class CheckResult(StrEnum):
     NOT_EVALUATED = "not_evaluated"
 
 
-@dataclass(frozen=True)
 class ReportPlatform(StrEnum):
     """Normalized platform represented by report metadata."""
 
