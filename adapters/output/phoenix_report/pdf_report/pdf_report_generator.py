@@ -9,12 +9,11 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
+from adapters.output.phoenix_report.common import result_badge, risk_badge
 from adapters.output.phoenix_report.generate_report import (
     build_charts,
     get_app_icon_data_uri,
     get_report_brand_icon_data_uri,
-    result_badge,
-    risk_badge,
 )
 from adapters.output.phoenix_report.pdf_report.presentation import PdfPresentation
 from domain.report import AndroidBinaryReportDetails, ReportData, ReportPlatform

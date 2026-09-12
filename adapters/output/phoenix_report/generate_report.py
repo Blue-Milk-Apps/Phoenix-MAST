@@ -23,6 +23,8 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from adapters.output.phoenix_report.common import result_badge as shared_result_badge
+from adapters.output.phoenix_report.common import risk_badge as shared_risk_badge
 from adapters.output.phoenix_report.report_scope import ReportScope, resolve_report_scope
 
 BASE_DIR = Path(__file__).parent
@@ -1663,37 +1665,11 @@ REPORT_BRAND_ICON_PATH = BASE_DIR / "assets" / "PhoenixShield.png"
 
 
 def risk_badge(rating, label=None):
-    from markupsafe import Markup
-
-    key = (rating or "").strip().lower()
-    css_class = {
-        "critical": "badge-critical",
-        "high": "badge-high",
-        "medium": "badge-medium",
-        "low": "badge-low",
-        "info": "badge-info",
-        "secure hotspot": "badge-secure",
-        "secure": "badge-secure",
-        "hotspot": "badge-hotspot",
-        "variable": "badge-variable",
-        "n/a": "badge-na",
-        "dangerous": "badge-high",
-        "normal": "badge-info",
-    }.get(key, "badge-info")
-    text = label if label else rating
-    return Markup(f'<span class="badge {css_class}">{text}</span>')
+    return shared_risk_badge(rating, label)
 
 
 def result_badge(result):
-    from markupsafe import Markup
-
-    key = (result or "").strip().lower()
-    css_class = {
-        "present": "badge-present",
-        "not present": "badge-notpresent",
-        "not evaluated": "badge-na",
-    }.get(key, "badge-na")
-    return Markup(f'<span class="badge {css_class}">{result}</span>')
+    return shared_result_badge(result)
 
 
 def make_overall_risk_polar_chart(risk_summary):
