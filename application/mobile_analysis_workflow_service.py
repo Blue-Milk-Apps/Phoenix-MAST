@@ -5,7 +5,9 @@ from dataclasses import asdict
 from pathlib import Path
 
 from adapters.output.file_output import FileScanOutput
+from adapters.output.phoenix_report.builders.android import AndroidBinaryReportDataBuilder
 from adapters.output.phoenix_report.generate_report import generate_report
+from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
 from adapters.post_scan import (
     AndroidBinaryScanDetailExtractor,
     AndroidBinaryScanOutputLoader,
@@ -45,9 +47,10 @@ from adapters.scanners.ios import (
 )
 from adapters.scanners.react_native import ReactNativeOpenGrepScanner, ReactNativeSourceMetadataScanner
 from application.post_scan_processing_service import PostScanProcessingService
+from application.report_generation_service import ReportGenerationService
 from application.scanner_service import ScannerService
 from domain.models import ExtractedBinary, ScanConfig, ScanType
-from domain.report import ReportTargetFactory
+from domain.report import ReportTargetFactory, ReportTargetKind
 from ports.scanner_port import ScannerPort
 from utilities.apk_utils import extract_apk, is_apk_file
 from utilities.ipa_utils import extract_ipa, is_ipa_file
@@ -176,10 +179,15 @@ class MobileAnalysisWorkflowService:
                 encoding="utf-8",
             )
             if post_scan_output:
-                generate_report(
-                    post_scan_output,
-                    self._report_output_path(scan_config.output_path, post_scan_output),
-                )
+                report_path = self._report_output_path(scan_config.output_path, post_scan_output)
+                target_kind = ReportTargetFactory.from_scan_config(scan_config).target_kind
+                if target_kind == ReportTargetKind.ANDROID_BINARY:
+                    report_data = ReportGenerationService([AndroidBinaryReportDataBuilder()]).build_report_data(
+                        post_scan_output
+                    )
+                    PdfReportGenerator().generate(report_data, report_path)
+                else:
+                    generate_report(post_scan_output, report_path)
             print(f"Results: {len(scan_results)}")
             print(f"Duration: {time.perf_counter() - wall_start:.2f} seconds")
         finally:
