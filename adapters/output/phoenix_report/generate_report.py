@@ -1849,6 +1849,7 @@ def generate_report(
     template = env.get_template("report.html.jinja")
     html_out = template.render(
         data=data,
+        presentation=data["report_scope"],
         css=css_text,
         charts=charts,
         app_icon_uri=app_icon_uri,
@@ -1903,6 +1904,7 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     report_data = _merge_nested(base_template, data)
     report_scope = resolve_report_scope(report_data)
     report_data["report_scope"] = asdict(report_scope)
+    report_data["presentation"] = asdict(report_scope)
     _normalize_data_storage_section_name(report_data)
     _retain_assessed_sections(report_data, report_scope)
 

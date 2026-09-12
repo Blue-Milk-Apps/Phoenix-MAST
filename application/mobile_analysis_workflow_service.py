@@ -136,7 +136,7 @@ class MobileScannerFactory:
             strings_output_path = config.output_path / ScanType.STRINGS.value
             if not strings_output_path.is_dir():
                 return []
-            return sorted(path for path in strings_output_path.rglob("*.txt") if path.is_file())
+            return [strings_output_path]
         raise ValueError(f"Unsupported target type for OpenGrep scan paths: {config.target_type}")
 
 
