@@ -311,6 +311,55 @@ class AndroidBinaryReportDetails(PlatformReportDetails):
 
 
 @dataclass(frozen=True)
+class IOSBinaryEvidenceDetails:
+    """iOS executable protection evidence."""
+
+    nx: bool | None = None
+    pie: bool | None = None
+    stack_canary: bool | None = None
+    arc: bool | None = None
+    rpath: bool | None = None
+    code_signature: bool | None = None
+    encrypted: bool | None = None
+    symbols_stripped: bool | None = None
+
+
+@dataclass(frozen=True)
+class IOSUrlSchemeDetails:
+    """A declared iOS URL scheme handler."""
+
+    url_name: str
+    schemes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class IOSSDKCategoryDetails:
+    """Detected third-party SDKs in one category."""
+
+    category: str
+    sdk_names: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class IOSBinaryReportDetails(PlatformReportDetails):
+    """iOS-binary-specific content for a report."""
+
+    file_info: FileDetails
+    app_info: AppDetails
+    binary_evidence: IOSBinaryEvidenceDetails
+    url_schemes: tuple[IOSUrlSchemeDetails, ...]
+    functionality: tuple[FunctionalityDetails, ...]
+    third_party_sdks: tuple[IOSSDKCategoryDetails, ...]
+    permissions: tuple[PermissionDetails, ...]
+    hardcoded_values: HardcodedValuesDetails
+    endpoints: tuple[EndpointDetails, ...]
+
+    @property
+    def target_kind(self) -> ReportTargetKind:
+        return ReportTargetKind.IOS_BINARY
+
+
+@dataclass(frozen=True)
 class ReportData:
     """Standard, format-independent output of a report data builder."""
 
