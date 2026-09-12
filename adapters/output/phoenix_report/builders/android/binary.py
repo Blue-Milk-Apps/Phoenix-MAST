@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+from adapters.output.phoenix_report.builders.android.binary_check_catalog import (
+    EVIDENCE_KEY_BY_CHECK,
+    SECTION_CHECKS,
+    AndroidBinaryCheckDefinition,
+)
 from domain.report import (
     AndroidApplicationDetails,
     AndroidBinaryReportDetails,
@@ -32,13 +37,6 @@ from domain.report import (
 )
 from ports.report_data_builder_port import ReportDataBuilderPort
 
-_SECTION_DEFINITIONS = (
-    ("code", "Code Vulnerability", "code_evidence"),
-    ("network", "Networking", "network_evidence"),
-    ("data storage", "Data Storage", "data_storage_evidence"),
-    ("resilience", "Resilience", "resilience_evidence"),
-)
-
 
 class AndroidBinaryReportDataBuilder(ReportDataBuilderPort):
     """Translate Android binary post-scan output into standard report data."""
@@ -62,7 +60,8 @@ class AndroidBinaryReportDataBuilder(ReportDataBuilderPort):
             )
 
         sections = tuple(
-            self._section(name, evidence_key, post_scan_data) for name, _area, evidence_key in _SECTION_DEFINITIONS
+            self._section(name, evidence_key, checks, post_scan_data)
+            for name, _area, evidence_key, checks in SECTION_CHECKS
         )
         findings_severity = self._findings_severity(sections)
 
@@ -71,7 +70,8 @@ class AndroidBinaryReportDataBuilder(ReportDataBuilderPort):
             vulnerability_sections=sections,
             overall_evaluation=self._overall_evaluation(sections),
             risk_summary=tuple(
-                RiskSummary(area=area, risk_level=RiskLevel.LOW) for _name, area, _evidence_key in _SECTION_DEFINITIONS
+                RiskSummary(area=evaluation.area, risk_level=evaluation.risk_level)
+                for evaluation in self._overall_evaluation(sections)
             ),
             findings_severity=findings_severity,
             platform_details=AndroidBinaryReportDetails(
@@ -91,62 +91,150 @@ class AndroidBinaryReportDataBuilder(ReportDataBuilderPort):
         self,
         section_name: str,
         evidence_key: str,
+        definitions: tuple[AndroidBinaryCheckDefinition, ...],
         post_scan_data: Mapping[str, Any],
     ) -> VulnerabilitySection:
         evidence = self._mapping(post_scan_data, evidence_key)
-        checks = tuple(self._check(check_name, value) for check_name, value in sorted(evidence.items()))
+        checks = tuple(self._check(definition, evidence, post_scan_data) for definition in definitions)
         return VulnerabilitySection(
             name=section_name,
             findings_text="",
             checks=checks,
         )
 
-    @staticmethod
-    def _check(check_name: str, value: Any) -> SecurityCheck:
-        evidence = value if isinstance(value, Mapping) else {}
-        present = evidence.get("present") if evidence else value
-        result = (
-            CheckResult.PRESENT
-            if present is True
-            else CheckResult.NOT_PRESENT
-            if present is False
-            else CheckResult.NOT_EVALUATED
-        )
-        details = evidence.get("evidence") if evidence else ""
+    @classmethod
+    def _check(
+        cls,
+        definition: AndroidBinaryCheckDefinition,
+        section_evidence: Mapping[str, Any],
+        post_scan_data: Mapping[str, Any],
+    ) -> SecurityCheck:
+        entry = section_evidence.get(EVIDENCE_KEY_BY_CHECK[cls._normalized(definition.name)])
+        entry = entry if isinstance(entry, Mapping) else {}
+        present = cls._optional_bool(entry.get("present"))
+        evidence = cls._text(entry, "evidence")
+        if present is None:
+            present, evidence = cls._derived_result(definition.name, post_scan_data, evidence)
+        result = cls._check_result(present)
         return SecurityCheck(
-            name=check_name.replace("_", " ").title(),
-            severity=CheckSeverity.INFO,
+            name=definition.name,
+            severity=definition.severity,
             result=result,
-            explanation="",
-            evidence=str(details or ""),
+            explanation=cls._explanation(definition.name, result),
+            evidence=evidence,
+            compliance=cls._text(entry, "compliance"),
+            remediation_link=cls._text(entry, "remediation_link"),
         )
+
+    @classmethod
+    def _derived_result(
+        cls,
+        check_name: str,
+        data: Mapping[str, Any],
+        evidence: str,
+    ) -> tuple[bool | None, str]:
+        component_key = {
+            "Activities Accessible to Other Apps": "exported_activities",
+            "Receivers Accessible to Other Apps": "exported_receivers",
+            "Services Accessible to Other Apps": "exported_services",
+        }.get(check_name)
+        if component_key:
+            components = cls._mapping(data, "app_components")
+            if component_key in components:
+                count = cls._integer(components[component_key])
+                return count > 0, f"{component_key}={count}"
+        if check_name == "App is Debuggable":
+            return cls._derived_boolean(data, "debuggable", evidence)
+        if check_name == "Allows Cleartext Traffic for All Domains":
+            return cls._derived_boolean(data, "uses_cleartext_traffic", evidence)
+        return None, evidence
+
+    @classmethod
+    def _derived_boolean(
+        cls,
+        data: Mapping[str, Any],
+        key: str,
+        evidence: str,
+    ) -> tuple[bool | None, str]:
+        for section_name in ("application", "app_info", "manifest"):
+            section = cls._mapping(data, section_name)
+            if key in section:
+                value = cls._optional_bool(section.get(key))
+                if value is not None:
+                    return value, evidence or f"{key}={str(value).lower()}"
+        return None, evidence
+
+    @staticmethod
+    def _check_result(value: bool | None) -> CheckResult:
+        if value is True:
+            return CheckResult.PRESENT
+        if value is False:
+            return CheckResult.NOT_PRESENT
+        return CheckResult.NOT_EVALUATED
+
+    @staticmethod
+    def _explanation(check_name: str, result: CheckResult) -> str:
+        if result == CheckResult.NOT_EVALUATED:
+            return f"{check_name} was not evaluated because the required scan evidence is unavailable."
+        if result == CheckResult.PRESENT:
+            return f"Evidence indicates that {check_name.lower()}."
+        return f"No evidence indicates that {check_name.lower()}."
 
     @staticmethod
     def _overall_evaluation(
         sections: tuple[VulnerabilitySection, ...],
     ) -> tuple[OverallEvaluation, ...]:
-        area_by_section = {name: area for name, area, _evidence_key in _SECTION_DEFINITIONS}
+        area_by_section = {name: area for name, area, _evidence_key, _checks in SECTION_CHECKS}
         return tuple(
             OverallEvaluation(
                 area=area_by_section[section.name],
-                risk_level=RiskLevel.LOW,
-                findings=tuple(check.name for check in section.checks if check.result == CheckResult.PRESENT)
+                risk_level=AndroidBinaryReportDataBuilder._risk_level(section),
+                findings=tuple(
+                    check.name
+                    for check in section.checks
+                    if check.result == CheckResult.PRESENT
+                    and check.severity not in {CheckSeverity.INFO, CheckSeverity.SECURE}
+                )
                 or ("No findings identified in this scan",),
             )
             for section in sections
         )
 
     @staticmethod
+    def _risk_level(section: VulnerabilitySection) -> RiskLevel:
+        severities = {check.severity for check in section.checks if check.result == CheckResult.PRESENT}
+        if CheckSeverity.CRITICAL in severities or CheckSeverity.HIGH in severities:
+            return RiskLevel.HIGH
+        if CheckSeverity.MEDIUM in severities:
+            return RiskLevel.MEDIUM
+        return RiskLevel.LOW
+
+    @staticmethod
     def _findings_severity(
         sections: tuple[VulnerabilitySection, ...],
     ) -> FindingSeverity:
-        info = sum(1 for section in sections for check in section.checks if check.result == CheckResult.PRESENT)
-        return FindingSeverity(info=info)
+        counts = {severity: 0 for severity in CheckSeverity}
+        for section in sections:
+            for check in section.checks:
+                if check.result == CheckResult.PRESENT:
+                    counts[check.severity] += 1
+        return FindingSeverity(
+            critical=counts[CheckSeverity.CRITICAL],
+            high=counts[CheckSeverity.HIGH],
+            medium=counts[CheckSeverity.MEDIUM],
+            low=counts[CheckSeverity.LOW],
+            info=counts[CheckSeverity.INFO],
+            secure=counts[CheckSeverity.SECURE],
+        )
 
     @staticmethod
     def _mapping(data: Mapping[str, Any], key: str) -> Mapping[str, Any]:
         value = data.get(key)
         return value if isinstance(value, Mapping) else {}
+
+    @staticmethod
+    def _normalized(value: str) -> str:
+        return " ".join(value.lower().split())
 
     @staticmethod
     def _mappings(value: Any) -> tuple[Mapping[str, Any], ...]:
