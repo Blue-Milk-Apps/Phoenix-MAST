@@ -17,6 +17,7 @@ from domain.report.models import (
     SecurityCheck,
     VulnerabilitySection,
 )
+from domain.report.target_factory import ReportTargetFactory
 
 __all__ = [
     "CheckResult",
@@ -28,6 +29,7 @@ __all__ = [
     "ReportPlatform",
     "ReportStack",
     "ReportTarget",
+    "ReportTargetFactory",
     "ReportTargetKind",
     "ReportTargetType",
     "RiskLevel",
