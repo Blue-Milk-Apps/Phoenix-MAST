@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Mapping
 
 
 class RiskLevel(StrEnum):
@@ -39,12 +39,64 @@ class CheckResult(StrEnum):
 
 
 @dataclass(frozen=True)
-class ReportAssessmentScope:
-    """Assessment facts that determine report applicability."""
+class ReportPlatform(StrEnum):
+    """Normalized platform represented by report metadata."""
 
-    platform: str
-    target_type: str
-    assessed_sections: tuple[str, ...]
+    ANDROID = "android"
+    IOS = "ios"
+    FLUTTER = "flutter"
+    REACT_NATIVE = "react_native"
+
+
+class ReportTargetType(StrEnum):
+    """Target form assessed by a report."""
+
+    BINARY = "binary"
+    SOURCE = "source"
+
+
+class ReportStack(StrEnum):
+    """Normalized technology stack for a source target."""
+
+    FLUTTER = "flutter"
+    REACT_NATIVE = "react_native"
+    NATIVE_ANDROID = "native_android"
+    NATIVE_IOS = "native_ios"
+
+
+class ReportTargetKind(StrEnum):
+    """Supported assessment target families."""
+
+    ANDROID_BINARY = "android_binary"
+    IOS_BINARY = "ios_binary"
+    FLUTTER_SOURCE = "flutter_source"
+    REACT_NATIVE_SOURCE = "react_native_source"
+    NATIVE_ANDROID_SOURCE = "native_android_source"
+    NATIVE_IOS_SOURCE = "native_ios_source"
+
+
+@dataclass(frozen=True)
+class ReportTarget:
+    """Canonical target classification for a report."""
+
+    target_kind: ReportTargetKind
+    platform: ReportPlatform
+    target_type: ReportTargetType
+    stack: ReportStack | None
+
+
+@dataclass(frozen=True)
+class ReportMetadata:
+    """Common identifying metadata for an assessment report."""
+
+    target: ReportTarget
+    app_display_name: str = ""
+    file_name: str = ""
+    package_name: str = ""
+    scan_date: str = ""
+    version_name: str = ""
+    version_code: str = ""
+    reviewer_org: str = ""
 
 
 @dataclass(frozen=True)
@@ -98,14 +150,22 @@ class FindingSeverity:
     secure: int = 0
 
 
+class PlatformReportDetails(ABC):
+    """Platform-specific report content emitted by a report data builder."""
+
+    @property
+    @abstractmethod
+    def target_kind(self) -> ReportTargetKind:
+        """Return the target kind this detail model represents."""
+
+
 @dataclass(frozen=True)
 class ReportData:
     """Standard, format-independent output of a report data builder."""
 
-    scope: ReportAssessmentScope
-    metadata: Mapping[str, Any]
+    metadata: ReportMetadata
     vulnerability_sections: tuple[VulnerabilitySection, ...]
     overall_evaluation: tuple[OverallEvaluation, ...]
     risk_summary: tuple[RiskSummary, ...]
     findings_severity: FindingSeverity
-    details: Mapping[str, Any] = field(default_factory=dict)
+    platform_details: PlatformReportDetails
