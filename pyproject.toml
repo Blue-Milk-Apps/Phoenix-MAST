@@ -34,6 +34,7 @@ packages = [
     "adapters",
     "adapters.output",
     "adapters.output.phoenix_report",
+    "adapters.output.phoenix_report.builders",
     "adapters.post_scan",
     "adapters.post_scan.android",
     "adapters.post_scan.android.native",

@@ -159,6 +159,158 @@ class PlatformReportDetails(ABC):
 
 
 @dataclass(frozen=True)
+class SignatureVersions:
+    """Verified Android application signature schemes."""
+
+    v1: bool = False
+    v2: bool = False
+    v3: bool = False
+    v4: bool = False
+
+
+@dataclass(frozen=True)
+class CertificateDetails:
+    """Application signing certificate details."""
+
+    owner_name: str = ""
+    organization: str = ""
+    organizational_unit: str = ""
+    location: str = ""
+    validity: str = ""
+    issuer: str = ""
+    serial_number: str = ""
+    signature_versions: SignatureVersions = SignatureVersions()
+    hash_algorithms: str = ""
+    fingerprint: str = ""
+    unique_certs: str = ""
+
+
+@dataclass(frozen=True)
+class FileDetails:
+    """Analyzed application file details."""
+
+    filename: str = ""
+    size: str = ""
+    md5: str = ""
+    sha1: str = ""
+    sha256: str = ""
+
+
+@dataclass(frozen=True)
+class AppDetails:
+    """Application identity and SDK details."""
+
+    icon_path: str = ""
+    name: str = ""
+    package_name: str = ""
+    main_activity: str = ""
+    target_sdk: str = ""
+    min_sdk: str = ""
+    max_sdk: str = ""
+    version_name: str = ""
+    app_store_id: str = ""
+    developer: str = ""
+    categories: str = ""
+    trackers_detected: str = ""
+
+
+@dataclass(frozen=True)
+class AndroidApplicationDetails:
+    """Android manifest application security settings."""
+
+    debuggable: bool | None = None
+    allow_backup: bool | None = None
+    uses_cleartext_traffic: bool | None = None
+
+
+@dataclass(frozen=True)
+class AppComponentSummary:
+    """Counts of Android application components."""
+
+    activities: int = 0
+    services: int = 0
+    receivers: int = 0
+    providers: int = 0
+    exported_activities: int = 0
+    exported_services: int = 0
+    exported_receivers: int = 0
+    exported_providers: int = 0
+
+
+@dataclass(frozen=True)
+class PermissionDetails:
+    """A requested application permission."""
+
+    permission: str
+    status: str = ""
+    info: str = ""
+    usage_description: str = ""
+    general_description: str = ""
+
+
+@dataclass(frozen=True)
+class FunctionalityDetails:
+    """Observed application functionality."""
+
+    name: str
+    present: bool | None
+    explanation: str = ""
+
+
+@dataclass(frozen=True)
+class HardcodedUrlDetails:
+    """A hardcoded URL found in application content."""
+
+    url: str
+    country: str = ""
+
+
+@dataclass(frozen=True)
+class HardcodedSecretDetails:
+    """A hardcoded secret found in application content."""
+
+    value: str
+
+
+@dataclass(frozen=True)
+class HardcodedValuesDetails:
+    """Hardcoded values found in application content."""
+
+    urls: tuple[HardcodedUrlDetails, ...] = ()
+    emails: tuple[str, ...] = ()
+    secrets: tuple[HardcodedSecretDetails, ...] = ()
+
+
+@dataclass(frozen=True)
+class EndpointDetails:
+    """A network endpoint observed in application content."""
+
+    endpoint: str
+    tags: str = ""
+    ip_address: str = ""
+    country: str = ""
+
+
+@dataclass(frozen=True)
+class AndroidBinaryReportDetails(PlatformReportDetails):
+    """Android-binary-specific content for a report."""
+
+    certificate: CertificateDetails
+    file_info: FileDetails
+    app_info: AppDetails
+    application: AndroidApplicationDetails
+    app_components: AppComponentSummary
+    functionality: tuple[FunctionalityDetails, ...]
+    permissions: tuple[PermissionDetails, ...]
+    hardcoded_values: HardcodedValuesDetails
+    endpoints: tuple[EndpointDetails, ...]
+
+    @property
+    def target_kind(self) -> ReportTargetKind:
+        return ReportTargetKind.ANDROID_BINARY
+
+
+@dataclass(frozen=True)
 class ReportData:
     """Standard, format-independent output of a report data builder."""
 
