@@ -205,6 +205,11 @@ class ReactNativeReportDetails(PlatformReportDetails):
     version_name: str = ""
     runtime: ReactNativeRuntimeDetails = ReactNativeRuntimeDetails()
     platforms: ReactNativePlatformDetails = ReactNativePlatformDetails()
+    dependencies: tuple[FlutterDependencyDetails, ...] = ()
+    functionality: tuple[FunctionalityDetails, ...] = ()
+    permissions: tuple[PermissionDetails, ...] = ()
+    hardcoded_values: HardcodedValuesDetails = field(default_factory=lambda: HardcodedValuesDetails())
+    endpoints: tuple[EndpointDetails, ...] = ()
 
     @property
     def target_kind(self) -> ReportTargetKind:
