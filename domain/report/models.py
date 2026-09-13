@@ -238,6 +238,11 @@ class NativeIOSReportDetails(PlatformReportDetails):
     version_name: str = ""
     minimum_os: str = ""
     url_schemes: tuple[str, ...] = ()
+    functionality: tuple[FunctionalityDetails, ...] = ()
+    permissions: tuple[PermissionDetails, ...] = ()
+    hardcoded_values: HardcodedValuesDetails = field(default_factory=lambda: HardcodedValuesDetails())
+    endpoints: tuple[EndpointDetails, ...] = ()
+    third_party_sdks: tuple[str, ...] = ()
 
     @property
     def target_kind(self) -> ReportTargetKind:
