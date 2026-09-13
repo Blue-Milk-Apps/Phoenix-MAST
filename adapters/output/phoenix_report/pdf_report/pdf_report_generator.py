@@ -10,7 +10,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from adapters.output.phoenix_report.common import result_badge, risk_badge
-from adapters.output.phoenix_report.pdf_report.android import map_android_binary_details
+from adapters.output.phoenix_report.pdf_report.android import map_android_binary_details, map_native_android_details
 from adapters.output.phoenix_report.pdf_report.common.charts import build_charts
 from adapters.output.phoenix_report.pdf_report.common.images import (
     get_app_icon_data_uri,
@@ -24,6 +24,7 @@ from domain.report import (
     AndroidBinaryReportDetails,
     FlutterReportDetails,
     IOSBinaryReportDetails,
+    NativeAndroidReportDetails,
     ReactNativeReportDetails,
     ReportData,
     ReportPlatform,
@@ -88,6 +89,8 @@ class PdfReportGenerator(ReportGeneratorPort):
         details = report_data.platform_details
         if isinstance(details, AndroidBinaryReportDetails):
             platform_details = map_android_binary_details(details)
+        elif isinstance(details, NativeAndroidReportDetails):
+            platform_details = map_native_android_details(details)
         elif isinstance(details, IOSBinaryReportDetails):
             platform_details = map_ios_binary_details(details)
         elif isinstance(details, FlutterReportDetails):
