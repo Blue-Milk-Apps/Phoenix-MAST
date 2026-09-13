@@ -8,6 +8,7 @@ from adapters.output.file_output import FileScanOutput
 from adapters.output.phoenix_report.builders.android import AndroidBinaryReportDataBuilder
 from adapters.output.phoenix_report.builders.flutter import FlutterReportDataBuilder
 from adapters.output.phoenix_report.builders.ios import IOSBinaryReportDataBuilder
+from adapters.output.phoenix_report.builders.react_native import ReactNativeReportDataBuilder
 from adapters.output.phoenix_report.generate_report import generate_report
 from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
 from adapters.post_scan import (
@@ -187,12 +188,14 @@ class MobileAnalysisWorkflowService:
                     ReportTargetKind.ANDROID_BINARY,
                     ReportTargetKind.IOS_BINARY,
                     ReportTargetKind.FLUTTER_SOURCE,
+                    ReportTargetKind.REACT_NATIVE_SOURCE,
                 }:
                     report_data = ReportGenerationService(
                         [
                             AndroidBinaryReportDataBuilder(),
                             IOSBinaryReportDataBuilder(),
                             FlutterReportDataBuilder(),
+                            ReactNativeReportDataBuilder(),
                         ]
                     ).build_report_data(post_scan_output)
                     PdfReportGenerator().generate(report_data, report_path)

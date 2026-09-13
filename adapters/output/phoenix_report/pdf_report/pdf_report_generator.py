@@ -19,10 +19,12 @@ from adapters.output.phoenix_report.pdf_report.common.images import (
 from adapters.output.phoenix_report.pdf_report.flutter import map_flutter_details
 from adapters.output.phoenix_report.pdf_report.ios import map_ios_binary_details
 from adapters.output.phoenix_report.pdf_report.presentation import PdfPresentation
+from adapters.output.phoenix_report.pdf_report.react_native import map_react_native_details
 from domain.report import (
     AndroidBinaryReportDetails,
     FlutterReportDetails,
     IOSBinaryReportDetails,
+    ReactNativeReportDetails,
     ReportData,
     ReportPlatform,
 )
@@ -90,6 +92,8 @@ class PdfReportGenerator(ReportGeneratorPort):
             platform_details = map_ios_binary_details(details)
         elif isinstance(details, FlutterReportDetails):
             platform_details = map_flutter_details(details)
+        elif isinstance(details, ReactNativeReportDetails):
+            platform_details = map_react_native_details(details)
         else:
             raise ValueError(
                 "PdfReportGenerator does not yet support "
