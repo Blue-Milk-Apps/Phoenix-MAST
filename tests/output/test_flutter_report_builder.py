@@ -58,6 +58,25 @@ def test_builds_all_sections_and_preserves_finding_metadata() -> None:
     assert check.remediation_link == "https://example.test/fix"
     assert report.findings_severity.high == 1
     assert report.risk_summary[0].risk_level == RiskLevel.HIGH
+    details = report.platform_details
+    assert details.package_name == ""
+
+
+def test_maps_flutter_metadata_and_dependencies() -> None:
+    report = FlutterReportDataBuilder().build(
+        {
+            "identity": {"package_name": "com.example.app", "version_name": "1.2.3"},
+            "sdk": {"dart_constraint": ">=3.3.0", "flutter_constraint": ">=3.22.0"},
+            "platforms": {"android": True, "ios": True, "web": False},
+            "dependency_inventory": {"declared": [{"name": "http"}], "resolved": [{"name": "path"}]},
+        },
+        _metadata(),
+    )
+    details = report.platform_details
+    assert details.package_name == "com.example.app"
+    assert details.dart_constraint == ">=3.3.0"
+    assert details.supported_platforms == ("android", "ios")
+    assert details.dependencies == ("http", "path")
 
 
 def test_partial_evidence_produces_empty_sections_and_not_evaluated_risk() -> None:

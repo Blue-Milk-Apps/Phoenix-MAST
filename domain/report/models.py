@@ -162,6 +162,13 @@ class PlatformReportDetails(ABC):
 class FlutterReportDetails(PlatformReportDetails):
     """Flutter-source-specific content for a report."""
 
+    package_name: str = ""
+    version_name: str = ""
+    dart_constraint: str = ""
+    flutter_constraint: str = ""
+    supported_platforms: tuple[str, ...] = ()
+    dependencies: tuple[str, ...] = ()
+
     @property
     def target_kind(self) -> ReportTargetKind:
         return ReportTargetKind.FLUTTER_SOURCE

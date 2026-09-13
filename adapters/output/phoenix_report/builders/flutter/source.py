@@ -51,7 +51,7 @@ class FlutterReportDataBuilder(ReportDataBuilderPort):
             evaluations,
             tuple(RiskSummary(e.area, e.risk_level) for e in evaluations),
             self._severity(sections),
-            FlutterReportDetails(),
+            self._details(post_scan_data),
         )
 
     @classmethod
@@ -105,3 +105,24 @@ class FlutterReportDataBuilder(ReportDataBuilderPort):
                 if check.result == CheckResult.PRESENT:
                     counts[check.severity.value] += 1
         return FindingSeverity(**counts)
+
+    @staticmethod
+    def _details(data: Mapping[str, Any]) -> FlutterReportDetails:
+        identity = data.get("identity") if isinstance(data.get("identity"), Mapping) else {}
+        sdk = data.get("sdk") if isinstance(data.get("sdk"), Mapping) else {}
+        platforms = data.get("platforms") if isinstance(data.get("platforms"), Mapping) else {}
+        dependencies = data.get("dependency_inventory") if isinstance(data.get("dependency_inventory"), Mapping) else {}
+        names = tuple(
+            str(item.get("name") or "")
+            for group in ("declared", "development", "resolved")
+            for item in dependencies.get(group, ())
+            if isinstance(item, Mapping) and item.get("name")
+        )
+        return FlutterReportDetails(
+            package_name=str(identity.get("package_name") or ""),
+            version_name=str(identity.get("version_name") or ""),
+            dart_constraint=str(sdk.get("dart_constraint") or ""),
+            flutter_constraint=str(sdk.get("flutter_constraint") or ""),
+            supported_platforms=tuple(str(name) for name, enabled in platforms.items() if enabled is True),
+            dependencies=names,
+        )
