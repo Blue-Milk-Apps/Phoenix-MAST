@@ -18,6 +18,8 @@ class PdfPresentation:
     target_type: ReportTargetType
     show_file_hashes: bool
     show_ios_binary_analysis: bool
+    show_url_schemes: bool
+    show_binary_protections: bool
 
     @classmethod
     def for_target_kind(cls, target_kind: ReportTargetKind) -> "PdfPresentation":
@@ -48,4 +50,6 @@ class PdfPresentation:
             target_type=target_type,
             show_file_hashes=target_type == ReportTargetType.BINARY,
             show_ios_binary_analysis=target_kind == ReportTargetKind.IOS_BINARY,
+            show_url_schemes=target_kind == ReportTargetKind.IOS_BINARY,
+            show_binary_protections=target_kind == ReportTargetKind.IOS_BINARY,
         )
