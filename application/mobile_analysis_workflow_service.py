@@ -12,7 +12,6 @@ from adapters.output.phoenix_report.builders.android import (
 from adapters.output.phoenix_report.builders.flutter import FlutterReportDataBuilder
 from adapters.output.phoenix_report.builders.ios import IOSBinaryReportDataBuilder, NativeIOSReportDataBuilder
 from adapters.output.phoenix_report.builders.react_native import ReactNativeReportDataBuilder
-from adapters.output.phoenix_report.generate_report import generate_report
 from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
 from adapters.post_scan import (
     AndroidBinaryScanDetailExtractor,
@@ -207,7 +206,7 @@ class MobileAnalysisWorkflowService:
                     ).build_report_data(post_scan_output)
                     PdfReportGenerator().generate(report_data, report_path)
                 else:
-                    generate_report(post_scan_output, report_path)
+                    raise ValueError(f"No modular report builder is registered for {target_kind.value}")
             print(f"Results: {len(scan_results)}")
             print(f"Duration: {time.perf_counter() - wall_start:.2f} seconds")
         finally:

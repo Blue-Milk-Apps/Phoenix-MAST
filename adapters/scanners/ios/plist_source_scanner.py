@@ -16,10 +16,7 @@ class PlistSourceScanner(ScannerPort):
 
     SUPPORTED_SUFFIXES = frozenset({".plist", ".entitlements", ".xcprivacy"})
     XCODE_BUILD_SETTING_PATTERN = re.compile(r"^\s*([A-Za-z0-9_]+)\s*=\s*(.*?)\s*;\s*$", re.MULTILINE)
-    XCODE_TARGET_NAME_PATTERN = re.compile(
-        r"/\*\s*(.*?)\s*\*/\s*=\s*\{\s*isa\s*=\s*PBXNativeTarget;",
-        re.DOTALL,
-    )
+    XCODE_TARGET_NAME_PATTERN = re.compile(r"/\*\s*([^*]*?)\s*\*/\s*=\s*\{\s*isa\s*=\s*PBXNativeTarget;")
     XCODE_VARIABLE_PATTERN = re.compile(r"\$\(([^)]+)\)")
 
     def __init__(self, output_format: str = "json") -> None:
@@ -101,6 +98,8 @@ class PlistSourceScanner(ScannerPort):
             target_names = self.XCODE_TARGET_NAME_PATTERN.findall(content)
             for target_name in target_names:
                 name = target_name.strip()
+                if "section" in name.lower() or "\n" in name:
+                    continue
                 if name and name not in settings.setdefault("TARGET_NAME", []):
                     settings["TARGET_NAME"].append(name)
 
