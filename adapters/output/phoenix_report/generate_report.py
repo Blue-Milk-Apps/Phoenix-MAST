@@ -28,6 +28,7 @@ from adapters.output.phoenix_report.pdf_report.common.images import (
     get_report_brand_icon_data_uri,
 )
 from adapters.output.phoenix_report.report_scope import ReportScope, resolve_report_scope
+from application.report_generation_service import ReportGenerationService
 
 BASE_DIR = Path(__file__).parent
 TEMPLATES_DIR = BASE_DIR / "templates"
@@ -1675,6 +1676,27 @@ def generate_report(
     output_path: Path | str,
     show_confidence_caveats: bool = False,
 ) -> Path:
+    if isinstance(input_data, dict) and isinstance(input_data.get("target_information"), dict):
+        from adapters.output.phoenix_report.builders.android import (
+            AndroidBinaryReportDataBuilder,
+            NativeAndroidReportDataBuilder,
+        )
+        from adapters.output.phoenix_report.builders.flutter import FlutterReportDataBuilder
+        from adapters.output.phoenix_report.builders.ios import IOSBinaryReportDataBuilder, NativeIOSReportDataBuilder
+        from adapters.output.phoenix_report.builders.react_native import ReactNativeReportDataBuilder
+        from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
+
+        report_data = ReportGenerationService(
+            [
+                AndroidBinaryReportDataBuilder(),
+                IOSBinaryReportDataBuilder(),
+                FlutterReportDataBuilder(),
+                ReactNativeReportDataBuilder(),
+                NativeAndroidReportDataBuilder(),
+                NativeIOSReportDataBuilder(),
+            ]
+        ).build_report_data(input_data)
+        return PdfReportGenerator().generate(report_data, output_path, show_confidence_caveats=show_confidence_caveats)
     _configure_weasyprint_library_path()
     from jinja2 import Environment, FileSystemLoader
     from weasyprint import HTML

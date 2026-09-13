@@ -106,7 +106,7 @@ class NativeIOSScanExtractionContext:
     def first_non_empty(*values: object) -> str:
         for value in values:
             text = str(value or "").strip()
-            if text:
+            if text and not (text.startswith("$(") and text.endswith(")")):
                 return text
         return ""
 

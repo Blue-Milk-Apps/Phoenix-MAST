@@ -6,7 +6,16 @@ def map_native_ios_details(details: NativeIOSReportDetails) -> dict[str, object]
         "functionality": {
             item.name: {"present": item.present, "explanation": item.explanation} for item in details.functionality
         },
-        "permissions": [{"permission": item.permission, "status": item.status} for item in details.permissions],
+        "permissions": [
+            {
+                "permission": item.permission,
+                "status": item.status,
+                "info": item.info,
+                "usage_description": item.usage_description,
+                "general_description": item.general_description,
+            }
+            for item in details.permissions
+        ],
         "hardcoded_values": {
             "urls": [{"url": item.url, "country": item.country} for item in details.hardcoded_values.urls],
             "emails": list(details.hardcoded_values.emails),

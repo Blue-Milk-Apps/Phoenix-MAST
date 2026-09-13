@@ -119,6 +119,11 @@ class PdfReportGenerator(ReportGeneratorPort):
                 "version_code": metadata.version_code,
                 "reviewer_org": metadata.reviewer_org,
             },
+            "app_info": {
+                "name": metadata.app_display_name,
+                "package_name": metadata.package_name,
+                "version_name": metadata.version_name,
+            },
             **platform_details,
             "vulnerability_sections": [
                 {

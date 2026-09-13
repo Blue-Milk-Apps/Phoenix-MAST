@@ -1,5 +1,6 @@
 from typing import Any, Mapping
 
+from adapters.output.phoenix_report.builders.ios.source_check_catalog import IOS_SOURCE_SECTION_CHECKS
 from adapters.output.phoenix_report.builders.source import SourceReportDataBuilder
 from domain.report.models import (
     EndpointDetails,
@@ -14,6 +15,8 @@ from domain.report.models import (
 
 
 class NativeIOSReportDataBuilder(SourceReportDataBuilder):
+    check_sections = IOS_SOURCE_SECTION_CHECKS
+
     @property
     def target_kind(self) -> ReportTargetKind:
         return ReportTargetKind.NATIVE_IOS_SOURCE
@@ -29,12 +32,21 @@ class NativeIOSReportDataBuilder(SourceReportDataBuilder):
             minimum_os=str(app.get("minimum_os") or app.get("min_sdk") or ""),
             url_schemes=tuple(str(item.get("url_name") if isinstance(item, Mapping) else item) for item in schemes),
             functionality=tuple(
-                FunctionalityDetails(str(name), item.get("present"), str(item.get("explanation") or ""))
+                FunctionalityDetails(
+                    str(name),
+                    item.get("present"),
+                    str(item.get("explanation") or "")
+                    or (
+                        f"{name} functionality was identified in the available scan evidence."
+                        if item.get("present") is True
+                        else f"No permission or scan evidence indicated {name} functionality."
+                    ),
+                )
                 for name, item in functionality.items()
                 if isinstance(item, Mapping)
             ),
             permissions=tuple(
-                PermissionDetails(str(item.get("permission") or item.get("name") or ""), str(item.get("status") or ""))
+                NativeIOSReportDataBuilder._permission_details(item)
                 for item in data.get("permissions", ())
                 if isinstance(item, Mapping)
             ),
@@ -60,5 +72,18 @@ class NativeIOSReportDataBuilder(SourceReportDataBuilder):
                 str(name)
                 for name in data.get("third_party_sdks", {})
                 if isinstance(data.get("third_party_sdks"), Mapping)
+            ),
+        )
+
+    @staticmethod
+    def _permission_details(item: Mapping[str, Any]) -> PermissionDetails:
+        permission = str(item.get("permission") or item.get("name") or "")
+        return PermissionDetails(
+            permission=permission,
+            status=str(item.get("status") or ""),
+            info=str(item.get("info") or ""),
+            usage_description=str(item.get("usage_description") or ""),
+            general_description=(
+                str(item.get("general_description") or "") or f"The application requests the {permission} permission."
             ),
         )
