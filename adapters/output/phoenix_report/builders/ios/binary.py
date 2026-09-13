@@ -5,14 +5,29 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from adapters.output.phoenix_report.builders.ios.binary_check_catalog import (
-    CODE_CHECKS,
+    SECTION_CHECKS,
     IOSBinaryCheckDefinition,
 )
 from domain.report import (
+    AppDetails,
     CheckResult,
+    CheckSeverity,
+    EndpointDetails,
+    FileDetails,
+    FindingSeverity,
+    FunctionalityDetails,
+    HardcodedValuesDetails,
+    IOSBinaryEvidenceDetails,
+    IOSBinaryReportDetails,
+    IOSSDKCategoryDetails,
+    IOSUrlSchemeDetails,
+    OverallEvaluation,
+    PermissionDetails,
     ReportData,
     ReportMetadata,
     ReportTargetKind,
+    RiskLevel,
+    RiskSummary,
     SecurityCheck,
     VulnerabilitySection,
 )
@@ -34,19 +49,94 @@ class IOSBinaryReportDataBuilder(ReportDataBuilderPort):
                 "iOS binary report builder requires "
                 f"target_kind={self.target_kind.value}, got {metadata.target.target_kind.value}"
             )
-        raise NotImplementedError("iOS binary report construction requires the remaining canonical sections.")
-
-    @classmethod
-    def _code_section(cls, post_scan_data: Mapping[str, Any]) -> VulnerabilitySection:
-        code_evidence = cls._mapping(post_scan_data, "code_evidence")
-        return VulnerabilitySection(
-            name="code",
-            findings_text="",
-            checks=tuple(cls._code_check(definition, code_evidence) for definition in CODE_CHECKS),
+        sections = self._sections(post_scan_data)
+        evaluations = tuple(
+            OverallEvaluation(
+                area=area,
+                risk_level=self._risk_level(section),
+                findings=tuple(c.name for c in section.checks if c.result == CheckResult.PRESENT)
+                or ("No findings identified in this scan",),
+            )
+            for section, (_name, area, _key, _defs) in zip(sections, SECTION_CHECKS)
+        )
+        return ReportData(
+            metadata=metadata,
+            vulnerability_sections=sections,
+            overall_evaluation=evaluations,
+            risk_summary=tuple(RiskSummary(area=e.area, risk_level=e.risk_level) for e in evaluations),
+            findings_severity=self._finding_severity(sections),
+            platform_details=self._details(post_scan_data),
         )
 
     @classmethod
-    def _code_check(
+    def _details(cls, data: Mapping[str, Any]) -> IOSBinaryReportDetails:
+        return IOSBinaryReportDetails(
+            file_info=FileDetails(
+                **{
+                    k: cls._text(cls._mapping(data, "file_info"), k)
+                    for k in ("filename", "size", "md5", "sha1", "sha256")
+                }
+            ),
+            app_info=AppDetails(
+                name=cls._text(cls._mapping(data, "app_info"), "name"),
+                package_name=cls._text(cls._mapping(data, "app_info"), "bundle_id"),
+            ),
+            binary_evidence=IOSBinaryEvidenceDetails(
+                **{
+                    k.replace(" ", "_"): cls._optional_bool(v)
+                    for k, v in cls._mapping(data, "ipa_binary_evidence").items()
+                }
+            ),
+            url_schemes=tuple(
+                IOSUrlSchemeDetails(cls._text(x, "url_name"), tuple(x.get("schemes", ())))
+                for x in data.get("url_schemes", ())
+                if isinstance(x, Mapping)
+            ),
+            functionality=tuple(
+                FunctionalityDetails(k, cls._optional_bool(v.get("present")) if isinstance(v, Mapping) else None)
+                for k, v in cls._mapping(data, "functionality").items()
+            ),
+            third_party_sdks=tuple(
+                IOSSDKCategoryDetails(k, tuple(n for n, present in v.items() if present))
+                for k, v in cls._mapping(data, "third_party_sdks").items()
+                if isinstance(v, Mapping)
+            ),
+            permissions=tuple(
+                PermissionDetails(cls._text(x, "permission"))
+                for x in data.get("permissions", ())
+                if isinstance(x, Mapping)
+            ),
+            hardcoded_values=HardcodedValuesDetails(),
+            endpoints=tuple(
+                EndpointDetails(cls._text(x, "endpoint")) for x in data.get("endpoints", ()) if isinstance(x, Mapping)
+            ),
+        )
+
+    @classmethod
+    def _sections(cls, post_scan_data: Mapping[str, Any]) -> tuple[VulnerabilitySection, ...]:
+        return tuple(
+            cls._section(name, evidence_key, definitions, post_scan_data)
+            for name, _area, evidence_key, definitions in SECTION_CHECKS
+        )
+
+    @classmethod
+    def _section(
+        cls,
+        name: str,
+        evidence_key: str,
+        definitions: tuple[IOSBinaryCheckDefinition, ...],
+        post_scan_data: Mapping[str, Any],
+    ) -> VulnerabilitySection:
+        return VulnerabilitySection(
+            name=name,
+            findings_text="",
+            checks=tuple(
+                cls._check(definition, cls._mapping(post_scan_data, evidence_key)) for definition in definitions
+            ),
+        )
+
+    @classmethod
+    def _check(
         cls,
         definition: IOSBinaryCheckDefinition,
         code_evidence: Mapping[str, Any],
@@ -76,6 +166,38 @@ class IOSBinaryReportDataBuilder(ReportDataBuilderPort):
             compliance=cls._text(entry, "compliance") or definition.compliance,
             remediation_link=cls._text(entry, "remediation_link"),
         )
+
+    @staticmethod
+    def _finding_severity(sections: tuple[VulnerabilitySection, ...]) -> FindingSeverity:
+        counts = {severity: 0 for severity in CheckSeverity}
+        for section in sections:
+            for check in section.checks:
+                if check.result == CheckResult.PRESENT:
+                    counts[check.severity] += 1
+        return FindingSeverity(
+            **{
+                severity.value: counts[severity]
+                for severity in (
+                    CheckSeverity.CRITICAL,
+                    CheckSeverity.HIGH,
+                    CheckSeverity.MEDIUM,
+                    CheckSeverity.LOW,
+                    CheckSeverity.INFO,
+                    CheckSeverity.SECURE,
+                )
+            }
+        )
+
+    @staticmethod
+    def _risk_level(section: VulnerabilitySection) -> RiskLevel:
+        present = [check.severity for check in section.checks if check.result == CheckResult.PRESENT]
+        if not present:
+            return RiskLevel.NOT_EVALUATED
+        if CheckSeverity.CRITICAL in present or CheckSeverity.HIGH in present:
+            return RiskLevel.HIGH
+        if CheckSeverity.MEDIUM in present:
+            return RiskLevel.MEDIUM
+        return RiskLevel.LOW
 
     @staticmethod
     def _mapping(data: Mapping[str, Any], key: str) -> Mapping[str, Any]:
