@@ -10,7 +10,7 @@ from adapters.output.phoenix_report.builders.android import (
     NativeAndroidReportDataBuilder,
 )
 from adapters.output.phoenix_report.builders.flutter import FlutterReportDataBuilder
-from adapters.output.phoenix_report.builders.ios import IOSBinaryReportDataBuilder
+from adapters.output.phoenix_report.builders.ios import IOSBinaryReportDataBuilder, NativeIOSReportDataBuilder
 from adapters.output.phoenix_report.builders.react_native import ReactNativeReportDataBuilder
 from adapters.output.phoenix_report.generate_report import generate_report
 from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
@@ -193,6 +193,7 @@ class MobileAnalysisWorkflowService:
                     ReportTargetKind.FLUTTER_SOURCE,
                     ReportTargetKind.REACT_NATIVE_SOURCE,
                     ReportTargetKind.NATIVE_ANDROID_SOURCE,
+                    ReportTargetKind.NATIVE_IOS_SOURCE,
                 }:
                     report_data = ReportGenerationService(
                         [
@@ -201,6 +202,7 @@ class MobileAnalysisWorkflowService:
                             FlutterReportDataBuilder(),
                             ReactNativeReportDataBuilder(),
                             NativeAndroidReportDataBuilder(),
+                            NativeIOSReportDataBuilder(),
                         ]
                     ).build_report_data(post_scan_output)
                     PdfReportGenerator().generate(report_data, report_path)
