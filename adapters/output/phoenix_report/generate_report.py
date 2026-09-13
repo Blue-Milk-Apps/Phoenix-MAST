@@ -13,9 +13,7 @@ permissions, one section per vulnerability category with a findings narrative
 and a checks-conducted table, hardcoded values, and endpoint connections.
 """
 
-import base64
 import copy
-import io
 import json
 import os
 import sys
@@ -23,8 +21,12 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from adapters.output.phoenix_report.common import result_badge as shared_result_badge
-from adapters.output.phoenix_report.common import risk_badge as shared_risk_badge
+from adapters.output.phoenix_report.common import result_badge, risk_badge
+from adapters.output.phoenix_report.pdf_report.common.charts import build_charts
+from adapters.output.phoenix_report.pdf_report.common.images import (
+    get_app_icon_data_uri,
+    get_report_brand_icon_data_uri,
+)
 from adapters.output.phoenix_report.report_scope import ReportScope, resolve_report_scope
 
 BASE_DIR = Path(__file__).parent
@@ -1657,139 +1659,6 @@ IPA_BINARY_PROTECTION_SPECS = (
 # Authentication, Cryptography, and Platform are dropped from the output
 # regardless of what's present in the source data file).
 EXCLUDED_VULN_SECTIONS = {"authentication", "cryptography", "platform"}
-
-# Path to the generic placeholder app-icon image used on the cover page
-# when app_info.icon_path isn't provided.
-PLACEHOLDER_ICON_PATH = BASE_DIR / "assets" / "placeholder_icon.png"
-REPORT_BRAND_ICON_PATH = BASE_DIR / "assets" / "PhoenixShield.png"
-
-
-def risk_badge(rating, label=None):
-    return shared_risk_badge(rating, label)
-
-
-def result_badge(result):
-    return shared_result_badge(result)
-
-
-def make_overall_risk_polar_chart(risk_summary):
-    """Single polar-area (Nightingale rose) chart with one wedge per area of
-    concern in risk_summary (e.g. Code Vulnerability, Data Storage,
-    Networking, Resilience); wedge radius encodes Low/Medium/High and color
-    matches the severity. Scales automatically to however many categories
-    are present in risk_summary, so a 3-category and a 4-category report
-    both render correctly with the same code."""
-    import matplotlib
-    import numpy as np
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    # Preferred display order; any keys not listed here are appended in
-    # whatever order they appear in the data.
-    preferred_order = ["code_vulnerability", "data_storage", "networking", "resilience"]
-    keys = [k for k in preferred_order if k in risk_summary]
-    keys += [k for k in risk_summary if k not in keys]
-
-    def pretty_label(key):
-        words = key.replace("_", " ").split()
-        # Two-word labels wrap onto two lines to match the original layout;
-        # longer/shorter labels are left on one line.
-        if len(words) == 2:
-            return "\n".join(w.capitalize() for w in words)
-        return " ".join(w.capitalize() for w in words)
-
-    categories = [(pretty_label(k), risk_summary.get(k, "Low")) for k in keys]
-
-    n = len(categories)
-    if n == 0:
-        fig, ax = plt.subplots(figsize=(5.6, 4.8))
-        ax.axis("off")
-        ax.text(
-            0.5,
-            0.5,
-            "No security sections were evaluated",
-            ha="center",
-            va="center",
-            fontsize=12,
-            color="#667085",
-        )
-        buf = io.BytesIO()
-        fig.savefig(buf, format="png", dpi=200, bbox_inches="tight", transparent=True)
-        plt.close(fig)
-        buf.seek(0)
-        return base64.b64encode(buf.read()).decode("ascii")
-
-    theta = np.linspace(0.0, 2 * np.pi, n, endpoint=False) + (np.pi / 2)
-    width = (2 * np.pi / n) * 0.92
-
-    radii = []
-    colors = []
-    labels = []
-    for label, level in categories:
-        key = (level or "low").strip().lower()
-        radii.append(RISK_LEVEL_ORDER.get(key, 1))
-        colors.append(RISK_LEVEL_COLOR.get(key, "#2980b9"))
-        labels.append(label)
-
-    fig = plt.figure(figsize=(5.6, 4.8))
-    ax = fig.add_subplot(111, projection="polar")
-    ax.set_theta_zero_location("N")
-    bars = ax.bar(theta, radii, width=width, color=colors, alpha=0.85, edgecolor="white", linewidth=2, bottom=0)
-
-    ax.set_ylim(0, 4.3)
-    ax.set_yticks([1, 2, 3])
-    ax.set_yticklabels(["Low", "Medium", "High"], fontsize=7.5, color="#888")
-    for t in ax.get_yticklabels():
-        t.set_bbox(dict(facecolor="white", edgecolor="none", pad=1, alpha=0.85))
-    ax.set_rlabel_position(200)
-    ax.set_xticks(theta)
-    ax.set_xticklabels(labels, fontsize=10, fontweight="bold", color="#16233c")
-    ax.tick_params(axis="x", pad=14)
-    ax.spines["polar"].set_color("#dddddd")
-    ax.grid(color="#dddddd", linewidth=0.7)
-    ax.set_facecolor("none")
-    fig.patch.set_alpha(0)
-
-    for angle, radius, level in zip(theta, radii, [c[1] for c in categories]):
-        label_r = max(radius - 0.55, 0.6)
-        ax.text(angle, label_r, level.title(), ha="center", va="center", fontsize=9, fontweight="bold", color="white")
-
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=200, bbox_inches="tight", transparent=True)
-    plt.close(fig)
-    buf.seek(0)
-    return base64.b64encode(buf.read()).decode("ascii")
-
-
-def build_charts(data):
-    rs = data.get("risk_summary", {})
-    return {"overall_risk_polar": make_overall_risk_polar_chart(rs)}
-
-
-def get_app_icon_data_uri(data):
-    """Return a data: URI for the app icon — the provided icon_path if set
-    and readable, otherwise the generic placeholder icon."""
-    icon_path = (data.get("app_info", {}) or {}).get("icon_path") or ""
-    path = Path(icon_path) if icon_path else None
-    if path and path.is_file():
-        target = path
-    else:
-        target = PLACEHOLDER_ICON_PATH
-    return _image_file_to_data_uri(target)
-
-
-def get_report_brand_icon_data_uri() -> str:
-    """Return a data: URI for the phoenix brand icon shown on the cover."""
-    target = REPORT_BRAND_ICON_PATH if REPORT_BRAND_ICON_PATH.is_file() else PLACEHOLDER_ICON_PATH
-    return _image_file_to_data_uri(target)
-
-
-def _image_file_to_data_uri(target: Path) -> str:
-    ext = target.suffix.lstrip(".").lower() or "png"
-    mime = "jpeg" if ext in ("jpg", "jpeg") else ext
-    encoded = base64.b64encode(target.read_bytes()).decode("ascii")
-    return f"data:image/{mime};base64,{encoded}"
 
 
 def load_report_data(input_data: dict[str, Any] | Path | str) -> dict[str, Any]:
