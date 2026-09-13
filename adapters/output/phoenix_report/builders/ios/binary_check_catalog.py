@@ -154,8 +154,87 @@ NETWORK_CHECKS = (
         "MASVS-NETWORK-2",
     ),
 )
-DATA_STORAGE_CHECKS: tuple[IOSBinaryCheckDefinition, ...] = ()
-RESILIENCE_CHECKS: tuple[IOSBinaryCheckDefinition, ...] = ()
+DATA_STORAGE_CHECKS = tuple(
+    IOSBinaryCheckDefinition(name, severity, key, "MASVS-STORAGE-1")
+    for name, severity, key in (
+        ("Application Uses Weak File Protection", CheckSeverity.MEDIUM, "weak_file_protection"),
+        ("Application Utilizes Deprecated Keychain Attributes", CheckSeverity.MEDIUM, "deprecated_keychain_attributes"),
+        ("Local Data Exposure: Advertiser ID Stored Insecurely", CheckSeverity.HIGH, "advertiser_id_stored_insecurely"),
+        (
+            "Local Data Exposure: Device IMEI Stored Insecurely",
+            CheckSeverity.HIGH,
+            "imei_labeled_value_stored_insecurely",
+        ),
+        (
+            "Local Data Exposure: Global Write Permissions (Source Code Only)",
+            CheckSeverity.HIGH,
+            "global_write_permissions",
+        ),
+        ("Local Data Exposure: GPS Latitude Stored Insecurely", CheckSeverity.HIGH, "location_data_stored_insecurely"),
+        (
+            "Local Data Exposure: Insecure Hardcoded API Keys",
+            CheckSeverity.HIGH,
+            "hardcoded_api_keys_stored_insecurely",
+        ),
+        (
+            "Local Data Exposure: Insecure Hardcoded Passwords",
+            CheckSeverity.HIGH,
+            "hardcoded_passwords_stored_insecurely",
+        ),
+        (
+            "Local Data Exposure: Sensitive Values Stored Insecurely",
+            CheckSeverity.HIGH,
+            "sensitive_values_stored_insecurely",
+        ),
+        ("Local Data Exposure: WiFi IP Address Stored Insecurely", CheckSeverity.HIGH, "wifi_ip_stored_insecurely"),
+        (
+            "Sensitive Values Stored in Plaintext Within the Keychain",
+            CheckSeverity.HIGH,
+            "sensitive_values_stored_in_plaintext_keychain",
+        ),
+        ("Sensitive Data Stored in User Defaults", CheckSeverity.HIGH, "sensitive_data_stored_in_user_defaults"),
+        (
+            "Local Data Exposure: Advertiser ID Logged Insecurely",
+            CheckSeverity.MEDIUM,
+            "advertiser_id_logged_insecurely",
+        ),
+        ("Local Data Exposure: Device IMEI Logged Insecurely", CheckSeverity.MEDIUM, "imei_logged_insecurely"),
+        (
+            "Local Data Exposure: GPS Latitude Logged Insecurely",
+            CheckSeverity.MEDIUM,
+            "location_data_logged_insecurely",
+        ),
+        (
+            "Local Data Exposure: Sensitive Data Logged Insecurely",
+            CheckSeverity.MEDIUM,
+            "sensitive_data_logged_insecurely",
+        ),
+        ("Local Data Exposure: WiFi MAC Address Logged Insecurely", CheckSeverity.MEDIUM, "wifi_mac_logged_insecurely"),
+        (
+            "Sensitive Data Exposed Through Device Keyboard Cache (Source Code Only)",
+            CheckSeverity.MEDIUM,
+            "keyboard_cache_exposure",
+        ),
+    )
+)
+RESILIENCE_CHECKS = (
+    IOSBinaryCheckDefinition(
+        "Biometric / Local Authentication Bypass Possible",
+        CheckSeverity.HIGH,
+        "biometric_bypass_possible",
+        "MASVS-AUTH-2",
+        "A biometric or local-authentication bypass condition was identified.",
+        "No biometric or local-authentication bypass condition was identified.",
+    ),
+    IOSBinaryCheckDefinition(
+        "Components Contain Debug Symbols",
+        CheckSeverity.MEDIUM,
+        "debug_symbols_present",
+        "MASVS-RESILIENCE-1",
+        "Debug symbols are present in application components.",
+        "No debug symbols were identified in application components.",
+    ),
+)
 SECTION_CHECKS = (
     ("code", "Code Vulnerability", "code_evidence", CODE_CHECKS),
     ("network", "Networking", "network_evidence", NETWORK_CHECKS),
