@@ -6,6 +6,7 @@ from pathlib import Path
 
 from adapters.output.file_output import FileScanOutput
 from adapters.output.phoenix_report.builders.android import AndroidBinaryReportDataBuilder
+from adapters.output.phoenix_report.builders.ios import IOSBinaryReportDataBuilder
 from adapters.output.phoenix_report.generate_report import generate_report
 from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
 from adapters.post_scan import (
@@ -181,10 +182,10 @@ class MobileAnalysisWorkflowService:
             if post_scan_output:
                 report_path = self._report_output_path(scan_config.output_path, post_scan_output)
                 target_kind = ReportTargetFactory.from_scan_config(scan_config).target_kind
-                if target_kind == ReportTargetKind.ANDROID_BINARY:
-                    report_data = ReportGenerationService([AndroidBinaryReportDataBuilder()]).build_report_data(
-                        post_scan_output
-                    )
+                if target_kind in {ReportTargetKind.ANDROID_BINARY, ReportTargetKind.IOS_BINARY}:
+                    report_data = ReportGenerationService(
+                        [AndroidBinaryReportDataBuilder(), IOSBinaryReportDataBuilder()]
+                    ).build_report_data(post_scan_output)
                     PdfReportGenerator().generate(report_data, report_path)
                 else:
                     generate_report(post_scan_output, report_path)
