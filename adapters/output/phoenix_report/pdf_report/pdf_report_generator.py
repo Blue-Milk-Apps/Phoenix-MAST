@@ -15,8 +15,10 @@ from adapters.output.phoenix_report.generate_report import (
     get_app_icon_data_uri,
     get_report_brand_icon_data_uri,
 )
+from adapters.output.phoenix_report.pdf_report.android import map_android_binary_details
+from adapters.output.phoenix_report.pdf_report.ios import map_ios_binary_details
 from adapters.output.phoenix_report.pdf_report.presentation import PdfPresentation
-from domain.report import AndroidBinaryReportDetails, ReportData, ReportPlatform
+from domain.report import AndroidBinaryReportDetails, IOSBinaryReportDetails, ReportData, ReportPlatform
 from ports.report_generator_port import ReportGeneratorPort
 
 
@@ -75,7 +77,11 @@ class PdfReportGenerator(ReportGeneratorPort):
     @staticmethod
     def _presentation_data(report_data: ReportData) -> dict[str, object]:
         details = report_data.platform_details
-        if not isinstance(details, AndroidBinaryReportDetails):
+        if isinstance(details, AndroidBinaryReportDetails):
+            platform_details = map_android_binary_details(details)
+        elif isinstance(details, IOSBinaryReportDetails):
+            platform_details = map_ios_binary_details(details)
+        else:
             raise ValueError(
                 "PdfReportGenerator does not yet support "
                 f"{report_data.metadata.target.target_kind.value} report details"
@@ -94,21 +100,7 @@ class PdfReportGenerator(ReportGeneratorPort):
                 "version_code": metadata.version_code,
                 "reviewer_org": metadata.reviewer_org,
             },
-            "certificate": asdict(details.certificate),
-            "file_info": asdict(details.file_info),
-            "app_info": asdict(details.app_info),
-            "application": asdict(details.application),
-            "app_components": asdict(details.app_components),
-            "functionality": {
-                item.name: {
-                    "present": item.present,
-                    "explanation": item.explanation,
-                }
-                for item in details.functionality
-            },
-            "permissions": [asdict(item) for item in details.permissions],
-            "hardcoded_values": asdict(details.hardcoded_values),
-            "endpoints": [asdict(item) for item in details.endpoints],
+            **platform_details,
             "vulnerability_sections": [
                 {
                     "section_name": section.name,
