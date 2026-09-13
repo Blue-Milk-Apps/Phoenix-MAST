@@ -16,6 +16,8 @@ from domain.report import (
     FileDetails,
     FindingSeverity,
     FunctionalityDetails,
+    HardcodedSecretDetails,
+    HardcodedUrlDetails,
     HardcodedValuesDetails,
     IOSBinaryEvidenceDetails,
     IOSBinaryReportDetails,
@@ -78,8 +80,15 @@ class IOSBinaryReportDataBuilder(ReportDataBuilderPort):
                 }
             ),
             app_info=AppDetails(
+                icon_path=cls._text(cls._mapping(data, "app_info"), "icon_path"),
                 name=cls._text(cls._mapping(data, "app_info"), "name"),
-                package_name=cls._text(cls._mapping(data, "app_info"), "bundle_id"),
+                package_name=cls._text(cls._mapping(data, "app_info"), "package_name"),
+                main_activity=cls._text(cls._mapping(data, "app_info"), "main_activity"),
+                version_name=cls._text(cls._mapping(data, "app_info"), "version_name"),
+                app_store_id=cls._text(cls._mapping(data, "app_info"), "app_store_id"),
+                developer=cls._text(cls._mapping(data, "app_info"), "developer"),
+                categories=cls._text(cls._mapping(data, "app_info"), "categories"),
+                trackers_detected=cls._text(cls._mapping(data, "app_info"), "trackers_detected"),
             ),
             binary_evidence=IOSBinaryEvidenceDetails(
                 **{
@@ -102,15 +111,44 @@ class IOSBinaryReportDataBuilder(ReportDataBuilderPort):
                 if isinstance(v, Mapping)
             ),
             permissions=tuple(
-                PermissionDetails(cls._text(x, "permission"))
+                PermissionDetails(
+                    permission=cls._text(x, "permission"),
+                    status=cls._text(x, "status"),
+                    info=cls._text(x, "info"),
+                    usage_description=cls._text(x, "usage_description"),
+                    general_description=cls._text(x, "general_description"),
+                )
                 for x in data.get("permissions", ())
                 if isinstance(x, Mapping)
             ),
-            hardcoded_values=HardcodedValuesDetails(),
+            hardcoded_values=cls._hardcoded_values(data),
             endpoints=tuple(
-                EndpointDetails(cls._text(x, "endpoint")) for x in data.get("endpoints", ()) if isinstance(x, Mapping)
+                EndpointDetails(
+                    endpoint=cls._text(x, "endpoint"),
+                    tags=cls._text(x, "tags"),
+                    ip_address=cls._text(x, "ip_address"),
+                    country=cls._text(x, "country"),
+                )
+                for x in data.get("endpoints", ())
+                if isinstance(x, Mapping)
             ),
         )
+
+    @classmethod
+    def _hardcoded_values(cls, data: Mapping[str, Any]) -> HardcodedValuesDetails:
+        values = cls._mapping(data, "hardcoded_values")
+        urls = tuple(
+            HardcodedUrlDetails(cls._text(item, "url"), cls._text(item, "country"))
+            for item in values.get("urls", ())
+            if isinstance(item, Mapping)
+        )
+        secrets = tuple(
+            HardcodedSecretDetails(cls._text(item, "value") or str(item).strip())
+            for item in values.get("secrets", ())
+            if isinstance(item, Mapping) or str(item).strip()
+        )
+        emails = tuple(str(value).strip() for value in values.get("emails", ()) if str(value).strip())
+        return HardcodedValuesDetails(urls=urls, emails=emails, secrets=secrets)
 
     @classmethod
     def _sections(cls, post_scan_data: Mapping[str, Any]) -> tuple[VulnerabilitySection, ...]:

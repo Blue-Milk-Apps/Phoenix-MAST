@@ -1872,6 +1872,16 @@ def _is_react_native_platform(data: dict[str, Any]) -> bool:
     return str(meta.get("platform") or "").strip().lower() == "react native"
 
 
+def _is_routed_ios_binary(data: dict[str, Any], report_scope: Any) -> bool:
+    target_information = data.get("target_information")
+    return (
+        _is_ios_platform(data)
+        and report_scope.target_type == "BINARY"
+        and isinstance(target_information, dict)
+        and str(target_information.get("target_kind") or "").strip().lower() == "ios_binary"
+    )
+
+
 def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     is_ios = _is_ios_platform(data)
     is_flutter = _is_flutter_platform(data)
@@ -1899,6 +1909,11 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
             for section_name, area in SECTION_TO_AREA.items()
             if section_name in report_scope.assessed_sections
         }
+    elif _is_routed_ios_binary(data, report_scope):
+        # iOS binary reports are built by IOSBinaryReportDataBuilder before
+        # reaching the PDF adapter. Keep this legacy normalizer limited to
+        # source reports so binary findings are not canonicalized twice.
+        section_to_area = {section_name: area for section_name, area in IOS_SECTION_TO_AREA.items()}
     elif is_ios:
         _canonicalize_ios_code_section(report_data, report_scope.target_type)
         _canonicalize_ios_network_section(report_data, report_scope.target_type)

@@ -172,6 +172,11 @@ DATA_STORAGE_CHECKS = tuple(
         ),
         ("Local Data Exposure: GPS Latitude Stored Insecurely", CheckSeverity.HIGH, "location_data_stored_insecurely"),
         (
+            "Local Data Exposure: GPS Longitude Stored Insecurely",
+            CheckSeverity.HIGH,
+            "longitude_data_stored_insecurely",
+        ),
+        (
             "Local Data Exposure: Insecure Hardcoded API Keys",
             CheckSeverity.HIGH,
             "hardcoded_api_keys_stored_insecurely",
@@ -187,6 +192,7 @@ DATA_STORAGE_CHECKS = tuple(
             "sensitive_values_stored_insecurely",
         ),
         ("Local Data Exposure: WiFi IP Address Stored Insecurely", CheckSeverity.HIGH, "wifi_ip_stored_insecurely"),
+        ("Local Data Exposure: WiFi MAC Address Stored Insecurely", CheckSeverity.HIGH, "wifi_mac_stored_insecurely"),
         (
             "Sensitive Values Stored in Plaintext Within the Keychain",
             CheckSeverity.HIGH,
@@ -205,9 +211,19 @@ DATA_STORAGE_CHECKS = tuple(
             "location_data_logged_insecurely",
         ),
         (
+            "Local Data Exposure: GPS Longitude Logged Insecurely",
+            CheckSeverity.MEDIUM,
+            "longitude_data_logged_insecurely",
+        ),
+        (
             "Local Data Exposure: Sensitive Data Logged Insecurely",
             CheckSeverity.MEDIUM,
             "sensitive_data_logged_insecurely",
+        ),
+        (
+            "Local Data Exposure: Sensitive Values Stored in Memory",
+            CheckSeverity.MEDIUM,
+            "sensitive_values_stored_in_memory",
         ),
         ("Local Data Exposure: WiFi MAC Address Logged Insecurely", CheckSeverity.MEDIUM, "wifi_mac_logged_insecurely"),
         (
