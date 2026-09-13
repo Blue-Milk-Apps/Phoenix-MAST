@@ -2,6 +2,7 @@
 
 from typing import Any, Mapping
 
+from adapters.output.phoenix_report.builders.source import SourceReportDataBuilder
 from domain.report import (
     CheckResult,
     CheckSeverity,
@@ -23,10 +24,9 @@ from domain.report import (
     SecurityCheck,
     VulnerabilitySection,
 )
-from ports.report_data_builder_port import ReportDataBuilderPort
 
 
-class FlutterReportDataBuilder(ReportDataBuilderPort):
+class FlutterReportDataBuilder(SourceReportDataBuilder):
     @property
     def target_kind(self) -> ReportTargetKind:
         return ReportTargetKind.FLUTTER_SOURCE

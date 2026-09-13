@@ -2,5 +2,6 @@
 
 from adapters.output.phoenix_report.builders.android import AndroidBinaryReportDataBuilder
 from adapters.output.phoenix_report.builders.flutter.source import FlutterReportDataBuilder
+from adapters.output.phoenix_report.builders.react_native import ReactNativeReportDataBuilder
 
-__all__ = ["AndroidBinaryReportDataBuilder", "FlutterReportDataBuilder"]
+__all__ = ["AndroidBinaryReportDataBuilder", "FlutterReportDataBuilder", "ReactNativeReportDataBuilder"]

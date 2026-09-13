@@ -9,6 +9,7 @@ from adapters.output.phoenix_report.builders.android.binary_check_catalog import
     SECTION_CHECKS,
     AndroidBinaryCheckDefinition,
 )
+from adapters.output.phoenix_report.builders.binary import BinaryReportDataBuilder
 from domain.report import (
     AndroidApplicationDetails,
     AndroidBinaryReportDetails,
@@ -35,10 +36,9 @@ from domain.report import (
     SignatureVersions,
     VulnerabilitySection,
 )
-from ports.report_data_builder_port import ReportDataBuilderPort
 
 
-class AndroidBinaryReportDataBuilder(ReportDataBuilderPort):
+class AndroidBinaryReportDataBuilder(BinaryReportDataBuilder):
     """Translate Android binary post-scan output into standard report data."""
 
     @property

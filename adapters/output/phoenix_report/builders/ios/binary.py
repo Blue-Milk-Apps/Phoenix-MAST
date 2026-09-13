@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+from adapters.output.phoenix_report.builders.binary import BinaryReportDataBuilder
 from adapters.output.phoenix_report.builders.ios.binary_check_catalog import (
     SECTION_CHECKS,
     IOSBinaryCheckDefinition,
@@ -33,10 +34,9 @@ from domain.report import (
     SecurityCheck,
     VulnerabilitySection,
 )
-from ports.report_data_builder_port import ReportDataBuilderPort
 
 
-class IOSBinaryReportDataBuilder(ReportDataBuilderPort):
+class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
     """Build standard report data for iOS binary assessments."""
 
     @property
