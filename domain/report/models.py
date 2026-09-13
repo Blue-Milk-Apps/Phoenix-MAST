@@ -233,6 +233,18 @@ class NativeAndroidReportDetails(PlatformReportDetails):
 
 
 @dataclass(frozen=True)
+class NativeIOSReportDetails(PlatformReportDetails):
+    bundle_identifier: str = ""
+    version_name: str = ""
+    minimum_os: str = ""
+    url_schemes: tuple[str, ...] = ()
+
+    @property
+    def target_kind(self) -> ReportTargetKind:
+        return ReportTargetKind.NATIVE_IOS_SOURCE
+
+
+@dataclass(frozen=True)
 class SignatureVersions:
     """Verified Android application signature schemes."""
 

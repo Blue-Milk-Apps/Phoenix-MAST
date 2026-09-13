@@ -17,7 +17,7 @@ from adapters.output.phoenix_report.pdf_report.common.images import (
     get_report_brand_icon_data_uri,
 )
 from adapters.output.phoenix_report.pdf_report.flutter import map_flutter_details
-from adapters.output.phoenix_report.pdf_report.ios import map_ios_binary_details
+from adapters.output.phoenix_report.pdf_report.ios import map_ios_binary_details, map_native_ios_details
 from adapters.output.phoenix_report.pdf_report.presentation import PdfPresentation
 from adapters.output.phoenix_report.pdf_report.react_native import map_react_native_details
 from domain.report import (
@@ -29,6 +29,7 @@ from domain.report import (
     ReportData,
     ReportPlatform,
 )
+from domain.report.models import NativeIOSReportDetails
 from ports.report_generator_port import ReportGeneratorPort
 
 
@@ -91,6 +92,8 @@ class PdfReportGenerator(ReportGeneratorPort):
             platform_details = map_android_binary_details(details)
         elif isinstance(details, NativeAndroidReportDetails):
             platform_details = map_native_android_details(details)
+        elif isinstance(details, NativeIOSReportDetails):
+            platform_details = map_native_ios_details(details)
         elif isinstance(details, IOSBinaryReportDetails):
             platform_details = map_ios_binary_details(details)
         elif isinstance(details, FlutterReportDetails):
