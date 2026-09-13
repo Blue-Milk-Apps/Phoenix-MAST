@@ -79,6 +79,28 @@ def test_maps_flutter_metadata_and_dependencies() -> None:
     assert tuple(item.name for item in details.dependencies) == ("http", "path")
 
 
+def test_maps_flutter_inventories() -> None:
+    report = FlutterReportDataBuilder().build(
+        {
+            "functionality": {"Camera": {"present": True, "explanation": "Detected"}},
+            "permissions": [{"permission": "camera", "status": "requested"}],
+            "hardcoded_values": {
+                "urls": [{"url": "https://example.test", "country": "US"}],
+                "emails": ["security@example.test"],
+                "secrets": [{"value": "secret-value"}],
+            },
+            "endpoints": [{"endpoint": "https://api.example.test", "country": "US"}],
+        },
+        _metadata(),
+    )
+    details = report.platform_details
+    assert details.functionality[0].name == "Camera"
+    assert details.permissions[0].permission == "camera"
+    assert details.hardcoded_values.urls[0].url == "https://example.test"
+    assert details.hardcoded_values.secrets[0].value == "secret-value"
+    assert details.endpoints[0].endpoint == "https://api.example.test"
+
+
 def test_partial_evidence_produces_empty_sections_and_not_evaluated_risk() -> None:
     report = FlutterReportDataBuilder().build({}, _metadata())
 

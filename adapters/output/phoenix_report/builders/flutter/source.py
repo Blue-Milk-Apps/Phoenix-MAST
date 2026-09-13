@@ -5,10 +5,16 @@ from typing import Any, Mapping
 from domain.report import (
     CheckResult,
     CheckSeverity,
+    EndpointDetails,
     FindingSeverity,
     FlutterDependencyDetails,
     FlutterReportDetails,
+    FunctionalityDetails,
+    HardcodedSecretDetails,
+    HardcodedUrlDetails,
+    HardcodedValuesDetails,
     OverallEvaluation,
+    PermissionDetails,
     ReportData,
     ReportMetadata,
     ReportTargetKind,
@@ -132,4 +138,53 @@ class FlutterReportDataBuilder(ReportDataBuilderPort):
             flutter_constraint=str(sdk.get("flutter_constraint") or ""),
             supported_platforms=tuple(str(name) for name, enabled in platforms.items() if enabled is True),
             dependencies=dependency_items,
+            functionality=tuple(
+                FunctionalityDetails(str(name), value.get("present"), str(value.get("explanation") or ""))
+                for name, value in FlutterReportDataBuilder._mapping(data, "functionality").items()
+                if isinstance(value, Mapping)
+            ),
+            permissions=tuple(
+                PermissionDetails(
+                    permission=str(item.get("permission") or item.get("name") or ""),
+                    status=str(item.get("status") or ""),
+                    info=str(item.get("info") or ""),
+                    usage_description=str(item.get("usage_description") or ""),
+                    general_description=str(item.get("general_description") or ""),
+                )
+                for item in data.get("permissions", ())
+                if isinstance(item, Mapping)
+            ),
+            hardcoded_values=FlutterReportDataBuilder._hardcoded_values(data),
+            endpoints=tuple(
+                EndpointDetails(
+                    endpoint=str(item.get("endpoint") or ""),
+                    tags=str(item.get("tags") or ""),
+                    ip_address=str(item.get("ip_address") or ""),
+                    country=str(item.get("country") or ""),
+                )
+                for item in data.get("endpoints", ())
+                if isinstance(item, Mapping)
+            ),
         )
+
+    @staticmethod
+    def _hardcoded_values(data: Mapping[str, Any]) -> HardcodedValuesDetails:
+        values = data.get("hardcoded_values") if isinstance(data.get("hardcoded_values"), Mapping) else {}
+        return HardcodedValuesDetails(
+            urls=tuple(
+                HardcodedUrlDetails(str(item.get("url") or ""), str(item.get("country") or ""))
+                for item in values.get("urls", ())
+                if isinstance(item, Mapping)
+            ),
+            emails=tuple(str(item) for item in values.get("emails", ()) if str(item).strip()),
+            secrets=tuple(
+                HardcodedSecretDetails(str(item.get("value") or item))
+                for item in values.get("secrets", ())
+                if str(item).strip()
+            ),
+        )
+
+    @staticmethod
+    def _mapping(data: Mapping[str, Any], key: str) -> Mapping[str, Any]:
+        value = data.get(key)
+        return value if isinstance(value, Mapping) else {}
