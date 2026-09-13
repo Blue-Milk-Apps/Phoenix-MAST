@@ -41,6 +41,7 @@ packages = [
     "adapters.output.phoenix_report.pdf_report",
     "adapters.output.phoenix_report.pdf_report.android",
     "adapters.output.phoenix_report.pdf_report.ios",
+    "adapters.output.phoenix_report.pdf_report.flutter",
     "adapters.post_scan",
     "adapters.post_scan.android",
     "adapters.post_scan.android.native",
