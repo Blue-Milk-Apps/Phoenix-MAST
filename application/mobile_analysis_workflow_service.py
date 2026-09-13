@@ -5,7 +5,10 @@ from dataclasses import asdict
 from pathlib import Path
 
 from adapters.output.file_output import FileScanOutput
-from adapters.output.phoenix_report.builders.android import AndroidBinaryReportDataBuilder
+from adapters.output.phoenix_report.builders.android import (
+    AndroidBinaryReportDataBuilder,
+    NativeAndroidReportDataBuilder,
+)
 from adapters.output.phoenix_report.builders.flutter import FlutterReportDataBuilder
 from adapters.output.phoenix_report.builders.ios import IOSBinaryReportDataBuilder
 from adapters.output.phoenix_report.builders.react_native import ReactNativeReportDataBuilder
@@ -189,6 +192,7 @@ class MobileAnalysisWorkflowService:
                     ReportTargetKind.IOS_BINARY,
                     ReportTargetKind.FLUTTER_SOURCE,
                     ReportTargetKind.REACT_NATIVE_SOURCE,
+                    ReportTargetKind.NATIVE_ANDROID_SOURCE,
                 }:
                     report_data = ReportGenerationService(
                         [
@@ -196,6 +200,7 @@ class MobileAnalysisWorkflowService:
                             IOSBinaryReportDataBuilder(),
                             FlutterReportDataBuilder(),
                             ReactNativeReportDataBuilder(),
+                            NativeAndroidReportDataBuilder(),
                         ]
                     ).build_report_data(post_scan_output)
                     PdfReportGenerator().generate(report_data, report_path)

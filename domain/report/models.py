@@ -217,6 +217,16 @@ class ReactNativeReportDetails(PlatformReportDetails):
 
 
 @dataclass(frozen=True)
+class NativeAndroidReportDetails(PlatformReportDetails):
+    package_name: str = ""
+    version_name: str = ""
+
+    @property
+    def target_kind(self) -> ReportTargetKind:
+        return ReportTargetKind.NATIVE_ANDROID_SOURCE
+
+
+@dataclass(frozen=True)
 class SignatureVersions:
     """Verified Android application signature schemes."""
 
