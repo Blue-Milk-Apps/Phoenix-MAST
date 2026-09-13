@@ -14,13 +14,9 @@ from domain.report import (
     HardcodedSecretDetails,
     HardcodedUrlDetails,
     HardcodedValuesDetails,
-    OverallEvaluation,
     PermissionDetails,
-    ReportData,
-    ReportMetadata,
     ReportTargetKind,
     RiskLevel,
-    RiskSummary,
     SecurityCheck,
     VulnerabilitySection,
 )
@@ -31,35 +27,8 @@ class FlutterReportDataBuilder(SourceReportDataBuilder):
     def target_kind(self) -> ReportTargetKind:
         return ReportTargetKind.FLUTTER_SOURCE
 
-    def build(self, post_scan_data: Mapping[str, Any], metadata: ReportMetadata) -> ReportData:
-        if metadata.target.target_kind != self.target_kind:
-            raise ValueError(f"Flutter report builder requires target_kind={self.target_kind.value}")
-        sections = tuple(
-            self._section(name, key, post_scan_data)
-            for name, key in (
-                ("Code", "code_evidence"),
-                ("Network", "network_evidence"),
-                ("Data Storage", "data_storage_evidence"),
-                ("Resilience", "resilience_evidence"),
-            )
-        )
-        evaluations = tuple(
-            OverallEvaluation(
-                area=name,
-                risk_level=self._risk(section),
-                findings=tuple(check.name for check in section.checks if check.result == CheckResult.PRESENT)
-                or ("No findings identified in this scan",),
-            )
-            for section, name in zip(sections, ("Code Vulnerability", "Networking", "Data Storage", "Resilience"))
-        )
-        return ReportData(
-            metadata,
-            sections,
-            evaluations,
-            tuple(RiskSummary(e.area, e.risk_level) for e in evaluations),
-            self._severity(sections),
-            self._details(post_scan_data),
-        )
+    def _build_details(self, post_scan_data: Mapping[str, Any]) -> FlutterReportDetails:
+        return self._details(post_scan_data)
 
     @classmethod
     def _section(cls, name: str, key: str, data: Mapping[str, Any]) -> VulnerabilitySection:
