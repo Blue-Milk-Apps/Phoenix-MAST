@@ -10,12 +10,12 @@ from dataclasses import asdict
 from pathlib import Path
 
 from adapters.output.phoenix_report.common import result_badge, risk_badge
-from adapters.output.phoenix_report.generate_report import (
-    build_charts,
+from adapters.output.phoenix_report.pdf_report.android import map_android_binary_details
+from adapters.output.phoenix_report.pdf_report.common.charts import build_charts
+from adapters.output.phoenix_report.pdf_report.common.images import (
     get_app_icon_data_uri,
     get_report_brand_icon_data_uri,
 )
-from adapters.output.phoenix_report.pdf_report.android import map_android_binary_details
 from adapters.output.phoenix_report.pdf_report.ios import map_ios_binary_details
 from adapters.output.phoenix_report.pdf_report.presentation import PdfPresentation
 from domain.report import AndroidBinaryReportDetails, IOSBinaryReportDetails, ReportData, ReportPlatform
