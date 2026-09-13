@@ -76,7 +76,7 @@ def test_maps_flutter_metadata_and_dependencies() -> None:
     assert details.package_name == "com.example.app"
     assert details.dart_constraint == ">=3.3.0"
     assert details.supported_platforms == ("android", "ios")
-    assert details.dependencies == ("http", "path")
+    assert tuple(item.name for item in details.dependencies) == ("http", "path")
 
 
 def test_partial_evidence_produces_empty_sections_and_not_evaluated_risk() -> None:

@@ -1,5 +1,5 @@
 from adapters.output.phoenix_report.pdf_report.flutter import map_flutter_details
-from domain.report import FlutterReportDetails
+from domain.report import FlutterDependencyDetails, FlutterReportDetails
 
 
 def test_maps_flutter_details_for_pdf() -> None:
@@ -10,12 +10,15 @@ def test_maps_flutter_details_for_pdf() -> None:
             dart_constraint=">=3.3.0",
             flutter_constraint=">=3.22.0",
             supported_platforms=("android", "ios"),
-            dependencies=("http", "path"),
+            dependencies=(FlutterDependencyDetails("http"), FlutterDependencyDetails("path")),
         )
     )
     assert mapped["flutter_details"] == {
         "dart_constraint": ">=3.3.0",
         "flutter_constraint": ">=3.22.0",
         "supported_platforms": ["android", "ios"],
-        "dependencies": ["http", "path"],
+        "dependencies": [
+            {"name": "http", "version": "", "constraint": "", "source": "", "group": ""},
+            {"name": "path", "version": "", "constraint": "", "source": "", "group": ""},
+        ],
     }

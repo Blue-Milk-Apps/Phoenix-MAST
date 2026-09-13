@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 
 
@@ -167,11 +167,24 @@ class FlutterReportDetails(PlatformReportDetails):
     dart_constraint: str = ""
     flutter_constraint: str = ""
     supported_platforms: tuple[str, ...] = ()
-    dependencies: tuple[str, ...] = ()
+    dependencies: tuple["FlutterDependencyDetails", ...] = ()
+    functionality: tuple[FunctionalityDetails, ...] = ()
+    permissions: tuple[PermissionDetails, ...] = ()
+    hardcoded_values: HardcodedValuesDetails = field(default_factory=lambda: HardcodedValuesDetails())
+    endpoints: tuple[EndpointDetails, ...] = ()
 
     @property
     def target_kind(self) -> ReportTargetKind:
         return ReportTargetKind.FLUTTER_SOURCE
+
+
+@dataclass(frozen=True)
+class FlutterDependencyDetails:
+    name: str
+    version: str = ""
+    constraint: str = ""
+    source: str = ""
+    group: str = ""
 
 
 @dataclass(frozen=True)

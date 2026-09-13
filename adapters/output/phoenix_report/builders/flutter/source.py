@@ -6,6 +6,7 @@ from domain.report import (
     CheckResult,
     CheckSeverity,
     FindingSeverity,
+    FlutterDependencyDetails,
     FlutterReportDetails,
     OverallEvaluation,
     ReportData,
@@ -112,8 +113,14 @@ class FlutterReportDataBuilder(ReportDataBuilderPort):
         sdk = data.get("sdk") if isinstance(data.get("sdk"), Mapping) else {}
         platforms = data.get("platforms") if isinstance(data.get("platforms"), Mapping) else {}
         dependencies = data.get("dependency_inventory") if isinstance(data.get("dependency_inventory"), Mapping) else {}
-        names = tuple(
-            str(item.get("name") or "")
+        dependency_items = tuple(
+            FlutterDependencyDetails(
+                name=str(item.get("name") or ""),
+                version=str(item.get("version") or ""),
+                constraint=str(item.get("constraint") or ""),
+                source=str(item.get("source") or ""),
+                group=group,
+            )
             for group in ("declared", "development", "resolved")
             for item in dependencies.get(group, ())
             if isinstance(item, Mapping) and item.get("name")
@@ -124,5 +131,5 @@ class FlutterReportDataBuilder(ReportDataBuilderPort):
             dart_constraint=str(sdk.get("dart_constraint") or ""),
             flutter_constraint=str(sdk.get("flutter_constraint") or ""),
             supported_platforms=tuple(str(name) for name, enabled in platforms.items() if enabled is True),
-            dependencies=names,
+            dependencies=dependency_items,
         )

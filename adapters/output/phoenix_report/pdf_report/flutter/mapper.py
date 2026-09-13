@@ -9,6 +9,15 @@ def map_flutter_details(details: FlutterReportDetails) -> dict[str, object]:
             "dart_constraint": details.dart_constraint,
             "flutter_constraint": details.flutter_constraint,
             "supported_platforms": list(details.supported_platforms),
-            "dependencies": list(details.dependencies),
+            "dependencies": [
+                {
+                    "name": dependency.name,
+                    "version": dependency.version,
+                    "constraint": dependency.constraint,
+                    "source": dependency.source,
+                    "group": dependency.group,
+                }
+                for dependency in details.dependencies
+            ],
         },
     }
