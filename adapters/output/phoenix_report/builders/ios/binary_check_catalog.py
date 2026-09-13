@@ -110,7 +110,52 @@ def code_evidence_key_by_check() -> dict[str, str]:
     return {c.normalized_name: c.evidence_key for c in CODE_CHECKS}
 
 
-NETWORK_CHECKS = DATA_STORAGE_CHECKS = RESILIENCE_CHECKS = ()
+NETWORK_CHECKS = (
+    IOSBinaryCheckDefinition(
+        "App Transport Security (ATS) Disabled", CheckSeverity.HIGH, "ats_disabled", "MASVS-NETWORK-1"
+    ),
+    IOSBinaryCheckDefinition(
+        "Change Cipher Spec Injection Vulnerable OpenSSL Version",
+        CheckSeverity.HIGH,
+        "vulnerable_openssl_ccs_injection",
+        "MASVS-NETWORK-1",
+    ),
+    IOSBinaryCheckDefinition(
+        "Application Contains Deprecated FTP Functionality", CheckSeverity.MEDIUM, "uses_ftp", "MASVS-NETWORK-1"
+    ),
+    IOSBinaryCheckDefinition(
+        "Application Contains Heartbleed Vulnerable OpenSSL Version",
+        CheckSeverity.HIGH,
+        "vulnerable_openssl_heartbleed",
+        "MASVS-NETWORK-1",
+    ),
+    IOSBinaryCheckDefinition(
+        "Application Contains Insecure HTTP Traffic", CheckSeverity.HIGH, "insecure_http_traffic", "MASVS-NETWORK-1"
+    ),
+    IOSBinaryCheckDefinition(
+        "Application Selectively Disabled ATS Protections",
+        CheckSeverity.MEDIUM,
+        "ats_exceptions_configured",
+        "MASVS-NETWORK-1",
+    ),
+    IOSBinaryCheckDefinition(
+        "Cookie Missing 'HttpOnly' Flag", CheckSeverity.MEDIUM, "cookie_missing_httponly", "MASVS-NETWORK-1"
+    ),
+    IOSBinaryCheckDefinition(
+        "Cookie Missing 'Secure' Flag", CheckSeverity.MEDIUM, "cookie_missing_secure_flag", "MASVS-NETWORK-1"
+    ),
+    IOSBinaryCheckDefinition(
+        "Insecure TLS Configuration", CheckSeverity.HIGH, "insecure_tls_configuration", "MASVS-NETWORK-1"
+    ),
+    IOSBinaryCheckDefinition(
+        "Certificate Pinning Not Implemented",
+        CheckSeverity.MEDIUM,
+        "certificate_pinning_not_implemented",
+        "MASVS-NETWORK-2",
+    ),
+)
+DATA_STORAGE_CHECKS: tuple[IOSBinaryCheckDefinition, ...] = ()
+RESILIENCE_CHECKS: tuple[IOSBinaryCheckDefinition, ...] = ()
 SECTION_CHECKS = (
     ("code", "Code Vulnerability", "code_evidence", CODE_CHECKS),
     ("network", "Networking", "network_evidence", NETWORK_CHECKS),
