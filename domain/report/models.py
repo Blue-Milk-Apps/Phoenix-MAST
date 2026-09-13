@@ -159,6 +159,15 @@ class PlatformReportDetails(ABC):
 
 
 @dataclass(frozen=True)
+class FlutterReportDetails(PlatformReportDetails):
+    """Flutter-source-specific content for a report."""
+
+    @property
+    def target_kind(self) -> ReportTargetKind:
+        return ReportTargetKind.FLUTTER_SOURCE
+
+
+@dataclass(frozen=True)
 class SignatureVersions:
     """Verified Android application signature schemes."""
 
