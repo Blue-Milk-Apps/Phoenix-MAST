@@ -43,6 +43,25 @@ CODE_CHECKS = (
     _code("Hardcoded API Keys within the Application Bundle", CheckSeverity.HIGH, "hardcoded_api_keys_in_bundle"),
     _code("Potentially Insecure iOS Entitlements", CheckSeverity.MEDIUM, "insecure_entitlements"),
 )
+
+
+def normalize_check_name(name: str) -> str:
+    return " ".join(name.lower().split())
+
+
+CODE_CHECK_BY_NAME = {normalize_check_name(check.name): check for check in CODE_CHECKS}
+CODE_CHECK_BY_ALIAS = {normalize_check_name(alias): check for check in CODE_CHECKS for alias in check.aliases}
+
+
+def code_check_for_name(name: str) -> IOSBinaryCheckDefinition | None:
+    normalized_name = normalize_check_name(name)
+    return CODE_CHECK_BY_NAME.get(normalized_name) or CODE_CHECK_BY_ALIAS.get(normalized_name)
+
+
+def code_evidence_key_by_check() -> dict[str, str]:
+    return {normalize_check_name(check.name): check.evidence_key for check in CODE_CHECKS}
+
+
 NETWORK_CHECKS: tuple[IOSBinaryCheckDefinition, ...] = ()
 DATA_STORAGE_CHECKS: tuple[IOSBinaryCheckDefinition, ...] = ()
 RESILIENCE_CHECKS: tuple[IOSBinaryCheckDefinition, ...] = ()
