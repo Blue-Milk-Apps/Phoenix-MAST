@@ -188,6 +188,30 @@ class FlutterDependencyDetails:
 
 
 @dataclass(frozen=True)
+class ReactNativeRuntimeDetails:
+    react_native_constraint: str = ""
+    expo_constraint: str = ""
+
+
+@dataclass(frozen=True)
+class ReactNativePlatformDetails:
+    android_detected: bool = False
+    ios_detected: bool = False
+
+
+@dataclass(frozen=True)
+class ReactNativeReportDetails(PlatformReportDetails):
+    package_name: str = ""
+    version_name: str = ""
+    runtime: ReactNativeRuntimeDetails = ReactNativeRuntimeDetails()
+    platforms: ReactNativePlatformDetails = ReactNativePlatformDetails()
+
+    @property
+    def target_kind(self) -> ReportTargetKind:
+        return ReportTargetKind.REACT_NATIVE_SOURCE
+
+
+@dataclass(frozen=True)
 class SignatureVersions:
     """Verified Android application signature schemes."""
 
