@@ -2,12 +2,14 @@ import json
 import plistlib
 from pathlib import Path
 
-from adapters.output.phoenix_report.generate_report import generate_report, load_report_data
+from adapters.output.phoenix_report.builders.react_native import ReactNativeReportDataBuilder
+from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
 from adapters.post_scan.react_native import ReactNativeScanDetailExtractor
 from adapters.scanners.react_native.react_native_source_metadata_scanner import (
     ReactNativeSourceMetadataScanner,
 )
 from application.mobile_analysis_workflow_service import MobileAnalysisWorkflowService
+from application.report_generation_service import ReportGenerationService
 from domain.models import ScanConfig
 from domain.post_scan.react_native import INVENTORY_RULE_ID_TO_KEY, REACT_NATIVE_RULE_IDS
 
@@ -107,17 +109,22 @@ def test_react_native_extractor_builds_mobile_only_report_and_pdf(tmp_path: Path
     assert report["functionality"]["SMS"]["present"] is None
     assert report["manual_review"]["findings"][0]["rule_id"] == "react-native.source.webview-message-bridge"
 
-    canonical = load_report_data(report)
-    checks = {
-        section["section_name"]: {item["check"]: item for item in section["checks"]}
-        for section in canonical["vulnerability_sections"]
+    report["target_information"] = {
+        "target_kind": "react_native_source",
+        "platform": "react_native",
+        "target_type": "source",
+        "stack": "react_native",
     }
-    assert checks["Code"]["App is Debuggable"]["result"] == "Not Present"
-    assert checks["Code"]["Contains Reflection Code"]["result"] == "Not Evaluated"
-    assert checks["Network"]["Contains HostnameVerifier That Accepts All Hostnames"]["result"] == ("Not Evaluated")
-    assert checks["Data Storage"]["Accesses External Storage"]["result"] == "Not Present"
+    canonical = ReportGenerationService([ReactNativeReportDataBuilder()]).build_report_data(report)
+    checks = {
+        section.name: {item.name: item for item in section.checks} for section in canonical.vulnerability_sections
+    }
+    assert checks["Code"]["App Is Debuggable"].result.value == "not_present"
+    assert checks["Code"]["Contains Reflection Code"].result.value == "not_evaluated"
+    assert checks["Network"]["Contains Hostname Verifier Accepts All"].result.value == "not_evaluated"
+    assert checks["Data Storage"]["Accesses External Storage"].result.value == "not_present"
 
-    pdf_path = generate_report(report, tmp_path / "react-native-report.pdf")
+    pdf_path = PdfReportGenerator().generate(canonical, tmp_path / "react-native-report.pdf")
     assert pdf_path.is_file()
     assert pdf_path.stat().st_size > 0
 
