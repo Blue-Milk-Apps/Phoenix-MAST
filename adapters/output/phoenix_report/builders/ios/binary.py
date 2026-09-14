@@ -234,7 +234,9 @@ class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
         present = [check.severity for check in section.checks if check.result == CheckResult.PRESENT]
         if not present:
             return RiskLevel.NOT_EVALUATED
-        if CheckSeverity.CRITICAL in present or CheckSeverity.HIGH in present:
+        if CheckSeverity.CRITICAL in present:
+            return RiskLevel.CRITICAL
+        if CheckSeverity.HIGH in present:
             return RiskLevel.HIGH
         if CheckSeverity.MEDIUM in present:
             return RiskLevel.MEDIUM

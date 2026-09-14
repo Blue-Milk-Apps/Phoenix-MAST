@@ -215,8 +215,10 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
             return RiskLevel.NOT_EVALUATED
 
         present_severities = {check.severity for check in assessed_checks if check.result == CheckResult.PRESENT}
-        has_high_risk_finding = bool(present_severities & {CheckSeverity.CRITICAL, CheckSeverity.HIGH})
-        if has_high_risk_finding:
+        if CheckSeverity.CRITICAL in present_severities:
+            return RiskLevel.CRITICAL
+
+        if CheckSeverity.HIGH in present_severities:
             return RiskLevel.HIGH
 
         has_medium_risk_finding = CheckSeverity.MEDIUM in present_severities

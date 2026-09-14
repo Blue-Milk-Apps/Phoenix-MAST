@@ -10,6 +10,7 @@ from enum import StrEnum
 class RiskLevel(StrEnum):
     """Overall risk assigned to a report area."""
 
+    CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"

@@ -203,7 +203,9 @@ class AndroidBinaryReportDataBuilder(BinaryReportDataBuilder):
     @staticmethod
     def _risk_level(section: VulnerabilitySection) -> RiskLevel:
         severities = {check.severity for check in section.checks if check.result == CheckResult.PRESENT}
-        if CheckSeverity.CRITICAL in severities or CheckSeverity.HIGH in severities:
+        if CheckSeverity.CRITICAL in severities:
+            return RiskLevel.CRITICAL
+        if CheckSeverity.HIGH in severities:
             return RiskLevel.HIGH
         if CheckSeverity.MEDIUM in severities:
             return RiskLevel.MEDIUM
