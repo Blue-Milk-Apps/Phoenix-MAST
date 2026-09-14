@@ -8,8 +8,17 @@ from domain.report import (
     CheckSeverity,
     EndpointDetails,
     FindingSeverity,
+    FlutterDeclaredDependency,
+    FlutterDeepLink,
     FlutterDependencyDetails,
+    FlutterDependencyPresentation,
+    FlutterManualReviewFinding,
+    FlutterPlatformPresentation,
+    FlutterPresentationDetails,
     FlutterReportDetails,
+    FlutterResolvedDependency,
+    FlutterSbomPackage,
+    FlutterUrlScheme,
     FunctionalityDetails,
     HardcodedSecretDetails,
     HardcodedUrlDetails,
@@ -134,7 +143,210 @@ class FlutterReportDataBuilder(SourceReportDataBuilder):
                 for item in data.get("endpoints", ())
                 if isinstance(item, Mapping)
             ),
+            presentation=FlutterReportDataBuilder._presentation(data),
         )
+
+    @classmethod
+    def _presentation(cls, data: Mapping[str, Any]) -> FlutterPresentationDetails:
+        app_info = cls._mapping(data, "app_info")
+        inventory = cls._mapping(data, "platform_inventory")
+        sdk = cls._mapping(inventory, "sdk")
+        android = cls._mapping(inventory, "android")
+        ios = cls._mapping(inventory, "ios")
+        warnings = tuple(cls._strings(inventory.get("warnings")))
+        metadata_assessed = inventory.get("source_metadata_assessed") is True
+
+        return FlutterPresentationDetails(
+            extraction_status=(
+                "Partial" if metadata_assessed and warnings else "Complete" if metadata_assessed else "Not Assessed"
+            ),
+            dart_sdk_constraint=cls._text(sdk, "dart_constraint") or cls._text(app_info, "dart_sdk_constraint"),
+            flutter_sdk_constraint=cls._text(sdk, "flutter_constraint")
+            or cls._text(app_info, "flutter_sdk_constraint"),
+            android_application_id=cls._text(android, "package_name") or cls._text(app_info, "android_application_id"),
+            ios_bundle_identifier=cls._text(ios, "bundle_identifier") or cls._text(app_info, "ios_bundle_identifier"),
+            description=cls._text(app_info, "description"),
+            homepage=cls._text(app_info, "homepage"),
+            repository=cls._text(app_info, "repository"),
+            warnings=warnings,
+            platforms=cls._platforms(inventory, android, ios),
+            dependencies=cls._dependency_presentation(data),
+            deep_links_assessed=cls._deep_links_assessed(data),
+            deep_links=cls._deep_links(data),
+            url_schemes_assessed=ios.get("metadata_assessed") is True,
+            url_schemes=cls._url_schemes(data),
+            queried_url_schemes=tuple(cls._strings(data.get("queried_url_schemes"))),
+            manual_review_available=isinstance(data.get("manual_review"), Mapping),
+            manual_review_status=cls._manual_review_status(data),
+            manual_review_findings=cls._manual_review_findings(data),
+        )
+
+    @classmethod
+    def _platforms(
+        cls,
+        inventory: Mapping[str, Any],
+        android: Mapping[str, Any],
+        ios: Mapping[str, Any],
+    ) -> tuple[FlutterPlatformPresentation, ...]:
+        android_requirements = cls._join_requirements(
+            ("Min SDK", android.get("min_sdk")),
+            ("Target SDK", android.get("target_sdk")),
+            ("Compile SDK", android.get("compile_sdk")),
+        )
+        return (
+            FlutterPlatformPresentation(
+                name="Android",
+                detected=android.get("detected") is True,
+                metadata_status=cls._metadata_status(android),
+                identifier=cls._text(android, "package_name"),
+                version=cls._text(android, "version_name"),
+                requirements=android_requirements,
+            ),
+            FlutterPlatformPresentation(
+                name="iOS",
+                detected=ios.get("detected") is True,
+                metadata_status=cls._metadata_status(ios),
+                identifier=cls._text(ios, "bundle_identifier"),
+                version=cls._text(ios, "version_name"),
+                requirements=cls._join_requirements(("Minimum iOS", ios.get("minimum_os"))),
+            ),
+            *(
+                FlutterPlatformPresentation(
+                    name=name,
+                    detected=inventory.get(key) is True,
+                    metadata_status="Not Applicable",
+                )
+                for name, key in (
+                    ("Web", "web_detected"),
+                    ("Linux", "linux_detected"),
+                    ("macOS", "macos_detected"),
+                    ("Windows", "windows_detected"),
+                )
+            ),
+        )
+
+    @staticmethod
+    def _metadata_status(platform: Mapping[str, Any]) -> str:
+        if platform.get("metadata_assessed") is True:
+            return "Assessed"
+        return "Not Assessed" if platform.get("detected") is True else "Not Applicable"
+
+    @classmethod
+    def _dependency_presentation(cls, data: Mapping[str, Any]) -> FlutterDependencyPresentation:
+        inventory = cls._mapping(data, "dependency_inventory")
+        declared = tuple(
+            FlutterDeclaredDependency(
+                name=cls._text(item, "name"),
+                constraint=cls._text(item, "constraint"),
+                scope=cls._text(item, "scope") or group,
+                source=cls._text(item, "source"),
+            )
+            for group in ("direct", "declared", "development")
+            for item in cls._mapping_list(inventory.get(group))
+            if cls._text(item, "name")
+        )
+        resolved = tuple(
+            FlutterResolvedDependency(
+                name=cls._text(item, "name"),
+                version=cls._text(item, "version"),
+                dependency_kind=cls._text(item, "dependency_kind"),
+                source=cls._text(item, "source"),
+            )
+            for item in cls._mapping_list(inventory.get("resolved"))
+            if cls._text(item, "name")
+        )
+        sbom_packages = tuple(
+            FlutterSbomPackage(
+                name=cls._text(item, "name"),
+                version=cls._text(item, "version"),
+                output_path=cls._text(item, "output_path"),
+            )
+            for item in cls._mapping_list(inventory.get("sbom_packages"))
+            if cls._text(item, "name")
+        )
+        return FlutterDependencyPresentation(
+            metadata_status="Assessed" if inventory.get("metadata_assessed") is True else "Not Assessed",
+            sbom_status="Assessed" if inventory.get("sbom_assessed") is True else "Not Assessed",
+            declared=declared,
+            resolved=resolved,
+            sbom_packages=sbom_packages,
+        )
+
+    @classmethod
+    def _deep_links(cls, data: Mapping[str, Any]) -> tuple[FlutterDeepLink, ...]:
+        container = cls._mapping(data, "deep_links")
+        return tuple(cls._deep_link(item) for item in cls._mapping_list(container.get("deep_links")))
+
+    @classmethod
+    def _deep_link(cls, item: Mapping[str, Any]) -> FlutterDeepLink:
+        scheme = cls._text(item, "scheme")
+        host = cls._text(item, "host")
+        port = cls._text(item, "port")
+        path = cls._text(item, "path") or cls._text(item, "path_prefix") or cls._text(item, "path_pattern")
+        authority = f"{host}:{port}" if host and port else host
+        if scheme and authority:
+            uri = f"{scheme}://{authority}{path}"
+        elif scheme:
+            uri = f"{scheme}:{path}"
+        else:
+            uri = f"{authority}{path}"
+        return FlutterDeepLink(uri, cls._text(item, "component"), cls._text(item, "mime_type"))
+
+    @classmethod
+    def _url_schemes(cls, data: Mapping[str, Any]) -> tuple[FlutterUrlScheme, ...]:
+        return tuple(
+            FlutterUrlScheme(cls._text(item, "url_name"), tuple(cls._strings(item.get("schemes"))))
+            for item in cls._mapping_list(data.get("url_schemes"))
+        )
+
+    @classmethod
+    def _manual_review_status(cls, data: Mapping[str, Any]) -> str:
+        review = cls._mapping(data, "manual_review")
+        if not review:
+            return "Not Assessed"
+        if review.get("fully_assessed") is True:
+            return "Fully Assessed"
+        if review.get("assessed") is True:
+            return "Partially Assessed"
+        return "Not Assessed"
+
+    @classmethod
+    def _manual_review_findings(cls, data: Mapping[str, Any]) -> tuple[FlutterManualReviewFinding, ...]:
+        return tuple(
+            FlutterManualReviewFinding(
+                rule_id=cls._text(item, "rule_id"),
+                scope=cls._text(item, "scope"),
+                severity=cls._text(item, "severity"),
+                location=cls._text(item, "location"),
+                reason=cls._text(item, "reason"),
+                message=cls._text(item, "message"),
+            )
+            for item in cls._mapping_list(cls._mapping(data, "manual_review").get("findings"))
+        )
+
+    @classmethod
+    def _deep_links_assessed(cls, data: Mapping[str, Any]) -> bool:
+        return isinstance(cls._mapping(data, "deep_links").get("deep_links"), list)
+
+    @staticmethod
+    def _join_requirements(*items: tuple[str, Any]) -> str:
+        return ", ".join(f"{label}: {value}" for label, value in items if str(value or "").strip())
+
+    @staticmethod
+    def _text(data: Mapping[str, Any], key: str) -> str:
+        return str(data.get(key) or "").strip()
+
+    @staticmethod
+    def _strings(value: Any) -> list[str]:
+        if not isinstance(value, (list, tuple)):
+            return []
+        return list(dict.fromkeys(str(item).strip() for item in value if str(item).strip()))
+
+    @staticmethod
+    def _mapping_list(value: Any) -> list[Mapping[str, Any]]:
+        if not isinstance(value, (list, tuple)):
+            return []
+        return [item for item in value if isinstance(item, Mapping)]
 
     @staticmethod
     def _hardcoded_values(data: Mapping[str, Any]) -> HardcodedValuesDetails:

@@ -159,6 +159,112 @@ class PlatformReportDetails(ABC):
 
 
 @dataclass(frozen=True)
+class FlutterPlatformPresentation:
+    """One generated platform row in the Flutter project inventory."""
+
+    name: str
+    detected: bool = False
+    metadata_status: str = "Not Assessed"
+    identifier: str = ""
+    version: str = ""
+    requirements: str = ""
+
+
+@dataclass(frozen=True)
+class FlutterDeclaredDependency:
+    """A dependency declared by a Flutter project."""
+
+    name: str
+    constraint: str = ""
+    scope: str = ""
+    source: str = ""
+
+
+@dataclass(frozen=True)
+class FlutterResolvedDependency:
+    """A dependency resolved by Flutter tooling."""
+
+    name: str
+    version: str = ""
+    dependency_kind: str = ""
+    source: str = ""
+
+
+@dataclass(frozen=True)
+class FlutterSbomPackage:
+    """A package emitted by the source scan SBOM."""
+
+    name: str
+    version: str = ""
+    output_path: str = ""
+
+
+@dataclass(frozen=True)
+class FlutterDependencyPresentation:
+    """Declared, resolved, and SBOM dependency views for the PDF."""
+
+    metadata_status: str = "Not Assessed"
+    sbom_status: str = "Not Assessed"
+    declared: tuple[FlutterDeclaredDependency, ...] = ()
+    resolved: tuple[FlutterResolvedDependency, ...] = ()
+    sbom_packages: tuple[FlutterSbomPackage, ...] = ()
+
+
+@dataclass(frozen=True)
+class FlutterDeepLink:
+    """An Android deep-link row projected into a Flutter report."""
+
+    uri: str = ""
+    component: str = ""
+    mime_type: str = ""
+
+
+@dataclass(frozen=True)
+class FlutterUrlScheme:
+    """An iOS URL-scheme declaration in a Flutter project."""
+
+    url_name: str = ""
+    schemes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class FlutterManualReviewFinding:
+    """A finding retained for Flutter manual review."""
+
+    rule_id: str = ""
+    scope: str = ""
+    severity: str = ""
+    location: str = ""
+    reason: str = ""
+    message: str = ""
+
+
+@dataclass(frozen=True)
+class FlutterPresentationDetails:
+    """Flutter inventory and manual-review data needed by PDF templates."""
+
+    extraction_status: str = "Not Assessed"
+    dart_sdk_constraint: str = ""
+    flutter_sdk_constraint: str = ""
+    android_application_id: str = ""
+    ios_bundle_identifier: str = ""
+    description: str = ""
+    homepage: str = ""
+    repository: str = ""
+    warnings: tuple[str, ...] = ()
+    platforms: tuple[FlutterPlatformPresentation, ...] = ()
+    dependencies: FlutterDependencyPresentation = FlutterDependencyPresentation()
+    deep_links_assessed: bool = False
+    deep_links: tuple[FlutterDeepLink, ...] = ()
+    url_schemes_assessed: bool = False
+    url_schemes: tuple[FlutterUrlScheme, ...] = ()
+    queried_url_schemes: tuple[str, ...] = ()
+    manual_review_available: bool = False
+    manual_review_status: str = "Not Assessed"
+    manual_review_findings: tuple[FlutterManualReviewFinding, ...] = ()
+
+
+@dataclass(frozen=True)
 class FlutterReportDetails(PlatformReportDetails):
     """Flutter-source-specific content for a report."""
 
@@ -172,6 +278,7 @@ class FlutterReportDetails(PlatformReportDetails):
     permissions: tuple[PermissionDetails, ...] = ()
     hardcoded_values: HardcodedValuesDetails = field(default_factory=lambda: HardcodedValuesDetails())
     endpoints: tuple[EndpointDetails, ...] = ()
+    presentation: FlutterPresentationDetails = FlutterPresentationDetails()
 
     @property
     def target_kind(self) -> ReportTargetKind:
