@@ -39,6 +39,8 @@ from domain.report import (
 class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
     """Build standard report data for iOS binary assessments."""
 
+    _excluded_functionalities = frozenset({"fingerprint", "google cloud messaging", "infrared led"})
+
     @property
     def target_kind(self) -> ReportTargetKind:
         return ReportTargetKind.IOS_BINARY
@@ -104,6 +106,7 @@ class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
             functionality=tuple(
                 FunctionalityDetails(k, cls._optional_bool(v.get("present")) if isinstance(v, Mapping) else None)
                 for k, v in cls._mapping(data, "functionality").items()
+                if str(k).strip().casefold() not in cls._excluded_functionalities
             ),
             third_party_sdks=tuple(
                 IOSSDKCategoryDetails(k, tuple(n for n, present in v.items() if present))

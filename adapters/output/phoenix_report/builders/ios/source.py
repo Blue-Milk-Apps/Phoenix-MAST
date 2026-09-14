@@ -16,6 +16,7 @@ from domain.report.models import (
 
 class NativeIOSReportDataBuilder(SourceReportDataBuilder):
     check_sections = IOS_SOURCE_SECTION_CHECKS
+    _excluded_functionalities = frozenset({"fingerprint", "google cloud messaging", "infrared led"})
 
     @property
     def target_kind(self) -> ReportTargetKind:
@@ -44,6 +45,7 @@ class NativeIOSReportDataBuilder(SourceReportDataBuilder):
                 )
                 for name, item in functionality.items()
                 if isinstance(item, Mapping)
+                and str(name).strip().casefold() not in NativeIOSReportDataBuilder._excluded_functionalities
             ),
             permissions=tuple(
                 NativeIOSReportDataBuilder._permission_details(item)

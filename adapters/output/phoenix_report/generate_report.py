@@ -1779,6 +1779,8 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     is_react_native = _is_react_native_platform(data)
     base_template = _ios_blank_template() if is_ios else _blank_template()
     report_data = _merge_nested(base_template, data)
+    if is_ios:
+        _filter_ios_functionality(report_data)
     report_scope = resolve_report_scope(report_data)
     report_data["report_scope"] = asdict(report_scope)
     report_data["presentation"] = asdict(report_scope)
@@ -1846,6 +1848,16 @@ def _normalize_report_data(data: dict[str, Any]) -> dict[str, Any]:
     report_data["findings_severity"] = _build_findings_severity(report_data)
 
     return _prune_placeholder_rows(report_data)
+
+
+def _filter_ios_functionality(report_data: dict[str, Any]) -> None:
+    """Keep legacy iOS reports limited to the iOS functionality catalog."""
+
+    functionality = report_data.get("functionality")
+    if not isinstance(functionality, dict):
+        return
+    allowed = set(_ios_blank_template().get("functionality", {}))
+    report_data["functionality"] = {name: details for name, details in functionality.items() if name in allowed}
 
 
 def _retain_assessed_sections(report_data: dict[str, Any], report_scope: ReportScope) -> None:

@@ -117,7 +117,10 @@ class IOSFunctionality:
             permission_keys=permission_keys,
             opengrep_hits=opengrep_hits.get("Calendar", []),
         )
-        self.In_App_Purchases = self._entry_from_sources()
+        self.In_App_Purchases = self._in_app_purchases_entry(
+            opengrep_hits.get("In-App Purchases", []),
+            strings_outputs,
+        )
         self.Keychain = self._entry_from_sources(
             entitlements=entitlements,
             entitlement_keys={"keychain_access_groups"},
@@ -210,6 +213,16 @@ class IOSFunctionality:
         if not matched:
             return self._entry(False, [])
         return self._entry(True, [f"queried URL schemes {', '.join(matched)} declared."])
+
+    def _in_app_purchases_entry(
+        self,
+        opengrep_hits: list[str],
+        strings_outputs: dict[str, str],
+    ) -> FunctionalityEntry:
+        explanation_parts = [description for description in opengrep_hits if description]
+        if not explanation_parts and self._strings_indicate_in_app_purchases(strings_outputs):
+            explanation_parts.append("strings output references Apple StoreKit purchase APIs.")
+        return self._entry(bool(explanation_parts), explanation_parts)
 
     def _nfc_entry(
         self,
@@ -400,6 +413,16 @@ class IOSFunctionality:
     @staticmethod
     def _strings_indicate_usb(strings_outputs: dict[str, str]) -> bool:
         pattern = re.compile(r"(externalaccessory|eaaccessory|uisupportedexternalaccessoryprotocols)", re.IGNORECASE)
+        return any(pattern.search(content or "") for content in strings_outputs.values())
+
+    @staticmethod
+    def _strings_indicate_in_app_purchases(strings_outputs: dict[str, str]) -> bool:
+        pattern = re.compile(
+            r"(storekit|skpaymentqueue|skproductsrequest|skpaymenttransaction|"
+            r"skpayment\b|skproduct\b|skreceiptrefreshrequest|product\.purchase|"
+            r"transaction\.currententitlements)",
+            re.IGNORECASE,
+        )
         return any(pattern.search(content or "") for content in strings_outputs.values())
 
     @staticmethod
