@@ -103,11 +103,13 @@ class PlistSourceScanner(ScannerPort):
                 if name and name not in settings.setdefault("TARGET_NAME", []):
                     settings["TARGET_NAME"].append(name)
 
-        return {
-            key: next((value for value in values if "$(" not in value), values[0])
-            for key, values in settings.items()
-            if values
-        }
+        variables = {key: values[0] for key, values in settings.items() if values}
+        for _ in range(10):
+            resolved = {key: str(self._resolve_xcode_variables(value, variables)) for key, value in variables.items()}
+            if resolved == variables:
+                break
+            variables = resolved
+        return variables
 
     def _resolve_xcode_variables(self, value: object, variables: dict[str, str]) -> object:
         if isinstance(value, dict):
