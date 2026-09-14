@@ -210,6 +210,8 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
 
     @staticmethod
     def _risk(section: VulnerabilitySection) -> RiskLevel:
+        if not any(check.result != CheckResult.NOT_EVALUATED for check in section.checks):
+            return RiskLevel.NOT_EVALUATED
         severities = [c.severity for c in section.checks if c.result == CheckResult.PRESENT]
         return (
             RiskLevel.HIGH
@@ -217,8 +219,6 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
             else RiskLevel.MEDIUM
             if CheckSeverity.MEDIUM in severities
             else RiskLevel.LOW
-            if severities
-            else RiskLevel.NOT_EVALUATED
         )
 
     @staticmethod
