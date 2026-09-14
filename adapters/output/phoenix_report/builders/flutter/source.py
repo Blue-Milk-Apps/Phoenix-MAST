@@ -2,7 +2,10 @@
 
 from typing import Any, Mapping
 
+from adapters.output.phoenix_report.builders.android.source_check_catalog import ANDROID_SOURCE_SECTION_CHECKS
+from adapters.output.phoenix_report.builders.ios.source_check_catalog import IOS_SOURCE_SECTION_CHECKS
 from adapters.output.phoenix_report.builders.source import SourceReportDataBuilder
+from domain.post_scan.flutter.rule_registry import REPORT_RULE_IDS_BY_SECTION, RULE_SEVERITIES
 from domain.report import (
     CheckResult,
     CheckSeverity,
@@ -25,13 +28,14 @@ from domain.report import (
     HardcodedValuesDetails,
     PermissionDetails,
     ReportTargetKind,
-    RiskLevel,
     SecurityCheck,
     VulnerabilitySection,
 )
 
 
 class FlutterReportDataBuilder(SourceReportDataBuilder):
+    """Build a Flutter report using canonical severities for all embedded source checks."""
+
     @property
     def target_kind(self) -> ReportTargetKind:
         return ReportTargetKind.FLUTTER_SOURCE
@@ -47,8 +51,8 @@ class FlutterReportDataBuilder(SourceReportDataBuilder):
         )
         return VulnerabilitySection(name=name, findings_text="", checks=checks)
 
-    @staticmethod
-    def _check(name: str, value: Mapping[str, Any]) -> SecurityCheck:
+    @classmethod
+    def _check(cls, name: str, value: Mapping[str, Any]) -> SecurityCheck:
         present = value.get("present")
         result = (
             CheckResult.PRESENT
@@ -57,8 +61,7 @@ class FlutterReportDataBuilder(SourceReportDataBuilder):
             if present is False
             else CheckResult.NOT_EVALUATED
         )
-        severity = str(value.get("severity", "info")).lower()
-        check_severity = next((item for item in CheckSeverity if item.value == severity), CheckSeverity.INFO)
+        check_severity = cls._canonical_severity(name, value)
         return SecurityCheck(
             name=name,
             severity=check_severity,
@@ -69,18 +72,51 @@ class FlutterReportDataBuilder(SourceReportDataBuilder):
             remediation_link=str(value.get("remediation_link") or ""),
         )
 
+    @classmethod
+    def _canonical_severity(cls, evidence_key: str, value: Mapping[str, Any]) -> CheckSeverity:
+        """Use the canonical rule severity before falling back to scan metadata."""
+
+        flutter_rule_ids = {
+            rule_id
+            for evidence_groups in REPORT_RULE_IDS_BY_SECTION.values()
+            for key, rule_ids in evidence_groups.items()
+            if key == evidence_key
+            for rule_id in rule_ids
+        }
+        severities = [
+            CheckSeverity(severity.lower())
+            for rule_id, severity in RULE_SEVERITIES.items()
+            if rule_id in flutter_rule_ids and severity.lower() in {item.value for item in CheckSeverity}
+        ]
+        if severities:
+            return cls._highest_severity(severities)
+
+        source_definitions = [
+            definition
+            for sections in (ANDROID_SOURCE_SECTION_CHECKS, IOS_SOURCE_SECTION_CHECKS)
+            for _, _, definitions in sections
+            for definition in definitions
+            if definition.evidence_key == evidence_key
+        ]
+        if source_definitions:
+            return cls._highest_severity([definition.severity for definition in source_definitions])
+
+        persisted = str(value.get("severity") or "").strip().lower()
+        if persisted:
+            return next((item for item in CheckSeverity if item.value == persisted), CheckSeverity.INFO)
+        return CheckSeverity.INFO
+
     @staticmethod
-    def _risk(section: VulnerabilitySection) -> RiskLevel:
-        severities = [c.severity for c in section.checks if c.result == CheckResult.PRESENT]
-        return (
-            RiskLevel.HIGH
-            if any(s in (CheckSeverity.CRITICAL, CheckSeverity.HIGH) for s in severities)
-            else RiskLevel.MEDIUM
-            if CheckSeverity.MEDIUM in severities
-            else RiskLevel.LOW
-            if severities
-            else RiskLevel.NOT_EVALUATED
-        )
+    def _highest_severity(severities: list[CheckSeverity]) -> CheckSeverity:
+        order = {
+            CheckSeverity.CRITICAL: 6,
+            CheckSeverity.HIGH: 5,
+            CheckSeverity.MEDIUM: 4,
+            CheckSeverity.LOW: 3,
+            CheckSeverity.INFO: 2,
+            CheckSeverity.SECURE: 1,
+        }
+        return max(severities, key=lambda severity: order.get(severity, 0))
 
     @staticmethod
     def _severity(sections: tuple[VulnerabilitySection, ...]) -> FindingSeverity:

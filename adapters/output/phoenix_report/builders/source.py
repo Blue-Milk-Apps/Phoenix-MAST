@@ -210,16 +210,20 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
 
     @staticmethod
     def _risk(section: VulnerabilitySection) -> RiskLevel:
-        if not any(check.result != CheckResult.NOT_EVALUATED for check in section.checks):
+        assessed_checks = tuple(check for check in section.checks if check.result != CheckResult.NOT_EVALUATED)
+        if not assessed_checks:
             return RiskLevel.NOT_EVALUATED
-        severities = [c.severity for c in section.checks if c.result == CheckResult.PRESENT]
-        return (
-            RiskLevel.HIGH
-            if any(s in (CheckSeverity.CRITICAL, CheckSeverity.HIGH) for s in severities)
-            else RiskLevel.MEDIUM
-            if CheckSeverity.MEDIUM in severities
-            else RiskLevel.LOW
-        )
+
+        present_severities = {check.severity for check in assessed_checks if check.result == CheckResult.PRESENT}
+        has_high_risk_finding = bool(present_severities & {CheckSeverity.CRITICAL, CheckSeverity.HIGH})
+        if has_high_risk_finding:
+            return RiskLevel.HIGH
+
+        has_medium_risk_finding = CheckSeverity.MEDIUM in present_severities
+        if has_medium_risk_finding:
+            return RiskLevel.MEDIUM
+
+        return RiskLevel.LOW
 
     @staticmethod
     def _severity(sections: tuple[VulnerabilitySection, ...]) -> FindingSeverity:
