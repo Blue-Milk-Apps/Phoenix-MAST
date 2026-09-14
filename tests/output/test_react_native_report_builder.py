@@ -23,7 +23,8 @@ def test_maps_react_native_details_and_inventories() -> None:
             "permissions": [{"name": "camera", "status": "requested"}],
             "hardcoded_values": {"emails": ["security@example.test"]},
             "endpoints": [{"endpoint": "https://api.example.test"}],
-            "code_evidence": {"unsafe": {"present": True, "severity": "high", "evidence": "src/App.tsx:4"}},
+            "code_evidence": {"uses_dynamic_code_execution": {"present": True, "evidence": "src/App.tsx:4"}},
+            "data_storage_evidence": {"deprecated_keychain_attributes": {"present": True}},
         },
         _metadata(),
     )
@@ -37,12 +38,20 @@ def test_maps_react_native_details_and_inventories() -> None:
     assert details.hardcoded_values.emails == ("security@example.test",)
     assert details.endpoints[0].endpoint == "https://api.example.test"
     assert report.findings_severity.high == 1
+    keychain = next(
+        check
+        for section in report.vulnerability_sections
+        if section.name == "Data Storage"
+        for check in section.checks
+        if check.name == "Application Utilizes Deprecated Keychain Attributes"
+    )
+    assert keychain.severity.value == "medium"
 
 
 def test_empty_react_native_data_has_four_empty_sections() -> None:
     report = ReactNativeReportDataBuilder().build({}, _metadata())
     assert len(report.vulnerability_sections) == 4
-    assert all(not section.checks for section in report.vulnerability_sections)
+    assert [len(section.checks) for section in report.vulnerability_sections] == [26, 28, 22, 1]
 
 
 def test_rejects_incompatible_target_kind() -> None:

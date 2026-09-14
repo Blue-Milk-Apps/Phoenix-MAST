@@ -2,6 +2,7 @@
 
 from typing import Any, Mapping
 
+from adapters.output.phoenix_report.builders.react_native.source_check_catalog import REACT_NATIVE_SOURCE_SECTION_CHECKS
 from adapters.output.phoenix_report.builders.source import SourceReportDataBuilder
 from domain.report import (
     EndpointDetails,
@@ -22,6 +23,8 @@ from domain.report import (
 
 class ReactNativeReportDataBuilder(SourceReportDataBuilder):
     """Apply the standard source report assembly to React Native evidence."""
+
+    check_sections = REACT_NATIVE_SOURCE_SECTION_CHECKS
 
     @property
     def target_kind(self) -> ReportTargetKind:
