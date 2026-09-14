@@ -222,6 +222,8 @@ class NativeAndroidReportDetails(PlatformReportDetails):
     version_name: str = ""
     target_sdk: str = ""
     min_sdk: str = ""
+    application: AndroidApplicationDetails = field(default_factory=lambda: AndroidApplicationDetails())
+    app_components: AppComponentSummary = field(default_factory=lambda: AppComponentSummary())
     functionality: tuple[FunctionalityDetails, ...] = ()
     permissions: tuple[PermissionDetails, ...] = ()
     hardcoded_values: HardcodedValuesDetails = field(default_factory=lambda: HardcodedValuesDetails())
