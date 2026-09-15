@@ -20,7 +20,7 @@ from domain.post_scan.utilities import (
 
 
 @dataclass
-class CodeEvidence:
+class CodeEvidenceBuilder:
     accesses_unique_identifiers: dict[str, Any]
     app_is_debuggable: dict[str, Any]
     activities_accessible_to_other_apps: dict[str, Any]

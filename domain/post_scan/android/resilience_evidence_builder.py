@@ -8,7 +8,7 @@ from domain.post_scan.utilities import first_non_empty
 
 
 @dataclass
-class ResilienceEvidence:
+class ResilienceEvidenceBuilder:
     root_detection_missing: dict[str, Any]
     biometric_local_authentication_bypass_possible: dict[str, Any]
 

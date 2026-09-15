@@ -1,4 +1,4 @@
-from domain.post_scan.android.resilience_evidence import ResilienceEvidence
+from domain.post_scan.android.resilience_evidence_builder import ResilienceEvidenceBuilder
 
 
 def test_android_resilience_evidence_detects_root_checks_and_biometric_hardening() -> None:
@@ -24,7 +24,7 @@ def test_android_resilience_evidence_detects_root_checks_and_biometric_hardening
         },
     }
 
-    evidence = ResilienceEvidence(loaded_outputs)
+    evidence = ResilienceEvidenceBuilder(loaded_outputs)
 
     assert evidence.root_detection_missing == {
         "present": False,
@@ -39,7 +39,7 @@ def test_android_resilience_evidence_detects_root_checks_and_biometric_hardening
 
 
 def test_android_resilience_evidence_reports_missing_root_detection() -> None:
-    evidence = ResilienceEvidence({"aapt2_identity": {"package_name": "com.example.app"}})
+    evidence = ResilienceEvidenceBuilder({"aapt2_identity": {"package_name": "com.example.app"}})
 
     assert evidence.root_detection_missing == {
         "present": True,
