@@ -41,6 +41,7 @@ def test_ipsw_scan_requires_ipa(tmp_path: Path) -> None:
         project_path=target,
         output_path=tmp_path / "scan-results",
         mode="binary",
+        enabled_scans=[ScanType.IPSW],
     )
 
     results = IpswScanner().scan(config)
@@ -110,6 +111,7 @@ def test_ipsw_scan_returns_raw_command_outputs(monkeypatch, tmp_path: Path) -> N
         project_path=ipa_path,
         output_path=tmp_path / "scan-results",
         mode="binary",
+        enabled_scans=[ScanType.IPSW],
     )
 
     results = IpswScanner().scan(config)

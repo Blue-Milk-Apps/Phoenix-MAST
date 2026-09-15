@@ -95,7 +95,7 @@ COPY entrypoints ./entrypoints
 COPY ports ./ports
 COPY rules ./rules
 
-RUN /opt/appcritiq-venv/bin/pip install --no-cache-dir .
+RUN /opt/appcritiq-venv/bin/pip install --no-cache-dir --no-deps .
 
 # 7. Permissions & Working Dir
 # We need to ensure the 'appcritiq' user owns the data mount point

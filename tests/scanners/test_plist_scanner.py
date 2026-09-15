@@ -38,6 +38,7 @@ def test_plist_scan_writes_app_plist_and_index(tmp_path: Path) -> None:
         project_path=project_path,
         output_path=tmp_path / "scan-results",
         mode="source",
+        enabled_scans=[ScanType.PLIST_SOURCE],
     )
 
     results = PlistSourceScanner().scan(config)
@@ -122,6 +123,7 @@ def test_plist_scan_groups_app_and_framework_bundles(tmp_path: Path) -> None:
         project_path=project_path,
         output_path=tmp_path / "scan-results",
         mode="source",
+        enabled_scans=[ScanType.PLIST_SOURCE],
     )
 
     results = PlistSourceScanner().scan(config)
@@ -182,6 +184,7 @@ def test_plist_scan_skips_xcode_project_plists(tmp_path: Path) -> None:
         project_path=project_path,
         output_path=tmp_path / "scan-results",
         mode="source",
+        enabled_scans=[ScanType.PLIST_SOURCE],
     )
 
     results = PlistSourceScanner().scan(config)
@@ -205,6 +208,7 @@ def test_plist_scan_can_write_xml(tmp_path: Path) -> None:
         project_path=project_path,
         output_path=tmp_path / "scan-results",
         mode="source",
+        enabled_scans=[ScanType.PLIST_SOURCE],
     )
 
     results = PlistSourceScanner(output_format="xml").scan(config)
@@ -233,6 +237,7 @@ def test_plist_scan_reports_sensitive_keys_without_copying_plist(
         project_path=project_path,
         output_path=tmp_path / "scan-results",
         mode="source",
+        enabled_scans=[ScanType.PLIST_SOURCE],
     )
 
     results = PlistSourceScanner().scan(config)
@@ -254,6 +259,7 @@ def test_plist_scan_skips_when_no_plists_found(tmp_path: Path) -> None:
         project_path=project_path,
         output_path=tmp_path / "scan-results",
         mode="source",
+        enabled_scans=[ScanType.PLIST_SOURCE],
     )
 
     results = PlistSourceScanner().scan(config)
@@ -272,6 +278,7 @@ def test_plist_scan_works_with_demo_project_fixture(tmp_path: Path) -> None:
         project_path=project_path,
         output_path=tmp_path / "scan-results",
         mode="source",
+        enabled_scans=[ScanType.PLIST_SOURCE],
     )
 
     results = PlistSourceScanner().scan(config)

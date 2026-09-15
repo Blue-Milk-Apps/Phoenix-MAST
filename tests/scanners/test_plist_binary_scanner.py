@@ -49,6 +49,7 @@ def test_plist_binary_scan_writes_normalized_plists(tmp_path: Path) -> None:
         project_path=project_path,
         output_path=tmp_path / "scan-results",
         mode="binary",
+        enabled_scans=[ScanType.PLIST_BINARY],
     )
 
     results = PlistBinaryScanner().scan(config)
@@ -105,6 +106,7 @@ def test_plist_binary_scan_can_write_xml(tmp_path: Path) -> None:
         project_path=project_path,
         output_path=tmp_path / "scan-results",
         mode="binary",
+        enabled_scans=[ScanType.PLIST_BINARY],
     )
 
     results = PlistBinaryScanner(output_format="xml").scan(config)
@@ -142,6 +144,7 @@ def test_plist_binary_scan_json_safe_stringifies_unknown_types(tmp_path: Path) -
         project_path=project_path,
         output_path=tmp_path / "scan-results",
         mode="binary",
+        enabled_scans=[ScanType.PLIST_BINARY],
     )
 
     results = PlistBinaryScanner().scan(config)
@@ -161,6 +164,7 @@ def test_plist_binary_scan_skips_when_no_ipa_found(tmp_path: Path) -> None:
         project_path=project_path,
         output_path=tmp_path / "scan-results",
         mode="binary",
+        enabled_scans=[ScanType.PLIST_BINARY],
     )
 
     results = PlistBinaryScanner().scan(config)

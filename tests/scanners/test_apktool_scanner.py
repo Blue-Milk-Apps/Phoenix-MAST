@@ -30,6 +30,7 @@ def test_apktool_scan_skips_non_apk(tmp_path: Path) -> None:
         project_path=source_file,
         output_path=tmp_path / "scan-results",
         mode="binary",
+        enabled_scans=[ScanType.APKTOOL],
     )
 
     results = ApktoolScanner().scan(config)
@@ -166,6 +167,7 @@ def scan_config(apk_path: Path) -> ScanConfig:
         project_path=apk_path,
         output_path=apk_path.parent / "scan-results",
         mode="binary",
+        enabled_scans=[ScanType.APKTOOL],
     )
 
 

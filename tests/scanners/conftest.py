@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from domain.models import ScanConfig
+from domain.models import ScanConfig, ScanType
 
 
 @pytest.fixture
@@ -15,7 +15,8 @@ def scan_config():
             project_path=project_path,
             output_path=output_path,
             mode="source",
-            opengrep_rules_path=rules_path,
+            enabled_scans=list(ScanType),
+            rules_path=rules_path,
         )
 
     return _build
