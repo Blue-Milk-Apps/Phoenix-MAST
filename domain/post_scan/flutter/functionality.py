@@ -80,40 +80,6 @@ class FlutterFunctionality:
         self.assessed = self.fully_assessed or any(item["present"] is True for item in self.items.values())
 
     @classmethod
-    def _platform_assessment_rows(
-        cls,
-        context: FlutterScanExtractionContext,
-        capability: str,
-        applicable_platforms: dict[str, bool],
-        platform_evidence: dict[str, dict[str, list[str]]],
-    ) -> dict[str, dict[str, Any]]:
-        rows: dict[str, dict[str, Any]] = {}
-        for platform, applicable in applicable_platforms.items():
-            if not applicable or capability not in cls._platform_capabilities(platform):
-                continue
-            details = list(dict.fromkeys(platform_evidence[platform][capability]))
-            if details:
-                rows[platform] = {
-                    "status": AssessmentStatus.PRESENT.value,
-                    "explanation": " ".join(details),
-                    "evidence": details,
-                }
-                continue
-            if not cls._platform_assessed(context, platform, capability):
-                rows[platform] = {
-                    "status": AssessmentStatus.NOT_EVALUATED.value,
-                    "explanation": "Required platform scan evidence was unavailable.",
-                    "evidence": [],
-                }
-                continue
-            rows[platform] = {
-                "status": AssessmentStatus.NOT_PRESENT.value,
-                "explanation": f"No assessed {platform} source evidence indicated {capability.lower()} functionality.",
-                "evidence": [],
-            }
-        return rows
-
-    @classmethod
     def _capability_assessed(
         cls,
         context: FlutterScanExtractionContext,

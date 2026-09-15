@@ -2,7 +2,6 @@
 
 from dataclasses import asdict
 
-from adapters.output.phoenix_report.pdf_report.common import map_functionality
 from domain.report.models import NativeAndroidReportDetails
 
 
@@ -10,7 +9,9 @@ def map_native_android_details(details: NativeAndroidReportDetails) -> dict[str,
     return {
         "application": asdict(details.application),
         "app_components": asdict(details.app_components),
-        "functionality": map_functionality(details.functionality),
+        "functionality": {
+            item.name: {"present": item.present, "explanation": item.explanation} for item in details.functionality
+        },
         "permissions": [
             {
                 "permission": item.permission,

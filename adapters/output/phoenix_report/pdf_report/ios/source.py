@@ -1,10 +1,11 @@
-from adapters.output.phoenix_report.pdf_report.common import map_functionality
 from domain.report.models import NativeIOSReportDetails
 
 
 def map_native_ios_details(details: NativeIOSReportDetails) -> dict[str, object]:
     return {
-        "functionality": map_functionality(details.functionality),
+        "functionality": {
+            item.name: {"present": item.present, "explanation": item.explanation} for item in details.functionality
+        },
         "permissions": [
             {
                 "permission": item.permission,
