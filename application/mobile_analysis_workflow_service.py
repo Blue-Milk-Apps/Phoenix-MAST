@@ -3,6 +3,17 @@ import os
 import time
 from pathlib import Path
 
+from adapters.binary_scanners import (
+    Aapt2Scanner,
+    AndroguardScanner,
+    ApkidScanner,
+    ApksignerScanner,
+    ApktoolScanner,
+    IpswScanner,
+    LIEFScanner,
+    MobSFScanner,
+    PlistBinaryScanner,
+)
 from adapters.output.file_output import FileScanOutput
 from adapters.output.phoenix_report.generate_report import generate_report
 from adapters.post_scan import (
@@ -10,29 +21,14 @@ from adapters.post_scan import (
     AndroidBinaryScanOutputLoader,
     IOSBinaryScanDetailExtractor,
     IOSBinaryScanOutputLoader,
-    NativeIOSScanDetailExtractor,
-    NativeIOSScanOutputLoader,
 )
-from adapters.scanners.android import (
-    Aapt2Scanner,
-    AndroguardScanner,
-    ApkidScanner,
-    ApksignerScanner,
-    ApktoolScanner,
-)
-from adapters.scanners.common import (
+from adapters.source_code_scanners import (
     GitleaksScanner,
-    MobSFScanner,
     OpenGrepScanner,
+    PlistSourceScanner,
     StringsScanner,
     SyftScanner,
     TrufflehogScanner,
-)
-from adapters.scanners.ios import (
-    IpswScanner,
-    LIEFScanner,
-    PlistBinaryScanner,
-    PlistSourceScanner,
 )
 from application.post_scan_processing_service import PostScanProcessingService
 from application.scanner_service import ScannerService
@@ -48,7 +44,7 @@ class MobileScannerFactory:
     def build_scanner_list(self, config: ScanConfig) -> list[ScannerPort]:
         scanners = self._base_scanners(config)
 
-        if config.target_type == "BINARY" and self._mobsf_url_configured():
+        if self._mobsf_url_configured():
             scanners.append(MobSFScanner())
 
         return scanners
@@ -107,7 +103,7 @@ class MobileScannerFactory:
     @staticmethod
     def _get_opengrep_scan_paths(config: ScanConfig) -> list[Path]:
         if config.target_type == "SOURCE":
-            return [config.project_path]
+            return [config.project_path, config.output_path]
         if config.target_type == "BINARY":
             return [config.output_path]
         raise ValueError(f"Unsupported target type for OpenGrep scan paths: {config.target_type}")
@@ -243,11 +239,6 @@ class MobileAnalysisWorkflowService:
                 return PostScanProcessingService(
                     scan_output_loader=IOSBinaryScanOutputLoader(),
                     scan_detail_extractor=IOSBinaryScanDetailExtractor(),
-                )
-            case ("SOURCE", "IOS", "NATIVE_IOS"):
-                return PostScanProcessingService(
-                    scan_output_loader=NativeIOSScanOutputLoader(),
-                    scan_detail_extractor=NativeIOSScanDetailExtractor(),
                 )
             case _:
                 return None

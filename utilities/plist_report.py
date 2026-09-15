@@ -50,7 +50,6 @@ class PlistReportBuilder:
 
         for plist_file in plist_files:
             relative_target = self._output_path_for_plist(plist_file)
-            source_path = self._source_path(plist_file)
             try:
                 data = self._load_plist(plist_file)
                 plist_type = self._classify_plist(plist_file, data)
@@ -63,7 +62,6 @@ class PlistReportBuilder:
                             "parse_status": "success",
                             "plist_type": plist_type,
                             "role": role,
-                            "source_path": source_path,
                             "skipped": True,
                             "skip_reason": "non_app_plist",
                         }
@@ -77,7 +75,6 @@ class PlistReportBuilder:
                         "parse_status": "success",
                         "plist_type": plist_type,
                         "role": role,
-                        "source_path": source_path,
                         "skipped": False,
                     }
                 )
@@ -102,7 +99,6 @@ class PlistReportBuilder:
                         "error": str(exc),
                         "output_path": relative_target.as_posix(),
                         "parse_status": "failed",
-                        "source_path": source_path,
                         "skipped": False,
                     }
                 )
@@ -197,9 +193,7 @@ class PlistReportBuilder:
         if relative == Path(".") or not relative.parts:
             relative = Path(plist_file.name)
 
-        if relative.suffix.lower() == ".plist":
-            return relative.with_suffix(f".{self.output_format}")
-        return relative.with_name(f"{relative.name}.{self.output_format}")
+        return relative.with_suffix(f".{self.output_format}")
 
     def _serialize_plist(
         self,
@@ -227,18 +221,6 @@ class PlistReportBuilder:
                 "important_items": self._framework_important_items(data),
                 "plist": json_safe(data),
             }
-        elif role == "entitlements":
-            payload = {
-                "entitlements": self._entitlement_details(data),
-                "plist": json_safe(data),
-                "plist_type": plist_type,
-            }
-        elif role == "privacy_manifest":
-            payload = {
-                "plist": json_safe(data),
-                "plist_type": plist_type,
-                "privacy_manifest": self._privacy_manifest_details(data),
-            }
         else:
             payload = {
                 "important_items": self._generic_important_items(data),
@@ -252,10 +234,6 @@ class PlistReportBuilder:
         name = plist_file.name.lower()
         keys = set(data) if isinstance(data, dict) else set()
 
-        if plist_file.suffix.lower() == ".xcprivacy" or name == "privacyinfo.xcprivacy":
-            return "privacy_manifest"
-        if plist_file.suffix.lower() == ".entitlements":
-            return "entitlements_plist"
         if name == "info.plist" and {"CFBundleIdentifier", "CFBundlePackageType"} & keys:
             return "ios_info_plist"
         if "entitlements" in name or any(str(key).startswith("com.apple.developer.") for key in keys):
@@ -269,7 +247,7 @@ class PlistReportBuilder:
         return "unknown_plist"
 
     def _should_emit_plist(self, plist_type: str, plist_file: Path, data: object) -> bool:
-        if plist_type in {"credentials_or_preferences_plist", "entitlements_plist", "privacy_manifest"}:
+        if plist_type in {"credentials_or_preferences_plist", "entitlements_plist"}:
             return True
         if plist_type == "ios_info_plist":
             return self._bundle_role(plist_file, data) in {"app", "framework"}
@@ -282,8 +260,6 @@ class PlistReportBuilder:
             return self._bundle_role(plist_file, data)
         if plist_type == "entitlements_plist":
             return "entitlements"
-        if plist_type == "privacy_manifest":
-            return "privacy_manifest"
         if plist_type == "credentials_or_preferences_plist":
             return "security_relevant"
         if self._has_sensitive_key(data):
@@ -399,9 +375,7 @@ class PlistReportBuilder:
             "application-identifier",
             "aps-environment",
             "com.apple.developer.associated-domains",
-            "com.apple.developer.healthkit",
             "com.apple.developer.icloud-container-identifiers",
-            "com.apple.developer.in-app-payments",
             "com.apple.security.application-groups",
             "keychain-access-groups",
         }
@@ -414,23 +388,8 @@ class PlistReportBuilder:
                 "application_identifier": data.get("application-identifier", ""),
                 "aps_environment": data.get("aps-environment", ""),
                 "associated_domains": data.get("com.apple.developer.associated-domains", []),
-                "healthkit": data.get("com.apple.developer.healthkit", False),
                 "icloud_containers": data.get("com.apple.developer.icloud-container-identifiers", []),
-                "in_app_payments": data.get("com.apple.developer.in-app-payments", []),
                 "keychain_access_groups": data.get("keychain-access-groups", []),
-            }
-        )
-
-    def _privacy_manifest_details(self, data: object) -> dict[str, object]:
-        if not isinstance(data, dict):
-            return {}
-
-        return json_safe(
-            {
-                "accessed_api_types": data.get("NSPrivacyAccessedAPITypes", []),
-                "collected_data_types": data.get("NSPrivacyCollectedDataTypes", []),
-                "tracking": data.get("NSPrivacyTracking") is True,
-                "tracking_domains": data.get("NSPrivacyTrackingDomains", []),
             }
         )
 
