@@ -405,7 +405,17 @@
       <td>{{ c.check }}</td>
       <td>{{ result_badge(c.result) }}</td>
       <td>{{ risk_badge(c.severity) }}</td>
-      <td>{{ c.explanation }}{% if c.remediation_link %}<br><span class="small">Remediation: {{ c.remediation_link }}</span>{% endif %}{% if c.confidence_caveat and show_confidence_caveats %}<br><span class="small confidence-caveat">⚠ {{ c.confidence_caveat }}</span>{% endif %}</td>
+      <td>
+        {{ c.explanation }}
+        {% if c.platform_assessments %}
+        <div class="small">
+          {% for assessment in c.platform_assessments %}
+          {{ assessment.platform|replace('_', ' ')|title }}: {{ assessment.status }}{% if not loop.last %}; {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if c.remediation_link %}<br><span class="small">Remediation: {{ c.remediation_link }}</span>{% endif %}{% if c.confidence_caveat and show_confidence_caveats %}<br><span class="small confidence-caveat">⚠ {{ c.confidence_caveat }}</span>{% endif %}
+      </td>
       <td class="small">{{ c.compliance }}</td>
       <td class="small">{{ c.evidence }}</td>
     </tr>

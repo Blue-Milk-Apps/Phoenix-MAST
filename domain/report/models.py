@@ -147,6 +147,7 @@ class SecurityCheck:
     compliance: str = ""
     remediation_link: str = ""
     platform_assessments: tuple[PlatformAssessment, ...] = ()
+    status: AssessmentStatus | None = None
 
 
 @dataclass(frozen=True)

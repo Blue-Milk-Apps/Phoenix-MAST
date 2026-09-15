@@ -1,7 +1,7 @@
 """Shared implementation boundary for source report builders."""
 
 from abc import ABC
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, ClassVar, Mapping
 
 from domain.report import (
@@ -15,6 +15,7 @@ from domain.report import (
     ReportData,
     ReportMetadata,
     ReportPlatform,
+    ReportTargetKind,
     RiskLevel,
     RiskSummary,
     SecurityCheck,
@@ -30,6 +31,7 @@ class SourceCheckDefinition:
     name: str
     evidence_key: str
     severity: CheckSeverity
+    applicable_platforms: frozenset[ReportPlatform] = frozenset()
     compliance: str = ""
     present_explanation: str = ""
     not_present_explanation: str = ""
@@ -58,6 +60,7 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
                     ("Resilience", "resilience_evidence"),
                 )
             )
+        sections = self._attach_platform_assessments(sections, metadata)
         evaluations = tuple(
             OverallEvaluation(
                 area=name,
@@ -77,10 +80,45 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
         )
 
     @classmethod
+    def _attach_platform_assessments(
+        cls,
+        sections: tuple[VulnerabilitySection, ...],
+        metadata: ReportMetadata,
+    ) -> tuple[VulnerabilitySection, ...]:
+        """Attach a single platform assessment to native source checks."""
+
+        platform = {
+            ReportTargetKind.NATIVE_ANDROID_SOURCE: ReportPlatform.ANDROID,
+            ReportTargetKind.NATIVE_IOS_SOURCE: ReportPlatform.IOS,
+        }.get(metadata.target.target_kind)
+        if platform is None:
+            return sections
+        return tuple(
+            replace(
+                section,
+                checks=tuple(cls._with_platform_assessment(check, platform) for check in section.checks),
+            )
+            for section in sections
+        )
+
+    @staticmethod
+    def _with_platform_assessment(check: SecurityCheck, platform: ReportPlatform) -> SecurityCheck:
+        status = AssessmentStatus(
+            check.result.value if check.result.value in {item.value for item in AssessmentStatus} else "not_evaluated"
+        )
+        assessment = PlatformAssessment(
+            platform=platform,
+            status=status,
+            explanation=check.explanation,
+            evidence=(check.evidence,) if check.evidence else (),
+        )
+        return replace(check, platform_assessments=(assessment,), status=status)
+
+    @classmethod
     def _section(cls, name: str, key: str, data: Mapping[str, Any]) -> VulnerabilitySection:
         evidence = data.get(key) if isinstance(data.get(key), Mapping) else {}
         checks = tuple(
-            cls._check(name, str(check_name), value)
+            cls._check(name, str(check_name), value, cls._security_assessments(data).get(str(check_name)))
             for check_name, value in evidence.items()
             if isinstance(value, Mapping)
         )
@@ -95,10 +133,14 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
         data: Mapping[str, Any],
     ) -> VulnerabilitySection:
         evidence = data.get(key) if isinstance(data.get(key), Mapping) else {}
+        assessments = cls._security_assessments(data)
         return VulnerabilitySection(
             name=name,
             findings_text="",
-            checks=tuple(cls._catalog_check(definition, evidence) for definition in definitions),
+            checks=tuple(
+                cls._catalog_check(definition, evidence, assessments.get(definition.evidence_key))
+                for definition in definitions
+            ),
         )
 
     @classmethod
@@ -106,6 +148,7 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
         cls,
         definition: SourceCheckDefinition,
         evidence: Mapping[str, Any],
+        platform_rows: object = None,
     ) -> SecurityCheck:
         entry = evidence.get(definition.evidence_key)
         entry = entry if isinstance(entry, Mapping) else {}
@@ -134,10 +177,17 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
             evidence=str(entry.get("evidence") or ""),
             compliance=str(entry.get("compliance") or definition.compliance),
             remediation_link=str(entry.get("remediation_link") or ""),
+            platform_assessments=cls._platform_assessments(platform_rows),
+            status=cls._aggregate_status(platform_rows),
         )
 
     @staticmethod
-    def _check(section_name: str, name: str, value: Mapping[str, Any]) -> SecurityCheck:
+    def _check(
+        section_name: str,
+        name: str,
+        value: Mapping[str, Any],
+        platform_rows: object = None,
+    ) -> SecurityCheck:
         present = value.get("present")
         result = (
             CheckResult.PRESENT
@@ -163,7 +213,55 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
             evidence=str(value.get("evidence") or ""),
             compliance=compliance,
             remediation_link=str(value.get("remediation_link") or ""),
+            platform_assessments=SourceReportDataBuilder._platform_assessments(platform_rows),
+            status=SourceReportDataBuilder._aggregate_status(platform_rows),
         )
+
+    @staticmethod
+    def _security_assessments(data: Mapping[str, Any]) -> Mapping[str, Any]:
+        direct = data.get("security_check_platform_assessments")
+        if isinstance(direct, Mapping):
+            return direct
+        inventory = data.get("platform_inventory")
+        if not isinstance(inventory, Mapping):
+            return {}
+        nested = inventory.get("security_check_platform_assessments")
+        if isinstance(nested, Mapping):
+            return nested
+        runtime = inventory.get("runtime")
+        if isinstance(runtime, Mapping) and isinstance(runtime.get("security_check_platform_assessments"), Mapping):
+            return runtime["security_check_platform_assessments"]
+        return {}
+
+    @staticmethod
+    def _platform_assessments(rows: object) -> tuple[PlatformAssessment, ...]:
+        if not isinstance(rows, Mapping):
+            return ()
+        assessments: list[PlatformAssessment] = []
+        for platform_name, row in rows.items():
+            if not isinstance(row, Mapping):
+                continue
+            try:
+                platform = ReportPlatform(str(platform_name))
+                status = AssessmentStatus(str(row.get("status") or ""))
+            except ValueError:
+                continue
+            evidence = row.get("evidence")
+            evidence = evidence if isinstance(evidence, (list, tuple)) else ()
+            assessments.append(
+                PlatformAssessment(
+                    platform=platform,
+                    status=status,
+                    explanation=str(row.get("explanation") or ""),
+                    evidence=tuple(str(item) for item in evidence if str(item).strip()),
+                )
+            )
+        return tuple(assessments)
+
+    @classmethod
+    def _aggregate_status(cls, rows: object) -> AssessmentStatus | None:
+        assessments = cls._platform_assessments(rows)
+        return AssessmentStatus.aggregate(item.status for item in assessments) if assessments else None
 
     @staticmethod
     def _display_name(name: str) -> str:

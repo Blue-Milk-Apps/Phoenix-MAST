@@ -28,7 +28,9 @@ def risk_badge(rating: str, label: str | None = None) -> Markup:
 def result_badge(result: str) -> Markup:
     """Render an assessment-result badge."""
 
-    css_class = {"present": "badge-present", "not present": "badge-notpresent"}.get(
-        (result or "").strip().lower(), "badge-na"
-    )
+    css_class = {
+        "present": "badge-present",
+        "not present": "badge-notpresent",
+        "partial": "badge-partial",
+    }.get((result or "").strip().lower(), "badge-na")
     return Markup(f'<span class="badge {css_class}">{result}</span>')

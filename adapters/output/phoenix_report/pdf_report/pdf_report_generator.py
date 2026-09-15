@@ -132,7 +132,18 @@ class PdfReportGenerator(ReportGeneratorPort):
                     "checks": [
                         {
                             "check": check.name,
-                            "result": check.result.value.replace("_", " ").title(),
+                            "result": (check.status.value if check.status else check.result.value)
+                            .replace("_", " ")
+                            .title(),
+                            "platform_assessments": [
+                                {
+                                    "platform": assessment.platform.value,
+                                    "status": assessment.status.value.replace("_", " ").title(),
+                                    "explanation": assessment.explanation,
+                                    "evidence": list(assessment.evidence),
+                                }
+                                for assessment in check.platform_assessments
+                            ],
                             "severity": check.severity.value.title(),
                             "explanation": check.explanation,
                             "evidence": check.evidence,

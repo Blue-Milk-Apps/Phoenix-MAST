@@ -26,6 +26,7 @@ from domain.post_scan.react_native.security_evidence import (
     derived_evidence,
     scope_catalog_applicable,
 )
+from domain.report import AssessmentStatus
 
 
 def build_report_sections(context: ReactNativeScanExtractionContext) -> dict[str, Any]:
@@ -105,6 +106,12 @@ def build_report_sections(context: ReactNativeScanExtractionContext) -> dict[str
         sections["platform_inventory"]["runtime"] = {
             **sections["platform_inventory"]["runtime"],
             "functionality_platform_assessments": functionality.platform_assessments,
+            "security_check_platform_assessments": _security_platform_assessments(context),
+        }
+    else:
+        sections["platform_inventory"]["runtime"] = {
+            **sections["platform_inventory"]["runtime"],
+            "security_check_platform_assessments": _security_platform_assessments(context),
         }
     manual_review = _manual_review(context)
     if manual_review["assessed"] or manual_review["findings"]:
@@ -139,6 +146,43 @@ def _dependency_inventory(context: ReactNativeScanExtractionContext) -> dict[str
         "resolved": dependencies["resolved"],
         "sbom_packages": context.syft_packages,
     }
+
+
+def _security_platform_assessments(context: ReactNativeScanExtractionContext) -> dict[str, dict[str, dict[str, Any]]]:
+    """Retain scoped OpenGrep outcomes for later report generation."""
+
+    registries = {"react_native": REACT_NATIVE_RULES, "android": ANDROID_RULES, "ios": IOS_RULES}
+    keys = {evidence_key for registry in registries.values() for groups in registry.values() for evidence_key in groups}
+    assessment = ReactNativeOpenGrepAssessment(context)
+    output: dict[str, dict[str, dict[str, Any]]] = {}
+    for key in sorted(keys):
+        rows: dict[str, dict[str, Any]] = {}
+        for scope, registry in registries.items():
+            rule_ids = frozenset(
+                rule_id
+                for groups in registry.values()
+                for evidence_key, values in groups.items()
+                if evidence_key == key
+                for rule_id in values
+            )
+            if not rule_ids or not scope_catalog_applicable(context, scope):
+                continue
+            entry = assessment.assess(scope, rule_ids, key)
+            status = (
+                AssessmentStatus.PRESENT
+                if entry.present is True
+                else AssessmentStatus.NOT_PRESENT
+                if entry.present is False
+                else AssessmentStatus.NOT_EVALUATED
+            )
+            rows[scope] = {
+                "status": status.value,
+                "explanation": entry.evidence,
+                "evidence": list(entry.details),
+            }
+        if rows:
+            output[key] = rows
+    return output
 
 
 def _component_counts(context: ReactNativeScanExtractionContext) -> dict[str, int | None]:

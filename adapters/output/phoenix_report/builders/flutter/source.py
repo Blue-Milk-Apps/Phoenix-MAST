@@ -57,7 +57,13 @@ class FlutterReportDataBuilder(SourceReportDataBuilder):
         return VulnerabilitySection(name=name, findings_text="", checks=checks)
 
     @classmethod
-    def _check(cls, section_name: str, name: str, value: Mapping[str, Any]) -> SecurityCheck:
+    def _check(
+        cls,
+        section_name: str,
+        name: str,
+        value: Mapping[str, Any],
+        platform_rows: object = None,
+    ) -> SecurityCheck:
         present = value.get("present")
         result = (
             CheckResult.PRESENT
@@ -96,6 +102,8 @@ class FlutterReportDataBuilder(SourceReportDataBuilder):
             evidence=evidence,
             compliance=compliance,
             remediation_link=str(value.get("remediation_link") or ""),
+            platform_assessments=cls._platform_assessments(platform_rows),
+            status=cls._aggregate_status(platform_rows),
         )
 
     @classmethod
