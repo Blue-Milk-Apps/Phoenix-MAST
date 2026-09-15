@@ -6,7 +6,6 @@ from typing import Any, ClassVar, Mapping
 
 from domain.report import (
     AssessmentStatus,
-    CheckResult,
     CheckSeverity,
     FindingSeverity,
     FunctionalityDetails,
@@ -65,7 +64,7 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
             OverallEvaluation(
                 area=name,
                 risk_level=self._risk(section),
-                findings=tuple(check.name for check in section.checks if check.result == CheckResult.PRESENT)
+                findings=tuple(check.name for check in section.checks if check.result == AssessmentStatus.PRESENT)
                 or ("No findings identified in this scan",),
             )
             for section, name in zip(sections, ("Code Vulnerability", "Networking", "Data Storage", "Resilience"))
@@ -103,9 +102,7 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
 
     @staticmethod
     def _with_platform_assessment(check: SecurityCheck, platform: ReportPlatform) -> SecurityCheck:
-        status = AssessmentStatus(
-            check.result.value if check.result.value in {item.value for item in AssessmentStatus} else "not_evaluated"
-        )
+        status = check.result
         assessment = PlatformAssessment(
             platform=platform,
             status=status,
@@ -154,19 +151,19 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
         entry = entry if isinstance(entry, Mapping) else {}
         present = entry.get("present")
         result = (
-            CheckResult.PRESENT
+            AssessmentStatus.PRESENT
             if present is True
-            else CheckResult.NOT_PRESENT
+            else AssessmentStatus.NOT_PRESENT
             if present is False
-            else CheckResult.NOT_EVALUATED
+            else AssessmentStatus.NOT_EVALUATED
         )
         explanation = str(entry.get("explanation") or "")
         if not explanation:
             explanation = (
                 definition.present_explanation
-                if result == CheckResult.PRESENT
+                if result == AssessmentStatus.PRESENT
                 else definition.not_present_explanation
-                if result == CheckResult.NOT_PRESENT
+                if result == AssessmentStatus.NOT_PRESENT
                 else f"{definition.name} was not evaluated because the required scan evidence is unavailable."
             )
         return SecurityCheck(
@@ -190,11 +187,11 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
     ) -> SecurityCheck:
         present = value.get("present")
         result = (
-            CheckResult.PRESENT
+            AssessmentStatus.PRESENT
             if present is True
-            else CheckResult.NOT_PRESENT
+            else AssessmentStatus.NOT_PRESENT
             if present is False
-            else CheckResult.NOT_EVALUATED
+            else AssessmentStatus.NOT_EVALUATED
         )
         severity = str(value.get("severity", "info")).lower()
         check_severity = next((item for item in CheckSeverity if item.value == severity), CheckSeverity.INFO)
@@ -294,10 +291,10 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
         return display_name
 
     @staticmethod
-    def _default_explanation(name: str, result: CheckResult) -> str:
-        if result == CheckResult.PRESENT:
+    def _default_explanation(name: str, result: AssessmentStatus) -> str:
+        if result == AssessmentStatus.PRESENT:
             return f"Evidence indicates that {name.lower()}."
-        if result == CheckResult.NOT_PRESENT:
+        if result == AssessmentStatus.NOT_PRESENT:
             return f"No evidence indicates that {name.lower()}."
         return f"{name} was not evaluated because the required scan evidence is unavailable."
 
@@ -312,11 +309,11 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
 
     @staticmethod
     def _risk(section: VulnerabilitySection) -> RiskLevel:
-        assessed_checks = tuple(check for check in section.checks if check.result != CheckResult.NOT_EVALUATED)
+        assessed_checks = tuple(check for check in section.checks if check.result != AssessmentStatus.NOT_EVALUATED)
         if not assessed_checks:
             return RiskLevel.NOT_EVALUATED
 
-        present_severities = {check.severity for check in assessed_checks if check.result == CheckResult.PRESENT}
+        present_severities = {check.severity for check in assessed_checks if check.result == AssessmentStatus.PRESENT}
         if CheckSeverity.CRITICAL in present_severities:
             return RiskLevel.CRITICAL
 
@@ -334,7 +331,7 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
         counts = {severity: 0 for severity in ("critical", "high", "medium", "low", "info", "secure")}
         for section in sections:
             for check in section.checks:
-                if check.result == CheckResult.PRESENT:
+                if check.result == AssessmentStatus.PRESENT:
                     counts[check.severity.value] += 1
         return FindingSeverity(**counts)
 

@@ -13,11 +13,14 @@ from domain.report import FunctionalityDetails
 def map_functionality(items: Iterable[FunctionalityDetails]) -> dict[str, dict[str, object]]:
     """Map typed functionality details to the shared PDF template shape."""
 
-    return {
-        item.name: {
+    mapped: dict[str, dict[str, object]] = {}
+    for item in items:
+        status = item.status.value if item.status else _status_from_presence(item.present)
+        explanation = item.explanation.strip() or _functionality_explanation(item.name, status)
+        mapped[item.name] = {
             "present": item.present,
-            "status": item.status.value if item.status else "",
-            "explanation": item.explanation,
+            "status": status,
+            "explanation": explanation,
             "platform_assessments": [
                 {
                     "platform": assessment.platform.value,
@@ -28,8 +31,25 @@ def map_functionality(items: Iterable[FunctionalityDetails]) -> dict[str, dict[s
                 for assessment in item.platform_assessments
             ],
         }
-        for item in items
-    }
+    return mapped
+
+
+def _status_from_presence(present: bool | None) -> str:
+    if present is True:
+        return "present"
+    if present is False:
+        return "not_present"
+    return "not_evaluated"
+
+
+def _functionality_explanation(name: str, status: str) -> str:
+    if status == "present":
+        return f"Evidence indicates that {name.lower()} functionality is present."
+    if status == "not_present":
+        return f"No evidence indicates that {name.lower()} functionality is present."
+    if status == "not_applicable":
+        return f"{name} functionality is not applicable to this target."
+    return f"{name} functionality was not evaluated because scan evidence is unavailable."
 
 
 __all__ = [

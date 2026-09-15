@@ -32,14 +32,6 @@ class CheckSeverity(StrEnum):
     NOT_APPLICABLE = "not_applicable"
 
 
-class CheckResult(StrEnum):
-    """Assessment outcome for an individual security check."""
-
-    PRESENT = "present"
-    NOT_PRESENT = "not_present"
-    NOT_EVALUATED = "not_evaluated"
-
-
 class AssessmentStatus(StrEnum):
     """Outcome of assessing one report item on one platform."""
 
@@ -141,7 +133,7 @@ class SecurityCheck:
 
     name: str
     severity: CheckSeverity
-    result: CheckResult
+    result: AssessmentStatus
     explanation: str
     evidence: str = ""
     compliance: str = ""

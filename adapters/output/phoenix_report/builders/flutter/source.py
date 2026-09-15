@@ -8,7 +8,6 @@ from adapters.output.phoenix_report.builders.source import SourceReportDataBuild
 from domain.post_scan.flutter.rule_registry import REPORT_RULE_IDS_BY_SECTION, RULE_SEVERITIES
 from domain.report import (
     AssessmentStatus,
-    CheckResult,
     CheckSeverity,
     EndpointDetails,
     FindingSeverity,
@@ -66,11 +65,11 @@ class FlutterReportDataBuilder(SourceReportDataBuilder):
     ) -> SecurityCheck:
         present = value.get("present")
         result = (
-            CheckResult.PRESENT
+            AssessmentStatus.PRESENT
             if present is True
-            else CheckResult.NOT_PRESENT
+            else AssessmentStatus.NOT_PRESENT
             if present is False
-            else CheckResult.NOT_EVALUATED
+            else AssessmentStatus.NOT_EVALUATED
         )
         check_severity = cls._canonical_severity(name, value)
         display_name = cls._display_name(name)
@@ -89,9 +88,9 @@ class FlutterReportDataBuilder(SourceReportDataBuilder):
                 evidence = "; ".join(str(item).strip() for item in details if str(item).strip())
         if not evidence:
             evidence = {
-                CheckResult.PRESENT: "Finding detected; location details unavailable.",
-                CheckResult.NOT_PRESENT: "No matching evidence identified.",
-                CheckResult.NOT_EVALUATED: "Required scan evidence unavailable.",
+                AssessmentStatus.PRESENT: "Finding detected; location details unavailable.",
+                AssessmentStatus.NOT_PRESENT: "No matching evidence identified.",
+                AssessmentStatus.NOT_EVALUATED: "Required scan evidence unavailable.",
             }[result]
 
         return SecurityCheck(
@@ -157,7 +156,7 @@ class FlutterReportDataBuilder(SourceReportDataBuilder):
         counts = {severity: 0 for severity in ("critical", "high", "medium", "low", "info", "secure")}
         for section in sections:
             for check in section.checks:
-                if check.result == CheckResult.PRESENT:
+                if check.result == AssessmentStatus.PRESENT:
                     counts[check.severity.value] += 1
         return FindingSeverity(**counts)
 
