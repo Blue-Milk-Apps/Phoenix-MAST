@@ -128,6 +128,7 @@ class OpenGrepScanner(ScannerPort):
     def scan(self, config: ScanConfig) -> list[ScanResult]:
         opengrep_home = Path(tempfile.mkdtemp(prefix="phoenix_opengrep_"))
         process: subprocess.Popen[str] | None = None
+        command: list[str] | None = None
 
         try:
             rules_path = self._get_rules_path(config)
@@ -148,7 +149,7 @@ class OpenGrepScanner(ScannerPort):
                 ]
 
             scan_paths = self._get_scan_paths(config)
-            cmd = [
+            command = [
                 executable,
                 "scan",
                 "--config",
@@ -161,12 +162,12 @@ class OpenGrepScanner(ScannerPort):
             ]
 
             if config.ignore_file and config.ignore_file.exists():
-                cmd.extend(["--exclude-rules", str(config.ignore_file)])
+                command.extend(["--exclude-rules", str(config.ignore_file)])
             for pattern in config.ignore_patterns:
-                cmd.extend(["--exclude", pattern])
+                command.extend(["--exclude", pattern])
 
             process = subprocess.Popen(
-                cmd,
+                command,
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -180,7 +181,15 @@ class OpenGrepScanner(ScannerPort):
                     print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}{clean_line}")
 
             if process.returncode not in (0, 1):
-                return [self._failure(f"OpenGrep error with return code {process.returncode}", stdout_data)]
+                return [
+                    self._failure(
+                        f"OpenGrep error with return code {process.returncode}",
+                        stdout_data,
+                        stderr_output=stderr_data,
+                        command=command,
+                        return_code=process.returncode,
+                    )
+                ]
 
             return [
                 ScanResult(
@@ -195,30 +204,66 @@ class OpenGrepScanner(ScannerPort):
         except subprocess.TimeoutExpired:
             if process is not None:
                 process.kill()
-                stdout_data, _stderr_data = process.communicate()
+                stdout_data, stderr_data = process.communicate()
             else:
                 stdout_data = ""
-            return [self._failure(f"OpenGrep timed out after {self._timeout_seconds()} seconds", stdout_data)]
+                stderr_data = ""
+            return [
+                self._failure(
+                    f"OpenGrep timed out after {self._timeout_seconds()} seconds",
+                    stdout_data,
+                    stderr_output=stderr_data,
+                    command=command,
+                )
+            ]
         except Exception as exc:
-            return [self._failure(str(exc))]
+            return [self._failure(str(exc), command=command)]
         finally:
             shutil.rmtree(opengrep_home, ignore_errors=True)
 
-    def _failure(self, error_message: str, raw_output: str = "") -> ScanResult:
+    def _failure(
+        self,
+        error_message: str,
+        raw_output: str = "",
+        *,
+        stderr_output: str = "",
+        command: list[str] | None = None,
+        return_code: int | None = None,
+    ) -> ScanResult:
         return ScanResult(
             scanner_name=self.name,
             scan_type=self.scan_type,
             success=False,
             error_message=error_message,
-            raw_output=self._error_report(error_message, raw_output),
+            raw_output=self._error_report(
+                error_message,
+                raw_output,
+                stderr_output=stderr_output,
+                command=command,
+                return_code=return_code,
+            ),
             relative_target_path=REPORT_PATH,
         )
 
-    def _error_report(self, error_message: str, raw_output: str = "") -> str:
+    def _error_report(
+        self,
+        error_message: str,
+        raw_output: str = "",
+        *,
+        stderr_output: str = "",
+        command: list[str] | None = None,
+        return_code: int | None = None,
+    ) -> str:
         report: dict[str, object] = {
             "error": error_message,
             "success": False,
         }
+        if return_code is not None:
+            report["return_code"] = return_code
+        if command:
+            report["command"] = command
+        if stderr_output.strip():
+            report["stderr"] = stderr_output
         if raw_output.strip():
             try:
                 report["raw_output"] = json.loads(raw_output)
