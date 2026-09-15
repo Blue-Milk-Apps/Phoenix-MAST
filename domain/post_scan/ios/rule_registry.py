@@ -118,6 +118,7 @@ FUNCTIONALITY_RULE_ID_TO_KEY: dict[str, str] = {
     "audio-parser-usage": "Audio",
     "crypto-platform-drbg": "Secure RNG",
     "crypto-api-drbg": "Secure RNG",
+    "ios.in-app-purchases.usage.present": "In-App Purchases",
     "ats-exceptions-usage": "Networking",
     "ats-disabled-usage": "Networking",
 }

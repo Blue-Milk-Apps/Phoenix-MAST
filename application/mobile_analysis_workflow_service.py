@@ -1,10 +1,18 @@
 import json
 import os
 import time
+from dataclasses import asdict
 from pathlib import Path
 
 from adapters.output.file_output import FileScanOutput
-from adapters.output.phoenix_report.generate_report import generate_report
+from adapters.output.phoenix_report.builders.android import (
+    AndroidBinaryReportDataBuilder,
+    NativeAndroidReportDataBuilder,
+)
+from adapters.output.phoenix_report.builders.flutter import FlutterReportDataBuilder
+from adapters.output.phoenix_report.builders.ios import IOSBinaryReportDataBuilder, NativeIOSReportDataBuilder
+from adapters.output.phoenix_report.builders.react_native import ReactNativeReportDataBuilder
+from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
 from adapters.post_scan import (
     AndroidBinaryScanDetailExtractor,
     AndroidBinaryScanOutputLoader,
@@ -44,8 +52,10 @@ from adapters.scanners.ios import (
 )
 from adapters.scanners.react_native import ReactNativeOpenGrepScanner, ReactNativeSourceMetadataScanner
 from application.post_scan_processing_service import PostScanProcessingService
+from application.report_generation_service import ReportGenerationService
 from application.scanner_service import ScannerService
 from domain.models import ExtractedBinary, ScanConfig, ScanType
+from domain.report import ReportTargetFactory, ReportTargetKind
 from ports.scanner_port import ScannerPort
 from utilities.apk_utils import extract_apk, is_apk_file
 from utilities.ipa_utils import extract_ipa, is_ipa_file
@@ -131,7 +141,7 @@ class MobileScannerFactory:
             strings_output_path = config.output_path / ScanType.STRINGS.value
             if not strings_output_path.is_dir():
                 return []
-            return sorted(path for path in strings_output_path.rglob("*.txt") if path.is_file())
+            return [strings_output_path]
         raise ValueError(f"Unsupported target type for OpenGrep scan paths: {config.target_type}")
 
 
@@ -166,16 +176,37 @@ class MobileAnalysisWorkflowService:
                 scan_output_method.write_result(result)
 
             post_scan_output = self._run_post_scan_processing(scan_config.output_path, scan_config)
+            if post_scan_output:
+                post_scan_output["target_information"] = asdict(ReportTargetFactory.from_scan_config(scan_config))
             target = scan_config.output_path / self.POST_SCAN_OUTPUT_FILE_NAME
             target.write_text(
                 json.dumps(post_scan_output, indent=2, sort_keys=True),
                 encoding="utf-8",
             )
             if post_scan_output:
-                generate_report(
-                    post_scan_output,
-                    self._report_output_path(scan_config.output_path, post_scan_output),
-                )
+                report_path = self._report_output_path(scan_config.output_path, post_scan_output)
+                target_kind = ReportTargetFactory.from_scan_config(scan_config).target_kind
+                if target_kind in {
+                    ReportTargetKind.ANDROID_BINARY,
+                    ReportTargetKind.IOS_BINARY,
+                    ReportTargetKind.FLUTTER_SOURCE,
+                    ReportTargetKind.REACT_NATIVE_SOURCE,
+                    ReportTargetKind.NATIVE_ANDROID_SOURCE,
+                    ReportTargetKind.NATIVE_IOS_SOURCE,
+                }:
+                    report_data = ReportGenerationService(
+                        [
+                            AndroidBinaryReportDataBuilder(),
+                            IOSBinaryReportDataBuilder(),
+                            FlutterReportDataBuilder(),
+                            ReactNativeReportDataBuilder(),
+                            NativeAndroidReportDataBuilder(),
+                            NativeIOSReportDataBuilder(),
+                        ]
+                    ).build_report_data(post_scan_output)
+                    PdfReportGenerator().generate(report_data, report_path)
+                else:
+                    raise ValueError(f"No modular report builder is registered for {target_kind.value}")
             print(f"Results: {len(scan_results)}")
             print(f"Duration: {time.perf_counter() - wall_start:.2f} seconds")
         finally:

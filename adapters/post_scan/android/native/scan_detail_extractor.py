@@ -40,8 +40,10 @@ class NativeAndroidScanDetailExtractor(ScanDetailExtractorPort):
             "deep_links": asdict(NativeAndroidDeepLinks(context)),
         }
         functionality = NativeAndroidFunctionality(context)
-        if functionality.assessed:
-            sections["functionality"] = functionality.items
+        # Keep every functionality row in the persisted post-scan shape.  An
+        # unavailable source scan is represented by ``present=None`` so later
+        # report generation can show an explicit not-evaluated result.
+        sections["functionality"] = functionality.items
 
         hardcoded_values = NativeAndroidHardcodedValues(context)
         if hardcoded_values.assessed:

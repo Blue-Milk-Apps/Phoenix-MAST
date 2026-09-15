@@ -34,6 +34,14 @@ packages = [
     "adapters",
     "adapters.output",
     "adapters.output.phoenix_report",
+    "adapters.output.phoenix_report.builders",
+    "adapters.output.phoenix_report.builders.android",
+    "adapters.output.phoenix_report.builders.ios",
+    "adapters.output.phoenix_report.common",
+    "adapters.output.phoenix_report.pdf_report",
+    "adapters.output.phoenix_report.pdf_report.android",
+    "adapters.output.phoenix_report.pdf_report.ios",
+    "adapters.output.phoenix_report.pdf_report.flutter",
     "adapters.post_scan",
     "adapters.post_scan.android",
     "adapters.post_scan.android.native",
@@ -51,6 +59,7 @@ packages = [
     "adapters.storage",
     "application",
     "domain",
+    "domain.report",
     "domain.post_scan",
     "domain.post_scan.android",
     "domain.post_scan.android.native",
@@ -86,6 +95,3 @@ line-length = 120
 
 [tool.ruff.lint]
 extend-select = ["I"]
-
-[tool.ruff.lint.per-file-ignores]
-"adapters/output/phoenix_report/generate_report.py" = ["F841"]

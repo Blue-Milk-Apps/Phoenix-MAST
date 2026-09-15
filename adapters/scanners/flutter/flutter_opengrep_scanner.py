@@ -158,7 +158,13 @@ class FlutterOpenGrepScanner(ScannerPort):
         if not result.success:
             error = result.error_message or str(report.get("error", "")).strip() or "OpenGrep scope failed."
             base_metadata.update({"status": "failed", "reason": error})
-            return base_metadata, [], [{"scope": scope, "error": error}], tool_version
+            error_details: dict[str, Any] = {"scope": scope, "error": error}
+            for key in ("return_code", "stderr", "command"):
+                if key in report:
+                    error_details[key] = report[key]
+            if "raw_output" in report:
+                error_details["stdout"] = report["raw_output"]
+            return base_metadata, [], [error_details], tool_version
 
         rule_ids = report_metadata.get("configured_rule_ids")
         configured = sorted(
@@ -208,4 +214,8 @@ class FlutterOpenGrepScanner(ScannerPort):
     @staticmethod
     def _platform_scan_paths(project_path: Path, platform: str) -> list[Path]:
         path = project_path / platform
+        if platform == "ios":
+            runner_path = path / "Runner"
+            if runner_path.is_dir():
+                return [runner_path]
         return [path] if path.is_dir() else []

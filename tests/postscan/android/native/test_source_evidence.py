@@ -76,7 +76,8 @@ def test_functionality_is_unknown_when_source_evidence_is_unavailable() -> None:
 
     assert functionality.assessed is False
     assert all(item["present"] is None for item in functionality.items.values())
-    assert "functionality" not in NativeAndroidScanDetailExtractor().extract_sections({})
+    sections = NativeAndroidScanDetailExtractor().extract_sections({})
+    assert sections["functionality"] == functionality.items
 
 
 def test_successful_empty_opengrep_is_assessed() -> None:

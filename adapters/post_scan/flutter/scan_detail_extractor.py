@@ -49,8 +49,7 @@ class FlutterScanDetailExtractor(ScanDetailExtractorPort):
         }
 
         functionality = FlutterFunctionality(context)
-        if functionality.assessed:
-            sections["functionality"] = functionality.items
+        sections["functionality"] = functionality.items
 
         hardcoded_values = FlutterHardcodedValues(context)
         if hardcoded_values.assessed or hardcoded_values.secrets:
@@ -72,8 +71,6 @@ class FlutterScanDetailExtractor(ScanDetailExtractorPort):
             ("resilience_evidence", FlutterResilienceEvidence(context)),
         )
         for section_name, model in evidence_models:
-            if not model.assessed:
-                continue
             evidence = asdict(model)
             evidence.pop("assessed", None)
             sections[section_name] = evidence

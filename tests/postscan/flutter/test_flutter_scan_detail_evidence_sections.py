@@ -104,15 +104,19 @@ def test_emits_clean_evidence_only_for_a_completed_relevant_rule() -> None:
         "evidence": "no_contains_potential_sql_injection_hits",
         "details": [],
     }
-    assert "network_evidence" not in sections
-    assert "data_storage_evidence" not in sections
-    assert "resilience_evidence" not in sections
+    assert sections["network_evidence"]["sensitive_information_unencrypted_in_transit"]["present"] is None
+    assert sections["data_storage_evidence"]["sensitive_values_stored_insecurely"]["present"] is None
+    assert sections["resilience_evidence"]["biometric_local_authentication_bypass_possible"]["present"] is None
 
 
-def test_omits_unassessed_empty_evidence_sections() -> None:
+def test_emits_unassessed_empty_evidence_sections() -> None:
     sections = FlutterScanDetailExtractor().extract_sections({})
 
-    assert "code_evidence" not in sections
-    assert "network_evidence" not in sections
-    assert "data_storage_evidence" not in sections
-    assert "resilience_evidence" not in sections
+    for section_name in (
+        "code_evidence",
+        "network_evidence",
+        "data_storage_evidence",
+        "resilience_evidence",
+    ):
+        assert section_name in sections
+        assert all(item["present"] is None for item in sections[section_name].values())

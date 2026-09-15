@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any
 
 from domain.post_scan.android.functionality import Functionality as AndroidFunctionality
-from domain.post_scan.android.rule_registry import (
-    FUNCTIONALITY_RULE_IDS as ANDROID_FUNCTIONALITY_RULE_IDS,
-)
 from domain.post_scan.flutter.scan_extraction_context import FlutterScanExtractionContext
 from domain.post_scan.flutter.security_evidence import opengrep_scope_applicable
+from domain.post_scan.ios.common.functionality import IOSFunctionality
 from domain.post_scan.ios.rule_registry import (
     FUNCTIONALITY_RULE_ID_TO_KEY as IOS_FUNCTIONALITY_RULES,
 )
@@ -40,25 +38,24 @@ class FlutterFunctionality:
         self._add_ios_metadata(context, evidence)
         self._add_opengrep_findings(context, evidence)
 
-        platform_assessments: list[bool] = []
-        if opengrep_scope_applicable(context, "android"):
-            permissions_assessed = isinstance(context.android_metadata.get("permissions"), list)
-            rules_assessed = self._rules_assessed(context, "android", ANDROID_FUNCTIONALITY_RULE_IDS)
-            platform_assessments.append(permissions_assessed and rules_assessed)
-        if opengrep_scope_applicable(context, "ios"):
-            metadata_assessed = context.ios_metadata_assessed and isinstance(
-                context.ios_metadata.get("permissions"), list
+        applicable_platforms = {
+            platform: opengrep_scope_applicable(context, platform) for platform in ("android", "ios")
+        }
+        platform_assessments = [
+            all(
+                self._platform_assessed(context, platform, capability)
+                for capability in self._platform_capabilities(platform)
             )
-            rules_assessed = self._rules_assessed(context, "ios", frozenset(IOS_FUNCTIONALITY_RULES))
-            platform_assessments.append(metadata_assessed and rules_assessed)
-
+            for platform, applicable in applicable_platforms.items()
+            if applicable
+        ]
         self.fully_assessed = bool(platform_assessments) and all(platform_assessments)
         self.items = {}
         for capability in self.CAPABILITIES:
             details = list(dict.fromkeys(evidence[capability]))
             if details:
                 self.items[capability] = {"present": True, "explanation": " ".join(details)}
-            elif self.fully_assessed:
+            elif self._capability_assessed(context, capability, applicable_platforms):
                 self.items[capability] = {
                     "present": False,
                     "explanation": f"No assessed source evidence indicated {capability.lower()} functionality.",
@@ -69,6 +66,55 @@ class FlutterFunctionality:
                     "explanation": "Functionality was not fully assessed for the applicable platforms.",
                 }
         self.assessed = self.fully_assessed or any(item["present"] is True for item in self.items.values())
+
+    @classmethod
+    def _capability_assessed(
+        cls,
+        context: FlutterScanExtractionContext,
+        capability: str,
+        applicable_platforms: dict[str, bool],
+    ) -> bool:
+        platforms = [
+            platform
+            for platform, applicable in applicable_platforms.items()
+            if applicable and capability in cls._platform_capabilities(platform)
+        ]
+        return bool(platforms) and all(cls._platform_assessed(context, platform, capability) for platform in platforms)
+
+    @classmethod
+    def _platform_capabilities(cls, platform: str) -> frozenset[str]:
+        if platform == "android":
+            return frozenset(AndroidFunctionality.KEYS)
+        if platform == "ios":
+            return frozenset(field.name.replace("_", " ") for field in fields(IOSFunctionality))
+        return frozenset()
+
+    @classmethod
+    def _platform_assessed(
+        cls,
+        context: FlutterScanExtractionContext,
+        platform: str,
+        capability: str,
+    ) -> bool:
+        if platform == "android":
+            if not context.android_metadata_assessed or not isinstance(
+                context.android_metadata.get("permissions"), list
+            ):
+                return False
+            rule_ids = frozenset(
+                rule_id for rule_id, name in AndroidFunctionality.RULE_IDS.items() if name == capability
+            )
+            return cls._rules_assessed(context, "android", rule_ids)
+
+        if platform == "ios":
+            if not context.ios_metadata_assessed or not isinstance(context.ios_metadata.get("permissions"), list):
+                return False
+            rule_ids = frozenset(rule_id for rule_id, name in IOS_FUNCTIONALITY_RULES.items() if name == capability)
+            if not context.opengrep_scope_assessed("ios"):
+                return False
+            return not rule_ids or rule_ids <= context.opengrep_configured_rule_ids("ios")
+
+        return False
 
     @staticmethod
     def _rules_assessed(

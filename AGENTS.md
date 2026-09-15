@@ -131,6 +131,8 @@ Do not assume these tools are installed when writing unit tests.
 
 Follow the existing style in nearby modules.
 
+Prefer cohesive, readable domain and adapter structures over fragmented internal helpers and opaque constant maps. Use frozen dataclasses for related structured data and enums for closed sets of values. Keep a model's fields and behavior together when that makes the contract easier to understand. Avoid introducing small factory functions, parallel metadata dictionaries, or repeated normalization expressions when direct class construction, named fields, or a focused method makes the intent clearer. Keep catalog entries self-contained where practical so a reviewer can understand a definition without tracing several internal constants.
+
 Use `pathlib.Path` for filesystem paths.
 
 Keep adapters responsible for external tool, subprocess, HTTP, or filesystem behavior.

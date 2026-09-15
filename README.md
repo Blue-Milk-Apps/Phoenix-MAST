@@ -49,7 +49,7 @@ Source scans run Gitleaks, TruffleHog, and Syft, with plist extraction included 
 
 Binary scans run Strings, with LIEF, ipsw, and plist extraction for iOS binaries and Androguard, Apktool, Apksigner, and APKiD for Android binaries. MobSF runs for binary scans only when `MOBSF_URL` is configured.
 
-OpenGrep runs only when a rules path is available. Native source targets scan the project directory directly. Flutter source scans are scoped: Flutter rules scan production Dart paths, Android rules scan only `android/`, and iOS rules scan only `ios/`. Missing embedded-platform directories are recorded as skipped scopes. For binary targets, phoenix first generates `strings` output from the IPA or APK contents and then runs OpenGrep over those generated text artifacts.
+OpenGrep runs only when a rules path is available. Native source targets scan the project directory directly. Flutter source scans are scoped: Flutter rules scan production Dart paths, Android rules scan only `android/`, and iOS rules scan only `ios/`. Missing embedded-platform directories are recorded as skipped scopes. For binary targets, phoenix first generates `strings` output from the IPA or APK contents and then runs OpenGrep once over that generated `strings` artifact directory.
 
 By default, phoenix looks for OpenGrep rules in these folders:
 

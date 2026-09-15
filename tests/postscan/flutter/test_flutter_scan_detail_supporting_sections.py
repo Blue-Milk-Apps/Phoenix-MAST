@@ -92,10 +92,11 @@ def test_preserves_positive_legacy_secret_and_raw_finding_from_partial_outputs()
     assert raw_secret not in serialized
 
 
-def test_omits_unassessed_empty_supporting_sections() -> None:
+def test_emits_unassessed_empty_supporting_sections() -> None:
     sections = FlutterScanDetailExtractor().extract_sections({})
 
-    assert "functionality" not in sections
+    assert "functionality" in sections
+    assert all(item["present"] is None for item in sections["functionality"].values())
     assert "hardcoded_values" not in sections
     assert "endpoints" not in sections
     assert "manual_review" not in sections

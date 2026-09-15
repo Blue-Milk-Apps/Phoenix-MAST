@@ -5,12 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from adapters.output.phoenix_report.generate_report import (
-    IOS_CODE_EVIDENCE_KEY_BY_CHECK,
-    IOS_DATA_STORAGE_EVIDENCE_KEY_BY_CHECK,
-    IOS_NETWORK_EVIDENCE_KEY_BY_CHECK,
-    IOS_RESILIENCE_EVIDENCE_KEY_BY_CHECK,
-)
+from adapters.output.phoenix_report.builders.ios.binary_check_catalog import SECTION_CHECKS as IOS_BINARY_SECTION_CHECKS
+from adapters.output.phoenix_report.builders.ios.source_check_catalog import IOS_SOURCE_SECTION_CHECKS
 from domain.post_scan.ios.binary.code_evidence import IOSCodeEvidence
 from domain.post_scan.ios.binary.resilience_evidence import IOSResilienceEvidence
 from domain.post_scan.ios.common.data_storage_evidence import IOSDataStorageEvidence
@@ -34,10 +30,10 @@ RULE_ID_PATTERN = re.compile(r"^\s*-\s+id:\s*([^\s#]+)", re.MULTILINE)
 
 
 def test_ios_rule_registry_classifies_every_rule_once() -> None:
-    assert len(IOS_RULE_REGISTRY) == 87
+    assert len(IOS_RULE_REGISTRY) == 88
     assert Counter(mapping.disposition for mapping in IOS_RULE_REGISTRY.values()) == {
         IOSRuleDisposition.REPORT_VULNERABILITY: 48,
-        IOSRuleDisposition.FUNCTIONALITY: 20,
+        IOSRuleDisposition.FUNCTIONALITY: 21,
         IOSRuleDisposition.POSITIVE_INFORMATIONAL: 8,
         IOSRuleDisposition.RAW_ONLY: 11,
     }
@@ -56,12 +52,17 @@ def test_ios_rule_registry_flags_an_unclassified_new_rule() -> None:
 
 
 def test_ios_report_rule_evidence_keys_are_consumed_by_models_and_report() -> None:
-    report_keys = {
-        "Code": set(IOS_CODE_EVIDENCE_KEY_BY_CHECK.values()),
-        "Network": set(IOS_NETWORK_EVIDENCE_KEY_BY_CHECK.values()),
-        "Data Storage": set(IOS_DATA_STORAGE_EVIDENCE_KEY_BY_CHECK.values()),
-        "Resilience": set(IOS_RESILIENCE_EVIDENCE_KEY_BY_CHECK.values()),
-    }
+    report_keys = {section: set() for section in ("Code", "Network", "Data Storage", "Resilience")}
+    for _key, section, _evidence_key, checks in IOS_BINARY_SECTION_CHECKS:
+        normalized_section = {
+            "Code Vulnerability": "Code",
+            "Networking": "Network",
+            "Data Storage": "Data Storage",
+            "Resilience": "Resilience",
+        }[section]
+        report_keys[normalized_section].update(check.evidence_key for check in checks)
+    for section, _evidence_key, checks in IOS_SOURCE_SECTION_CHECKS:
+        report_keys[section].update(check.evidence_key for check in checks)
     model_keys = {
         "Code": set(field.name for field in fields(NativeIOSCodeEvidence))
         & set(field.name for field in fields(IOSCodeEvidence)),
@@ -81,7 +82,7 @@ def test_ios_report_rule_evidence_keys_are_consumed_by_models_and_report() -> No
 def test_ios_functionality_and_permission_rule_consumers_are_valid() -> None:
     functionality_fields = {field.name for field in fields(IOSFunctionality)}
     assert {
-        capability.replace(" ", "_") for capability in FUNCTIONALITY_RULE_ID_TO_KEY.values()
+        capability.replace(" ", "_").replace("-", "_") for capability in FUNCTIONALITY_RULE_ID_TO_KEY.values()
     } <= functionality_fields
     assert all(rule_id in IOS_RULE_IDS for rule_id in FUNCTIONALITY_RULE_ID_TO_KEY)
     assert all(rule_id in IOS_RULE_IDS for rule_id in PERMISSION_RULE_ID_TO_KEYS)

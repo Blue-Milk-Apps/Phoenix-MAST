@@ -120,12 +120,14 @@ def test_flutter_workflow_persists_post_scan_output_and_requests_report(
         lambda self, scan_config, scan_output_method: [opengrep_result],
     )
 
-    def fake_generate_report(data: dict, report_path: Path) -> Path:
+    def fake_pdf_generation(data, report_path: Path) -> Path:
         generated_reports.append((data, report_path))
         report_path.write_bytes(b"%PDF-fake")
         return report_path
 
-    monkeypatch.setattr(workflow, "generate_report", fake_generate_report)
+    monkeypatch.setattr(
+        workflow.PdfReportGenerator, "generate", lambda self, data, path: fake_pdf_generation(data, path)
+    )
 
     workflow.MobileAnalysisWorkflowService().run(config)
 
@@ -141,6 +143,6 @@ def test_flutter_workflow_persists_post_scan_output_and_requests_report(
     }
     assert len(generated_reports) == 1
     report_data, report_path = generated_reports[0]
-    assert report_data == post_scan
+    assert report_data.metadata.target.target_kind.value == "flutter_source"
     assert report_path.name == "example_app_phoenix_Report.pdf"
     assert report_path.read_bytes() == b"%PDF-fake"

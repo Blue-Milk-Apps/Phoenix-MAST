@@ -91,6 +91,10 @@ def test_extracts_core_flutter_metadata_and_inventory_sections() -> None:
         "deep_links",
         "url_schemes",
         "queried_url_schemes",
+        "functionality",
+        "network_evidence",
+        "data_storage_evidence",
+        "resilience_evidence",
         "code_evidence",
     }
     assert sections["meta"] == {
