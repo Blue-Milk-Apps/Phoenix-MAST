@@ -19,8 +19,6 @@ from adapters.output.phoenix_report.generate_report import generate_report
 from adapters.post_scan import (
     AndroidBinaryScanDetailExtractor,
     AndroidBinaryScanOutputLoader,
-    IOSBinaryScanDetailExtractor,
-    IOSBinaryScanOutputLoader,
 )
 from adapters.source_code_scanners import (
     DependencyCheckScanner,
@@ -62,10 +60,7 @@ class MobileScannerFactory:
             case ("BINARY", "IOS", _):
                 return [
                     IpswScanner(),
-                    SyftScanner(output_format=config.syft_output_format),
                     LIEFScanner(),
-                    TrufflehogScanner(),
-                    GitleaksScanner(),
                     StringsScanner(),
                     PlistBinaryScanner(),
                 ]
@@ -215,11 +210,6 @@ class MobileAnalysisWorkflowService:
                 return PostScanProcessingService(
                     scan_output_loader=AndroidBinaryScanOutputLoader(),
                     scan_detail_extractor=AndroidBinaryScanDetailExtractor(),
-                )
-            case ("BINARY", "IOS", _):
-                return PostScanProcessingService(
-                    scan_output_loader=IOSBinaryScanOutputLoader(),
-                    scan_detail_extractor=IOSBinaryScanDetailExtractor(),
                 )
             case _:
                 return None
