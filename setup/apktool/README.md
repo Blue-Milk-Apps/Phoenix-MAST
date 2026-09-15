@@ -1,6 +1,6 @@
 # Apktool Evidence Extractor Setup
 
-phoenix uses apktool during APK binary scans to reconstruct Android semantics into a temporary workspace. phoenix keeps normalized JSON evidence and removes the decoded project after extraction.
+AppcritIQ uses apktool during APK binary scans to reconstruct Android semantics into a temporary workspace. AppcritIQ keeps normalized JSON evidence and removes the decoded project after extraction.
 
 ## Local Install
 
@@ -19,23 +19,23 @@ sudo apt-get install -y apktool
 apktool --version
 ```
 
-phoenix checks availability with the `apktool` command on `PATH`.
+AppcritIQ checks availability with the `apktool` command on `PATH`.
 
 ## Docker Install
 
-The phoenix Docker image installs a pinned apktool wrapper and JAR into `/usr/local/bin` and verifies it during the image build:
+The AppcritIQ Docker image installs a pinned apktool wrapper and JAR into `/usr/local/bin` and verifies it during the image build:
 
 ```bash
-docker compose build phoenix
-docker compose run --rm phoenix --help
+docker compose build appcritiq
+docker compose run --rm appcritiq --help
 ```
 
-## phoenix Usage
+## AppcritIQ Usage
 
 Apktool runs automatically during APK binary scans:
 
 ```bash
-uv run phoenix scan --android-binary-path path/to/app.apk
+uv run appcritiq scan --android-binary-path path/to/app.apk
 ```
 
 The scanner skips non-APK inputs. It emits deterministic JSON artifacts under:
@@ -66,6 +66,6 @@ The scanner writes compact evidence artifacts rather than persisting the full de
 
 ## Extraction Philosophy
 
-phoenix treats apktool as Android semantic reconstruction infrastructure, not as a long-term APK dump. The scanner prioritizes high-signal, provenance-rich AppSec evidence that downstream systems can enrich into findings later.
+AppcritIQ treats apktool as Android semantic reconstruction infrastructure, not as a long-term APK dump. The scanner prioritizes high-signal, provenance-rich AppSec evidence that downstream systems can enrich into findings later.
 
-The decoded apktool workspace is temporary. phoenix preserves contextual relationships in JSON artifacts and avoids storing full smali trees, giant string dumps, or UI-focused decoded resources.
+The decoded apktool workspace is temporary. AppcritIQ preserves contextual relationships in JSON artifacts and avoids storing full smali trees, giant string dumps, or UI-focused decoded resources.

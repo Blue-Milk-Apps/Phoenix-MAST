@@ -44,7 +44,7 @@ def test_gitleaks_compose_container_detects_fake_secret(tmp_path: Path) -> None:
     (fake_repo / ".gitleaks.toml").write_text(
         "\n".join(
             [
-                'title = "Phoenix Gitleaks Integration Test"',
+                'title = "AppcritIQ Gitleaks Integration Test"',
                 "",
                 "[[rules]]",
                 'id = "test-secret"',

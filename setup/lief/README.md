@@ -1,6 +1,6 @@
 # LIEF Setup
 
-Phoenix uses the Python `lief` package for IPA-only Mach-O inspection during binary scans.
+AppcritIQ uses the Python `lief` package for IPA-only Mach-O inspection during binary scans.
 
 ## Local Install
 
@@ -16,12 +16,12 @@ If you need to install it manually into an existing environment:
 uv pip install lief
 ```
 
-## Phoenix Usage
+## AppcritIQ Usage
 
-Run Phoenix against an IPA file:
+Run AppcritIQ against an IPA file:
 
 ```bash
-uv run phoenix scan --ios-binary-path path/to/app.ipa
+uv run appcritiq scan --ios-binary-path path/to/app.ipa
 ```
 
 The LIEF scanner skips non-IPA inputs, including APK files and source directories.

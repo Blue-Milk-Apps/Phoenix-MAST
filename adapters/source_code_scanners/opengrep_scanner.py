@@ -37,7 +37,8 @@ class OpenGrepScanner(ScannerPort):
     @property
     def description(self) -> str:
         return (
-            "Static analysis and security evidence extraction based on NIAP, OWASP MASVS, and Phoenix OpenGrep rules."
+            "Static analysis and security evidence extraction based on NIAP, OWASP MASVS, "
+            "and AppcritIQ OpenGrep rules."
         )
 
     def _opengrep_executable(self) -> str | None:
@@ -96,13 +97,15 @@ class OpenGrepScanner(ScannerPort):
         return None
 
     def _has_rule_files(self, rules_path: Path) -> bool:
-        return any(path.is_file() and path.suffix.lower() in {".yml", ".yaml"} for path in rules_path.rglob("*"))
+        return any(
+            path.is_file() and path.suffix.lower() in {".yml", ".yaml"}
+            for path in rules_path.rglob("*")
+        )
 
     def _timeout_seconds(self) -> int:
-        raw = (
-            os.environ.get("PHOENIX_OPENGREP_TIMEOUT", "").strip()
-            or os.environ.get("PHOENIX_OPENGREP_TIMEOUT", "").strip()
-        )
+        raw = os.environ.get("APPCRITIQ_OPENGREP_TIMEOUT", "").strip() or os.environ.get(
+            "PHOENIX_OPENGREP_TIMEOUT", ""
+        ).strip()
         if not raw:
             return self.DEFAULT_PROCESS_TIMEOUT_SECONDS
         try:
@@ -124,7 +127,7 @@ class OpenGrepScanner(ScannerPort):
         return [config.project_path]
 
     def scan(self, config: ScanConfig) -> list[ScanResult]:
-        opengrep_home = Path(tempfile.mkdtemp(prefix="phoenix_opengrep_"))
+        opengrep_home = Path(tempfile.mkdtemp(prefix="appcritiq_opengrep_"))
         process: subprocess.Popen[str] | None = None
 
         try:

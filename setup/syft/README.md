@@ -1,12 +1,12 @@
 # Syft Setup
 
-Phoenix uses Syft to generate CycloneDX SBOM output. The adapter expects a `syft` command on `PATH`.
+AppcritIQ uses Syft to generate CycloneDX SBOM output. The adapter expects a `syft` command on `PATH`.
 
-## What Phoenix expects
+## What AppcritIQ expects
 
 - `syft` installed and available on `PATH`.
 - No extra local database is required.
-- Phoenix writes `sbom.json` and `sbom.xml` under the scan output directory.
+- AppcritIQ writes `sbom.json` and `sbom.xml` under the scan output directory.
 
 The adapter runs:
 
@@ -39,18 +39,18 @@ Docker is also available:
 docker pull anchore/syft
 ```
 
-Phoenix local scans need the host binary. Docker-only Syft installs are useful for manual validation, but they do not satisfy `shutil.which("syft")` in the local adapter.
+AppcritIQ local scans need the host binary. Docker-only Syft installs are useful for manual validation, but they do not satisfy `shutil.which("syft")` in the local adapter.
 
 ## Run a manual check
 
 ```bash
-syft scan . -o cyclonedx-json=/tmp/phoenix-sbom.json
+syft scan . -o cyclonedx-json=/tmp/appcritiq-sbom.json
 ```
 
-Then run Phoenix with the scan target flag that matches your app or source project. See the [`<scan-target-flag>` list](../README.md#scan-target-flags) for valid options.
+Then run AppcritIQ with the scan target flag that matches your app or source project. See the [`<scan-target-flag>` list](../README.md#scan-target-flags) for valid options.
 
 ```bash
-uv run phoenix scan <scan-target-flag> path/to/target
+uv run appcritiq scan <scan-target-flag> path/to/target
 ```
 
 ## Troubleshooting

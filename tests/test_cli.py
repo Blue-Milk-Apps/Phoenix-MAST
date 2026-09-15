@@ -508,7 +508,7 @@ def test_scan_command_prints_selected_scan_details(tmp_path: Path, capsys, monke
 
     output = capsys.readouterr().out
     assert exit_code == 0
-    assert "Phoenix scan" in output
+    assert "AppcritIQ scan" in output
     assert f"Project: {tmp_path.resolve()}" in output
     assert "Scan type: Android binary" in output
     assert "Proceeding with Android binary scan" in output
@@ -569,7 +569,9 @@ def test_scan_command_passes_scan_config_to_mobile_analysis_workflow_service(
     assert exit_code == 0
     assert captured["config"].platform == "ANDROID"
     assert captured["config"].stack == "ANY"
-    assert captured["config"].opengrep_rules_path == (Path(cli.__file__).parent.parent / "rules" / "android").resolve()
+    assert captured["config"].opengrep_rules_path == (
+        Path(cli.__file__).parent.parent / "rules" / "android"
+    ).resolve()
     assert not hasattr(captured["config"], "scanners")
     assert not hasattr(captured["config"], "enabled_scans")
 
@@ -631,7 +633,7 @@ def test_cli_version_exits_successfully(capsys) -> None:
         assert exc.code == 0
 
     output = capsys.readouterr().out
-    assert output.startswith("phoenix ")
+    assert output.startswith("appcritiq ")
 
 
 def test_cli_help_mentions_scan_path_flags(capsys) -> None:

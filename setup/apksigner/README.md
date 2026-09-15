@@ -1,10 +1,10 @@
 # Apksigner Evidence Extractor Setup
 
-Phoenix uses `apksigner` during APK binary scans to extract APK signing integrity, signer identity, and lightweight supply-chain provenance evidence. The extractor writes normalized JSON evidence and does not generate findings.
+AppcritIQ uses `apksigner` during APK binary scans to extract APK signing integrity, signer identity, and lightweight supply-chain provenance evidence. The extractor writes normalized JSON evidence and does not generate findings.
 
 ## Local Install
 
-Phoenix resolves `apksigner` from the local `PATH`.
+AppcritIQ resolves `apksigner` from the local `PATH`.
 
 On macOS, install Android SDK Build Tools with Android Studio or the Android command-line tools. `apksigner` usually lives under:
 
@@ -31,7 +31,7 @@ Reload your shell:
 source ~/.zshrc
 ```
 
-Verify that Phoenix can resolve the same command:
+Verify that AppcritIQ can resolve the same command:
 
 ```bash
 which apksigner
@@ -47,30 +47,30 @@ which apksigner
 apksigner version
 ```
 
-Phoenix does not use an `APKSIGNER_PATH` override. If `apksigner` is not on `PATH`, the scanner skips and reports that the tool is unavailable.
+AppcritIQ does not use an `APKSIGNER_PATH` override. If `apksigner` is not on `PATH`, the scanner skips and reports that the tool is unavailable.
 
 ## Docker Install
 
-For Docker scans, do not add a host Android SDK path to Phoenix. Host paths such as `/Users/.../Library/Android/sdk/...` are not available inside the container unless explicitly mounted.
+For Docker scans, do not add a host Android SDK path to AppcritIQ. Host paths such as `/Users/.../Library/Android/sdk/...` are not available inside the container unless explicitly mounted.
 
-The Phoenix Docker image installs `apksigner` inside the container and verifies it during image build:
+The AppcritIQ Docker image installs `apksigner` inside the container and verifies it during image build:
 
 ```bash
-docker compose build phoenix
+docker compose build appcritiq
 ```
 
 Verify the container command directly:
 
 ```bash
-docker compose run --rm --entrypoint apksigner phoenix version
+docker compose run --rm --entrypoint apksigner appcritiq version
 ```
 
-## Phoenix Usage
+## AppcritIQ Usage
 
 Apksigner runs automatically during APK binary scans:
 
 ```bash
-uv run phoenix scan --android-binary-path path/to/app.apk
+uv run appcritiq scan --android-binary-path path/to/app.apk
 ```
 
 The scanner skips non-APK inputs. It emits one primary document-style artifact under:
@@ -93,7 +93,7 @@ scan-results/.../apksigner/raw/apksigner_verify_stderr.txt
 - APK identity context
 - extraction metadata
 - apksigner tool version
-- Phoenix extractor version
+- AppcritIQ extractor version
 - schema version
 - command profile used
 - verification status
@@ -180,4 +180,4 @@ Allowed values for `lineage.lineage_state`:
 
 ## Extraction Philosophy
 
-Phoenix treats `apksigner` output as signing evidence, not as policy. Downstream systems can use this evidence to generate findings such as missing modern signing schemes, debug signer usage, unexpected signer drift, broken lineage, or unknown production signer.
+AppcritIQ treats `apksigner` output as signing evidence, not as policy. Downstream systems can use this evidence to generate findings such as missing modern signing schemes, debug signer usage, unexpected signer drift, broken lineage, or unknown production signer.
