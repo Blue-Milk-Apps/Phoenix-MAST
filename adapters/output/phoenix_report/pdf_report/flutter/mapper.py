@@ -7,7 +7,21 @@ def map_flutter_details(details: FlutterReportDetails) -> dict[str, object]:
     presentation = details.presentation
     return {
         "functionality": {
-            item.name: {"present": item.present, "explanation": item.explanation} for item in details.functionality
+            item.name: {
+                "present": item.present,
+                "status": item.status.value if item.status else "",
+                "explanation": item.explanation,
+                "platform_assessments": [
+                    {
+                        "platform": assessment.platform.value,
+                        "status": assessment.status.value,
+                        "explanation": assessment.explanation,
+                        "evidence": list(assessment.evidence),
+                    }
+                    for assessment in item.platform_assessments
+                ],
+            }
+            for item in details.functionality
         },
         "permissions": [
             {

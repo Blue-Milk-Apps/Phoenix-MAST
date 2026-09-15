@@ -321,8 +321,25 @@
     {% for name, f in data.functionality.items() %}
     <tr>
       <td>{{ name }}</td>
-      <td>{% if f.present is none %}{{ risk_badge('N/A', label='Not Evaluated') }}{% else %}{{ risk_badge('Info' if f.present else 'N/A', label=('Present' if f.present else 'Not Present')) }}{% endif %}</td>
-      <td>{{ f.explanation }}</td>
+      <td>
+        {% if f.status == 'present' %}{{ risk_badge('Info', label='Present') }}
+        {% elif f.status == 'not_present' %}{{ risk_badge('N/A', label='Not Present') }}
+        {% elif f.status == 'partial' %}{{ risk_badge('N/A', label='Partial') }}
+        {% elif f.status == 'not_applicable' %}{{ risk_badge('N/A', label='Not Applicable') }}
+        {% elif f.status == 'not_evaluated' %}{{ risk_badge('N/A', label='Not Evaluated') }}
+        {% elif f.present is none %}{{ risk_badge('N/A', label='Not Evaluated') }}
+        {% else %}{{ risk_badge('Info' if f.present else 'N/A', label=('Present' if f.present else 'Not Present')) }}{% endif %}
+      </td>
+      <td>
+        {{ f.explanation }}
+        {% if f.platform_assessments %}
+        <div class="small">
+          {% for assessment in f.platform_assessments %}
+          {{ assessment.platform|replace('_', ' ')|title }}: {{ assessment.status|replace('_', ' ')|title }}{% if not loop.last %}; {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+      </td>
     </tr>
     {% endfor %}
   </table>

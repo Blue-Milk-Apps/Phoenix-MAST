@@ -50,6 +50,7 @@ class FlutterScanDetailExtractor(ScanDetailExtractorPort):
 
         functionality = FlutterFunctionality(context)
         sections["functionality"] = functionality.items
+        sections["platform_inventory"]["functionality_platform_assessments"] = functionality.platform_assessments
 
         hardcoded_values = FlutterHardcodedValues(context)
         if hardcoded_values.assessed or hardcoded_values.secrets:
