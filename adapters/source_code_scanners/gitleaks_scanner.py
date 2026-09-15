@@ -11,7 +11,6 @@ from pathlib import Path
 
 from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
-from utilities.scan_target_utils import ResolvedScanTarget, resolve_scan_target
 
 REPORT_PATH = "gitleaks_report.json"
 
@@ -73,13 +72,14 @@ class GitleaksScanner(ScannerPort):
         return None
 
     def scan(self, config: ScanConfig) -> list[ScanResult]:
-        resolved_target: ResolvedScanTarget | None = None
         try:
             env_config = os.environ.get("GITLEAKS_CONFIG", "").strip()
             if env_config:
                 env_config_path = Path(env_config).expanduser()
                 if not env_config_path.exists():
-                    error_message = f"GITLEAKS_CONFIG path does not exist: {env_config_path}"
+                    error_message = (
+                        f"GITLEAKS_CONFIG path does not exist: {env_config_path}"
+                    )
                     return [
                         ScanResult(
                             scanner_name=self.name,
@@ -91,8 +91,6 @@ class GitleaksScanner(ScannerPort):
                         )
                     ]
 
-            resolved_target = resolve_scan_target(config)
-            print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}Resolved scan target: {resolved_target.path}")
             executable = self._gitleaks_executable()
             if not executable:
                 error_message = "Gitleaks executable was not found on this system."
@@ -124,7 +122,7 @@ class GitleaksScanner(ScannerPort):
             if config_path:
                 cmd.extend(["--config", str(config_path)])
 
-            cmd.append(str(resolved_target.path))
+            cmd.append(str(config.project_path))
 
             process = subprocess.Popen(
                 cmd,
@@ -132,13 +130,17 @@ class GitleaksScanner(ScannerPort):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
-            stdout_data, stderr_data = process.communicate(timeout=self._timeout_seconds())
+            stdout_data, stderr_data = process.communicate(
+                timeout=self._timeout_seconds()
+            )
 
             if stderr_data:
                 for line in stderr_data.splitlines():
                     clean_line = line.replace("\r", "").strip()
                     if clean_line:
-                        print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}{clean_line}")
+                        print(
+                            f"{ScannerPort.format_stdout_prefix(self.scan_type)}{clean_line}"
+                        )
 
             if process.returncode not in (0, 1):
                 error_message = f"Gitleaks error with return code {process.returncode}"
@@ -170,8 +172,12 @@ class GitleaksScanner(ScannerPort):
                 for line in stderr_data.splitlines():
                     clean_line = line.replace("\r", "").strip()
                     if clean_line:
-                        print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}{clean_line}")
-            error_message = f"Gitleaks timed out after {self._timeout_seconds()} seconds"
+                        print(
+                            f"{ScannerPort.format_stdout_prefix(self.scan_type)}{clean_line}"
+                        )
+            error_message = (
+                f"Gitleaks timed out after {self._timeout_seconds()} seconds"
+            )
             return [
                 ScanResult(
                     scanner_name=self.name,
@@ -193,9 +199,6 @@ class GitleaksScanner(ScannerPort):
                     relative_target_path=REPORT_PATH,
                 )
             ]
-        finally:
-            if resolved_target is not None:
-                resolved_target.cleanup()
 
     @staticmethod
     def _json_report(raw_output: str, default: object) -> str:
