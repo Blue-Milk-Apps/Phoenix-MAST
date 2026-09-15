@@ -37,7 +37,6 @@ class ScanType(str, Enum):
     STRINGS = "strings"
     PLIST_SOURCE = "plist_source"
     PLIST_BINARY = "plist_binary"
-    NATIVE_ANDROID_SOURCE_METADATA = "native_android_source_metadata"
     SYFT = "syft"
 
 

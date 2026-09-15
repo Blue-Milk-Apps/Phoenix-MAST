@@ -474,7 +474,6 @@ def test_create_scan_config_for_native_android_source(tmp_path: Path, monkeypatc
     _assert_scanner_types(
         config,
         {
-            ScanType.NATIVE_ANDROID_SOURCE_METADATA,
             ScanType.TRUFFLEHOG,
             ScanType.GITLEAKS,
             ScanType.SYFT,
@@ -497,7 +496,6 @@ def test_create_scan_config_for_native_android_source_includes_opengrep_when_rul
 
     assert config.opengrep_rules_path == rules_path.resolve()
     assert {scanner.scan_type for scanner in _build_scanners(config)} == {
-        ScanType.NATIVE_ANDROID_SOURCE_METADATA,
         ScanType.TRUFFLEHOG,
         ScanType.GITLEAKS,
         ScanType.SYFT,
