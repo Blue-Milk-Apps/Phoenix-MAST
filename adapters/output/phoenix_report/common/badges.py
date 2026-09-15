@@ -13,6 +13,7 @@ def risk_badge(rating: str, label: str | None = None) -> Markup:
         "medium": "badge-medium",
         "low": "badge-low",
         "info": "badge-info",
+        "partial": "badge-partial",
         "secure hotspot": "badge-secure",
         "secure": "badge-secure",
         "hotspot": "badge-hotspot",

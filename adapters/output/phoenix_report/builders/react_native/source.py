@@ -5,6 +5,7 @@ from typing import Any, Mapping
 from adapters.output.phoenix_report.builders.react_native.source_check_catalog import REACT_NATIVE_SOURCE_SECTION_CHECKS
 from adapters.output.phoenix_report.builders.source import SourceReportDataBuilder
 from domain.report import (
+    AssessmentStatus,
     EndpointDetails,
     FlutterDependencyDetails,
     FunctionalityDetails,
@@ -12,11 +13,13 @@ from domain.report import (
     HardcodedUrlDetails,
     HardcodedValuesDetails,
     PermissionDetails,
+    PlatformAssessment,
     ReactNativePlatformDetails,
     ReactNativeReportDetails,
     ReactNativeRuntimeDetails,
     ReportData,
     ReportMetadata,
+    ReportPlatform,
     ReportTargetKind,
 )
 
@@ -54,6 +57,14 @@ class ReactNativeReportDataBuilder(SourceReportDataBuilder):
             if isinstance(item, Mapping) and item.get("name")
         )
         functionality = data.get("functionality") if isinstance(data.get("functionality"), Mapping) else {}
+        inventory = data.get("platform_inventory") if isinstance(data.get("platform_inventory"), Mapping) else {}
+        runtime_assessments = (
+            inventory.get("runtime", {}).get("functionality_platform_assessments")
+            if isinstance(inventory.get("runtime"), Mapping)
+            else None
+        )
+        raw_assessments = data.get("functionality_platform_assessments", runtime_assessments)
+        assessments = raw_assessments if isinstance(raw_assessments, Mapping) else {}
         hardcoded = data.get("hardcoded_values") if isinstance(data.get("hardcoded_values"), Mapping) else {}
         return ReactNativeReportDetails(
             package_name=str(identity.get("package_name") or ""),
@@ -64,7 +75,7 @@ class ReactNativeReportDataBuilder(SourceReportDataBuilder):
             platforms=ReactNativePlatformDetails(platforms.get("android") is True, platforms.get("ios") is True),
             dependencies=dependency_items,
             functionality=tuple(
-                FunctionalityDetails(str(name), item.get("present"), str(item.get("explanation") or ""))
+                ReactNativeReportDataBuilder._functionality_detail(name, item, assessments.get(name))
                 for name, item in functionality.items()
                 if isinstance(item, Mapping)
             ),
@@ -91,4 +102,42 @@ class ReactNativeReportDataBuilder(SourceReportDataBuilder):
                 for item in data.get("endpoints", ())
                 if isinstance(item, Mapping)
             ),
+        )
+
+    @classmethod
+    def _functionality_detail(
+        cls,
+        name: object,
+        item: Mapping[str, Any],
+        raw_assessments: object,
+    ) -> FunctionalityDetails:
+        rows = raw_assessments if isinstance(raw_assessments, Mapping) else {}
+        platform_assessments = tuple(
+            assessment
+            for platform_name, row in rows.items()
+            if isinstance(row, Mapping) and (assessment := cls._platform_assessment(platform_name, row)) is not None
+        )
+        status = AssessmentStatus.aggregate(item.status for item in platform_assessments)
+        return FunctionalityDetails(
+            name=str(name),
+            present=item.get("present"),
+            explanation=str(item.get("explanation") or ""),
+            platform_assessments=platform_assessments,
+            status=status,
+        )
+
+    @staticmethod
+    def _platform_assessment(platform_name: object, row: Mapping[str, Any]) -> PlatformAssessment | None:
+        try:
+            platform = ReportPlatform(str(platform_name))
+            status = AssessmentStatus(str(row.get("status") or ""))
+        except ValueError:
+            return None
+        evidence = row.get("evidence")
+        evidence = evidence if isinstance(evidence, (list, tuple)) else ()
+        return PlatformAssessment(
+            platform=platform,
+            status=status,
+            explanation=str(row.get("explanation") or ""),
+            evidence=tuple(str(item) for item in evidence if str(item).strip()),
         )

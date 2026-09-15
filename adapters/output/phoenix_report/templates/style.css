@@ -94,6 +94,7 @@ p { margin: 0 0 8px 0; }
 .badge-critical { background: #7b1113; }
 .badge-medium { background: #e08e0b; }
 .badge-low, .badge-info { background: #2980b9; }
+.badge-partial { background: #8e44ad; }
 .badge-secure, .badge-notpresent { background: #27ae60; }
 .badge-hotspot { background: #444444; }
 .badge-variable { background: #6c5ce7; }

@@ -14,11 +14,13 @@ from domain.post_scan.react_native.rule_registry import (
     FUNCTIONALITY_RULE_ID_TO_KEY as REACT_NATIVE_FUNCTIONALITY_RULES,
 )
 from domain.post_scan.react_native.scan_extraction_context import ReactNativeScanExtractionContext
+from domain.report import AssessmentStatus
 
 
 @dataclass
 class ReactNativeFunctionality:
     items: dict[str, dict[str, Any]]
+    platform_assessments: dict[str, dict[str, dict[str, Any]]]
     applicable: bool
     assessed: bool
     fully_assessed: bool
@@ -39,10 +41,13 @@ class ReactNativeFunctionality:
 
     def __init__(self, context: ReactNativeScanExtractionContext) -> None:
         evidence: dict[str, list[str]] = {capability: [] for capability in self.CAPABILITIES}
-        self._add_android_permissions(context, evidence)
-        self._add_ios_metadata(context, evidence)
-        self._add_react_native_dependencies(context, evidence)
-        self._add_opengrep_findings(context, evidence)
+        platform_evidence = {
+            scope: {capability: [] for capability in self.CAPABILITIES} for scope in ("react_native", "android", "ios")
+        }
+        self._add_android_permissions(context, evidence, platform_evidence)
+        self._add_ios_metadata(context, evidence, platform_evidence)
+        self._add_react_native_dependencies(context, evidence, platform_evidence)
+        self._add_opengrep_findings(context, evidence, platform_evidence)
 
         platform_assessments: list[bool] = []
         if context.opengrep_scope_applicable("react_native"):
@@ -66,6 +71,7 @@ class ReactNativeFunctionality:
         self.applicable = bool(platform_assessments)
         self.fully_assessed = self.applicable and all(platform_assessments)
         self.items = {}
+        self.platform_assessments = {}
         for capability in self.CAPABILITIES:
             details = list(dict.fromkeys(evidence[capability]))
             if details:
@@ -80,7 +86,71 @@ class ReactNativeFunctionality:
                     "present": None,
                     "explanation": "Functionality was not fully assessed for the applicable mobile platforms.",
                 }
+            self.platform_assessments[capability] = self._platform_assessment_rows(
+                context,
+                capability,
+                platform_evidence,
+            )
         self.assessed = self.fully_assessed or any(item["present"] is True for item in self.items.values())
+
+    @classmethod
+    def _platform_assessment_rows(
+        cls,
+        context: ReactNativeScanExtractionContext,
+        capability: str,
+        platform_evidence: dict[str, dict[str, list[str]]],
+    ) -> dict[str, dict[str, Any]]:
+        rows: dict[str, dict[str, Any]] = {}
+        for scope in ("react_native", "android", "ios"):
+            if not cls._scope_applicable(context, scope) or capability not in cls._scope_capabilities(scope):
+                continue
+            details = list(dict.fromkeys(platform_evidence[scope][capability]))
+            if details:
+                rows[scope] = {
+                    "status": AssessmentStatus.PRESENT.value,
+                    "explanation": " ".join(details),
+                    "evidence": details,
+                }
+                continue
+            if not cls._scope_assessed(context, scope):
+                rows[scope] = {
+                    "status": AssessmentStatus.NOT_EVALUATED.value,
+                    "explanation": "Required platform scan evidence was unavailable.",
+                    "evidence": [],
+                }
+                continue
+            rows[scope] = {
+                "status": AssessmentStatus.NOT_PRESENT.value,
+                "explanation": f"No assessed {scope.replace('_', ' ')} source evidence indicated {capability.lower()} functionality.",
+                "evidence": [],
+            }
+        return rows
+
+    @classmethod
+    def _scope_capabilities(cls, scope: str) -> frozenset[str]:
+        if scope == "react_native":
+            return frozenset(REACT_NATIVE_FUNCTIONALITY_RULES.values())
+        if scope == "android":
+            return frozenset(AndroidFunctionality.KEYS)
+        return frozenset(IOS_FUNCTIONALITY_RULES.values())
+
+    @staticmethod
+    def _scope_applicable(context: ReactNativeScanExtractionContext, scope: str) -> bool:
+        if scope == "react_native":
+            return context.opengrep_scope_applicable(scope)
+        return ReactNativeFunctionality._platform_applicable(context, scope)
+
+    @staticmethod
+    def _scope_assessed(context: ReactNativeScanExtractionContext, scope: str) -> bool:
+        if scope == "react_native":
+            return context.opengrep_scope_assessed(scope, frozenset(REACT_NATIVE_FUNCTIONALITY_RULES))
+        if scope == "android":
+            return isinstance(context.android_metadata.get("permissions"), list) and context.opengrep_scope_assessed(
+                scope, ANDROID_FUNCTIONALITY_RULE_IDS
+            )
+        return isinstance(context.ios_metadata.get("permissions"), list) and context.opengrep_scope_assessed(
+            scope, frozenset(IOS_FUNCTIONALITY_RULES)
+        )
 
     @staticmethod
     def _platform_applicable(context: ReactNativeScanExtractionContext, scope: str) -> bool:
@@ -91,6 +161,7 @@ class ReactNativeFunctionality:
     def _add_react_native_dependencies(
         context: ReactNativeScanExtractionContext,
         evidence: dict[str, list[str]],
+        platform_evidence: dict[str, dict[str, list[str]]],
     ) -> None:
         if not context.first_non_empty(
             context.runtime.get("react_native_constraint"),
@@ -122,12 +193,15 @@ class ReactNativeFunctionality:
         }
         for capability, package_names in dependency_capabilities.items():
             for package_name in sorted(declared & package_names):
-                evidence[capability].append(f"Declared React Native dependency: {package_name}.")
+                detail = f"Declared React Native dependency: {package_name}."
+                evidence[capability].append(detail)
+                platform_evidence["react_native"][capability].append(detail)
 
     @staticmethod
     def _add_android_permissions(
         context: ReactNativeScanExtractionContext,
         evidence: dict[str, list[str]],
+        platform_evidence: dict[str, dict[str, list[str]]],
     ) -> None:
         declared = {
             context.first_non_empty(item.get("name"))
@@ -136,12 +210,15 @@ class ReactNativeFunctionality:
         declared.discard("")
         for capability, names in AndroidFunctionality.PERMISSIONS.items():
             for permission in sorted(names & declared):
-                evidence[capability].append(f"Declared Android permission: {permission}.")
+                detail = f"Declared Android permission: {permission}."
+                evidence[capability].append(detail)
+                platform_evidence["android"][capability].append(detail)
 
     @staticmethod
     def _add_ios_metadata(
         context: ReactNativeScanExtractionContext,
         evidence: dict[str, list[str]],
+        platform_evidence: dict[str, dict[str, list[str]]],
     ) -> None:
         permission_keys = {
             context.first_non_empty(item.get("key"))
@@ -153,7 +230,9 @@ class ReactNativeFunctionality:
             if capability not in evidence:
                 continue
             for key in sorted(set(keys) & permission_keys):
-                evidence[capability].append(f"Declared iOS permission: {key}.")
+                detail = f"Declared iOS permission: {key}."
+                evidence[capability].append(detail)
+                platform_evidence["ios"][capability].append(detail)
 
         for artifact in context.mapping_list(context.ios_metadata.get("entitlements")):
             metadata = context.mapping(artifact.get("metadata"))
@@ -164,20 +243,27 @@ class ReactNativeFunctionality:
                 ("keychain_access_groups", "Keychain"),
             ):
                 if ReactNativeFunctionality._has_value(metadata.get(key)):
-                    evidence[capability].append(f"iOS entitlement {key} is present.")
+                    detail = f"iOS entitlement {key} is present."
+                    evidence[capability].append(detail)
+                    platform_evidence["ios"][capability].append(detail)
 
         if "remote-notification" in context.string_list(context.ios_metadata.get("background_modes")):
-            evidence["Push Notifications"].append("iOS background mode remote-notification is declared.")
+            detail = "iOS background mode remote-notification is declared."
+            evidence["Push Notifications"].append(detail)
+            platform_evidence["ios"]["Push Notifications"].append(detail)
         if context.mapping(context.ios_metadata.get("app_transport_security")) or context.mapping(
             context.ios_metadata.get("url_schemes")
         ):
-            evidence["Networking"].append("iOS networking configuration is present.")
+            detail = "iOS networking configuration is present."
+            evidence["Networking"].append(detail)
+            platform_evidence["ios"]["Networking"].append(detail)
 
     @classmethod
     def _add_opengrep_findings(
         cls,
         context: ReactNativeScanExtractionContext,
         evidence: dict[str, list[str]],
+        platform_evidence: dict[str, dict[str, list[str]]],
     ) -> None:
         for scope, mapping in (
             ("react_native", REACT_NATIVE_FUNCTIONALITY_RULES),
@@ -191,6 +277,7 @@ class ReactNativeFunctionality:
                 explanation = cls._result_explanation(context, result)
                 if explanation:
                     evidence[capability].append(explanation)
+                    platform_evidence[scope][capability].append(explanation)
 
     @staticmethod
     def _result_explanation(context: ReactNativeScanExtractionContext, result: dict[str, Any]) -> str:

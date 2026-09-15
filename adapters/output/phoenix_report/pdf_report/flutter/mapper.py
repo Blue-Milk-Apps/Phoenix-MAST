@@ -1,28 +1,13 @@
 """Map typed Flutter report details to the PDF template shape."""
 
+from adapters.output.phoenix_report.pdf_report.common import map_functionality
 from domain.report import FlutterReportDetails
 
 
 def map_flutter_details(details: FlutterReportDetails) -> dict[str, object]:
     presentation = details.presentation
     return {
-        "functionality": {
-            item.name: {
-                "present": item.present,
-                "status": item.status.value if item.status else "",
-                "explanation": item.explanation,
-                "platform_assessments": [
-                    {
-                        "platform": assessment.platform.value,
-                        "status": assessment.status.value,
-                        "explanation": assessment.explanation,
-                        "evidence": list(assessment.evidence),
-                    }
-                    for assessment in item.platform_assessments
-                ],
-            }
-            for item in details.functionality
-        },
+        "functionality": map_functionality(details.functionality),
         "permissions": [
             {
                 "permission": item.permission,

@@ -102,6 +102,10 @@ def build_report_sections(context: ReactNativeScanExtractionContext) -> dict[str
     functionality = ReactNativeFunctionality(context)
     if functionality.applicable or functionality.assessed:
         sections["functionality"] = functionality.items
+        sections["platform_inventory"]["runtime"] = {
+            **sections["platform_inventory"]["runtime"],
+            "functionality_platform_assessments": functionality.platform_assessments,
+        }
     manual_review = _manual_review(context)
     if manual_review["assessed"] or manual_review["findings"]:
         sections["manual_review"] = manual_review

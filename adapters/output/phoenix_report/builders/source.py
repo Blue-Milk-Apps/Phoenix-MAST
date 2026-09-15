@@ -5,12 +5,16 @@ from dataclasses import dataclass
 from typing import Any, ClassVar, Mapping
 
 from domain.report import (
+    AssessmentStatus,
     CheckResult,
     CheckSeverity,
     FindingSeverity,
+    FunctionalityDetails,
     OverallEvaluation,
+    PlatformAssessment,
     ReportData,
     ReportMetadata,
+    ReportPlatform,
     RiskLevel,
     RiskSummary,
     SecurityCheck,
@@ -238,3 +242,27 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
 
     def _build_details(self, data: Mapping[str, Any]):
         raise NotImplementedError
+
+    @staticmethod
+    def _single_platform_functionality(
+        name: object,
+        value: Mapping[str, Any],
+        platform: ReportPlatform,
+    ) -> FunctionalityDetails:
+        present = value.get("present")
+        status = (
+            AssessmentStatus.PRESENT
+            if present is True
+            else AssessmentStatus.NOT_PRESENT
+            if present is False
+            else AssessmentStatus.NOT_EVALUATED
+        )
+        explanation = str(value.get("explanation") or "")
+        assessment = PlatformAssessment(platform=platform, status=status, explanation=explanation)
+        return FunctionalityDetails(
+            name=str(name),
+            present=present,
+            explanation=explanation,
+            platform_assessments=(assessment,),
+            status=status,
+        )

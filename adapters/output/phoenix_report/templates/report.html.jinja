@@ -324,7 +324,7 @@
       <td>
         {% if f.status == 'present' %}{{ risk_badge('Info', label='Present') }}
         {% elif f.status == 'not_present' %}{{ risk_badge('N/A', label='Not Present') }}
-        {% elif f.status == 'partial' %}{{ risk_badge('N/A', label='Partial') }}
+        {% elif f.status == 'partial' %}{{ risk_badge('Partial', label='Partial') }}
         {% elif f.status == 'not_applicable' %}{{ risk_badge('N/A', label='Not Applicable') }}
         {% elif f.status == 'not_evaluated' %}{{ risk_badge('N/A', label='Not Evaluated') }}
         {% elif f.present is none %}{{ risk_badge('N/A', label='Not Evaluated') }}

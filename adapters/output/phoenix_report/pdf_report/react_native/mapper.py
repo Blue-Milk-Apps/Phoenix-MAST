@@ -1,11 +1,10 @@
+from adapters.output.phoenix_report.pdf_report.common import map_functionality
 from domain.report import ReactNativeReportDetails
 
 
 def map_react_native_details(details: ReactNativeReportDetails) -> dict[str, object]:
     return {
-        "functionality": {
-            item.name: {"present": item.present, "explanation": item.explanation} for item in details.functionality
-        },
+        "functionality": map_functionality(details.functionality),
         "permissions": [
             {
                 "permission": item.permission,
