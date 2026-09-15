@@ -23,6 +23,7 @@ from adapters.post_scan import (
     IOSBinaryScanOutputLoader,
 )
 from adapters.source_code_scanners import (
+    DependencyCheckScanner,
     GitleaksScanner,
     OpenGrepScanner,
     PlistSourceScanner,
@@ -75,12 +76,14 @@ class MobileScannerFactory:
                     TrufflehogScanner(),
                     GitleaksScanner(),
                     PlistSourceScanner(),
+                    DependencyCheckScanner(),
                     SyftScanner(output_format=config.syft_output_format),
                 ]
             case ("SOURCE", "ANDROID", "NATIVE_ANDROID"):
                 return [
                     TrufflehogScanner(),
                     GitleaksScanner(),
+                    DependencyCheckScanner(),
                     SyftScanner(output_format=config.syft_output_format),
                 ]
             case ("SOURCE", "IOS", "NATIVE_IOS"):
