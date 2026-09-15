@@ -415,8 +415,7 @@ def test_resolve_opengrep_rules_path_uses_app_rules_fallback(monkeypatch) -> Non
     assert resolved == app_rules_path
 
 
-def test_create_scan_config_for_react_native_source(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(cli, "_resolve_opengrep_rules_path", lambda override, slug: None)
+def test_create_scan_config_for_react_native_source(tmp_path: Path) -> None:
     args = _scan_args(tmp_path, "--react-native-source-path")
 
     config = cli._create_scan_config(args)
@@ -430,7 +429,6 @@ def test_create_scan_config_for_react_native_source(tmp_path: Path, monkeypatch)
     _assert_scanner_types(
         config,
         {
-            ScanType.REACT_NATIVE_SOURCE_METADATA,
             ScanType.TRUFFLEHOG,
             ScanType.GITLEAKS,
             ScanType.PLIST_SOURCE,
@@ -454,7 +452,6 @@ def test_create_scan_config_for_react_native_source_includes_opengrep_when_rules
 
     assert config.opengrep_rules_path == rules_path.resolve()
     assert {scanner.scan_type for scanner in _build_scanners(config)} == {
-        ScanType.REACT_NATIVE_SOURCE_METADATA,
         ScanType.TRUFFLEHOG,
         ScanType.GITLEAKS,
         ScanType.PLIST_SOURCE,
@@ -675,7 +672,7 @@ def test_get_opengrep_scan_paths_for_source_returns_project_only(tmp_path: Path)
     assert paths == [config.project_path]
 
 
-def test_get_opengrep_scan_paths_for_binary_returns_strings_text_artifacts_only(tmp_path: Path) -> None:
+def test_get_opengrep_scan_paths_for_binary_returns_output_only(tmp_path: Path) -> None:
     config = ScanConfig(
         project_path=tmp_path / "app.apk",
         output_path=tmp_path / "scan-results",
@@ -683,31 +680,10 @@ def test_get_opengrep_scan_paths_for_binary_returns_strings_text_artifacts_only(
         platform="ANDROID",
         stack="ANY",
     )
-    strings_path = config.output_path / ScanType.STRINGS.value
-    strings_path.mkdir(parents=True)
-    first_strings = strings_path / "classes.txt"
-    nested_strings = strings_path / "lib" / "native.txt"
-    nested_strings.parent.mkdir()
-    first_strings.write_text("first", encoding="utf-8")
-    nested_strings.write_text("second", encoding="utf-8")
-    (strings_path / "scan_summary.json").write_text("{}", encoding="utf-8")
-    (config.output_path / "androguard.json").write_text("{}", encoding="utf-8")
 
     paths = workflow.MobileScannerFactory()._get_opengrep_scan_paths(config)
 
-    assert paths == [first_strings, nested_strings]
-
-
-def test_get_opengrep_scan_paths_for_binary_without_strings_returns_empty(tmp_path: Path) -> None:
-    config = ScanConfig(
-        project_path=tmp_path / "app.apk",
-        output_path=tmp_path / "scan-results",
-        mode="binary",
-        platform="ANDROID",
-        stack="ANY",
-    )
-
-    assert workflow.MobileScannerFactory()._get_opengrep_scan_paths(config) == []
+    assert paths == [config.output_path]
 
 
 def test_cli_version_exits_successfully(capsys) -> None:

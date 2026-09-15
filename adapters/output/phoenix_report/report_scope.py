@@ -31,22 +31,9 @@ def resolve_report_scope(data: dict[str, Any]) -> ReportScope:
     is_source = target_type == "SOURCE"
     is_ios = platform.lower() == "ios"
     is_flutter = platform.lower() == "flutter"
-    is_react_native = platform.lower() == "react native"
 
     if is_ios and is_source:
         assessed_sections = ("code", "network", "data storage")
-    elif is_react_native and is_source:
-        section_evidence_keys = {
-            "code": "code_evidence",
-            "network": "network_evidence",
-            "data storage": "data_storage_evidence",
-            "resilience": "resilience_evidence",
-        }
-        assessed_sections = tuple(
-            section
-            for section, evidence_key in section_evidence_keys.items()
-            if isinstance(data.get(evidence_key), dict) and bool(data[evidence_key])
-        )
     elif is_source:
         section_evidence_keys = {
             "code": "code_evidence",
@@ -65,17 +52,13 @@ def resolve_report_scope(data: dict[str, Any]) -> ReportScope:
     return ReportScope(
         platform=platform,
         target_type=target_type,
-        assessment_label="React Native Source Code"
-        if is_react_native and is_source
-        else "Flutter Source Code"
+        assessment_label="Flutter Source Code"
         if is_flutter and is_source
         else "Source Code"
         if is_source
         else "Binary",
         assessment_title=(
-            "React Native Source Code Vulnerability Assessment"
-            if is_react_native and is_source
-            else "Flutter Source Code Vulnerability Assessment"
+            "Flutter Source Code Vulnerability Assessment"
             if is_flutter and is_source
             else "Source Code Vulnerability Assessment"
             if is_source
@@ -83,9 +66,7 @@ def resolve_report_scope(data: dict[str, Any]) -> ReportScope:
         ),
         target_label="Project Name" if is_source else "File Name",
         target_information_heading=(
-            "React Native Project Information"
-            if is_react_native and is_source
-            else "Flutter Project Information"
+            "Flutter Project Information"
             if is_flutter and is_source
             else "Source Project Information"
             if is_source
