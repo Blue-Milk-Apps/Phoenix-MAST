@@ -7,7 +7,7 @@ from domain.post_scan.utilities import first_non_empty
 
 
 @dataclass
-class Permissions:
+class PermissionsBuilder:
     items: list[dict[str, str]]
 
     ANDROID_PERMISSION_DESCRIPTIONS = {

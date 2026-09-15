@@ -3,7 +3,7 @@ from typing import Any
 
 
 @dataclass
-class AppComponent:
+class AppComponentBuilder:
     activities: int = 0
     services: int = 0
     receivers: int = 0

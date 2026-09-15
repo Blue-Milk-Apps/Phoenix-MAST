@@ -5,7 +5,7 @@ from domain.post_scan.utilities import first_non_empty
 
 
 @dataclass
-class AndroidAppInfo:
+class AndroidAppInfoBuilder:
     icon_path: str
     name: str
     package_name: str

@@ -7,7 +7,7 @@ from domain.post_scan.utilities import first_non_empty
 
 
 @dataclass
-class Endpoints:
+class EndpointsBuilder:
     items: list[dict[str, str]]
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:

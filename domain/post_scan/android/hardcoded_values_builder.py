@@ -8,7 +8,7 @@ from domain.post_scan.utilities import build_hardcoded_values
 
 
 @dataclass
-class HardcodedValues:
+class HardcodedValuesBuilder:
     urls: list[dict[str, str]]
     emails: list[str]
     secrets: list[dict[str, str]]

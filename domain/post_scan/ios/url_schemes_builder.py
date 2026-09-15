@@ -1,4 +1,4 @@
-"""Build the default iOS URL schemes section."""
+"""Build default iOS URL schemes section."""
 
 from __future__ import annotations
 

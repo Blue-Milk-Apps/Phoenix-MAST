@@ -11,7 +11,7 @@ from domain.post_scan.utilities import first_non_empty
 
 
 @dataclass
-class FileInfo:
+class FileInfoBuilder:
     filename: str
     size: str
     md5: str
