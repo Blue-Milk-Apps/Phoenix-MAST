@@ -47,12 +47,14 @@ class FlutterReportDataBuilder(SourceReportDataBuilder):
     def _section(cls, name: str, key: str, data: Mapping[str, Any]) -> VulnerabilitySection:
         evidence = data.get(key) if isinstance(data.get(key), Mapping) else {}
         checks = tuple(
-            cls._check(str(check_name), value) for check_name, value in evidence.items() if isinstance(value, Mapping)
+            cls._check(name, str(check_name), value)
+            for check_name, value in evidence.items()
+            if isinstance(value, Mapping)
         )
         return VulnerabilitySection(name=name, findings_text="", checks=checks)
 
     @classmethod
-    def _check(cls, name: str, value: Mapping[str, Any]) -> SecurityCheck:
+    def _check(cls, section_name: str, name: str, value: Mapping[str, Any]) -> SecurityCheck:
         present = value.get("present")
         result = (
             CheckResult.PRESENT
@@ -62,13 +64,34 @@ class FlutterReportDataBuilder(SourceReportDataBuilder):
             else CheckResult.NOT_EVALUATED
         )
         check_severity = cls._canonical_severity(name, value)
+        display_name = cls._display_name(name)
+        explanation = str(value.get("explanation") or "").strip()
+        if not explanation:
+            explanation = cls._default_explanation(display_name, result)
+
+        compliance = str(value.get("compliance") or "").strip()
+        if not compliance:
+            compliance = cls._default_compliance(section_name)
+
+        evidence = str(value.get("evidence") or "").strip()
+        if not evidence:
+            details = value.get("details")
+            if isinstance(details, (list, tuple)):
+                evidence = "; ".join(str(item).strip() for item in details if str(item).strip())
+        if not evidence:
+            evidence = {
+                CheckResult.PRESENT: "Finding detected; location details unavailable.",
+                CheckResult.NOT_PRESENT: "No matching evidence identified.",
+                CheckResult.NOT_EVALUATED: "Required scan evidence unavailable.",
+            }[result]
+
         return SecurityCheck(
-            name=name,
+            name=display_name,
             severity=check_severity,
             result=result,
-            explanation=str(value.get("explanation") or ""),
-            evidence=str(value.get("evidence") or ""),
-            compliance=str(value.get("compliance") or ""),
+            explanation=explanation,
+            evidence=evidence,
+            compliance=compliance,
             remediation_link=str(value.get("remediation_link") or ""),
         )
 
