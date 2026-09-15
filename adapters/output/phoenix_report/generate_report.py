@@ -105,21 +105,25 @@ IOS_NETWORK_EVIDENCE_KEY_BY_CHECK = {
 IOS_DATA_EVIDENCE_KEY_BY_CHECK = {
     "application utilizes deprecated keychain attributes": "deprecated_keychain_attributes",
     "local data exposure: advertiser id stored insecurely": "advertiser_id_stored_insecurely",
-    "local data exposure: imei-labeled value stored insecurely": "imei_labeled_value_stored_insecurely",
-    "local data exposure: global write permissions (source code only)": "global_write_permissions",
-    "local data exposure: location data stored insecurely": "location_data_stored_insecurely",
+    "local data exposure: device imei stored insecurely": "imei_stored_insecurely",
+    "local data exposure: global write permissions": "global_write_permissions",
+    "local data exposure: gps latitude stored insecurely": "gps_latitude_stored_insecurely",
+    "local data exposure: gps longitude stored insecurely": "gps_longitude_stored_insecurely",
     "local data exposure: insecure hardcoded api keys": "hardcoded_api_keys_stored_insecurely",
     "local data exposure: insecure hardcoded passwords": "hardcoded_passwords_stored_insecurely",  # pragma: allowlist secret
     "local data exposure: sensitive values stored insecurely": "sensitive_values_stored_insecurely",
     "local data exposure: wifi ip address stored insecurely": "wifi_ip_stored_insecurely",
-    "keychain items accessible after first unlock": "keychain_items_accessible_after_first_unlock",
-    "sensitive data stored in user defaults": "sensitive_data_stored_in_user_defaults",
+    "local data exposure: wifi mac address stored insecurely": "wifi_mac_stored_insecurely",
+    "sensitive values stored in plaintext within the keychain": "keychain_plaintext_values",
+    "sensitive values stored insecurely within nsuserdefaults": "nsuserdefaults_sensitive_values",
     "local data exposure: advertiser id logged insecurely": "advertiser_id_logged_insecurely",
     "local data exposure: device imei logged insecurely": "imei_logged_insecurely",
-    "local data exposure: location data logged insecurely": "location_data_logged_insecurely",
+    "local data exposure: gps latitude logged insecurely": "gps_latitude_logged_insecurely",
+    "local data exposure: gps longitude logged insecurely": "gps_longitude_logged_insecurely",
     "local data exposure: sensitive data logged insecurely": "sensitive_data_logged_insecurely",
+    "local data exposure: sensitive values stored in memory": "sensitive_values_in_memory",
     "local data exposure: wifi mac address logged insecurely": "wifi_mac_logged_insecurely",
-    "sensitive data exposed through device keyboard cache (source code only)": "keyboard_cache_exposure",
+    "sensitive data exposed through device keyboard cache": "keyboard_cache_exposure",
 }
 IOS_RESILIENCE_EVIDENCE_KEY_BY_CHECK = {
     "biometric / local authentication bypass possible": "biometric_bypass_possible",
@@ -1049,7 +1053,7 @@ IOS_DATA_CHECK_SPECS = (
         "aliases": (),
     },
     {
-        "check": "Local Data Exposure: Global Write Permissions (Source Code Only)",
+        "check": "Local Data Exposure: Global Write Permissions",
         "severity": "High",
         "compliance": "MASVS-STORAGE-1, MASVS-PLATFORM-1; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
         "present_explanation": "An app-created file has world-writable permissions.",
@@ -1081,7 +1085,7 @@ IOS_DATA_CHECK_SPECS = (
         "compliance": "MASVS-STORAGE-1, MASVS-CRYPTO-2; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
         "present_explanation": "A hardcoded API key was found persisted to unprotected on-device storage.",
         "not_present_explanation": "No hardcoded API key was found persisted to unprotected on-device storage.",
-        "confidence_caveat": "Source findings identify data reaching storage; IPA-only findings are triage signals based on co-occurring symbols and strings and require source or runtime confirmation.",
+        "confidence_caveat": "Approximated via storage-API symbol presence near PII-keyword strings, not confirmed data flow.",
         "aliases": (),
     },
     {
@@ -1090,7 +1094,7 @@ IOS_DATA_CHECK_SPECS = (
         "compliance": "MASVS-STORAGE-1; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
         "present_explanation": "A hardcoded password was found persisted to unprotected on-device storage.",
         "not_present_explanation": "No hardcoded password was found persisted to unprotected on-device storage.",
-        "confidence_caveat": "Source findings identify data reaching storage; IPA-only findings are triage signals based on co-occurring symbols and strings and require source or runtime confirmation.",
+        "confidence_caveat": "Approximated via storage-API symbol presence near PII-keyword strings, not confirmed data flow.",
         "aliases": (),
     },
     {
@@ -1099,7 +1103,7 @@ IOS_DATA_CHECK_SPECS = (
         "compliance": "MASVS-STORAGE-1; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
         "present_explanation": "Another sensitive value was found persisted to unprotected on-device storage.",
         "not_present_explanation": "No other sensitive value was found persisted to unprotected on-device storage.",
-        "confidence_caveat": "Source findings identify data reaching storage; IPA-only findings are triage signals based on co-occurring symbols and strings and require source or runtime confirmation.",
+        "confidence_caveat": "Approximated via storage-API symbol presence near PII-keyword strings, not confirmed data flow.",
         "aliases": (),
     },
     {
@@ -1108,7 +1112,7 @@ IOS_DATA_CHECK_SPECS = (
         "compliance": "MASVS-STORAGE-1; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
         "present_explanation": "WiFi IP address is written to an unprotected on-device storage location.",
         "not_present_explanation": "WiFi IP address is not written to an unprotected on-device storage location.",
-        "confidence_caveat": "Source findings identify data reaching storage; IPA-only findings are triage signals based on co-occurring symbols and strings and require source or runtime confirmation.",
+        "confidence_caveat": "Approximated via storage-API symbol presence near PII-keyword strings, not confirmed data flow.",
         "aliases": (),
     },
     {
@@ -1130,16 +1134,16 @@ IOS_DATA_CHECK_SPECS = (
         "aliases": (),
     },
     {
-        "check": "Sensitive Data Stored in User Defaults",
+        "check": "Sensitive Values Stored Insecurely Within NSUserDefaults",
         "severity": "High",
         "compliance": "MASVS-STORAGE-1; MASTG-TEST-0300-0302; MASTG-KNOW-0093; legacy MSTG-STORAGE-1",
-        "present_explanation": "Sensitive data was found written to the app's local User Defaults preferences storage.",
+        "present_explanation": "A sensitive-looking key/value pair was found in the app's NSUserDefaults (UserDefaults) plist.",
         "not_present_explanation": (
-            "No sensitive data was found written to the app's local User Defaults preferences storage."
+            "No sensitive-looking key/value pair was found in the app's NSUserDefaults (UserDefaults) plist."
         ),
         "confidence_caveat": (
-            "Source findings identify a User Defaults write; IPA-only findings are triage signals based on "
-            "co-occurring symbols and strings and require source or runtime confirmation."
+            "Reliable where the actual preferences plist is extracted and inspected directly; otherwise "
+            "approximated via API-usage pattern."
         ),
         "aliases": (),
     },
@@ -1152,8 +1156,7 @@ IOS_DATA_CHECK_SPECS = (
         ),
         "not_present_explanation": "Advertiser ID is not written to the device console/log.",
         "confidence_caveat": (
-            "Source findings identify a value reaching a logging call; IPA-only findings are triage signals based on "
-            "co-occurring symbols and strings and require source or runtime confirmation."
+            "Detected via logging-API symbol presence near PII-keyword strings, not a confirmed log-output capture."
         ),
         "aliases": (),
     },
@@ -1164,8 +1167,7 @@ IOS_DATA_CHECK_SPECS = (
         "present_explanation": "Device IMEI is written to the device console/log.",
         "not_present_explanation": "Device IMEI is not written to the device console/log.",
         "confidence_caveat": (
-            "Source findings identify a value reaching a logging call; IPA-only findings are triage signals based on "
-            "co-occurring symbols and strings and require source or runtime confirmation."
+            "Detected via logging-API symbol presence near PII-keyword strings, not a confirmed log-output capture."
         ),
         "aliases": (),
     },
@@ -1198,8 +1200,7 @@ IOS_DATA_CHECK_SPECS = (
         "present_explanation": "Other sensitive data is written to the device console/log.",
         "not_present_explanation": "No other sensitive data is written to the device console/log.",
         "confidence_caveat": (
-            "Source findings identify a value reaching a logging call; IPA-only findings are triage signals based on "
-            "co-occurring symbols and strings and require source or runtime confirmation."
+            "Detected via logging-API symbol presence near PII-keyword strings, not a confirmed log-output capture."
         ),
         "aliases": (),
     },
@@ -1225,87 +1226,26 @@ IOS_DATA_CHECK_SPECS = (
         "present_explanation": "WiFi MAC address is written to the device console/log.",
         "not_present_explanation": "WiFi MAC address is not written to the device console/log.",
         "confidence_caveat": (
-            "Source findings identify a value reaching a logging call; IPA-only findings are triage signals based on "
-            "co-occurring symbols and strings and require source or runtime confirmation. BSSID can identify an "
-            "access point rather than the device's own MAC address."
+            "Detected via logging-API symbol presence near PII-keyword strings, not a confirmed log-output capture."
         ),
         "aliases": (),
     },
     {
-        "check": "Sensitive Data Exposed Through Device Keyboard Cache (Source Code Only)",
+        "check": "Sensitive Data Exposed Through Device Keyboard Cache",
         "severity": "Medium",
         "compliance": "MASVS-STORAGE-2; legacy MSTG-STORAGE-2",
         "present_explanation": (
-            "One or more sensitive input fields explicitly enable autocorrection or spell checking, or disable "
-            "secure text entry."
+            "One or more sensitive input fields do not disable the keyboard's autocorrect/predictive-text "
+            "cache (e.g. via isSecureTextEntry or UITextAutocorrectionTypeNo)."
         ),
         "not_present_explanation": (
-            "No sensitive input fields with an explicitly unsafe keyboard configuration were identified."
+            "Sensitive input fields disable the keyboard's autocorrect/predictive-text cache (e.g. via "
+            "isSecureTextEntry or UITextAutocorrectionTypeNo)."
         ),
-        "confidence_caveat": "Source-code-only detection of explicit unsafe input settings; IPA-only scans are not assessed.",
+        "confidence_caveat": "Low-confidence static heuristic -- absence of a security attribute is inferred, not directly observed.",
         "aliases": (),
     },
 )
-_IOS_RETIRED_DATA_CHECK_NAMES = {
-    "Local Data Exposure: WiFi MAC Address Stored Insecurely",
-    "Local Data Exposure: Sensitive Values Stored in Memory",
-}
-IOS_DATA_CHECK_SPECS = tuple(
-    {
-        **spec,
-        **(
-            {
-                "check": "Local Data Exposure: IMEI-Labeled Value Stored Insecurely",
-                "present_explanation": "An IMEI-labeled value is written to an unprotected on-device storage location.",
-                "not_present_explanation": "No IMEI-labeled value is written to an unprotected on-device storage location.",
-            }
-            if spec["check"] == "Local Data Exposure: Device IMEI Stored Insecurely"
-            else {}
-        ),
-        **(
-            {
-                "check": "Local Data Exposure: Location Data Stored Insecurely",
-                "present_explanation": "Location data is written to an unprotected on-device storage location.",
-                "not_present_explanation": "Location data is not written to an unprotected on-device storage location.",
-                "confidence_caveat": (
-                    "Source findings identify data reaching storage; IPA-only findings are triage signals based on "
-                    "co-occurring symbols and strings and require source or runtime confirmation."
-                ),
-            }
-            if spec["check"] == "Local Data Exposure: GPS Latitude Stored Insecurely"
-            else {}
-        ),
-        **(
-            {
-                "check": "Keychain Items Accessible After First Unlock",
-                "severity": "Medium",
-                "present_explanation": "One or more Keychain items are configured to be accessible after the first device unlock.",
-                "not_present_explanation": "No Keychain items configured to be accessible after the first device unlock were identified.",
-                "confidence_caveat": "Detected from Keychain accessibility configuration, not a direct read of stored values.",
-            }
-            if spec["check"] == "Sensitive Values Stored in Plaintext Within the Keychain"
-            else {}
-        ),
-        **(
-            {
-                "check": "Local Data Exposure: Location Data Logged Insecurely",
-                "present_explanation": "Location data is written to the device console/log.",
-                "not_present_explanation": "Location data is not written to the device console/log.",
-                "confidence_caveat": (
-                    "Source findings identify a value reaching a logging call; IPA-only findings are triage signals based "
-                    "on co-occurring symbols and strings and require source or runtime confirmation."
-                ),
-            }
-            if spec["check"] == "Local Data Exposure: GPS Latitude Logged Insecurely"
-            else {}
-        ),
-    }
-    for spec in IOS_DATA_CHECK_SPECS
-    if spec["check"] not in _IOS_RETIRED_DATA_CHECK_NAMES
-    and spec["check"] != "Local Data Exposure: GPS Longitude Stored Insecurely"
-    and spec["check"] != "Local Data Exposure: GPS Longitude Logged Insecurely"
-)
-
 IOS_RESILIENCE_CHECK_SPECS = (
     {
         "check": "Biometric / Local Authentication Bypass Possible",
