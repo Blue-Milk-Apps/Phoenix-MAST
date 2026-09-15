@@ -74,6 +74,10 @@ def test_combines_android_ios_metadata_and_functionality_rules() -> None:
     assert functionality.items["Push Notifications"]["present"] is True
     assert functionality.items["SMS"]["present"] is None
     assert "Web" not in functionality.items
+    assert set(functionality.platform_assessments["Camera"]) == {"android", "ios"}
+    assert "react_native" not in functionality.platform_assessments["Camera"]
+    assert set(functionality.platform_assessments["Keychain"]) == {"ios"}
+    assert set(functionality.platform_assessments["Maps"]) == {"android"}
 
 
 def test_absent_mobile_platform_does_not_block_negative_results() -> None:

@@ -106,6 +106,11 @@ scans remain visible, and multi-platform source checks expose one assessment
 row per platform. Source reports omit binary-only certificate and file-hash
 presentation.
 
+React Native reports retain `React Native` as the target identity. Functionality
+and checks backed by embedded native inventories are labeled `Android` or `iOS`
+in their platform-assessment rows; React Native is retained for JavaScript or
+runtime-only evidence.
+
 ## Native library requirements
 
 WeasyPrint depends on native text and graphics libraries in addition to the

@@ -4,6 +4,7 @@ from typing import Any, Mapping
 
 from adapters.output.phoenix_report.builders.react_native.source_check_catalog import REACT_NATIVE_SOURCE_SECTION_CHECKS
 from adapters.output.phoenix_report.builders.source import SourceReportDataBuilder
+from domain.post_scan.react_native.functionality import ReactNativeFunctionality
 from domain.report import (
     AssessmentStatus,
     EndpointDetails,
@@ -112,9 +113,15 @@ class ReactNativeReportDataBuilder(SourceReportDataBuilder):
         raw_assessments: object,
     ) -> FunctionalityDetails:
         rows = raw_assessments if isinstance(raw_assessments, Mapping) else {}
+        has_native_assessment = any(str(platform) in {"android", "ios"} for platform in rows)
         platform_assessments = tuple(
             assessment
             for platform_name, row in rows.items()
+            if not (
+                str(platform_name) == "react_native"
+                and str(name) in ReactNativeFunctionality.PLATFORM_BACKED_CAPABILITIES
+                and has_native_assessment
+            )
             if isinstance(row, Mapping) and (assessment := cls._platform_assessment(platform_name, row)) is not None
         )
         status = AssessmentStatus.aggregate(item.status for item in platform_assessments)

@@ -38,6 +38,10 @@ class ReactNativeFunctionality:
             )
         )
     )
+    # Use native platform labels when a capability has an Android or iOS
+    # counterpart in the scan. Keep React Native for capabilities that only
+    # exist at the JavaScript/runtime layer, such as navigation.
+    PLATFORM_BACKED_CAPABILITIES = frozenset((*AndroidFunctionality.KEYS, *IOS_FUNCTIONALITY_RULES.values()))
 
     def __init__(self, context: ReactNativeScanExtractionContext) -> None:
         evidence: dict[str, list[str]] = {capability: [] for capability in self.CAPABILITIES}
@@ -101,7 +105,10 @@ class ReactNativeFunctionality:
         platform_evidence: dict[str, dict[str, list[str]]],
     ) -> dict[str, dict[str, Any]]:
         rows: dict[str, dict[str, Any]] = {}
+        native_scopes = cls._evidence_scopes(context, capability)
         for scope in ("react_native", "android", "ios"):
+            if scope == "react_native" and native_scopes != ("react_native",):
+                continue
             if not cls._scope_applicable(context, scope) or capability not in cls._scope_capabilities(scope):
                 continue
             details = list(dict.fromkeys(platform_evidence[scope][capability]))
@@ -133,6 +140,19 @@ class ReactNativeFunctionality:
         if scope == "android":
             return frozenset(AndroidFunctionality.KEYS)
         return frozenset(IOS_FUNCTIONALITY_RULES.values())
+
+    @classmethod
+    def _evidence_scopes(cls, context: ReactNativeScanExtractionContext, capability: str) -> tuple[str, ...]:
+        """Choose native labels for capabilities backed by native inventories."""
+
+        if capability not in cls.PLATFORM_BACKED_CAPABILITIES:
+            return ("react_native",)
+        native_scopes = tuple(
+            scope
+            for scope in ("android", "ios")
+            if cls._scope_applicable(context, scope) and capability in cls._scope_capabilities(scope)
+        )
+        return native_scopes or ("react_native",)
 
     @staticmethod
     def _scope_applicable(context: ReactNativeScanExtractionContext, scope: str) -> bool:
@@ -195,7 +215,8 @@ class ReactNativeFunctionality:
             for package_name in sorted(declared & package_names):
                 detail = f"Declared React Native dependency: {package_name}."
                 evidence[capability].append(detail)
-                platform_evidence["react_native"][capability].append(detail)
+                for scope in ReactNativeFunctionality._evidence_scopes(context, capability):
+                    platform_evidence[scope][capability].append(detail)
 
     @staticmethod
     def _add_android_permissions(
@@ -277,7 +298,9 @@ class ReactNativeFunctionality:
                 explanation = cls._result_explanation(context, result)
                 if explanation:
                     evidence[capability].append(explanation)
-                    platform_evidence[scope][capability].append(explanation)
+                    target_scopes = cls._evidence_scopes(context, capability) if scope == "react_native" else (scope,)
+                    for target_scope in target_scopes:
+                        platform_evidence[target_scope][capability].append(explanation)
 
     @staticmethod
     def _result_explanation(context: ReactNativeScanExtractionContext, result: dict[str, Any]) -> str:

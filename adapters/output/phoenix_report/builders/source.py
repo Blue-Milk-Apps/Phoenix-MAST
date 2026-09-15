@@ -174,8 +174,8 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
             evidence=str(entry.get("evidence") or ""),
             compliance=str(entry.get("compliance") or definition.compliance),
             remediation_link=str(entry.get("remediation_link") or ""),
-            platform_assessments=cls._platform_assessments(platform_rows),
-            status=cls._aggregate_status(platform_rows),
+            platform_assessments=cls._platform_assessments(platform_rows, definition.applicable_platforms),
+            status=cls._aggregate_status(platform_rows, definition.applicable_platforms),
         )
 
     @staticmethod
@@ -231,7 +231,10 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
         return {}
 
     @staticmethod
-    def _platform_assessments(rows: object) -> tuple[PlatformAssessment, ...]:
+    def _platform_assessments(
+        rows: object,
+        allowed_platforms: frozenset[ReportPlatform] | None = None,
+    ) -> tuple[PlatformAssessment, ...]:
         if not isinstance(rows, Mapping):
             return ()
         assessments: list[PlatformAssessment] = []
@@ -242,6 +245,8 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
                 platform = ReportPlatform(str(platform_name))
                 status = AssessmentStatus(str(row.get("status") or ""))
             except ValueError:
+                continue
+            if allowed_platforms and platform not in allowed_platforms:
                 continue
             evidence = row.get("evidence")
             evidence = evidence if isinstance(evidence, (list, tuple)) else ()
@@ -256,8 +261,12 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
         return tuple(assessments)
 
     @classmethod
-    def _aggregate_status(cls, rows: object) -> AssessmentStatus | None:
-        assessments = cls._platform_assessments(rows)
+    def _aggregate_status(
+        cls,
+        rows: object,
+        allowed_platforms: frozenset[ReportPlatform] | None = None,
+    ) -> AssessmentStatus | None:
+        assessments = cls._platform_assessments(rows, allowed_platforms)
         return AssessmentStatus.aggregate(item.status for item in assessments) if assessments else None
 
     @staticmethod
