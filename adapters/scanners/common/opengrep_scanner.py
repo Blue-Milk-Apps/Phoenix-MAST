@@ -98,6 +98,8 @@ class OpenGrepScanner(ScannerPort):
         return None
 
     def _has_rule_files(self, rules_path: Path) -> bool:
+        if rules_path.is_file():
+            return rules_path.suffix.lower() in {".yml", ".yaml"}
         return any(path.is_file() and path.suffix.lower() in {".yml", ".yaml"} for path in rules_path.rglob("*"))
 
     def _timeout_seconds(self) -> int:
@@ -300,7 +302,8 @@ class OpenGrepScanner(ScannerPort):
     @staticmethod
     def _configured_rule_ids(rules_path: Path) -> list[str]:
         rule_ids: set[str] = set()
-        for path in sorted(rules_path.rglob("*")):
+        paths = (rules_path,) if rules_path.is_file() else tuple(sorted(rules_path.rglob("*")))
+        for path in paths:
             if not path.is_file() or path.suffix.lower() not in {".yml", ".yaml"}:
                 continue
             for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():

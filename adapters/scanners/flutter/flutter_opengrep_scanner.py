@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from adapters.scanners.common import OpenGrepScanner
+from adapters.scanners.ios import IOSSectionOpenGrepScanner
 from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
 
@@ -145,7 +146,12 @@ class FlutterOpenGrepScanner(ScannerPort):
             base_metadata["reason"] = f"No {scope} OpenGrep rules directory was found."
             return base_metadata, [], [], ""
 
-        result = OpenGrepScanner(rules_path=rules_path, scan_paths=scan_paths).scan(config)[0]
+        scanner = (
+            IOSSectionOpenGrepScanner(rules_directory=rules_path, scan_paths=scan_paths)
+            if scope == "ios"
+            else OpenGrepScanner(rules_path=rules_path, scan_paths=scan_paths)
+        )
+        result = scanner.scan(config)[0]
         try:
             payload = json.loads(result.raw_output)
         except json.JSONDecodeError:
@@ -172,7 +178,10 @@ class FlutterOpenGrepScanner(ScannerPort):
             if isinstance(rule_ids, list)
             else set()
         )
-        base_metadata.update({"status": "success", "configured_rule_ids": configured})
+        scope_status = str(report_metadata.get("status", "success"))
+        if scope_status == "complete":
+            scope_status = "success"
+        base_metadata.update({"status": scope_status, "configured_rule_ids": configured})
         findings = [
             {**finding, "phoenix_scope": scope} for finding in report.get("results", []) if isinstance(finding, dict)
         ]

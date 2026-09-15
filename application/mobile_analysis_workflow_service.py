@@ -45,6 +45,7 @@ from adapters.scanners.common import (
 )
 from adapters.scanners.flutter import FlutterOpenGrepScanner, FlutterSourceMetadataScanner
 from adapters.scanners.ios import (
+    IOSSectionOpenGrepScanner,
     IpswScanner,
     LIEFScanner,
     PlistBinaryScanner,
@@ -238,6 +239,11 @@ class MobileAnalysisWorkflowService:
             elif scan_config.stack == "REACT_NATIVE":
                 opengrep_scanner = ReactNativeOpenGrepScanner(
                     react_native_rules_path=Path(open_grep_rules_path),
+                )
+            elif scan_config.platform == "IOS":
+                opengrep_scanner = IOSSectionOpenGrepScanner(
+                    rules_directory=Path(open_grep_rules_path),
+                    scan_paths=opengrep_scan_paths,
                 )
             else:
                 opengrep_scanner = OpenGrepScanner(
