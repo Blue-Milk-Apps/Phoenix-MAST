@@ -322,13 +322,9 @@
     <tr>
       <td>{{ name }}</td>
       <td>
-        {% if f.status == 'present' %}{{ risk_badge('Info', label='Present') }}
-        {% elif f.status == 'not_present' %}{{ risk_badge('N/A', label='Not Present') }}
-        {% elif f.status == 'partial' %}{{ risk_badge('Partial', label='Partial') }}
-        {% elif f.status == 'not_applicable' %}{{ risk_badge('N/A', label='Not Applicable') }}
-        {% elif f.status == 'not_evaluated' %}{{ risk_badge('N/A', label='Not Evaluated') }}
-        {% elif f.present is none %}{{ risk_badge('N/A', label='Not Evaluated') }}
-        {% else %}{{ risk_badge('Info' if f.present else 'N/A', label=('Present' if f.present else 'Not Present')) }}{% endif %}
+        {% if f.status %}{{ assessment_badge(f.status) }}
+        {% elif f.present is none %}{{ assessment_badge('not_evaluated') }}
+        {% else %}{{ assessment_badge('present' if f.present else 'not_present') }}{% endif %}
       </td>
       <td>
         {{ f.explanation }}

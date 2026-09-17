@@ -95,10 +95,12 @@ p { margin: 0 0 8px 0; }
 .badge-medium { background: #e08e0b; }
 .badge-low, .badge-info { background: #2980b9; }
 .badge-partial { background: #8e44ad; }
-.badge-secure, .badge-notpresent { background: #27ae60; }
+.badge-secure, .badge-not-present { background: #27ae60; }
 .badge-hotspot { background: #444444; }
 .badge-variable { background: #6c5ce7; }
 .badge-na { background: #999999; }
+.badge-not-evaluated { background: #7f8c8d; }
+.badge-not-applicable { background: #999999; }
 
 /* ---------- Tables ---------- */
 table { width: 100%; border-collapse: collapse; margin: 10px 0 16px 0; }

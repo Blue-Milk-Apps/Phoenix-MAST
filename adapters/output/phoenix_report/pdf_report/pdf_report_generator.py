@@ -9,7 +9,7 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
-from adapters.output.phoenix_report.common import result_badge, risk_badge
+from adapters.output.phoenix_report.common import assessment_badge, result_badge, risk_badge
 from adapters.output.phoenix_report.pdf_report.android import map_android_binary_details, map_native_android_details
 from adapters.output.phoenix_report.pdf_report.common.charts import build_charts
 from adapters.output.phoenix_report.pdf_report.common.images import (
@@ -55,6 +55,7 @@ class PdfReportGenerator(ReportGeneratorPort):
         environment = Environment(loader=FileSystemLoader(str(base_dir / "templates")))
         environment.globals["risk_badge"] = risk_badge
         environment.globals["result_badge"] = result_badge
+        environment.globals["assessment_badge"] = assessment_badge
         html = environment.get_template("report.html.jinja").render(
             data=data,
             presentation=asdict(presentation),
