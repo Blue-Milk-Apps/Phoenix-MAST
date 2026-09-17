@@ -90,5 +90,5 @@ RUN useradd -m -u 1001 phoenix \
 USER phoenix
 WORKDIR /workspace
 
-ENTRYPOINT ["phoenix"]
+ENTRYPOINT [""]
 CMD ["--help"]

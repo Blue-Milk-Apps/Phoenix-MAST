@@ -49,6 +49,7 @@ class IOSRuleFile:
     path: Path
     section: IOSRuleSection
     rule_ids: tuple[str, ...]
+    rule_documents: tuple[dict[str, Any], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -91,6 +92,22 @@ class IOSRuleInventory:
         if errors:
             raise IOSRuleInventoryError("Invalid iOS OpenGrep rule inventory: " + "; ".join(errors))
 
+    def write_single_rule(self, rule_id: str, output_directory: Path) -> Path:
+        """Write one catalog rule to a temporary OpenGrep configuration file."""
+
+        for rule_file in self.files:
+            for rule in rule_file.rule_documents:
+                if rule.get("id") != rule_id:
+                    continue
+                output_directory.mkdir(parents=True, exist_ok=True)
+                output_path = output_directory / f"{rule_id.replace('/', '_')}.yml"
+                output_path.write_text(
+                    yaml.safe_dump({"rules": [rule]}, sort_keys=False),
+                    encoding="utf-8",
+                )
+                return output_path
+        raise IOSRuleInventoryError(f"Rule ID is not present in the iOS inventory: {rule_id}")
+
     @staticmethod
     def _parse_file(path: Path) -> IOSRuleFile:
         section = IOSRuleSection.from_file_name(path.stem)
@@ -103,6 +120,7 @@ class IOSRuleInventory:
             raise IOSRuleInventoryError(f"iOS rule file {path} must contain a top-level rules list.")
 
         rule_ids: list[str] = []
+        rule_documents: list[dict[str, Any]] = []
         section_errors: list[str] = []
         for index, rule in enumerate(document["rules"], start=1):
             rule_id = rule.get("id") if isinstance(rule, dict) else None
@@ -110,6 +128,7 @@ class IOSRuleInventory:
                 section_errors.append(f"{path.name} rule {index} has no non-empty id")
                 continue
             rule_ids.append(rule_id.strip())
+            rule_documents.append(rule)
 
             metadata = rule.get("metadata") if isinstance(rule, dict) else None
             phoenix_metadata: Any = metadata.get("phoenix") if isinstance(metadata, dict) else None
@@ -121,7 +140,12 @@ class IOSRuleInventory:
 
         if section_errors:
             raise IOSRuleInventoryError("Invalid iOS rule sections: " + "; ".join(section_errors))
-        return IOSRuleFile(path=path, section=section, rule_ids=tuple(rule_ids))
+        return IOSRuleFile(
+            path=path,
+            section=section,
+            rule_ids=tuple(rule_ids),
+            rule_documents=tuple(rule_documents),
+        )
 
 
 def validate_ios_rule_inventory(rules_directory: Path) -> IOSRuleInventory:
