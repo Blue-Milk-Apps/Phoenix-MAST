@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import Iterable
 
 
 class RiskLevel(StrEnum):
@@ -31,12 +32,29 @@ class CheckSeverity(StrEnum):
     NOT_APPLICABLE = "not_applicable"
 
 
-class CheckResult(StrEnum):
-    """Assessment outcome for an individual security check."""
+class AssessmentStatus(StrEnum):
+    """Outcome of assessing one report item on one platform."""
 
     PRESENT = "present"
     NOT_PRESENT = "not_present"
+    PARTIAL = "partial"
     NOT_EVALUATED = "not_evaluated"
+    NOT_APPLICABLE = "not_applicable"
+
+    @classmethod
+    def aggregate(cls, statuses: Iterable["AssessmentStatus"]) -> "AssessmentStatus":
+        """Combine platform outcomes into one report-level outcome."""
+
+        applicable = tuple(status for status in statuses if status != cls.NOT_APPLICABLE)
+        if not applicable:
+            return cls.NOT_APPLICABLE
+        if cls.PRESENT in applicable:
+            return cls.PRESENT
+        if all(status == cls.NOT_PRESENT for status in applicable):
+            return cls.NOT_PRESENT
+        if all(status == cls.NOT_EVALUATED for status in applicable):
+            return cls.NOT_EVALUATED
+        return cls.PARTIAL
 
 
 class ReportPlatform(StrEnum):
@@ -100,16 +118,28 @@ class ReportMetadata:
 
 
 @dataclass(frozen=True)
+class PlatformAssessment:
+    """Assessment outcome and supporting details for one platform."""
+
+    platform: ReportPlatform
+    status: AssessmentStatus
+    explanation: str = ""
+    evidence: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class SecurityCheck:
     """A single assessed security control."""
 
     name: str
     severity: CheckSeverity
-    result: CheckResult
+    result: AssessmentStatus
     explanation: str
     evidence: str = ""
     compliance: str = ""
     remediation_link: str = ""
+    platform_assessments: tuple[PlatformAssessment, ...] = ()
+    status: AssessmentStatus | None = None
 
 
 @dataclass(frozen=True)
@@ -456,6 +486,8 @@ class FunctionalityDetails:
     name: str
     present: bool | None
     explanation: str = ""
+    platform_assessments: tuple[PlatformAssessment, ...] = ()
+    status: AssessmentStatus | None = None
 
 
 @dataclass(frozen=True)

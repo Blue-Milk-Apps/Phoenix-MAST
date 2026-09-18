@@ -6,12 +6,12 @@ from domain.report.models import (
     AndroidApplicationDetails,
     AppComponentSummary,
     EndpointDetails,
-    FunctionalityDetails,
     HardcodedSecretDetails,
     HardcodedUrlDetails,
     HardcodedValuesDetails,
     NativeAndroidReportDetails,
     PermissionDetails,
+    ReportPlatform,
     ReportTargetKind,
 )
 
@@ -50,11 +50,14 @@ class NativeAndroidReportDataBuilder(SourceReportDataBuilder):
                 exported_providers=self._integer(components.get("exported_providers")),
             ),
             functionality=tuple(
-                FunctionalityDetails(
-                    name=str(name),
-                    present=item.get("present"),
-                    explanation=str(item.get("explanation") or "")
-                    or self._functionality_explanation(str(name), item.get("present")),
+                self._single_platform_functionality(
+                    name,
+                    {
+                        **item,
+                        "explanation": str(item.get("explanation") or "")
+                        or self._functionality_explanation(str(name), item.get("present")),
+                    },
+                    ReportPlatform.ANDROID,
                 )
                 for name, item in functionality.items()
                 if isinstance(item, Mapping)

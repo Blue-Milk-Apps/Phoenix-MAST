@@ -48,6 +48,33 @@ def test_scans_each_flutter_platform_with_only_its_scoped_rules(tmp_path: Path, 
         FakeOpenGrepScanner,
     )
 
+    class FakeIOSSectionOpenGrepScanner:
+        def __init__(self, rules_directory=None, scan_paths=None):
+            _ = rules_directory
+            calls.append(("ios", list(scan_paths)))
+
+        def scan(self, config):
+            _ = config
+            return [
+                _result(
+                    {
+                        "success": True,
+                        "results": [{"check_id": rule_ids["ios"]}],
+                        "errors": [],
+                        "scan_metadata": {
+                            "status": "complete",
+                            "tool_version": "test-version",
+                            "configured_rule_ids": [rule_ids["ios"]],
+                        },
+                    }
+                )
+            ]
+
+    monkeypatch.setattr(
+        "adapters.scanners.flutter.flutter_opengrep_scanner.IOSSectionOpenGrepScanner",
+        FakeIOSSectionOpenGrepScanner,
+    )
+
     result = FlutterOpenGrepScanner(
         rules_root / "flutter",
         android_rules_path=rules_root / "android",

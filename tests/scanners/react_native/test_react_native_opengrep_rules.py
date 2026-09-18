@@ -13,6 +13,7 @@ from domain.post_scan.react_native import INVENTORY_RULE_ID_TO_KEY, REACT_NATIVE
 ROOT = Path(__file__).parents[3]
 RULES_PATH = ROOT / "rules" / "react_native"
 FIXTURES_PATH = Path(__file__).parent / "fixtures" / "opengrep"
+OPENGREP_AVAILABLE = all(shutil.which(executable) for executable in ("opengrep", "opengrep-core"))
 
 
 @pytest.mark.skipif(not RULES_PATH.is_dir(), reason="Local React Native rules are not installed")
@@ -21,8 +22,8 @@ def test_local_react_native_rule_ids_match_registry() -> None:
 
 
 @pytest.mark.skipif(
-    not RULES_PATH.is_dir() or shutil.which("opengrep") is None,
-    reason="Local React Native rules or the OpenGrep executable are not installed",
+    not RULES_PATH.is_dir() or not OPENGREP_AVAILABLE,
+    reason="Local React Native rules or both OpenGrep executables are not installed",
 )
 def test_react_native_rules_match_positive_fixture_and_ignore_negative_fixture() -> None:
     positive = _scan(FIXTURES_PATH / "positive.tsx")

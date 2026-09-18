@@ -321,8 +321,21 @@
     {% for name, f in data.functionality.items() %}
     <tr>
       <td>{{ name }}</td>
-      <td>{% if f.present is none %}{{ risk_badge('N/A', label='Not Evaluated') }}{% else %}{{ risk_badge('Info' if f.present else 'N/A', label=('Present' if f.present else 'Not Present')) }}{% endif %}</td>
-      <td>{{ f.explanation }}</td>
+      <td>
+        {% if f.status %}{{ assessment_badge(f.status) }}
+        {% elif f.present is none %}{{ assessment_badge('not_evaluated') }}
+        {% else %}{{ assessment_badge('present' if f.present else 'not_present') }}{% endif %}
+      </td>
+      <td>
+        {{ f.explanation }}
+        {% if f.platform_assessments %}
+        <div class="small">
+          {% for assessment in f.platform_assessments %}
+          {{ assessment.platform|replace('_', ' ')|title }}: {{ assessment.status|replace('_', ' ')|title }}{% if not loop.last %}; {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+      </td>
     </tr>
     {% endfor %}
   </table>
@@ -388,7 +401,17 @@
       <td>{{ c.check }}</td>
       <td>{{ result_badge(c.result) }}</td>
       <td>{{ risk_badge(c.severity) }}</td>
-      <td>{{ c.explanation }}{% if c.remediation_link %}<br><span class="small">Remediation: {{ c.remediation_link }}</span>{% endif %}{% if c.confidence_caveat and show_confidence_caveats %}<br><span class="small confidence-caveat">⚠ {{ c.confidence_caveat }}</span>{% endif %}</td>
+      <td>
+        {{ c.explanation }}
+        {% if c.platform_assessments %}
+        <div class="small">
+          {% for assessment in c.platform_assessments %}
+          {{ assessment.platform|replace('_', ' ')|title }}: {{ assessment.status }}{% if not loop.last %}; {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if c.remediation_link %}<br><span class="small">Remediation: {{ c.remediation_link }}</span>{% endif %}{% if c.confidence_caveat and show_confidence_caveats %}<br><span class="small confidence-caveat">⚠ {{ c.confidence_caveat }}</span>{% endif %}
+      </td>
       <td class="small">{{ c.compliance }}</td>
       <td class="small">{{ c.evidence }}</td>
     </tr>

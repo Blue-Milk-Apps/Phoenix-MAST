@@ -9,8 +9,13 @@ import pytest
 
 from domain.post_scan.flutter import FLUTTER_RULE_IDS
 
+OPENGREP_AVAILABLE = all(shutil.which(executable) for executable in ("opengrep", "opengrep-core"))
 
-@pytest.mark.skipif(shutil.which("opengrep") is None, reason="OpenGrep is not installed")
+
+@pytest.mark.skipif(
+    not OPENGREP_AVAILABLE,
+    reason="OpenGrep and opengrep-core are not both installed",
+)
 def test_flutter_rules_match_positive_fixture_and_ignore_negative_fixture() -> None:
     root = Path(__file__).parents[3]
     rules_path = root / "rules" / "flutter"

@@ -9,7 +9,7 @@ import sys
 from dataclasses import asdict
 from pathlib import Path
 
-from adapters.output.phoenix_report.common import result_badge, risk_badge
+from adapters.output.phoenix_report.common import assessment_badge, result_badge, risk_badge
 from adapters.output.phoenix_report.pdf_report.android import map_android_binary_details, map_native_android_details
 from adapters.output.phoenix_report.pdf_report.common.charts import build_charts
 from adapters.output.phoenix_report.pdf_report.common.images import (
@@ -55,6 +55,7 @@ class PdfReportGenerator(ReportGeneratorPort):
         environment = Environment(loader=FileSystemLoader(str(base_dir / "templates")))
         environment.globals["risk_badge"] = risk_badge
         environment.globals["result_badge"] = result_badge
+        environment.globals["assessment_badge"] = assessment_badge
         html = environment.get_template("report.html.jinja").render(
             data=data,
             presentation=asdict(presentation),
@@ -74,7 +75,23 @@ class PdfReportGenerator(ReportGeneratorPort):
     def _merged_presentation_data(cls, report_data: ReportData) -> dict[str, object]:
         base_dir = Path(__file__).parent.parent
         base_template = json.loads((base_dir / "data" / "blank_template.json").read_text(encoding="utf-8"))
-        return cls._merge(base_template, cls._presentation_data(report_data))
+        presentation_data = cls._presentation_data(report_data)
+        merged = cls._merge(base_template, presentation_data)
+        # Typed platform details are authoritative for these collections.  A
+        # recursive merge would retain unrelated placeholder rows from the
+        # shared template (for example Android functionality in an iOS report).
+        for key in (
+            "functionality",
+            "third_party_sdks",
+            "hardcoded_values",
+            "permissions",
+            "endpoints",
+            "url_schemes",
+            "ipa_binary_protections",
+        ):
+            if key in presentation_data:
+                merged[key] = copy.deepcopy(presentation_data[key])
+        return merged
 
     @staticmethod
     def _merge(base: object, override: object) -> object:
@@ -132,7 +149,18 @@ class PdfReportGenerator(ReportGeneratorPort):
                     "checks": [
                         {
                             "check": check.name,
-                            "result": check.result.value.replace("_", " ").title(),
+                            "result": (check.status.value if check.status else check.result.value)
+                            .replace("_", " ")
+                            .title(),
+                            "platform_assessments": [
+                                {
+                                    "platform": assessment.platform.value,
+                                    "status": assessment.status.value.replace("_", " ").title(),
+                                    "explanation": assessment.explanation,
+                                    "evidence": list(assessment.evidence),
+                                }
+                                for assessment in check.platform_assessments
+                            ],
                             "severity": check.severity.value.title(),
                             "explanation": check.explanation,
                             "evidence": check.evidence,
