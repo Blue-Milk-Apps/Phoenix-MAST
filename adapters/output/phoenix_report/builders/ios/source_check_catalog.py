@@ -1,9 +1,11 @@
 """Canonical iOS source checks and their evidence bindings."""
 
-from adapters.output.phoenix_report.builders.source import SourceCheckDefinition
-from domain.report import CheckSeverity
+from dataclasses import replace
 
-IOS_SOURCE_SECTION_CHECKS = (
+from adapters.output.phoenix_report.builders.source import SourceCheckDefinition
+from domain.report import CheckSeverity, ReportPlatform
+
+_IOS_SOURCE_SECTION_CHECKS = (
     (
         "Code",
         "code_evidence",
@@ -412,4 +414,14 @@ IOS_SOURCE_SECTION_CHECKS = (
             ),
         ),
     ),
+)
+
+
+IOS_SOURCE_SECTION_CHECKS = tuple(
+    (
+        section,
+        evidence_key,
+        tuple(replace(definition, applicable_platforms=frozenset({ReportPlatform.IOS})) for definition in definitions),
+    )
+    for section, evidence_key, definitions in _IOS_SOURCE_SECTION_CHECKS
 )

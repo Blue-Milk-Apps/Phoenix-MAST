@@ -3,7 +3,7 @@
 from adapters.output.phoenix_report.builders.android.source_check_catalog import ANDROID_SOURCE_SECTION_CHECKS
 from adapters.output.phoenix_report.builders.ios.source_check_catalog import IOS_SOURCE_SECTION_CHECKS
 from adapters.output.phoenix_report.builders.source import SourceCheckDefinition
-from domain.report import CheckSeverity
+from domain.report import CheckSeverity, ReportPlatform
 
 
 def _definitions_by_key(
@@ -20,6 +20,7 @@ _REACT_NATIVE_DEFINITIONS = {
         name="Uses Dynamic Code Execution",
         evidence_key="uses_dynamic_code_execution",
         severity=CheckSeverity.HIGH,
+        applicable_platforms=frozenset({ReportPlatform.REACT_NATIVE}),
         compliance="MASVS-CODE-3",
         present_explanation="The app executes dynamically loaded or generated code.",
         not_present_explanation="No dynamic code execution was identified in the app.",
@@ -28,6 +29,7 @@ _REACT_NATIVE_DEFINITIONS = {
         name="Insecure WebView Configuration",
         evidence_key="insecure_webview_configuration",
         severity=CheckSeverity.HIGH,
+        applicable_platforms=frozenset({ReportPlatform.REACT_NATIVE}),
         compliance="MASVS-PLATFORM-2; MASVS-NETWORK-1",
         present_explanation="The app contains a WebView configuration that weakens origin or content security.",
         not_present_explanation="No insecure WebView configuration was identified in the app.",
@@ -36,6 +38,7 @@ _REACT_NATIVE_DEFINITIONS = {
         name="Copies Sensitive Information into the Clipboard Without User Consent",
         evidence_key="copies_sensitive_information_into_clipboard_without_user_consent",
         severity=CheckSeverity.HIGH,
+        applicable_platforms=frozenset({ReportPlatform.REACT_NATIVE}),
         compliance="MASVS-STORAGE-2",
         present_explanation="The app copies sensitive information into the clipboard without the user's consent.",
         not_present_explanation="The app does not copy sensitive information into the clipboard without the user's consent.",

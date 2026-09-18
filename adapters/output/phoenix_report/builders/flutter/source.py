@@ -7,7 +7,7 @@ from adapters.output.phoenix_report.builders.ios.source_check_catalog import IOS
 from adapters.output.phoenix_report.builders.source import SourceReportDataBuilder
 from domain.post_scan.flutter.rule_registry import REPORT_RULE_IDS_BY_SECTION, RULE_SEVERITIES
 from domain.report import (
-    CheckResult,
+    AssessmentStatus,
     CheckSeverity,
     EndpointDetails,
     FindingSeverity,
@@ -27,6 +27,8 @@ from domain.report import (
     HardcodedUrlDetails,
     HardcodedValuesDetails,
     PermissionDetails,
+    PlatformAssessment,
+    ReportPlatform,
     ReportTargetKind,
     SecurityCheck,
     VulnerabilitySection,
@@ -54,14 +56,20 @@ class FlutterReportDataBuilder(SourceReportDataBuilder):
         return VulnerabilitySection(name=name, findings_text="", checks=checks)
 
     @classmethod
-    def _check(cls, section_name: str, name: str, value: Mapping[str, Any]) -> SecurityCheck:
+    def _check(
+        cls,
+        section_name: str,
+        name: str,
+        value: Mapping[str, Any],
+        platform_rows: object = None,
+    ) -> SecurityCheck:
         present = value.get("present")
         result = (
-            CheckResult.PRESENT
+            AssessmentStatus.PRESENT
             if present is True
-            else CheckResult.NOT_PRESENT
+            else AssessmentStatus.NOT_PRESENT
             if present is False
-            else CheckResult.NOT_EVALUATED
+            else AssessmentStatus.NOT_EVALUATED
         )
         check_severity = cls._canonical_severity(name, value)
         display_name = cls._display_name(name)
@@ -80,9 +88,9 @@ class FlutterReportDataBuilder(SourceReportDataBuilder):
                 evidence = "; ".join(str(item).strip() for item in details if str(item).strip())
         if not evidence:
             evidence = {
-                CheckResult.PRESENT: "Finding detected; location details unavailable.",
-                CheckResult.NOT_PRESENT: "No matching evidence identified.",
-                CheckResult.NOT_EVALUATED: "Required scan evidence unavailable.",
+                AssessmentStatus.PRESENT: "Finding detected; location details unavailable.",
+                AssessmentStatus.NOT_PRESENT: "No matching evidence identified.",
+                AssessmentStatus.NOT_EVALUATED: "Required scan evidence unavailable.",
             }[result]
 
         return SecurityCheck(
@@ -93,6 +101,8 @@ class FlutterReportDataBuilder(SourceReportDataBuilder):
             evidence=evidence,
             compliance=compliance,
             remediation_link=str(value.get("remediation_link") or ""),
+            platform_assessments=cls._platform_assessments(platform_rows),
+            status=cls._aggregate_status(platform_rows),
         )
 
     @classmethod
@@ -146,7 +156,7 @@ class FlutterReportDataBuilder(SourceReportDataBuilder):
         counts = {severity: 0 for severity in ("critical", "high", "medium", "low", "info", "secure")}
         for section in sections:
             for check in section.checks:
-                if check.result == CheckResult.PRESENT:
+                if check.result == AssessmentStatus.PRESENT:
                     counts[check.severity.value] += 1
         return FindingSeverity(**counts)
 
@@ -175,11 +185,7 @@ class FlutterReportDataBuilder(SourceReportDataBuilder):
             flutter_constraint=str(sdk.get("flutter_constraint") or ""),
             supported_platforms=tuple(str(name) for name, enabled in platforms.items() if enabled is True),
             dependencies=dependency_items,
-            functionality=tuple(
-                FunctionalityDetails(str(name), value.get("present"), str(value.get("explanation") or ""))
-                for name, value in FlutterReportDataBuilder._mapping(data, "functionality").items()
-                if isinstance(value, Mapping)
-            ),
+            functionality=FlutterReportDataBuilder._functionality(data),
             permissions=tuple(
                 PermissionDetails(
                     permission=str(item.get("permission") or item.get("name") or ""),
@@ -203,6 +209,55 @@ class FlutterReportDataBuilder(SourceReportDataBuilder):
                 if isinstance(item, Mapping)
             ),
             presentation=FlutterReportDataBuilder._presentation(data),
+        )
+
+    @classmethod
+    def _functionality(cls, data: Mapping[str, Any]) -> tuple[FunctionalityDetails, ...]:
+        functionality = cls._mapping(data, "functionality")
+        raw_assessments = data.get("functionality_platform_assessments")
+        if not isinstance(raw_assessments, Mapping):
+            inventory = cls._mapping(data, "platform_inventory")
+            raw_assessments = inventory.get("functionality_platform_assessments")
+        assessments = raw_assessments if isinstance(raw_assessments, Mapping) else {}
+        details: list[FunctionalityDetails] = []
+        for name, value in functionality.items():
+            if not isinstance(value, Mapping):
+                continue
+            rows = assessments.get(name)
+            rows = rows if isinstance(rows, Mapping) else {}
+            platform_assessments = tuple(
+                assessment
+                for platform_name, row in rows.items()
+                if isinstance(row, Mapping) and (assessment := cls._platform_assessment(platform_name, row)) is not None
+            )
+            status = AssessmentStatus.aggregate(item.status for item in platform_assessments)
+            details.append(
+                FunctionalityDetails(
+                    name=str(name),
+                    present=value.get("present"),
+                    explanation=str(value.get("explanation") or ""),
+                    platform_assessments=platform_assessments,
+                    status=status,
+                )
+            )
+        return tuple(details)
+
+    @classmethod
+    def _platform_assessment(
+        cls,
+        platform_name: object,
+        row: Mapping[str, Any],
+    ) -> PlatformAssessment | None:
+        try:
+            platform = ReportPlatform(str(platform_name))
+            status = AssessmentStatus(str(row.get("status") or ""))
+        except ValueError:
+            return None
+        return PlatformAssessment(
+            platform=platform,
+            status=status,
+            explanation=str(row.get("explanation") or ""),
+            evidence=tuple(cls._strings(row.get("evidence"))),
         )
 
     @classmethod

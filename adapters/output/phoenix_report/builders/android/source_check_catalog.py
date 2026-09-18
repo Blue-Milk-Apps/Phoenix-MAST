@@ -1,9 +1,11 @@
 """Canonical native Android source checks and their evidence bindings."""
 
-from adapters.output.phoenix_report.builders.source import SourceCheckDefinition
-from domain.report import CheckSeverity
+from dataclasses import replace
 
-ANDROID_SOURCE_SECTION_CHECKS = (
+from adapters.output.phoenix_report.builders.source import SourceCheckDefinition
+from domain.report import CheckSeverity, ReportPlatform
+
+_ANDROID_SOURCE_SECTION_CHECKS = (
     (
         "Code",
         "code_evidence",
@@ -250,4 +252,16 @@ ANDROID_SOURCE_SECTION_CHECKS = (
             ),
         ),
     ),
+)
+
+
+ANDROID_SOURCE_SECTION_CHECKS = tuple(
+    (
+        section,
+        evidence_key,
+        tuple(
+            replace(definition, applicable_platforms=frozenset({ReportPlatform.ANDROID})) for definition in definitions
+        ),
+    )
+    for section, evidence_key, definitions in _ANDROID_SOURCE_SECTION_CHECKS
 )

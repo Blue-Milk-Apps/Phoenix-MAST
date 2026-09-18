@@ -15,8 +15,8 @@ from domain.report import (
     AndroidBinaryReportDetails,
     AppComponentSummary,
     AppDetails,
+    AssessmentStatus,
     CertificateDetails,
-    CheckResult,
     CheckSeverity,
     EndpointDetails,
     FileDetails,
@@ -29,6 +29,7 @@ from domain.report import (
     PermissionDetails,
     ReportData,
     ReportMetadata,
+    ReportPlatform,
     ReportTargetKind,
     RiskLevel,
     RiskSummary,
@@ -63,6 +64,7 @@ class AndroidBinaryReportDataBuilder(BinaryReportDataBuilder):
             self._section(name, evidence_key, checks, post_scan_data)
             for name, _area, evidence_key, checks in SECTION_CHECKS
         )
+        sections = self._attach_single_platform_assessments(sections, ReportPlatform.ANDROID)
         findings_severity = self._findings_severity(sections)
 
         return ReportData(
@@ -95,7 +97,10 @@ class AndroidBinaryReportDataBuilder(BinaryReportDataBuilder):
         post_scan_data: Mapping[str, Any],
     ) -> VulnerabilitySection:
         evidence = self._mapping(post_scan_data, evidence_key)
-        checks = tuple(self._check(definition, evidence, post_scan_data) for definition in definitions)
+        checks = tuple(
+            self._check(definition, evidence, post_scan_data, self._compliance_for_section(section_name))
+            for definition in definitions
+        )
         return VulnerabilitySection(
             name=section_name,
             findings_text="",
@@ -108,6 +113,7 @@ class AndroidBinaryReportDataBuilder(BinaryReportDataBuilder):
         definition: AndroidBinaryCheckDefinition,
         section_evidence: Mapping[str, Any],
         post_scan_data: Mapping[str, Any],
+        compliance: str,
     ) -> SecurityCheck:
         entry = section_evidence.get(EVIDENCE_KEY_BY_CHECK[cls._normalized(definition.name)])
         entry = entry if isinstance(entry, Mapping) else {}
@@ -120,9 +126,9 @@ class AndroidBinaryReportDataBuilder(BinaryReportDataBuilder):
             name=definition.name,
             severity=definition.severity,
             result=result,
-            explanation=cls._explanation(definition.name, result),
+            explanation=cls._text(entry, "explanation") or cls._explanation(definition.name, result),
             evidence=evidence,
-            compliance=cls._text(entry, "compliance"),
+            compliance=cls._text(entry, "compliance") or compliance,
             remediation_link=cls._text(entry, "remediation_link"),
         )
 
@@ -165,18 +171,27 @@ class AndroidBinaryReportDataBuilder(BinaryReportDataBuilder):
         return None, evidence
 
     @staticmethod
-    def _check_result(value: bool | None) -> CheckResult:
-        if value is True:
-            return CheckResult.PRESENT
-        if value is False:
-            return CheckResult.NOT_PRESENT
-        return CheckResult.NOT_EVALUATED
+    def _compliance_for_section(section_name: str) -> str:
+        return {
+            "code": "MASVS-CODE",
+            "network": "MASVS-NETWORK",
+            "data storage": "MASVS-STORAGE",
+            "resilience": "MASVS-RESILIENCE",
+        }.get(section_name.strip().lower(), "MASVS")
 
     @staticmethod
-    def _explanation(check_name: str, result: CheckResult) -> str:
-        if result == CheckResult.NOT_EVALUATED:
+    def _check_result(value: bool | None) -> AssessmentStatus:
+        if value is True:
+            return AssessmentStatus.PRESENT
+        if value is False:
+            return AssessmentStatus.NOT_PRESENT
+        return AssessmentStatus.NOT_EVALUATED
+
+    @staticmethod
+    def _explanation(check_name: str, result: AssessmentStatus) -> str:
+        if result == AssessmentStatus.NOT_EVALUATED:
             return f"{check_name} was not evaluated because the required scan evidence is unavailable."
-        if result == CheckResult.PRESENT:
+        if result == AssessmentStatus.PRESENT:
             return f"Evidence indicates that {check_name.lower()}."
         return f"No evidence indicates that {check_name.lower()}."
 
@@ -192,7 +207,7 @@ class AndroidBinaryReportDataBuilder(BinaryReportDataBuilder):
                 findings=tuple(
                     check.name
                     for check in section.checks
-                    if check.result == CheckResult.PRESENT
+                    if check.result == AssessmentStatus.PRESENT
                     and check.severity not in {CheckSeverity.INFO, CheckSeverity.SECURE}
                 )
                 or ("No findings identified in this scan",),
@@ -202,7 +217,10 @@ class AndroidBinaryReportDataBuilder(BinaryReportDataBuilder):
 
     @staticmethod
     def _risk_level(section: VulnerabilitySection) -> RiskLevel:
-        severities = {check.severity for check in section.checks if check.result == CheckResult.PRESENT}
+        evaluated = tuple(check for check in section.checks if check.result != AssessmentStatus.NOT_EVALUATED)
+        if not evaluated:
+            return RiskLevel.NOT_EVALUATED
+        severities = {check.severity for check in evaluated if check.result == AssessmentStatus.PRESENT}
         if CheckSeverity.CRITICAL in severities:
             return RiskLevel.CRITICAL
         if CheckSeverity.HIGH in severities:
@@ -218,7 +236,7 @@ class AndroidBinaryReportDataBuilder(BinaryReportDataBuilder):
         counts = {severity: 0 for severity in CheckSeverity}
         for section in sections:
             for check in section.checks:
-                if check.result == CheckResult.PRESENT:
+                if check.result == AssessmentStatus.PRESENT:
                     counts[check.severity] += 1
         return FindingSeverity(
             critical=counts[CheckSeverity.CRITICAL],
@@ -323,9 +341,10 @@ class AndroidBinaryReportDataBuilder(BinaryReportDataBuilder):
     def _functionality_details(cls, data: Mapping[str, Any]) -> tuple[FunctionalityDetails, ...]:
         functionality = cls._mapping(data, "functionality")
         return tuple(
-            FunctionalityDetails(
+            cls._single_platform_functionality(
                 name=name,
-                present=cls._optional_bool(value.get("present")) if isinstance(value, Mapping) else None,
+                value=cls._optional_bool(value.get("present")) if isinstance(value, Mapping) else None,
+                platform=ReportPlatform.ANDROID,
                 explanation=cls._text(value, "explanation") if isinstance(value, Mapping) else "",
             )
             for name, value in sorted(functionality.items())

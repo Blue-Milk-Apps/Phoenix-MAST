@@ -2,7 +2,7 @@ import pytest
 
 from adapters.output.phoenix_report.builders.flutter import FlutterReportDataBuilder
 from domain.report import (
-    CheckResult,
+    AssessmentStatus,
     CheckSeverity,
     ReportMetadata,
     ReportPlatform,
@@ -51,7 +51,7 @@ def test_builds_all_sections_and_preserves_finding_metadata() -> None:
         "Resilience",
     ]
     check = report.vulnerability_sections[0].checks[0]
-    assert check.result == CheckResult.PRESENT
+    assert check.result == AssessmentStatus.PRESENT
     assert check.severity == CheckSeverity.HIGH
     assert check.evidence == "lib/main.dart:4"
     assert check.compliance == "MASVS-CODE"

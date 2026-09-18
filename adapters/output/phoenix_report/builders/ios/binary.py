@@ -11,12 +11,11 @@ from adapters.output.phoenix_report.builders.ios.binary_check_catalog import (
 )
 from domain.report import (
     AppDetails,
-    CheckResult,
+    AssessmentStatus,
     CheckSeverity,
     EndpointDetails,
     FileDetails,
     FindingSeverity,
-    FunctionalityDetails,
     HardcodedSecretDetails,
     HardcodedUrlDetails,
     HardcodedValuesDetails,
@@ -28,6 +27,7 @@ from domain.report import (
     PermissionDetails,
     ReportData,
     ReportMetadata,
+    ReportPlatform,
     ReportTargetKind,
     RiskLevel,
     RiskSummary,
@@ -54,11 +54,12 @@ class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
                 f"target_kind={self.target_kind.value}, got {metadata.target.target_kind.value}"
             )
         sections = self._sections(post_scan_data)
+        sections = self._attach_single_platform_assessments(sections, ReportPlatform.IOS)
         evaluations = tuple(
             OverallEvaluation(
                 area=area,
                 risk_level=self._risk_level(section),
-                findings=tuple(c.name for c in section.checks if c.result == CheckResult.PRESENT)
+                findings=tuple(c.name for c in section.checks if c.result == AssessmentStatus.PRESENT)
                 or ("No findings identified in this scan",),
             )
             for section, (_name, area, _key, _defs) in zip(sections, SECTION_CHECKS)
@@ -104,7 +105,12 @@ class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
                 if isinstance(x, Mapping)
             ),
             functionality=tuple(
-                FunctionalityDetails(k, cls._optional_bool(v.get("present")) if isinstance(v, Mapping) else None)
+                cls._single_platform_functionality(
+                    name=k,
+                    value=cls._optional_bool(v.get("present")) if isinstance(v, Mapping) else None,
+                    platform=ReportPlatform.IOS,
+                    explanation=cls._text(v, "explanation") if isinstance(v, Mapping) else "",
+                )
                 for k, v in cls._mapping(data, "functionality").items()
                 if str(k).strip().casefold() not in cls._excluded_functionalities
             ),
@@ -185,17 +191,17 @@ class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
         entry = cls._mapping(code_evidence, definition.evidence_key)
         present = cls._optional_bool(entry.get("present"))
         result = (
-            CheckResult.PRESENT
+            AssessmentStatus.PRESENT
             if present is True
-            else CheckResult.NOT_PRESENT
+            else AssessmentStatus.NOT_PRESENT
             if present is False
-            else CheckResult.NOT_EVALUATED
+            else AssessmentStatus.NOT_EVALUATED
         )
         explanation = (
             definition.present_explanation
-            if result == CheckResult.PRESENT
+            if result == AssessmentStatus.PRESENT
             else definition.not_present_explanation
-            if result == CheckResult.NOT_PRESENT
+            if result == AssessmentStatus.NOT_PRESENT
             else f"{definition.name} was not evaluated because scan evidence is unavailable."
         )
         return SecurityCheck(
@@ -213,7 +219,7 @@ class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
         counts = {severity: 0 for severity in CheckSeverity}
         for section in sections:
             for check in section.checks:
-                if check.result == CheckResult.PRESENT:
+                if check.result == AssessmentStatus.PRESENT:
                     counts[check.severity] += 1
         return FindingSeverity(
             **{
@@ -231,9 +237,10 @@ class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
 
     @staticmethod
     def _risk_level(section: VulnerabilitySection) -> RiskLevel:
-        present = [check.severity for check in section.checks if check.result == CheckResult.PRESENT]
-        if not present:
+        evaluated = tuple(check for check in section.checks if check.result != AssessmentStatus.NOT_EVALUATED)
+        if not evaluated:
             return RiskLevel.NOT_EVALUATED
+        present = [check.severity for check in evaluated if check.result == AssessmentStatus.PRESENT]
         if CheckSeverity.CRITICAL in present:
             return RiskLevel.CRITICAL
         if CheckSeverity.HIGH in present:

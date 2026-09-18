@@ -4,12 +4,12 @@ from adapters.output.phoenix_report.builders.ios.source_check_catalog import IOS
 from adapters.output.phoenix_report.builders.source import SourceReportDataBuilder
 from domain.report.models import (
     EndpointDetails,
-    FunctionalityDetails,
     HardcodedSecretDetails,
     HardcodedUrlDetails,
     HardcodedValuesDetails,
     NativeIOSReportDetails,
     PermissionDetails,
+    ReportPlatform,
     ReportTargetKind,
 )
 
@@ -33,15 +33,18 @@ class NativeIOSReportDataBuilder(SourceReportDataBuilder):
             minimum_os=str(app.get("minimum_os") or app.get("min_sdk") or ""),
             url_schemes=tuple(str(item.get("url_name") if isinstance(item, Mapping) else item) for item in schemes),
             functionality=tuple(
-                FunctionalityDetails(
-                    str(name),
-                    item.get("present"),
-                    str(item.get("explanation") or "")
-                    or (
-                        f"{name} functionality was identified in the available scan evidence."
-                        if item.get("present") is True
-                        else f"No permission or scan evidence indicated {name} functionality."
-                    ),
+                self._single_platform_functionality(
+                    name,
+                    {
+                        **item,
+                        "explanation": str(item.get("explanation") or "")
+                        or (
+                            f"{name} functionality was identified in the available scan evidence."
+                            if item.get("present") is True
+                            else f"No permission or scan evidence indicated {name} functionality."
+                        ),
+                    },
+                    ReportPlatform.IOS,
                 )
                 for name, item in functionality.items()
                 if isinstance(item, Mapping)
