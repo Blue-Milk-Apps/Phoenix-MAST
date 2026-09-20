@@ -35,11 +35,11 @@ def test_all_bundled_android_rules_are_explicitly_classified() -> None:
         for rule in document["rules"]:
             rule_id = rule["id"]
             rule_ids.add(rule_id)
-            phoenix = (rule.get("metadata") or {}).get("phoenix") or {}
+            metadata = rule.get("metadata") or {}
             mapping = ANDROID_RULE_REGISTRY[rule_id]
             if mapping.disposition is AndroidRuleDisposition.REPORT_VULNERABILITY:
-                assert phoenix["report_section"] == mapping.section
-                assert phoenix["evidence_key"] == mapping.evidence_key
+                assert metadata["report_section"] == mapping.section
+                assert metadata["evidence_key"] == mapping.evidence_key
 
     assert unclassified_android_rule_ids(rule_ids) == set()
     assert set(ANDROID_RULE_REGISTRY) == rule_ids

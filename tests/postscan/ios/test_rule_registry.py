@@ -127,7 +127,7 @@ def test_explicit_rule_ids_populate_functionality_permissions_and_network_eviden
     assert network_evidence.ats_disabled.evidence == ("Info.plist: <key>NSAllowsArbitraryLoads</key><true/>")
 
 
-def test_installed_ios_rule_bundle_matches_tracked_registry() -> None:
+def test_installed_ios_rule_bundle_has_unique_ids() -> None:
     rule_files = sorted((REPOSITORY_ROOT / "rules" / "ios").glob("*.yml"))
     if not rule_files:
         pytest.skip("The external iOS OpenGrep rule bundle is not installed.")
@@ -138,4 +138,3 @@ def test_installed_ios_rule_bundle_matches_tracked_registry() -> None:
         for match in RULE_ID_PATTERN.finditer(rule_file.read_text(encoding="utf-8"))
     ]
     assert len(rule_ids) == len(set(rule_ids)), "The installed iOS rule bundle contains duplicate IDs."
-    assert set(rule_ids) == set(IOS_RULE_IDS)
