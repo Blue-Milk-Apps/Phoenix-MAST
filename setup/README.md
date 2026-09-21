@@ -1,0 +1,136 @@
+# phoenix Scanner Setup
+
+Phoenix scanner adapters call external tools from the local `PATH`. The current adapters are:
+
+| Scanner | Required local command | Extra local data |
+| --- | --- | --- |
+| MobSF Scanner | MobSF service | `MOBSF_URL` pointing to MobSF |
+| LIEF | Python `lief` package | IPA files only |
+| ipsw | `ipsw` | IPA files only |
+| Androguard | Python `androguard` package | APK files only |
+| aapt2 | `aapt2` | APK files only |
+| Apktool | `apktool` | APK files only |
+| Apksigner | `apksigner` | APK files only |
+| APKiD | `apkid` | APK files only |
+| TruffleHog | `trufflehog` | None |
+| Gitleaks | `gitleaks` | `.gitleaks.toml` in the scanned project or `GITLEAKS_CONFIG` |
+| Strings | `strings` | App binaries and embedded frameworks / native libraries |
+| Syft | `syft` | None |
+| Phoenix PDF Report | Python `jinja2`, `weasyprint`, `matplotlib`, `numpy`, `markupsafe` packages | Native WeasyPrint libraries such as `pango`, `glib`, and `cairo` |
+
+These setup notes document the manual steps that the Makefile targets should later automate.
+
+## Docker Tool Pins
+
+The Phoenix Docker image pins scanner tool versions with build arguments so CI images are reproducible and upgrades are explicit:
+
+| Build arg | Default |
+| --- | --- |
+| `SYFT_VERSION` | `v1.44.0` |
+| `TRUFFLEHOG_VERSION` | `v3.95.2` |
+| `GITLEAKS_VERSION` | `8.30.1` |
+| `APKTOOL_VERSION` | `2.10.0` |
+| `IPSW_VERSION` | `3.1.687` |
+| `APKID_VERSION` | `3.1.0` |
+| `ANDROGUARD_VERSION` | `4.1.3` |
+| `LIEF_VERSION` | `0.17.2` |
+
+Override a pin only when intentionally refreshing the scanner image:
+
+```bash
+docker compose build Phoenix --build-arg GITLEAKS_VERSION=8.30.1
+```
+
+## Readmes
+
+- [MobSF Scanner and MobSF](mobsf-scanner/README.md)
+- [LIEF](lief/README.md)
+- [ipsw](ipsw/README.md)
+- [Androguard](androguard/README.md)
+- [aapt2](aapt2/README.md)
+- [Apktool](apktool/README.md)
+- [Apksigner](apksigner/README.md)
+- [APKiD](apkid/README.md)
+- [Syft](syft/README.md)
+- [TruffleHog](trufflehog/README.md)
+- [Gitleaks](gitleaks/README.md)
+- [Strings](strings/README.md)
+
+## phoenix paths
+
+Phoenix uses `MOBSF_URL` to find the MobSF service for binary scans. If `MOBSF_URL` is not set, Phoenix skips MobSF and continues with the other configured scanners. When using `make services-up`, MobSF is available at `http://localhost:8000`.
+
+## phoenix PDF report setup
+
+WeasyPrint also requires native shared libraries that `uv` does not install.
+On macOS, the supported local setup is Homebrew:
+
+```bash
+brew install pango
+```
+
+Homebrew installs or updates the required `glib` and `cairo` libraries as
+dependencies when needed. phoenix also sets `DYLD_FALLBACK_LIBRARY_PATH`
+at report-generation runtime on macOS so WeasyPrint can resolve Homebrew
+libraries from `/opt/homebrew/lib` or `/usr/local/lib`.
+
+## Scan Target Flags
+
+`phoenix scan` requires exactly one scan target flag. Any of these flags is valid:
+
+```bash
+phoenix scan --ios-binary-path path/to/app.ipa
+phoenix scan --android-binary-path path/to/app.apk
+phoenix scan --flutter-source-path path/to/project
+phoenix scan --react-native-source-path path/to/project
+phoenix scan --native-android-source-path path/to/project
+phoenix scan --native-ios-source-path path/to/project
+```
+
+Source scans run Gitleaks as part of the Phoenix pipeline, while binary scans run LIEF, ipsw, and plist extraction for iOS binaries, Androguard, Apktool, Apksigner, and APKiD for Android binaries, and Strings against app binaries plus embedded frameworks/native libraries. MobSF runs for binary scans only when `MOBSF_URL` is configured. ipsw writes compact signing, entitlement, and Mach-O summary evidence under `scan-results/.../ipsw/`. Apktool writes compact Android evidence JSON under `scan-results/.../apktool/` and removes the decoded project after extraction. Apksigner writes APK signing evidence under `scan-results/.../apksigner/`. APKiD writes compact environmental intelligence under `scan-results/.../apkid/`.
+
+For local APK signing evidence, Phoenix resolves `apksigner` from `PATH`. For Docker scans, the Phoenix image installs `apksigner` inside the container during image build, so host Android SDK paths are not needed. APKiD follows the same runtime availability model: local scans need `apkid` on `PATH`, while Docker scans use the APKiD command installed in the Phoenix image.
+
+## Verification
+
+After setup, these commands should all resolve:
+
+```bash
+trufflehog --version
+gitleaks version
+strings --help
+apktool --version
+aapt2 version
+apksigner version
+apkid --version
+ipsw version
+syft version
+```
+
+Run Phoenix locally with:
+
+See the [scan target flags](#scan-target-flags) list for valid `<scan-target-flag>` values.
+
+```bash
+uv run Phoenix scan <scan-target-flag> path/to/target
+```
+
+Run Phoenix locally against an IPA or APK while using the MobSF sidecar:
+
+```bash
+make services-up
+MOBSF_URL=http://localhost:8000 uv run phoenix scan --ios-binary-path "path/to/app.ipa"
+```
+
+Run a Compose scan with MobSF by pointing Phoenix at the Compose sidecar:
+
+```bash
+MOBSF_URL=http://mobsf-scanner:8000 make compose-run PROJECT_PATH="path/to/app.ipa" SCAN_FLAG=--ios-binary-path
+```
+
+## Online references
+
+- MobSF Docker setup: https://mobsf.github.io/Mobile-Security-Framework-MobSF/
+- Syft installation: https://oss.anchore.com/docs/installation/syft
+- TruffleHog installation and usage: https://github.com/trufflesecurity/trufflehog
+- ipsw installation: https://blacktop.github.io/ipsw/docs/getting-started/installation/

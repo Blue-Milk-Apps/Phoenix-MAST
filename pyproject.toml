@@ -1,0 +1,101 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "phoenix"
+version = "0.1.0"
+description = "All-in-one MobSec MAST tool for iOS and Android"
+requires-python = ">=3.12"
+dependencies = [
+    "androguard>=4.1.3",
+    "apkid==3.1.0",
+    "jinja2>=3.1.6",
+    "lief",
+    "markupsafe>=3.0.3",
+    "matplotlib>=3.10.9",
+    "numpy>=2.4.5",
+    "pyyaml>=6.0",
+    "weasyprint>=69.0",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.0",
+    "pytest>=8.0",
+    "ruff>=0.15.15",
+]
+
+[project.scripts]
+phoenix = "entrypoints.cli:main"
+
+[tool.setuptools]
+packages = [
+    "adapters",
+    "adapters.output",
+    "adapters.output.phoenix_report",
+    "adapters.output.phoenix_report.builders",
+    "adapters.output.phoenix_report.builders.android",
+    "adapters.output.phoenix_report.builders.flutter",
+    "adapters.output.phoenix_report.builders.ios",
+    "adapters.output.phoenix_report.builders.react_native",
+    "adapters.output.phoenix_report.common",
+    "adapters.output.phoenix_report.pdf_report",
+    "adapters.output.phoenix_report.pdf_report.android",
+    "adapters.output.phoenix_report.pdf_report.common",
+    "adapters.output.phoenix_report.pdf_report.ios",
+    "adapters.output.phoenix_report.pdf_report.flutter",
+    "adapters.output.phoenix_report.pdf_report.react_native",
+    "adapters.post_scan",
+    "adapters.post_scan.android",
+    "adapters.post_scan.android.native",
+    "adapters.post_scan.flutter",
+    "adapters.post_scan.ios",
+    "adapters.post_scan.ios.binary",
+    "adapters.post_scan.ios.native",
+    "adapters.post_scan.react_native",
+    "adapters.scanners",
+    "adapters.scanners.android",
+    "adapters.scanners.common",
+    "adapters.scanners.flutter",
+    "adapters.scanners.ios",
+    "adapters.scanners.react_native",
+    "adapters.storage",
+    "application",
+    "domain",
+    "domain.report",
+    "domain.post_scan",
+    "domain.post_scan.android",
+    "domain.post_scan.android.native",
+    "domain.post_scan.flutter",
+    "domain.post_scan.react_native",
+    "domain.post_scan.ios",
+    "domain.post_scan.ios.binary",
+    "domain.post_scan.ios.common",
+    "domain.post_scan.ios.native",
+    "entrypoints",
+    "ports",
+    "ports.post_scan",
+    "utilities",
+]
+
+[tool.setuptools.package-data]
+"adapters.output.phoenix_report" = [
+    "assets/*",
+    "data/*",
+    "docs/*",
+    "schema/*",
+    "templates/*",
+]
+
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests",
+]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+extend-select = ["I"]
