@@ -304,7 +304,8 @@
 {% if data.flutter_presentation.manual_review_available %}
 <!-- ===================== FLUTTER MANUAL REVIEW ===================== -->
 <div class="section">
-  <h2>Manual Review</h2>
+  <h2>Requires Manual Review</h2>
+  <p class="small">Potential security concerns that require human validation before they can be classified as confirmed findings.</p>
   <p class="small">Assessment status: {{ data.flutter_presentation.manual_review_status }}</p>
   {% if data.flutter_presentation.manual_review_findings %}
   <table>
@@ -313,7 +314,7 @@
     <tr><td class="mono">{{ finding.rule_id }}</td><td>{{ finding.scope }}</td><td>{{ finding.severity }}</td><td class="mono">{{ finding.location }}</td><td>{{ finding.reason }}</td><td>{{ finding.message }}</td></tr>
     {% endfor %}
   </table>
-  {% else %}<p class="small">No manual-review findings were identified by the assessed rules.</p>{% endif %}
+  {% else %}<p class="small">The assessed rules did not identify any potential security concerns requiring manual review.</p>{% endif %}
 </div>
 {% endif %}
 {% endif %}
@@ -358,25 +359,6 @@
   <p class="small">No custom URL schemes were declared by this app.</p>
   {% endif %}
   {% endif %}
-</div>
-
-<!-- ===================== PERMISSIONS ===================== -->
-<div class="section">
-  <h2>{{ 'Permission Inventory' if data.meta.platform == 'React Native' else 'Permissions Requested' }}</h2>
-  {% if data.meta.platform == 'React Native' and data.permissions_disclaimer %}
-  <p class="small">{{ data.permissions_disclaimer }}</p>
-  {% endif %}
-  <table>
-    <tr>{% if data.meta.platform in ['Flutter', 'React Native'] %}<th>Platform</th>{% endif %}<th>Permission</th><th>Status</th><th>Description</th></tr>
-    {% for p in data.permissions %}
-    <tr>
-      {% if data.meta.platform in ['Flutter', 'React Native'] %}<td>{{ p.platform }}</td>{% endif %}
-      <td class="mono">{{ p.display_permission or p.permission }}</td>
-      <td>{{ risk_badge('High' if p.status == 'dangerous' else 'Info', label=p.status) }}</td>
-      <td>{{ p.general_description }}{% if p.usage_description %}<br><span class="small">{{ p.usage_description }}</span>{% endif %}</td>
-    </tr>
-    {% endfor %}
-  </table>
 </div>
 
 <!-- ===================== VULNERABILITY SECTIONS ===================== -->
