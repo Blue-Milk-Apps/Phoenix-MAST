@@ -360,23 +360,6 @@
   {% endif %}
 </div>
 
-<!-- ===================== THIRD PARTY SDKS ===================== -->
-<div class="section">
-  <h2>Third-Party SDKs</h2>
-  {% for category, sdks in data.third_party_sdks.items() %}
-  <div class="sdk-category">
-    <h4>{{ category }}</h4>
-    <div class="sdk-grid">
-      {% for name, present in sdks.items() %}
-      <div class="sdk-item">
-        <span class="{{ 'sdk-yes' if present else 'sdk-no' }}">{{ '✔' if present else '✗' }} {{ name }}</span>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-  {% endfor %}
-</div>
-
 <!-- ===================== PERMISSIONS ===================== -->
 <div class="section">
   <h2>{{ 'Permission Inventory' if data.meta.platform == 'React Native' else 'Permissions Requested' }}</h2>
