@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from domain.post_scan.ios.common.evidence import EvidenceEntry
@@ -113,8 +115,15 @@ class IOSDataStorageEvidence:
     WIFI_IP_MARKERS = ("wifi_ip", "wifiip", "wifi ip", "wifiipaddress")
     NON_USER_DEFAULTS_STORAGE_MARKERS = ("writeToFile:", "writeToURL:", "NSKeyedArchiver")
 
-    @staticmethod
-    def _opengrep_evidence(result: dict[str, Any]) -> str:
+    @classmethod
+    def _opengrep_evidence(
+        cls,
+        result: dict[str, Any],
+        loaded_outputs: dict[str, Any] | None = None,
+        *,
+        include_operation: bool = False,
+        include_dataflow: bool = False,
+    ) -> str:
         """Return matched source evidence with a location when OpenGrep provides one."""
 
         extra = result.get("extra") or {}
@@ -126,7 +135,90 @@ class IOSDataStorageEvidence:
             path = f"{path}:{line}"
         elif not path and line not in (None, ""):
             path = f"line {line}"
-        return f"{path}: {evidence}" if path else evidence
+        formatted = f"{path}: {evidence}" if path else evidence
+        if include_operation:
+            operation = cls._keychain_operation(result, loaded_outputs or {})
+            if operation and operation not in evidence:
+                formatted = f"{formatted} (Keychain operation: {operation})"
+        if include_dataflow:
+            dataflow = cls._dataflow_context(result)
+            if dataflow:
+                formatted = f"{formatted} (Data flow: {dataflow})"
+        return formatted
+
+    @classmethod
+    def _keychain_operation(cls, result: dict[str, Any], loaded_outputs: dict[str, Any]) -> str:
+        """Find a nearby Keychain API name without copying surrounding source values."""
+
+        lines = str((result.get("extra") or {}).get("lines") or "")
+        operation_pattern = re.compile(r"\bSecItem(?:Add|Update|CopyMatching|Delete)\b")
+        match = operation_pattern.search(lines)
+        if match:
+            return match.group(0)
+
+        path_text = str(result.get("path") or "").strip()
+        start = result.get("start")
+        line_number = start.get("line") if isinstance(start, dict) else None
+        project_text = str((loaded_outputs.get("scan_metadata") or {}).get("project_path") or "").strip()
+        if not path_text or not project_text or not isinstance(line_number, int):
+            return ""
+        path = Path(path_text)
+        project = Path(project_text)
+        if not path.is_absolute():
+            path = project / path
+        try:
+            path = path.resolve()
+            path.relative_to(project.resolve())
+        except (OSError, ValueError):
+            return ""
+        if not path.is_file():
+            return ""
+        try:
+            source_lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        except OSError:
+            return ""
+        nearby = source_lines[max(0, line_number - 3) : min(len(source_lines), line_number + 2)]
+        operations = []
+        for source_line in nearby:
+            operations.extend(operation_pattern.findall(source_line))
+        return next(iter(dict.fromkeys(operations)), "")
+
+    @staticmethod
+    def _dataflow_context(result: dict[str, Any]) -> str:
+        """Summarize taint endpoints and intermediate identifiers without values."""
+
+        trace = result.get("dataflow_trace")
+        if not isinstance(trace, dict):
+            return ""
+
+        def content_from_metavar(name: str) -> str:
+            metavars = (result.get("extra") or {}).get("metavars")
+            item = metavars.get(name) if isinstance(metavars, dict) else None
+            content = item.get("abstract_content") if isinstance(item, dict) else None
+            return str(content or "").strip()
+
+        def safe_identifier(value: str) -> str:
+            return value if re.fullmatch(r"[A-Za-z_]\w*", value) else "<value>"
+
+        source = content_from_metavar("$VALUE")
+        intermediate = [
+            str(item.get("content") or "").strip()
+            for item in trace.get("intermediate_vars", [])
+            if isinstance(item, dict) and str(item.get("content") or "").strip()
+        ]
+        sink = trace.get("taint_sink")
+        sink_content = ""
+        if isinstance(sink, list) and len(sink) > 1 and isinstance(sink[1], list) and len(sink[1]) > 1:
+            sink_content = str(sink[1][1] or "").strip()
+        if not sink_content:
+            return ""
+        sink_api = re.match(
+            r"\s*((?:UserDefaults|NSKeyedArchiver)(?:\.[A-Za-z_]\w*)+|[A-Za-z_]\w*\.write(?:ToFile|ToURL)?)",
+            sink_content,
+        )
+        sink_name = sink_api.group(1) if sink_api else "storage API"
+        identifiers = [safe_identifier(item) for item in ([source, *intermediate]) if item]
+        return " -> ".join([*identifiers, sink_name]) if identifiers else sink_name
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
         self.weak_file_protection = self._weak_file_protection_entry(loaded_outputs)
@@ -233,7 +325,7 @@ class IOSDataStorageEvidence:
                 or result.get("check_id") != cls.KEYCHAIN_ITEMS_ACCESSIBLE_AFTER_FIRST_UNLOCK_RULE_ID
             ):
                 continue
-            return EvidenceEntry(True, cls._opengrep_evidence(result))
+            return EvidenceEntry(True, cls._opengrep_evidence(result, loaded_outputs, include_operation=True))
 
         strings_outputs = loaded_outputs.get("strings_outputs") or {}
         if isinstance(strings_outputs, dict):
@@ -374,7 +466,10 @@ class IOSDataStorageEvidence:
             for result in results:
                 if not isinstance(result, dict) or result.get("check_id") != cls.WIFI_MAC_INSECURE_STORAGE_RULE_ID:
                     continue
-                return EvidenceEntry(True, cls._opengrep_evidence(result))
+                return EvidenceEntry(
+                    True,
+                    cls._opengrep_evidence(result, loaded_outputs, include_dataflow=True),
+                )
             return EvidenceEntry(False, "no_wifi_mac_stored_insecurely_hits")
 
         return EvidenceEntry(None, "source_data_flow_analysis_required")

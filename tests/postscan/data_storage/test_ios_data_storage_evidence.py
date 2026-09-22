@@ -61,6 +61,63 @@ def test_ios_data_storage_evidence_wifi_ip_requires_source_finding() -> None:
     assert binary_only.wifi_ip_stored_insecurely.evidence == "(Triage Signal) App.txt: wifiipaddress; UserDefaults"
 
 
+def test_ios_data_storage_evidence_includes_source_location_and_keychain_operation(tmp_path) -> None:
+    source_path = tmp_path / "Credentials.swift"
+    source_path.write_text(
+        "let accessibility = kSecAttrAccessibleAfterFirstUnlock\nSecItemAdd(query, nil)\n",
+        encoding="utf-8",
+    )
+    detected = IOSDataStorageEvidence(
+        {
+            "scan_metadata": {"project_path": str(tmp_path)},
+            "opengrep": {
+                "results": [
+                    {
+                        "check_id": "ios.storage.keychain-items-accessible-after-first-unlock",
+                        "path": str(source_path),
+                        "start": {"line": 1},
+                        "extra": {"lines": "let accessibility = kSecAttrAccessibleAfterFirstUnlock"},
+                    }
+                ]
+            },
+        }
+    )
+
+    assert detected.keychain_items_accessible_after_first_unlock.evidence == (
+        f"{source_path}:1: let accessibility = kSecAttrAccessibleAfterFirstUnlock (Keychain operation: SecItemAdd)"
+    )
+
+
+def test_ios_data_storage_evidence_includes_wifi_dataflow_context() -> None:
+    detected = IOSDataStorageEvidence(
+        {
+            "opengrep": {
+                "results": [
+                    {
+                        "check_id": "ios.storage.wifi-mac-insecure-storage",
+                        "path": "Sources/NetworkInfo.swift",
+                        "start": {"line": 12},
+                        "extra": {
+                            "lines": 'UserDefaults.standard.set(wifiMac, forKey: "bssid")',
+                            "metavars": {
+                                "$VALUE": {"abstract_content": "bssid"},
+                            },
+                        },
+                        "dataflow_trace": {
+                            "intermediate_vars": [{"content": "wifiMac"}],
+                            "taint_sink": ["CliLoc", [{}, 'UserDefaults.standard.set(wifiMac, forKey: "bssid")']],
+                        },
+                    }
+                ]
+            }
+        }
+    )
+
+    assert detected.wifi_mac_stored_insecurely.evidence.endswith(
+        "(Data flow: bssid -> wifiMac -> UserDefaults.standard.set)"
+    )
+
+
 def test_ios_data_storage_evidence_source_only_storage_checks_have_ipa_triage() -> None:
     cases = (
         (
