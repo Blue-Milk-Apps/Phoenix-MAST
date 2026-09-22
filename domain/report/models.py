@@ -259,8 +259,8 @@ class FlutterUrlScheme:
 
 
 @dataclass(frozen=True)
-class FlutterManualReviewFinding:
-    """A finding retained for Flutter manual review."""
+class ManualReviewFinding:
+    """A raw finding retained for manual review."""
 
     rule_id: str = ""
     scope: str = ""
@@ -268,6 +268,11 @@ class FlutterManualReviewFinding:
     location: str = ""
     reason: str = ""
     message: str = ""
+
+
+@dataclass(frozen=True)
+class FlutterManualReviewFinding(ManualReviewFinding):
+    """A finding retained for Flutter manual review."""
 
 
 @dataclass(frozen=True)
@@ -383,6 +388,9 @@ class NativeIOSReportDetails(PlatformReportDetails):
     hardcoded_values: HardcodedValuesDetails = field(default_factory=lambda: HardcodedValuesDetails())
     endpoints: tuple[EndpointDetails, ...] = ()
     third_party_sdks: tuple[str, ...] = ()
+    manual_review_available: bool = False
+    manual_review_status: str = "Not Assessed"
+    manual_review_findings: tuple[ManualReviewFinding, ...] = ()
 
     @property
     def target_kind(self) -> ReportTargetKind:

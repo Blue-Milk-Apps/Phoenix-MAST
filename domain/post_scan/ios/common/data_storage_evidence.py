@@ -113,6 +113,21 @@ class IOSDataStorageEvidence:
     WIFI_IP_MARKERS = ("wifi_ip", "wifiip", "wifi ip", "wifiipaddress")
     NON_USER_DEFAULTS_STORAGE_MARKERS = ("writeToFile:", "writeToURL:", "NSKeyedArchiver")
 
+    @staticmethod
+    def _opengrep_evidence(result: dict[str, Any]) -> str:
+        """Return matched source evidence with a location when OpenGrep provides one."""
+
+        extra = result.get("extra") or {}
+        evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
+        path = str(result.get("path", "")).strip()
+        start = result.get("start")
+        line = start.get("line") if isinstance(start, dict) else None
+        if path and line not in (None, ""):
+            path = f"{path}:{line}"
+        elif not path and line not in (None, ""):
+            path = f"line {line}"
+        return f"{path}: {evidence}" if path else evidence
+
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
         self.weak_file_protection = self._weak_file_protection_entry(loaded_outputs)
         self.deprecated_keychain_attributes = self._deprecated_keychain_attributes_entry(loaded_outputs)
@@ -218,10 +233,7 @@ class IOSDataStorageEvidence:
                 or result.get("check_id") != cls.KEYCHAIN_ITEMS_ACCESSIBLE_AFTER_FIRST_UNLOCK_RULE_ID
             ):
                 continue
-            extra = result.get("extra") or {}
-            evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
-            path = str(result.get("path", "")).strip()
-            return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
+            return EvidenceEntry(True, cls._opengrep_evidence(result))
 
         strings_outputs = loaded_outputs.get("strings_outputs") or {}
         if isinstance(strings_outputs, dict):
@@ -362,10 +374,7 @@ class IOSDataStorageEvidence:
             for result in results:
                 if not isinstance(result, dict) or result.get("check_id") != cls.WIFI_MAC_INSECURE_STORAGE_RULE_ID:
                     continue
-                extra = result.get("extra") or {}
-                evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
-                path = str(result.get("path", "")).strip()
-                return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
+                return EvidenceEntry(True, cls._opengrep_evidence(result))
             return EvidenceEntry(False, "no_wifi_mac_stored_insecurely_hits")
 
         return EvidenceEntry(None, "source_data_flow_analysis_required")
@@ -375,10 +384,7 @@ class IOSDataStorageEvidence:
         for result in (loaded_outputs.get("opengrep") or {}).get("results") or []:
             if not isinstance(result, dict) or result.get("check_id") != cls.SENSITIVE_VALUE_LONG_LIVED_MEMORY_RULE_ID:
                 continue
-            extra = result.get("extra") or {}
-            evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
-            path = str(result.get("path", "")).strip()
-            return EvidenceEntry(None, f"{path}: {evidence}" if path else evidence)
+            return EvidenceEntry(None, cls._opengrep_evidence(result))
         return EvidenceEntry(None, "dynamic_memory_analysis_required")
 
     @classmethod

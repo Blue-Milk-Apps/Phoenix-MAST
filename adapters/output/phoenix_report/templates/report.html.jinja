@@ -319,6 +319,23 @@
 {% endif %}
 {% endif %}
 
+{% if data.meta.platform == 'iOS' and presentation.target_type == 'source' and data.native_ios_details.manual_review_available %}
+<!-- ===================== NATIVE IOS MANUAL REVIEW ===================== -->
+<div class="section">
+  <h2>Requires Manual Review</h2>
+  <p class="small">Potential security concerns that require human validation before they can be classified as confirmed findings.</p>
+  <p class="small">Assessment status: {{ data.native_ios_details.manual_review_status }}</p>
+  {% if data.native_ios_details.manual_review_findings %}
+  <table>
+    <tr><th>Rule</th><th>Scope</th><th>Severity</th><th>Location</th><th>Reason</th><th>Finding</th></tr>
+    {% for finding in data.native_ios_details.manual_review_findings %}
+    <tr><td class="mono">{{ finding.rule_id }}</td><td>{{ finding.scope }}</td><td>{{ finding.severity }}</td><td class="mono">{{ finding.location }}</td><td>{{ finding.reason }}</td><td>{{ finding.message }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="small">The assessed rules did not identify any potential security concerns requiring manual review.</p>{% endif %}
+</div>
+{% endif %}
+
 <!-- ===================== FUNCTIONALITY ===================== -->
 <div class="section">
   <h2>Functionality</h2>

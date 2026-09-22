@@ -30,5 +30,18 @@ def map_native_ios_details(details: NativeIOSReportDetails) -> dict[str, object]
             "minimum_os": details.minimum_os,
             "url_schemes": list(details.url_schemes),
             "third_party_sdks": list(details.third_party_sdks),
+            "manual_review_available": details.manual_review_available,
+            "manual_review_status": details.manual_review_status,
+            "manual_review_findings": [
+                {
+                    "rule_id": finding.rule_id,
+                    "scope": finding.scope,
+                    "severity": finding.severity,
+                    "location": finding.location,
+                    "reason": finding.reason,
+                    "message": finding.message,
+                }
+                for finding in details.manual_review_findings
+            ],
         },
     }
