@@ -228,6 +228,21 @@ DATA_STORAGE_CHECKS = tuple(
         ),
     )
 )
+DATA_STORAGE_CHECKS += (
+    IOSBinaryCheckDefinition(
+        name="Keychain Items Accessible After First Unlock",
+        severity=CheckSeverity.MEDIUM,
+        evidence_key="keychain_items_accessible_after_first_unlock",
+        compliance="MASVS-STORAGE-1; MASTG-TEST-0052; MASTG-KNOW-0057; legacy MSTG-STORAGE-1",
+        present_explanation=(
+            "One or more Keychain items are configured to remain accessible after the first device unlock; "
+            "review the data sensitivity and use the most restrictive suitable accessibility class."
+        ),
+        not_present_explanation=(
+            "No Keychain items configured to remain accessible after the first device unlock were identified."
+        ),
+    ),
+)
 RESILIENCE_CHECKS = (
     IOSBinaryCheckDefinition(
         "Biometric / Local Authentication Bypass Possible",
