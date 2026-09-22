@@ -836,8 +836,8 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
     }
     assert result["resilience_evidence"] == {
         "biometric_bypass_possible": {
-            "present": False,
-            "evidence": "no_biometric_bypass_possible_hits",
+            "present": None,
+            "evidence": "source_control_flow_and_runtime_authentication_testing_required",
         },
         "debug_symbols_present": {
             "present": False,

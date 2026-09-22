@@ -164,6 +164,18 @@
   </table>
   {% endif %}
 
+  {% if data.meta.platform == 'iOS' and presentation.target_type == 'BINARY' and data.ios_binary_manual_review_available %}
+  <h2>Requires Manual Review</h2>
+  <p class="small">These checks need source-level or runtime validation and are not confirmed findings from binary evidence alone.</p>
+  <p class="small">Assessment status: {{ data.ios_binary_manual_review_status }}</p>
+  <table>
+    <tr><th>Rule</th><th>Scope</th><th>Severity</th><th>Location</th><th>Reason</th><th>Finding</th></tr>
+    {% for finding in data.ios_binary_manual_review_findings %}
+    <tr><td class="mono">{{ finding.rule_id }}</td><td>{{ finding.scope }}</td><td>{{ finding.severity }}</td><td class="mono">{{ finding.location }}</td><td>{{ finding.reason }}</td><td>{{ finding.message }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
   {% if data.meta.platform != 'iOS' and (data.meta.platform != 'Flutter' or data.app_components.activities is not none or data.app_components.services is not none or data.app_components.receivers is not none or data.app_components.providers is not none) %}
   <h2>App Components</h2>
   <div class="components-bars">

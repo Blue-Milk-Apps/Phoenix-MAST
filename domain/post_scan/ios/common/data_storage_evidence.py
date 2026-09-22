@@ -354,8 +354,13 @@ class IOSDataStorageEvidence:
                 advertiser_id_marker = next((marker for marker in cls.ADVERTISER_ID_MARKERS if marker in text), "")
                 storage_marker = next((marker for marker in cls.INSECURE_STORAGE_MARKERS if marker in text), "")
                 if advertiser_id_marker and storage_marker:
-                    return EvidenceEntry(True, f"{path}: {advertiser_id_marker}; {storage_marker}")
+                    return EvidenceEntry(
+                        None,
+                        f"(Triage Signal; source review required) {path}: {advertiser_id_marker}; {storage_marker}",
+                    )
 
+        if cls._is_binary_scan(loaded_outputs):
+            return EvidenceEntry(None, "source_data_flow_analysis_required")
         return EvidenceEntry(False, "no_advertiser_id_stored_insecurely_hits")
 
     @classmethod
@@ -386,8 +391,13 @@ class IOSDataStorageEvidence:
                 )
                 storage_marker = next((marker for marker in cls.INSECURE_STORAGE_MARKERS if marker in text), "")
                 if imei_marker and storage_marker:
-                    return EvidenceEntry(True, f"{path}: {imei_marker}; {storage_marker}")
+                    return EvidenceEntry(
+                        None,
+                        f"(Triage Signal; source review required) {path}: {imei_marker}; {storage_marker}",
+                    )
 
+        if cls._is_binary_scan(loaded_outputs):
+            return EvidenceEntry(None, "source_data_flow_analysis_required")
         return EvidenceEntry(False, "no_imei_labeled_value_stored_insecurely_hits")
 
     @classmethod
@@ -396,6 +406,8 @@ class IOSDataStorageEvidence:
         opengrep = loaded_outputs.get("opengrep")
         results = opengrep.get("results") if isinstance(opengrep, dict) else None
         if not isinstance(results, list):
+            if cls._is_binary_scan(loaded_outputs):
+                return EvidenceEntry(None, "source_permission_api_analysis_required")
             return EvidenceEntry(False, "global_write_permissions_not_assessed_no_opengrep_results")
 
         for result in results:
@@ -406,6 +418,8 @@ class IOSDataStorageEvidence:
             path = str(result.get("path", "")).strip()
             return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
 
+        if cls._is_binary_scan(loaded_outputs):
+            return EvidenceEntry(None, "source_permission_api_analysis_required")
         return EvidenceEntry(False, "no_global_write_permissions_hits")
 
     @classmethod
@@ -470,6 +484,8 @@ class IOSDataStorageEvidence:
                     True,
                     cls._opengrep_evidence(result, loaded_outputs, include_dataflow=True),
                 )
+            if cls._is_binary_scan(loaded_outputs):
+                return EvidenceEntry(None, "source_data_flow_analysis_required")
             return EvidenceEntry(False, "no_wifi_mac_stored_insecurely_hits")
 
         return EvidenceEntry(None, "source_data_flow_analysis_required")
@@ -503,6 +519,8 @@ class IOSDataStorageEvidence:
                 path = str(result.get("path", "")).strip()
                 return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
 
+            if cls._is_binary_scan(loaded_outputs):
+                return EvidenceEntry(None, "source_data_flow_analysis_required")
             return EvidenceEntry(False, no_hit_evidence)
 
         strings_outputs = loaded_outputs.get("strings_outputs") or {}
@@ -520,7 +538,13 @@ class IOSDataStorageEvidence:
                 )
                 storage_marker = next((marker for marker in storage_markers if marker.lower() in lowered_text), "")
                 if data_marker and storage_marker:
-                    return EvidenceEntry(True, f"(Triage Signal) {path}: {data_marker}; {storage_marker}")
+                    return EvidenceEntry(
+                        None,
+                        f"(Triage Signal; source review required) {path}: {data_marker}; {storage_marker}",
+                    )
+
+        if cls._is_binary_scan(loaded_outputs):
+            return EvidenceEntry(None, "source_data_flow_analysis_required")
 
         return EvidenceEntry(False, no_hit_evidence)
 
@@ -540,6 +564,8 @@ class IOSDataStorageEvidence:
                 path = str(result.get("path", "")).strip()
                 return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
 
+            if cls._is_binary_scan(loaded_outputs):
+                return EvidenceEntry(None, "source_data_flow_analysis_required")
             return EvidenceEntry(False, "no_sensitive_data_stored_in_user_defaults_hits")
 
         strings_outputs = loaded_outputs.get("strings_outputs") or {}
@@ -550,7 +576,13 @@ class IOSDataStorageEvidence:
                 user_defaults_marker = next((marker for marker in cls.USER_DEFAULTS_MARKERS if marker in text), "")
                 sensitive_marker = next((marker for marker in cls.SENSITIVE_DATA_MARKERS if marker in lowered_text), "")
                 if user_defaults_marker and sensitive_marker:
-                    return EvidenceEntry(True, f"(Triage Signal) {path}: {user_defaults_marker}; {sensitive_marker}")
+                    return EvidenceEntry(
+                        None,
+                        f"(Triage Signal; source review required) {path}: {user_defaults_marker}; {sensitive_marker}",
+                    )
+
+        if cls._is_binary_scan(loaded_outputs):
+            return EvidenceEntry(None, "source_data_flow_analysis_required")
 
         return EvidenceEntry(False, "no_sensitive_data_stored_in_user_defaults_hits")
 
@@ -574,6 +606,8 @@ class IOSDataStorageEvidence:
                 path = str(result.get("path", "")).strip()
                 return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
 
+            if cls._is_binary_scan(loaded_outputs):
+                return EvidenceEntry(None, "source_data_flow_analysis_required")
             return EvidenceEntry(False, no_hit_evidence)
 
         strings_outputs = loaded_outputs.get("strings_outputs") or {}
@@ -591,7 +625,13 @@ class IOSDataStorageEvidence:
                     "",
                 )
                 if logging_marker and data_marker:
-                    return EvidenceEntry(True, f"(Triage Signal) {path}: {logging_marker}; {data_marker}")
+                    return EvidenceEntry(
+                        None,
+                        f"(Triage Signal; source review required) {path}: {logging_marker}; {data_marker}",
+                    )
+
+        if cls._is_binary_scan(loaded_outputs):
+            return EvidenceEntry(None, "source_data_flow_analysis_required")
 
         return EvidenceEntry(False, no_hit_evidence)
 
@@ -600,6 +640,8 @@ class IOSDataStorageEvidence:
         opengrep = loaded_outputs.get("opengrep")
         results = opengrep.get("results") if isinstance(opengrep, dict) else None
         if not isinstance(results, list):
+            if cls._is_binary_scan(loaded_outputs):
+                return EvidenceEntry(None, "source_input_configuration_analysis_required")
             return EvidenceEntry(False, "keyboard_cache_exposure_not_assessed_binary_scan")
 
         for result in results:
@@ -610,4 +652,20 @@ class IOSDataStorageEvidence:
             path = str(result.get("path", "")).strip()
             return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
 
+        if cls._is_binary_scan(loaded_outputs):
+            return EvidenceEntry(None, "source_input_configuration_analysis_required")
         return EvidenceEntry(False, "no_keyboard_cache_exposure_hits")
+
+    @staticmethod
+    def _is_binary_scan(loaded_outputs: dict[str, Any]) -> bool:
+        """Identify binary output so strings-only signals are not reported as confirmed findings."""
+
+        metadata = loaded_outputs.get("scan_metadata")
+        if isinstance(metadata, dict):
+            target_type = str(metadata.get("target_type") or "").strip().lower()
+            if target_type == "binary":
+                return True
+            target_kind = str(metadata.get("target_kind") or "").strip().lower()
+            if target_kind.endswith("_binary"):
+                return True
+        return any(key in loaded_outputs for key in ("strings_outputs", "ipsw_outputs", "lief_outputs"))

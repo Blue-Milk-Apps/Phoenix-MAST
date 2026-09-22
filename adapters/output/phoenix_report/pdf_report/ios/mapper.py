@@ -86,4 +86,17 @@ def map_ios_binary_details(details: IOSBinaryReportDetails) -> dict[str, object]
         "permissions": [asdict(item) for item in details.permissions],
         "hardcoded_values": asdict(details.hardcoded_values),
         "endpoints": [asdict(item) for item in details.endpoints],
+        "ios_binary_manual_review_available": details.manual_review_available,
+        "ios_binary_manual_review_status": details.manual_review_status,
+        "ios_binary_manual_review_findings": [
+            {
+                "rule_id": finding.rule_id,
+                "scope": finding.scope,
+                "severity": finding.severity,
+                "location": finding.location,
+                "reason": finding.reason,
+                "message": finding.message,
+            }
+            for finding in details.manual_review_findings
+        ],
     }

@@ -23,6 +23,7 @@ from domain.report import (
     IOSBinaryReportDetails,
     IOSSDKCategoryDetails,
     IOSUrlSchemeDetails,
+    ManualReviewFinding,
     OverallEvaluation,
     PermissionDetails,
     ReportData,
@@ -75,6 +76,7 @@ class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
 
     @classmethod
     def _details(cls, data: Mapping[str, Any]) -> IOSBinaryReportDetails:
+        manual_review_findings = cls._manual_review_findings(data)
         return IOSBinaryReportDetails(
             file_info=FileDetails(
                 **{
@@ -141,7 +143,34 @@ class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
                 for x in data.get("endpoints", ())
                 if isinstance(x, Mapping)
             ),
+            manual_review_available=bool(manual_review_findings),
+            manual_review_status="Required" if manual_review_findings else "Not Required",
+            manual_review_findings=manual_review_findings,
         )
+
+    @classmethod
+    def _manual_review_findings(cls, data: Mapping[str, Any]) -> tuple[ManualReviewFinding, ...]:
+        """Expose binary checks whose evidence needs source or runtime confirmation."""
+
+        findings: list[ManualReviewFinding] = []
+        for _section_name, _area, evidence_key, definitions in SECTION_CHECKS:
+            evidence_section = cls._mapping(data, evidence_key)
+            for definition in definitions:
+                entry = cls._mapping(evidence_section, definition.evidence_key)
+                if not entry or cls._optional_bool(entry.get("present")) is not None:
+                    continue
+                evidence = cls._text(entry, "evidence")
+                findings.append(
+                    ManualReviewFinding(
+                        rule_id=f"ios.binary.{definition.evidence_key}",
+                        scope="iOS binary",
+                        severity=definition.severity.value,
+                        location=evidence if evidence.startswith("(Triage Signal") else "",
+                        reason=cls._not_evaluated_explanation(entry, definition.name),
+                        message=definition.name,
+                    )
+                )
+        return tuple(findings)
 
     @classmethod
     def _hardcoded_values(cls, data: Mapping[str, Any]) -> HardcodedValuesDetails:
@@ -202,7 +231,7 @@ class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
             if result == AssessmentStatus.PRESENT
             else definition.not_present_explanation
             if result == AssessmentStatus.NOT_PRESENT
-            else cls._not_evaluated_explanation(entry)
+            else cls._not_evaluated_explanation(entry, definition.name)
         )
         return SecurityCheck(
             name=definition.name,
@@ -215,7 +244,7 @@ class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
         )
 
     @staticmethod
-    def _not_evaluated_explanation(entry: Mapping[str, Any]) -> str:
+    def _not_evaluated_explanation(entry: Mapping[str, Any], check_name: str = "") -> str:
         evidence = str(entry.get("evidence") or "").strip()
         if evidence == "dynamic_memory_analysis_required":
             return (
@@ -223,9 +252,35 @@ class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
                 "requires manual review and dynamic memory inspection."
             )
         if evidence == "source_data_flow_analysis_required":
+            lowered_name = check_name.lower()
+            if "wifi mac" in lowered_name or "bssid" in lowered_name:
+                subject = "insecure WiFi MAC/BSSID storage"
+            elif "logged" in lowered_name:
+                subject = "insecure logging of the identified data"
+            elif "user defaults" in lowered_name:
+                subject = "sensitive data storage in UserDefaults"
+            else:
+                subject = "the identified storage behavior"
+            return f"Not evaluated because confirming {subject} requires source-level data-flow analysis."
+        if evidence == "source_permission_api_analysis_required":
             return (
-                "Not evaluated because confirming insecure WiFi MAC/BSSID storage requires source-level "
-                "data-flow analysis."
+                "Not evaluated because confirming global write access requires source-level review of the "
+                "permission-setting API and its effective access scope."
+            )
+        if evidence == "source_input_configuration_analysis_required":
+            return (
+                "Not evaluated because determining whether text input can expose sensitive values through the "
+                "keyboard cache requires source-level input configuration review."
+            )
+        if evidence == "source_control_flow_and_runtime_authentication_testing_required":
+            return (
+                "Not evaluated because determining whether biometric or local authentication can be bypassed "
+                "requires source-level control-flow review and runtime authentication testing."
+            )
+        if evidence.startswith("(Triage Signal; source review required)"):
+            return (
+                "Not evaluated because binary strings only indicate related data and storage or logging names; "
+                "source-level data-flow review is required to confirm their use."
             )
         detail = str(entry.get("not_evaluated_detail") or entry.get("not_evaluated_reason") or "").strip()
         if detail:

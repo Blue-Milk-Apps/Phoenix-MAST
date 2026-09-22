@@ -594,6 +594,9 @@ class IOSBinaryReportDetails(PlatformReportDetails):
     permissions: tuple[PermissionDetails, ...]
     hardcoded_values: HardcodedValuesDetails
     endpoints: tuple[EndpointDetails, ...]
+    manual_review_available: bool = False
+    manual_review_status: str = "Not Assessed"
+    manual_review_findings: tuple[ManualReviewFinding, ...] = ()
 
     @property
     def target_kind(self) -> ReportTargetKind:
