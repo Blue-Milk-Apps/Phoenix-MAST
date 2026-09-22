@@ -216,6 +216,17 @@ class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
 
     @staticmethod
     def _not_evaluated_explanation(entry: Mapping[str, Any]) -> str:
+        evidence = str(entry.get("evidence") or "").strip()
+        if evidence == "dynamic_memory_analysis_required":
+            return (
+                "Not evaluated because confirming whether sensitive values remain recoverable in runtime memory "
+                "requires manual review and dynamic memory inspection."
+            )
+        if evidence == "source_data_flow_analysis_required":
+            return (
+                "Not evaluated because confirming insecure WiFi MAC/BSSID storage requires source-level "
+                "data-flow analysis."
+            )
         detail = str(entry.get("not_evaluated_detail") or entry.get("not_evaluated_reason") or "").strip()
         if detail:
             return f"Not evaluated because {detail.rstrip('.')}."

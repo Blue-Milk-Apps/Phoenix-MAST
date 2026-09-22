@@ -12,9 +12,6 @@ from domain.post_scan.ios.rule_registry import (
 from domain.post_scan.ios.rule_registry import DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY
 from domain.post_scan.ios.rule_registry import WEAK_FILE_PROTECTION_RULE_IDS as REGISTERED_WEAK_FILE_PROTECTION_RULE_IDS
 
-# TODO(dynamic): Add sensitive-values-in-memory evidence when runtime memory inspection is available.
-# It is intentionally omitted from static scan results.
-
 
 @dataclass
 class IOSDataStorageEvidence:
@@ -28,6 +25,8 @@ class IOSDataStorageEvidence:
     hardcoded_passwords_stored_insecurely: EvidenceEntry
     sensitive_values_stored_insecurely: EvidenceEntry
     wifi_ip_stored_insecurely: EvidenceEntry
+    wifi_mac_stored_insecurely: EvidenceEntry
+    sensitive_values_stored_in_memory: EvidenceEntry
     keychain_items_accessible_after_first_unlock: EvidenceEntry
     sensitive_data_stored_in_user_defaults: EvidenceEntry
     advertiser_id_logged_insecurely: EvidenceEntry
@@ -68,6 +67,8 @@ class IOSDataStorageEvidence:
         "sensitive_data_stored_in_user_defaults"
     ]
     WIFI_IP_INSECURE_STORAGE_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY["wifi_ip_stored_insecurely"]
+    WIFI_MAC_INSECURE_STORAGE_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY["wifi_mac_stored_insecurely"]
+    SENSITIVE_VALUE_LONG_LIVED_MEMORY_RULE_ID = "ios.storage.sensitive-value-long-lived-memory"
     ADVERTISER_ID_LOGGING_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY["advertiser_id_logged_insecurely"]
     IMEI_LOGGING_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY["imei_logged_insecurely"]
     LOCATION_DATA_LOGGING_RULE_ID = DATA_STORAGE_RULE_ID_BY_EVIDENCE_KEY["location_data_logged_insecurely"]
@@ -123,6 +124,8 @@ class IOSDataStorageEvidence:
         self.hardcoded_passwords_stored_insecurely = self._hardcoded_passwords_stored_insecurely_entry(loaded_outputs)
         self.sensitive_values_stored_insecurely = self._sensitive_values_stored_insecurely_entry(loaded_outputs)
         self.wifi_ip_stored_insecurely = self._wifi_ip_stored_insecurely_entry(loaded_outputs)
+        self.wifi_mac_stored_insecurely = self._wifi_mac_stored_insecurely_entry(loaded_outputs)
+        self.sensitive_values_stored_in_memory = self._sensitive_values_stored_in_memory_entry(loaded_outputs)
         self.keychain_items_accessible_after_first_unlock = self._keychain_items_accessible_after_first_unlock_entry(
             loaded_outputs
         )
@@ -350,6 +353,33 @@ class IOSDataStorageEvidence:
             storage_markers=cls.INSECURE_STORAGE_MARKERS,
             no_hit_evidence="no_wifi_ip_stored_insecurely_hits",
         )
+
+    @classmethod
+    def _wifi_mac_stored_insecurely_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        opengrep = loaded_outputs.get("opengrep")
+        results = opengrep.get("results") if isinstance(opengrep, dict) else None
+        if isinstance(results, list):
+            for result in results:
+                if not isinstance(result, dict) or result.get("check_id") != cls.WIFI_MAC_INSECURE_STORAGE_RULE_ID:
+                    continue
+                extra = result.get("extra") or {}
+                evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
+                path = str(result.get("path", "")).strip()
+                return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
+            return EvidenceEntry(False, "no_wifi_mac_stored_insecurely_hits")
+
+        return EvidenceEntry(None, "source_data_flow_analysis_required")
+
+    @classmethod
+    def _sensitive_values_stored_in_memory_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
+        for result in (loaded_outputs.get("opengrep") or {}).get("results") or []:
+            if not isinstance(result, dict) or result.get("check_id") != cls.SENSITIVE_VALUE_LONG_LIVED_MEMORY_RULE_ID:
+                continue
+            extra = result.get("extra") or {}
+            evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
+            path = str(result.get("path", "")).strip()
+            return EvidenceEntry(None, f"{path}: {evidence}" if path else evidence)
+        return EvidenceEntry(None, "dynamic_memory_analysis_required")
 
     @classmethod
     def _source_or_storage_triage_entry(

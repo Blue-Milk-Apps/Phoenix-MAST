@@ -30,12 +30,12 @@ RULE_ID_PATTERN = re.compile(r"^\s*-\s+id:\s*([^\s#]+)", re.MULTILINE)
 
 
 def test_ios_rule_registry_classifies_every_rule_once() -> None:
-    assert len(IOS_RULE_REGISTRY) == 88
+    assert len(IOS_RULE_REGISTRY) == 90
     assert Counter(mapping.disposition for mapping in IOS_RULE_REGISTRY.values()) == {
-        IOSRuleDisposition.REPORT_VULNERABILITY: 48,
+        IOSRuleDisposition.REPORT_VULNERABILITY: 49,
         IOSRuleDisposition.FUNCTIONALITY: 21,
         IOSRuleDisposition.POSITIVE_INFORMATIONAL: 8,
-        IOSRuleDisposition.RAW_ONLY: 11,
+        IOSRuleDisposition.RAW_ONLY: 12,
     }
     assert not unclassified_ios_rule_ids(IOS_RULE_IDS)
     assert all(mapping.applies_to for mapping in IOS_RULE_REGISTRY.values())

@@ -34,6 +34,7 @@ class SourceCheckDefinition:
     compliance: str = ""
     present_explanation: str = ""
     not_present_explanation: str = ""
+    not_evaluated_explanation: str = ""
 
 
 class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
@@ -173,7 +174,8 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
                 if result == AssessmentStatus.PRESENT
                 else definition.not_present_explanation
                 if result == AssessmentStatus.NOT_PRESENT
-                else cls._not_evaluated_explanation(
+                else definition.not_evaluated_explanation
+                or cls._not_evaluated_explanation(
                     entry,
                     evidence_available=evidence_available,
                     entry_available=entry_available,

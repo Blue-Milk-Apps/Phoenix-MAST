@@ -335,6 +335,24 @@ _IOS_SOURCE_SECTION_CHECKS = (
                 not_present_explanation="WiFi IP address is not written to an unprotected on-device storage location.",
             ),
             SourceCheckDefinition(
+                name="Local Data Exposure: WiFi MAC/BSSID Stored Insecurely",
+                evidence_key="wifi_mac_stored_insecurely",
+                severity=CheckSeverity.HIGH,
+                compliance="MASVS-STORAGE-1; MASTG-TEST-0052; legacy MSTG-STORAGE-1",
+                present_explanation="A WiFi MAC address or BSSID is written to unprotected on-device storage.",
+                not_present_explanation="No WiFi MAC address or BSSID was found written to unprotected on-device storage.",
+            ),
+            SourceCheckDefinition(
+                name="Local Data Exposure: Sensitive Values Stored in Memory (Requires Manual Review)",
+                evidence_key="sensitive_values_stored_in_memory",
+                severity=CheckSeverity.MEDIUM,
+                compliance="MASVS-STORAGE-2",
+                not_evaluated_explanation=(
+                    "Not evaluated because static analysis cannot confirm whether sensitive values remain "
+                    "recoverable in runtime memory; manual review and dynamic memory inspection are required."
+                ),
+            ),
+            SourceCheckDefinition(
                 name="Keychain Items Accessible After First Unlock",
                 evidence_key="keychain_items_accessible_after_first_unlock",
                 severity=CheckSeverity.MEDIUM,

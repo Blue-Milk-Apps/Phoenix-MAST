@@ -823,6 +823,8 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
         "hardcoded_passwords_stored_insecurely",
         "sensitive_values_stored_insecurely",
         "wifi_ip_stored_insecurely",
+        "wifi_mac_stored_insecurely",
+        "sensitive_values_stored_in_memory",
         "keychain_items_accessible_after_first_unlock",
         "sensitive_data_stored_in_user_defaults",
         "advertiser_id_logged_insecurely",

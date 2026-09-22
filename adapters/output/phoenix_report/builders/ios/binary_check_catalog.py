@@ -192,7 +192,7 @@ DATA_STORAGE_CHECKS = tuple(
             "sensitive_values_stored_insecurely",
         ),
         ("Local Data Exposure: WiFi IP Address Stored Insecurely", CheckSeverity.HIGH, "wifi_ip_stored_insecurely"),
-        ("Local Data Exposure: WiFi MAC Address Stored Insecurely", CheckSeverity.HIGH, "wifi_mac_stored_insecurely"),
+        ("Local Data Exposure: WiFi MAC/BSSID Stored Insecurely", CheckSeverity.HIGH, "wifi_mac_stored_insecurely"),
         ("Sensitive Data Stored in User Defaults", CheckSeverity.HIGH, "sensitive_data_stored_in_user_defaults"),
         (
             "Local Data Exposure: Advertiser ID Logged Insecurely",
@@ -216,7 +216,7 @@ DATA_STORAGE_CHECKS = tuple(
             "sensitive_data_logged_insecurely",
         ),
         (
-            "Local Data Exposure: Sensitive Values Stored in Memory",
+            "Local Data Exposure: Sensitive Values Stored in Memory (Requires Manual Review)",
             CheckSeverity.MEDIUM,
             "sensitive_values_stored_in_memory",
         ),

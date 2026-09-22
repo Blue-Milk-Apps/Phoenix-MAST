@@ -15,7 +15,7 @@ def test_default_ios_rule_inventory_uses_current_section_files() -> None:
         ("Code", 13),
         ("Functionality", 36),
         ("Network", 7),
-        ("Data Evidence", 41),
+        ("Data Evidence", 43),
     ]
 
 
