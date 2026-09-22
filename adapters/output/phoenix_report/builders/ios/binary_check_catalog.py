@@ -193,11 +193,6 @@ DATA_STORAGE_CHECKS = tuple(
         ),
         ("Local Data Exposure: WiFi IP Address Stored Insecurely", CheckSeverity.HIGH, "wifi_ip_stored_insecurely"),
         ("Local Data Exposure: WiFi MAC Address Stored Insecurely", CheckSeverity.HIGH, "wifi_mac_stored_insecurely"),
-        (
-            "Sensitive Values Stored in Plaintext Within the Keychain",
-            CheckSeverity.HIGH,
-            "sensitive_values_stored_in_plaintext_keychain",
-        ),
         ("Sensitive Data Stored in User Defaults", CheckSeverity.HIGH, "sensitive_data_stored_in_user_defaults"),
         (
             "Local Data Exposure: Advertiser ID Logged Insecurely",

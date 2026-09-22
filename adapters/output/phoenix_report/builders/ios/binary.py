@@ -202,7 +202,7 @@ class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
             if result == AssessmentStatus.PRESENT
             else definition.not_present_explanation
             if result == AssessmentStatus.NOT_PRESENT
-            else f"{definition.name} was not evaluated because scan evidence is unavailable."
+            else cls._not_evaluated_explanation(entry)
         )
         return SecurityCheck(
             name=definition.name,
@@ -213,6 +213,15 @@ class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
             compliance=cls._text(entry, "compliance") or definition.compliance,
             remediation_link=cls._text(entry, "remediation_link"),
         )
+
+    @staticmethod
+    def _not_evaluated_explanation(entry: Mapping[str, Any]) -> str:
+        detail = str(entry.get("not_evaluated_detail") or entry.get("not_evaluated_reason") or "").strip()
+        if detail:
+            return f"Not evaluated because {detail.rstrip('.')}."
+        if not entry:
+            return "Not evaluated because post-scan analysis did not produce evidence for this check."
+        return "Not evaluated because the scanner did not return a conclusive result."
 
     @staticmethod
     def _finding_severity(sections: tuple[VulnerabilitySection, ...]) -> FindingSeverity:

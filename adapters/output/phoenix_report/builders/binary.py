@@ -47,7 +47,7 @@ class BinaryReportDataBuilder(ReportDataBuilderPort, ABC):
             return f"Evidence indicates that {name.lower()} functionality is present."
         if status == AssessmentStatus.NOT_PRESENT:
             return f"No evidence indicates that {name.lower()} functionality is present."
-        return f"{name} functionality was not evaluated because scan evidence is unavailable."
+        return "Not evaluated because functionality evidence was not produced by the binary scan."
 
     @staticmethod
     def _attach_single_platform_assessments(
