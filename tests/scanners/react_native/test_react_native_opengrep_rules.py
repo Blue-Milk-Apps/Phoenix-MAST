@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -36,23 +38,28 @@ def test_react_native_rules_match_positive_fixture_and_ignore_negative_fixture()
 
 
 def _scan(source_path: Path) -> dict[str, object]:
-    completed = subprocess.run(
-        [
-            str(shutil.which("opengrep")),
-            "scan",
-            "--config",
-            str(RULES_PATH),
-            str(source_path),
-            "--json",
-            "--no-rewrite-rule-ids",
-            "--no-git-ignore",
-            "--disable-version-check",
-        ],
-        check=False,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        timeout=30,
-    )
+    # OpenGrep writes its diagnostic log below the process home directory.
+    # Keep scanner tests isolated from a read-only or developer-specific home.
+    with tempfile.TemporaryDirectory(prefix="phoenix-opengrep-home-") as home:
+        environment = {**os.environ, "HOME": home}
+        completed = subprocess.run(
+            [
+                str(shutil.which("opengrep")),
+                "scan",
+                "--config",
+                str(RULES_PATH),
+                str(source_path),
+                "--json",
+                "--no-rewrite-rule-ids",
+                "--no-git-ignore",
+                "--disable-version-check",
+            ],
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=30,
+            env=environment,
+        )
     assert completed.returncode in (0, 1), completed.stderr
     return json.loads(completed.stdout)

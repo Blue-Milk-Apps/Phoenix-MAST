@@ -31,6 +31,7 @@ class FlutterDataStorageEvidence:
     hardcoded_passwords_stored_insecurely: FlutterEvidenceEntry
     sensitive_values_stored_insecurely: FlutterEvidenceEntry
     wifi_ip_stored_insecurely: FlutterEvidenceEntry
+    wifi_mac_stored_insecurely: FlutterEvidenceEntry
     keychain_items_accessible_after_first_unlock: FlutterEvidenceEntry
     sensitive_data_stored_in_user_defaults: FlutterEvidenceEntry
     advertiser_id_logged_insecurely: FlutterEvidenceEntry

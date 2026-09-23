@@ -15,5 +15,8 @@ class IOSResilienceEvidence:
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
         _ = loaded_outputs
-        self.biometric_bypass_possible = EvidenceEntry(False, "no_biometric_bypass_possible_hits")
+        self.biometric_bypass_possible = EvidenceEntry(
+            None,
+            "source_control_flow_and_runtime_authentication_testing_required",
+        )
         self.debug_symbols_present = EvidenceEntry(False, "no_debug_symbols_present_hits")

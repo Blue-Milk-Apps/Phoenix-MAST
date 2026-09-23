@@ -11,11 +11,12 @@ from domain.post_scan.android.native import (
 )
 
 
-def test_android_rules_use_phoenix_metadata() -> None:
+def test_android_rules_use_flat_metadata() -> None:
     rules = (Path(__file__).parents[4] / "rules" / "android" / "android_rules.yml").read_text(encoding="utf-8")
 
     assert "appcritiq:" not in rules
-    assert rules.count("\n      phoenix:") == 27
+    assert "\n      phoenix:" not in rules
+    assert rules.count("\n      report_section:") == 27
 
 
 def test_functionality_combines_manifest_permissions_and_phoenix_opengrep_metadata() -> None:

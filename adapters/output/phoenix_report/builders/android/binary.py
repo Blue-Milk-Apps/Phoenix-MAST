@@ -126,7 +126,7 @@ class AndroidBinaryReportDataBuilder(BinaryReportDataBuilder):
             name=definition.name,
             severity=definition.severity,
             result=result,
-            explanation=cls._text(entry, "explanation") or cls._explanation(definition.name, result),
+            explanation=cls._text(entry, "explanation") or cls._explanation(definition.name, result, entry),
             evidence=evidence,
             compliance=cls._text(entry, "compliance") or compliance,
             remediation_link=cls._text(entry, "remediation_link"),
@@ -188,9 +188,14 @@ class AndroidBinaryReportDataBuilder(BinaryReportDataBuilder):
         return AssessmentStatus.NOT_EVALUATED
 
     @staticmethod
-    def _explanation(check_name: str, result: AssessmentStatus) -> str:
+    def _explanation(check_name: str, result: AssessmentStatus, entry: Mapping[str, Any]) -> str:
         if result == AssessmentStatus.NOT_EVALUATED:
-            return f"{check_name} was not evaluated because the required scan evidence is unavailable."
+            detail = str(entry.get("not_evaluated_detail") or entry.get("not_evaluated_reason") or "").strip()
+            if detail:
+                return f"Not evaluated because {detail.rstrip('.')}."
+            if not entry:
+                return "Not evaluated because post-scan analysis did not produce evidence for this check."
+            return "Not evaluated because the scanner did not return a conclusive result."
         if result == AssessmentStatus.PRESENT:
             return f"Evidence indicates that {check_name.lower()}."
         return f"No evidence indicates that {check_name.lower()}."

@@ -157,6 +157,7 @@ REACT_NATIVE_SOURCE_SECTION_CHECKS = (
             "sensitive_values_stored_insecurely",
             "weak_file_protection",
             "wifi_ip_stored_insecurely",
+            "wifi_mac_stored_insecurely",
             "wifi_mac_logged_insecurely",
         ),
     ),

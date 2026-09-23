@@ -110,4 +110,4 @@ class NativeAndroidReportDataBuilder(SourceReportDataBuilder):
             return f"{name} functionality was identified in the available scan evidence."
         if present is False:
             return f"No permission or scan evidence indicated {name} functionality."
-        return f"{name} functionality was not evaluated because the required scan evidence is unavailable."
+        return "Not evaluated because Android functionality scan results were not produced."

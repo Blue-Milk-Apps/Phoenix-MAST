@@ -7,6 +7,7 @@ from domain.report.models import (
     HardcodedSecretDetails,
     HardcodedUrlDetails,
     HardcodedValuesDetails,
+    ManualReviewFinding,
     NativeIOSReportDetails,
     PermissionDetails,
     ReportPlatform,
@@ -78,6 +79,35 @@ class NativeIOSReportDataBuilder(SourceReportDataBuilder):
                 for name in data.get("third_party_sdks", {})
                 if isinstance(data.get("third_party_sdks"), Mapping)
             ),
+            manual_review_available=isinstance(data.get("manual_review"), Mapping),
+            manual_review_status=self._manual_review_status(data),
+            manual_review_findings=self._manual_review_findings(data),
+        )
+
+    @staticmethod
+    def _manual_review_status(data: Mapping[str, Any]) -> str:
+        review = data.get("manual_review") if isinstance(data.get("manual_review"), Mapping) else {}
+        if review.get("fully_assessed") is True:
+            return "Complete"
+        if review.get("assessed") is True:
+            return "Partial"
+        return "Not Assessed"
+
+    @staticmethod
+    def _manual_review_findings(data: Mapping[str, Any]) -> tuple[ManualReviewFinding, ...]:
+        review = data.get("manual_review") if isinstance(data.get("manual_review"), Mapping) else {}
+        findings = review.get("findings") if isinstance(review.get("findings"), list) else []
+        return tuple(
+            ManualReviewFinding(
+                rule_id=str(item.get("rule_id") or ""),
+                scope=str(item.get("scope") or ""),
+                severity=str(item.get("severity") or ""),
+                location=str(item.get("location") or ""),
+                reason=str(item.get("reason") or ""),
+                message=str(item.get("message") or ""),
+            )
+            for item in findings
+            if isinstance(item, Mapping)
         )
 
     @staticmethod
