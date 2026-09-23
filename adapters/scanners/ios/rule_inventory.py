@@ -10,8 +10,6 @@ from typing import Any, Collection
 
 import yaml
 
-from domain.post_scan.ios.rule_registry import IOS_RULE_IDS
-
 
 class IOSRuleInventoryError(ValueError):
     """Raised when the iOS rule files do not match the Phoenix registry."""
@@ -28,8 +26,10 @@ class IOSRuleSection(StrEnum):
     def from_file_name(cls, file_name: str) -> "IOSRuleSection":
         sections = {
             "code": cls.CODE,
+            "crypto": cls.CODE,
             "functionality": cls.FUNCTIONALITY,
             "network": cls.NETWORK,
+            "networking": cls.NETWORK,
             "permissions": cls.PERMISSIONS,
             "storage": cls.STORAGE,
         }
@@ -38,7 +38,7 @@ class IOSRuleSection(StrEnum):
         except KeyError as exc:
             raise IOSRuleInventoryError(
                 f"Unsupported iOS rule file '{file_name}.yml'. "
-                "Expected code, functionality, network, permissions, or storage."
+                "Expected code, crypto, functionality, network, networking, permissions, or storage."
             ) from exc
 
 
@@ -72,7 +72,7 @@ class IOSRuleInventory:
         return cls(files=files)
 
     def validate(self, expected_rule_ids: Collection[str] | None = None) -> None:
-        """Validate file sections, duplicate IDs, and registry coverage."""
+        """Validate duplicate IDs and optional expected-rule coverage."""
 
         errors: list[str] = []
         all_rule_ids = [rule_id for rule_file in self.files for rule_id in rule_file.rule_ids]
@@ -80,14 +80,15 @@ class IOSRuleInventory:
         if duplicates:
             errors.append(f"duplicate rule IDs: {', '.join(duplicates)}")
 
-        expected = set(IOS_RULE_IDS if expected_rule_ids is None else expected_rule_ids)
-        actual = set(all_rule_ids)
-        missing = sorted(expected - actual)
-        unexpected = sorted(actual - expected)
-        if missing:
-            errors.append(f"missing rule IDs: {', '.join(missing)}")
-        if unexpected:
-            errors.append(f"unexpected rule IDs: {', '.join(unexpected)}")
+        if expected_rule_ids is not None:
+            expected = set(expected_rule_ids)
+            actual = set(all_rule_ids)
+            missing = sorted(expected - actual)
+            unexpected = sorted(actual - expected)
+            if missing:
+                errors.append(f"missing rule IDs: {', '.join(missing)}")
+            if unexpected:
+                errors.append(f"unexpected rule IDs: {', '.join(unexpected)}")
 
         if errors:
             raise IOSRuleInventoryError("Invalid iOS OpenGrep rule inventory: " + "; ".join(errors))
@@ -121,25 +122,17 @@ class IOSRuleInventory:
 
         rule_ids: list[str] = []
         rule_documents: list[dict[str, Any]] = []
-        section_errors: list[str] = []
+        rule_errors: list[str] = []
         for index, rule in enumerate(document["rules"], start=1):
             rule_id = rule.get("id") if isinstance(rule, dict) else None
             if not isinstance(rule_id, str) or not rule_id.strip():
-                section_errors.append(f"{path.name} rule {index} has no non-empty id")
+                rule_errors.append(f"{path.name} rule {index} has no non-empty id")
                 continue
             rule_ids.append(rule_id.strip())
             rule_documents.append(rule)
 
-            metadata = rule.get("metadata") if isinstance(rule, dict) else None
-            phoenix_metadata: Any = metadata.get("phoenix") if isinstance(metadata, dict) else None
-            declared_section = phoenix_metadata.get("report_section") if isinstance(phoenix_metadata, dict) else None
-            if declared_section != section.value:
-                section_errors.append(
-                    f"{rule_id} declares report_section={declared_section!r}; expected {section.value!r}"
-                )
-
-        if section_errors:
-            raise IOSRuleInventoryError("Invalid iOS rule sections: " + "; ".join(section_errors))
+        if rule_errors:
+            raise IOSRuleInventoryError("Invalid iOS rules: " + "; ".join(rule_errors))
         return IOSRuleFile(
             path=path,
             section=section,

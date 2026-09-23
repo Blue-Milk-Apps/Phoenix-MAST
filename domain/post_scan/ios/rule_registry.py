@@ -71,6 +71,7 @@ DATA_STORAGE_RULE_IDS_BY_EVIDENCE_KEY: dict[str, frozenset[str]] = {
     "hardcoded_passwords_stored_insecurely": frozenset({"ios.storage.hardcoded-password-insecure-storage"}),
     "sensitive_values_stored_insecurely": frozenset({"ios.storage.sensitive-value-insecure-storage"}),
     "wifi_ip_stored_insecurely": frozenset({"ios.storage.wifi-ip-insecure-storage"}),
+    "wifi_mac_stored_insecurely": frozenset({"ios.storage.wifi-mac-insecure-storage"}),
     "keychain_items_accessible_after_first_unlock": frozenset(
         {"ios.storage.keychain-items-accessible-after-first-unlock"}
     ),
@@ -164,6 +165,10 @@ RAW_ONLY_RULE_REASONS: dict[str, str] = {
     "private-api-usage-unsafebitcast": "Potential private API usage needs a dedicated source report check before promotion.",
     "config-storage-usage": "UserDefaults usage alone does not establish insecure storage.",
     "settings-bundle-usage": "Settings bundle usage is informational and has no matching capability field.",
+    "ios.storage.sensitive-value-long-lived-memory": (
+        "Static analysis can only identify values that may remain in long-lived memory; runtime memory inspection "
+        "and manual review are required to confirm exposure."
+    ),
 }
 
 SOURCE_ONLY_RULE_IDS = frozenset(
@@ -174,6 +179,7 @@ SOURCE_ONLY_RULE_IDS = frozenset(
         "ios.storage.advertiser-id-insecure-storage",
         "ios.network.cookie-missing-httponly",
         "ios.network.cookie-missing-secure-flag",
+        "ios.storage.wifi-mac-insecure-storage",
     }
 )
 
@@ -211,7 +217,14 @@ def _build_registry() -> dict[str, IOSRuleMapping]:
     )
     registry.update(
         {
-            rule_id: IOSRuleMapping(IOSRuleDisposition.RAW_ONLY, "Raw", reason=reason)
+            rule_id: IOSRuleMapping(
+                IOSRuleDisposition.RAW_ONLY,
+                "Raw",
+                reason=reason,
+                applies_to=frozenset({"SOURCE"})
+                if rule_id == "ios.storage.sensitive-value-long-lived-memory"
+                else frozenset({"BINARY", "SOURCE"}),
+            )
             for rule_id, reason in RAW_ONLY_RULE_REASONS.items()
         }
     )

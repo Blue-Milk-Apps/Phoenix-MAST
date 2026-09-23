@@ -76,10 +76,10 @@ def test_bundled_flutter_rules_match_the_registry_contract() -> None:
 
     assert set(bundled_rules) == set(FLUTTER_RULE_IDS)
     for rule_id, mapping in FLUTTER_RULE_REGISTRY.items():
-        phoenix = bundled_rules[rule_id]["metadata"]["phoenix"]
-        assert phoenix["severity"] == mapping.severity
-        assert phoenix["report_section"] == mapping.section
+        metadata = bundled_rules[rule_id]["metadata"]
+        assert metadata["severity"] == mapping.severity
+        assert metadata["report_section"] == mapping.section
         if mapping.disposition is FlutterRuleDisposition.REPORT_VULNERABILITY:
-            assert phoenix["evidence_key"] == mapping.evidence_key
+            assert metadata["evidence_key"] == mapping.evidence_key
         else:
-            assert phoenix["disposition"] == mapping.disposition.value
+            assert metadata["disposition"] == mapping.disposition.value

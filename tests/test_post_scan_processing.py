@@ -823,6 +823,8 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
         "hardcoded_passwords_stored_insecurely",
         "sensitive_values_stored_insecurely",
         "wifi_ip_stored_insecurely",
+        "wifi_mac_stored_insecurely",
+        "sensitive_values_stored_in_memory",
         "keychain_items_accessible_after_first_unlock",
         "sensitive_data_stored_in_user_defaults",
         "advertiser_id_logged_insecurely",
@@ -834,8 +836,8 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
     }
     assert result["resilience_evidence"] == {
         "biometric_bypass_possible": {
-            "present": False,
-            "evidence": "no_biometric_bypass_possible_hits",
+            "present": None,
+            "evidence": "source_control_flow_and_runtime_authentication_testing_required",
         },
         "debug_symbols_present": {
             "present": False,

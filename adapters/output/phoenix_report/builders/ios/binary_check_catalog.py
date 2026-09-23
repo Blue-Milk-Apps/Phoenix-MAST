@@ -192,12 +192,7 @@ DATA_STORAGE_CHECKS = tuple(
             "sensitive_values_stored_insecurely",
         ),
         ("Local Data Exposure: WiFi IP Address Stored Insecurely", CheckSeverity.HIGH, "wifi_ip_stored_insecurely"),
-        ("Local Data Exposure: WiFi MAC Address Stored Insecurely", CheckSeverity.HIGH, "wifi_mac_stored_insecurely"),
-        (
-            "Sensitive Values Stored in Plaintext Within the Keychain",
-            CheckSeverity.HIGH,
-            "sensitive_values_stored_in_plaintext_keychain",
-        ),
+        ("Local Data Exposure: WiFi MAC/BSSID Stored Insecurely", CheckSeverity.HIGH, "wifi_mac_stored_insecurely"),
         ("Sensitive Data Stored in User Defaults", CheckSeverity.HIGH, "sensitive_data_stored_in_user_defaults"),
         (
             "Local Data Exposure: Advertiser ID Logged Insecurely",
@@ -221,7 +216,7 @@ DATA_STORAGE_CHECKS = tuple(
             "sensitive_data_logged_insecurely",
         ),
         (
-            "Local Data Exposure: Sensitive Values Stored in Memory",
+            "Local Data Exposure: Sensitive Values Stored in Memory (Requires Manual Review)",
             CheckSeverity.MEDIUM,
             "sensitive_values_stored_in_memory",
         ),
@@ -232,6 +227,21 @@ DATA_STORAGE_CHECKS = tuple(
             "keyboard_cache_exposure",
         ),
     )
+)
+DATA_STORAGE_CHECKS += (
+    IOSBinaryCheckDefinition(
+        name="Keychain Items Accessible After First Unlock",
+        severity=CheckSeverity.MEDIUM,
+        evidence_key="keychain_items_accessible_after_first_unlock",
+        compliance="MASVS-STORAGE-1; MASTG-TEST-0052; MASTG-KNOW-0057; legacy MSTG-STORAGE-1",
+        present_explanation=(
+            "One or more Keychain items are configured to remain accessible after the first device unlock; "
+            "review the data sensitivity and use the most restrictive suitable accessibility class."
+        ),
+        not_present_explanation=(
+            "No Keychain items configured to remain accessible after the first device unlock were identified."
+        ),
+    ),
 )
 RESILIENCE_CHECKS = (
     IOSBinaryCheckDefinition(

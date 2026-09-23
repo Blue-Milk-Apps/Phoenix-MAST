@@ -34,6 +34,7 @@ class SourceCheckDefinition:
     compliance: str = ""
     present_explanation: str = ""
     not_present_explanation: str = ""
+    not_evaluated_explanation: str = ""
 
 
 class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
@@ -129,13 +130,19 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
         definitions: tuple[SourceCheckDefinition, ...],
         data: Mapping[str, Any],
     ) -> VulnerabilitySection:
-        evidence = data.get(key) if isinstance(data.get(key), Mapping) else {}
+        evidence_available = isinstance(data.get(key), Mapping)
+        evidence = data.get(key) if evidence_available else {}
         assessments = cls._security_assessments(data)
         return VulnerabilitySection(
             name=name,
             findings_text="",
             checks=tuple(
-                cls._catalog_check(definition, evidence, assessments.get(definition.evidence_key))
+                cls._catalog_check(
+                    definition,
+                    evidence,
+                    assessments.get(definition.evidence_key),
+                    evidence_available=evidence_available,
+                )
                 for definition in definitions
             ),
         )
@@ -146,9 +153,12 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
         definition: SourceCheckDefinition,
         evidence: Mapping[str, Any],
         platform_rows: object = None,
+        *,
+        evidence_available: bool = True,
     ) -> SecurityCheck:
-        entry = evidence.get(definition.evidence_key)
-        entry = entry if isinstance(entry, Mapping) else {}
+        raw_entry = evidence.get(definition.evidence_key)
+        entry_available = isinstance(raw_entry, Mapping)
+        entry = raw_entry if entry_available else {}
         present = entry.get("present")
         result = (
             AssessmentStatus.PRESENT
@@ -164,7 +174,12 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
                 if result == AssessmentStatus.PRESENT
                 else definition.not_present_explanation
                 if result == AssessmentStatus.NOT_PRESENT
-                else f"{definition.name} was not evaluated because the required scan evidence is unavailable."
+                else definition.not_evaluated_explanation
+                or cls._not_evaluated_explanation(
+                    entry,
+                    evidence_available=evidence_available,
+                    entry_available=entry_available,
+                )
             )
         return SecurityCheck(
             name=definition.name,
@@ -198,7 +213,15 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
         display_name = SourceReportDataBuilder._display_name(name)
         explanation = str(value.get("explanation") or "")
         if not explanation:
-            explanation = SourceReportDataBuilder._default_explanation(display_name, result)
+            explanation = (
+                SourceReportDataBuilder._not_evaluated_explanation(
+                    value,
+                    evidence_available=True,
+                    entry_available=True,
+                )
+                if result == AssessmentStatus.NOT_EVALUATED
+                else SourceReportDataBuilder._default_explanation(display_name, result)
+            )
         compliance = str(value.get("compliance") or "")
         if not compliance:
             compliance = SourceReportDataBuilder._default_compliance(section_name)
@@ -305,7 +328,23 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
             return f"Evidence indicates that {name.lower()}."
         if result == AssessmentStatus.NOT_PRESENT:
             return f"No evidence indicates that {name.lower()}."
-        return f"{name} was not evaluated because the required scan evidence is unavailable."
+        return "Not evaluated because the scanner did not return a conclusive result."
+
+    @staticmethod
+    def _not_evaluated_explanation(
+        entry: Mapping[str, Any],
+        *,
+        evidence_available: bool,
+        entry_available: bool,
+    ) -> str:
+        detail = str(entry.get("not_evaluated_detail") or entry.get("not_evaluated_reason") or "").strip()
+        if detail:
+            return f"Not evaluated because {detail.rstrip('.')}."
+        if not evidence_available:
+            return "Not evaluated because the required scanner results were not produced."
+        if not entry_available:
+            return "Not evaluated because post-scan analysis did not produce evidence for this check."
+        return "Not evaluated because the scanner did not return a conclusive result."
 
     @staticmethod
     def _default_compliance(section_name: str) -> str:
