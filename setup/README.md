@@ -79,12 +79,12 @@ libraries from `/opt/homebrew/lib` or `/usr/local/lib`.
 `phoenix scan` requires exactly one scan target flag. Any of these flags is valid:
 
 ```bash
-phoenix scan --ios-binary-path path/to/app.ipa
-phoenix scan --android-binary-path path/to/app.apk
-phoenix scan --flutter-source-path path/to/project
-phoenix scan --react-native-source-path path/to/project
-phoenix scan --native-android-source-path path/to/project
-phoenix scan --native-ios-source-path path/to/project
+phoenix scan --ios-binary path/to/app.ipa
+phoenix scan --android-binary path/to/app.apk
+phoenix scan --flutter-source path/to/project
+phoenix scan --react-native-source path/to/project
+phoenix scan --android-source path/to/project
+phoenix scan --ios-source path/to/project
 ```
 
 Source scans run Gitleaks as part of the Phoenix pipeline, while binary scans run LIEF, ipsw, and plist extraction for iOS binaries, Androguard, Apktool, Apksigner, and APKiD for Android binaries, and Strings against app binaries plus embedded frameworks/native libraries. MobSF runs for binary scans only when `MOBSF_URL` is configured. ipsw writes compact signing, entitlement, and Mach-O summary evidence under `scan-results/.../ipsw/`. Apktool writes compact Android evidence JSON under `scan-results/.../apktool/` and removes the decoded project after extraction. Apksigner writes APK signing evidence under `scan-results/.../apksigner/`. APKiD writes compact environmental intelligence under `scan-results/.../apkid/`.
@@ -119,13 +119,13 @@ Run Phoenix locally against an IPA or APK while using the MobSF sidecar:
 
 ```bash
 make services-up
-MOBSF_URL=http://localhost:8000 uv run phoenix scan --ios-binary-path "path/to/app.ipa"
+MOBSF_URL=http://localhost:8000 uv run phoenix scan --ios-binary "path/to/app.ipa"
 ```
 
 Run a Compose scan with MobSF by pointing Phoenix at the Compose sidecar:
 
 ```bash
-MOBSF_URL=http://mobsf-scanner:8000 make compose-run PROJECT_PATH="path/to/app.ipa" SCAN_FLAG=--ios-binary-path
+MOBSF_URL=http://mobsf-scanner:8000 make compose-run PROJECT_PATH="path/to/app.ipa" SCAN_FLAG=--ios-binary
 ```
 
 ## Online references

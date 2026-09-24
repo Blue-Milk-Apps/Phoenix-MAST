@@ -21,7 +21,7 @@ uv pip install lief
 Run Phoenix against an IPA file:
 
 ```bash
-uv run phoenix scan --ios-binary-path path/to/app.ipa
+uv run phoenix scan --ios-binary path/to/app.ipa
 ```
 
 The LIEF scanner skips non-IPA inputs, including APK files and source directories.

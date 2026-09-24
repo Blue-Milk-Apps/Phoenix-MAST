@@ -50,7 +50,7 @@ services:
       - MOBSF_URL=${MOBSF_URL:-}
     # Defaults also let sidecar-only and teardown commands parse this file.
     entrypoint: ["phoenix"]
-    command: ["scan", "${SCAN_FLAG:---native-ios-source-path}", "${PHOENIX_SCAN_PATH:-/workspace}", "--output", "/app/results"]
+    command: ["scan", "${SCAN_FLAG:---ios-source}", "${PHOENIX_SCAN_PATH:-/workspace}", "--output", "/app/results"]
 
 
   phoenix-secrets:
@@ -64,7 +64,7 @@ services:
       - ${OUTPUT_PATH:-./scan-results}:/app/results
       - ${RULES_PATH:-./rules}:/app/rules:ro
     entrypoint: ["phoenix"]
-    command: ["scan", "${SCAN_FLAG:---native-ios-source-path}", "${PHOENIX_SCAN_PATH:-/workspace}", "--output", "/app/results"]
+    command: ["scan", "${SCAN_FLAG:---ios-source}", "${PHOENIX_SCAN_PATH:-/workspace}", "--output", "/app/results"]
 
 networks:
   default:

@@ -19,13 +19,13 @@ http://localhost:8000
 Then run Phoenix locally:
 
 ```bash
-MOBSF_URL=http://localhost:8000 uv run phoenix scan --ios-binary-path "path/to/app.ipa"
+MOBSF_URL=http://localhost:8000 uv run phoenix scan --ios-binary "path/to/app.ipa"
 ```
 
 The same works for APK files:
 
 ```bash
-MOBSF_URL=http://localhost:8000 uv run phoenix scan --android-binary-path "path/to/app.apk"
+MOBSF_URL=http://localhost:8000 uv run phoenix scan --android-binary "path/to/app.apk"
 ```
 
 ## API Key
@@ -39,14 +39,14 @@ phoenix-local-mobsf-api-key
 The Phoenix MobSF scanner uses the same default when `MOBSF_API_KEY` is not set, so this command works without extra key setup:
 
 ```bash
-MOBSF_URL=http://localhost:8000 uv run phoenix scan --ios-binary-path "path/to/app.ipa"
+MOBSF_URL=http://localhost:8000 uv run phoenix scan --ios-binary "path/to/app.ipa"
 ```
 
 To use a custom key, pass the same value to both the sidecar and the local scan:
 
 ```bash
 MOBSF_API_KEY="your-key" make services-up # pragma: allowlist secret
-MOBSF_URL=http://localhost:8000 MOBSF_API_KEY="your-key" uv run phoenix scan --ios-binary-path "path/to/app.ipa" # pragma: allowlist secret
+MOBSF_URL=http://localhost:8000 MOBSF_API_KEY="your-key" uv run phoenix scan --ios-binary "path/to/app.ipa" # pragma: allowlist secret
 ```
 
 ## Stop MobSF
@@ -66,19 +66,19 @@ Use `make compose-down` if you want to stop the whole compose stack.
 Use the Compose workflow when you want Docker to run Phoenix against a mounted scan target. MobSF is optional in this flow; pass `MOBSF_URL` when you want MobSF evidence included:
 
 ```bash
-MOBSF_URL=http://mobsf-scanner:8000 make compose-run PROJECT_PATH="path/to/app.ipa" SCAN_FLAG=--ios-binary-path
+MOBSF_URL=http://mobsf-scanner:8000 make compose-run PROJECT_PATH="path/to/app.ipa" SCAN_FLAG=--ios-binary
 ```
 
 Without `MOBSF_URL`, the same binary scan runs the other binary scanners and skips MobSF:
 
 ```bash
-make compose-run PROJECT_PATH="path/to/app.ipa" SCAN_FLAG=--ios-binary-path
+make compose-run PROJECT_PATH="path/to/app.ipa" SCAN_FLAG=--ios-binary
 ```
 
 For source directories, pass the matching source scan target flag. Source scans do not need MobSF:
 
 ```bash
-make compose-run PROJECT_PATH="path/to/project" SCAN_FLAG=--react-native-source-path
+make compose-run PROJECT_PATH="path/to/project" SCAN_FLAG=--react-native-source
 ```
 
 ## Troubleshooting

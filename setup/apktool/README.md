@@ -35,7 +35,7 @@ docker compose run --rm phoenix --help
 Apktool runs automatically during APK binary scans:
 
 ```bash
-uv run phoenix scan --android-binary-path path/to/app.apk
+uv run phoenix scan --android-binary path/to/app.apk
 ```
 
 The scanner skips non-APK inputs. It emits deterministic JSON artifacts under:

@@ -29,7 +29,7 @@ uv run python -c "from androguard.misc import AnalyzeAPK; print(AnalyzeAPK)"
 Run Phoenix against one APK at a time:
 
 ```bash
-uv run Phoenix scan --android-binary-path path/to/app.apk
+uv run Phoenix scan --android-binary path/to/app.apk
 ```
 
 The Androguard scanner skips non-APK inputs. It emits deterministic machine-readable JSON files under:

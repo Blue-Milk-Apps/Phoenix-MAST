@@ -48,7 +48,7 @@ docker compose run --rm --entrypoint ipsw phoenix version
 ipsw runs automatically during iOS binary scans:
 
 ```bash
-uv run phoenix scan --ios-binary-path path/to/app.ipa
+uv run phoenix scan --ios-binary path/to/app.ipa
 ```
 
 The scanner skips non-IPA inputs, including APK files and source directories. It emits one JSON artifact per scanned Mach-O binary under:

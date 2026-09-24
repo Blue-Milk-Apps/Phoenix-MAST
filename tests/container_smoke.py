@@ -20,12 +20,12 @@ def main():
     assert not list(rules_root.rglob("*.yaml")), "Private rules must not be bundled"
 
     for flag, relative in (
-        ("--native-ios-source-path", "ios/source"),
-        ("--native-android-source-path", "android/source"),
-        ("--flutter-source-path", "flutter/source"),
-        ("--react-native-source-path", "react_native/source"),
-        ("--ios-binary-path", "ios/binary"),
-        ("--android-binary-path", "android/binary"),
+        ("--ios-source", "ios/source"),
+        ("--android-source", "android/source"),
+        ("--flutter-source", "flutter/source"),
+        ("--react-native-source", "react_native/source"),
+        ("--ios-binary", "ios/binary"),
+        ("--android-binary", "android/binary"),
     ):
         config = _create_scan_config(_build_parser().parse_args(["scan", flag, "/workspace"]))
         assert config.opengrep_rules_path == rules_root / relative
@@ -80,7 +80,7 @@ def main():
         )
         output = root / "results"
         subprocess.run(
-            ["phoenix", "scan", "--native-ios-source-path", str(source), "--output", str(output)],
+            ["phoenix", "scan", "--ios-source", str(source), "--output", str(output)],
             check=True,
             timeout=180,
         )

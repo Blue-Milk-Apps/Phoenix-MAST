@@ -66,8 +66,8 @@ def test_gitleaks_compose_container_detects_fake_secret(tmp_path: Path) -> None:
             "PROJECT_MOUNT_PATH": str(fake_repo),
             "OUTPUT_PATH": str(results_dir),
             "GITLEAKS_SCAN_PATH": "/workspace",
-            "SCAN_FLAG": "--native-android-source-path",
-            "PHOENIX_SCAN_FLAG": "--native-android-source-path",
+            "SCAN_FLAG": "--android-source",
+            "PHOENIX_SCAN_FLAG": "--android-source",
             "PHOENIX_SCAN_PATH": "/workspace",
         }
     )

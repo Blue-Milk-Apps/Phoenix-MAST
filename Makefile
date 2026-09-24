@@ -24,9 +24,9 @@ help:
 	@echo "  make hooks-install Install the repository pre-commit hook"
 	@echo ""
 	@echo "Examples:"
-	@echo "  make run PROJECT_PATH=/path/to/project SCAN_FLAG=--native-ios-source-path"
-	@echo "  make compose-run PROJECT_PATH=/path/to/project SCAN_FLAG=--native-ios-source-path"
-	@echo "  make compose-run PROJECT_PATH=/path/to/app.ipa SCAN_FLAG=--ios-binary-path"
+	@echo "  make run PROJECT_PATH=/path/to/project SCAN_FLAG=--ios-source"
+	@echo "  make compose-run PROJECT_PATH=/path/to/project SCAN_FLAG=--ios-source"
+	@echo "  make compose-run PROJECT_PATH=/path/to/app.ipa SCAN_FLAG=--ios-binary"
 
 build:
 	docker build \
@@ -68,7 +68,7 @@ services-up:
 		status=$$(docker inspect -f '{{.State.Health.Status}}' "$$container_id" 2>/dev/null || echo starting); \
 		if [ "$$status" = "healthy" ]; then \
 			echo "MobSF scanner is ready at http://localhost:8000"; \
-			echo 'Run: MOBSF_URL=http://localhost:8000 uv run phoenix scan --ios-binary-path "path/to/app.ipa"'; \
+			echo 'Run: MOBSF_URL=http://localhost:8000 uv run phoenix scan --ios-binary "path/to/app.ipa"'; \
 			exit 0; \
 		fi; \
 		sleep 2; \

@@ -20,8 +20,8 @@
     {
       "id": "scanFlag",
       "type": "promptString",
-      "description": "Scan flag (e.g. --ios-binary-path)",
-      "default": "--ios-binary-path"
+      "description": "Scan flag (e.g. --ios-binary)",
+      "default": "--ios-binary"
     },
     {
       "id": "file_path",

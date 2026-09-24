@@ -83,19 +83,19 @@ uv run phoenix scan <scan-target-flag> path/to/target
 The CLI entrypoint accepts exactly one scan target flag:
 
 ```bash
-phoenix scan --ios-binary-path path/to/app.ipa
-phoenix scan --android-binary-path path/to/app.apk
-phoenix scan --flutter-source-path path/to/project
-phoenix scan --react-native-source-path path/to/project
-phoenix scan --native-android-source-path path/to/project
-phoenix scan --native-ios-source-path path/to/project
+phoenix scan --ios-binary path/to/app.ipa
+phoenix scan --android-binary path/to/app.apk
+phoenix scan --flutter-source path/to/project
+phoenix scan --react-native-source path/to/project
+phoenix scan --android-source path/to/project
+phoenix scan --ios-source path/to/project
 ```
 
 For local MobSF binary scans:
 
 ```bash
 make services-up
-MOBSF_URL=http://localhost:8000 uv run phoenix scan --ios-binary-path path/to/app.ipa
+MOBSF_URL=http://localhost:8000 uv run phoenix scan --ios-binary path/to/app.ipa
 make services-down
 ```
 
