@@ -14,6 +14,7 @@ from domain.report import (
     ReportTargetKind,
     ReportTargetType,
 )
+from domain.report.rule_report import with_rule_assessments
 from ports.report_data_builder_port import ReportDataBuilderPort
 
 
@@ -43,7 +44,7 @@ class ReportGenerationService:
 
         metadata = self._metadata_from(post_scan_data)
         builder = self._builder_resolver.resolve(metadata.target.target_kind)
-        return builder.build(post_scan_data, metadata)
+        return with_rule_assessments(builder.build(post_scan_data, metadata), post_scan_data)
 
     @classmethod
     def _metadata_from(cls, post_scan_data: Mapping[str, Any]) -> ReportMetadata:

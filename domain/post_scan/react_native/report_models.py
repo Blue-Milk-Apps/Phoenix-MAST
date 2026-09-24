@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any
 
 from domain.post_scan.android.rule_registry import REPORT_RULE_IDS_BY_SECTION as ANDROID_RULES
-from domain.post_scan.ios.rule_registry import REPORT_RULE_IDS_BY_SECTION as IOS_RULES
 from domain.post_scan.react_native.endpoints import ReactNativeEndpoints
 from domain.post_scan.react_native.functionality import ReactNativeFunctionality
 from domain.post_scan.react_native.opengrep_assessment import ReactNativeOpenGrepAssessment
@@ -151,7 +150,7 @@ def _dependency_inventory(context: ReactNativeScanExtractionContext) -> dict[str
 def _security_platform_assessments(context: ReactNativeScanExtractionContext) -> dict[str, dict[str, dict[str, Any]]]:
     """Retain scoped OpenGrep outcomes for later report generation."""
 
-    registries = {"react_native": REACT_NATIVE_RULES, "android": ANDROID_RULES, "ios": IOS_RULES}
+    registries = {"react_native": REACT_NATIVE_RULES, "android": ANDROID_RULES}
     keys = {evidence_key for registry in registries.values() for groups in registry.values() for evidence_key in groups}
     assessment = ReactNativeOpenGrepAssessment(context)
     output: dict[str, dict[str, dict[str, Any]]] = {}
@@ -200,7 +199,7 @@ def _component_counts(context: ReactNativeScanExtractionContext) -> dict[str, in
 
 def _evidence_section(context: ReactNativeScanExtractionContext, section: str) -> dict[str, dict[str, Any]]:
     assessment = ReactNativeOpenGrepAssessment(context)
-    registries = {"react_native": REACT_NATIVE_RULES, "android": ANDROID_RULES, "ios": IOS_RULES}
+    registries = {"react_native": REACT_NATIVE_RULES, "android": ANDROID_RULES}
     preferred_sections = {
         evidence_key: report_section for report_section, groups in REACT_NATIVE_RULES.items() for evidence_key in groups
     }

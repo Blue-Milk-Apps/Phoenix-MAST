@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import yaml
 
 from adapters.output.phoenix_report.builders.android import NativeAndroidReportDataBuilder
@@ -12,6 +10,7 @@ from domain.post_scan.android.rule_registry import (
     AndroidRuleDisposition,
     unclassified_android_rule_ids,
 )
+from tests.rule_fixtures import private_rules
 
 
 def _report(sections: dict) -> object:
@@ -29,7 +28,7 @@ def _report(sections: dict) -> object:
 
 def test_all_bundled_android_rules_are_explicitly_classified() -> None:
     rule_ids: set[str] = set()
-    rules_root = Path(__file__).parents[4] / "rules" / "android"
+    rules_root = private_rules("android")
     for rules_path in rules_root.glob("*.yml"):
         document = yaml.safe_load(rules_path.read_text(encoding="utf-8"))
         for rule in document["rules"]:

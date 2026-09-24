@@ -6,8 +6,6 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from domain.post_scan.ios.rule_registry import FUNCTIONALITY_RULE_ID_TO_KEY
-
 
 @dataclass
 class FunctionalityEntry:
@@ -49,40 +47,22 @@ class IOSFunctionality:
         background_modes = self._plist_background_modes(loaded_outputs)
         url_schemes = self._plist_url_schemes(loaded_outputs)
         required_capabilities = self._plist_required_device_capabilities(loaded_outputs)
-        opengrep_hits = self._opengrep_descriptions_by_capability(loaded_outputs)
         strings_outputs = loaded_outputs.get("strings_outputs") or {}
-
-        self.Camera = self._entry_from_sources(
-            plist_keys={"NSCameraUsageDescription"},
-            permission_keys=permission_keys,
-            opengrep_hits=opengrep_hits.get("Camera", []),
-        )
+        self.Camera = self._entry_from_sources(plist_keys={"NSCameraUsageDescription"}, permission_keys=permission_keys)
         self.Biometric_Authentication = self._entry_from_sources(
-            plist_keys={"NSFaceIDUsageDescription"},
-            permission_keys=permission_keys,
-            opengrep_hits=opengrep_hits.get("Biometric Authentication", []),
+            plist_keys={"NSFaceIDUsageDescription"}, permission_keys=permission_keys
         )
-        self.Networking = self._networking_entry(
-            loaded_outputs,
-            url_schemes,
-            opengrep_hits.get("Networking", []),
-            strings_outputs,
-        )
-        self.Secure_RNG = self._entry_from_sources(
-            opengrep_hits=opengrep_hits.get("Secure RNG", []),
-        )
+        self.Networking = self._networking_entry(loaded_outputs, url_schemes, strings_outputs)
+        self.Secure_RNG = self._entry_from_sources()
         self.Push_Notifications = self._entry_from_sources(
             entitlements=entitlements,
             entitlement_keys={"aps_environment"},
             background_modes=background_modes,
             background_mode_values={"remote-notification"},
-            opengrep_hits=opengrep_hits.get("Push Notifications", []),
         )
-        self.Audio = self._entry_from_sources(opengrep_hits=opengrep_hits.get("Audio", []))
+        self.Audio = self._entry_from_sources()
         self.Contacts = self._entry_from_sources(
-            plist_keys={"NSContactsUsageDescription"},
-            permission_keys=permission_keys,
-            opengrep_hits=opengrep_hits.get("Contacts", []),
+            plist_keys={"NSContactsUsageDescription"}, permission_keys=permission_keys
         )
         self.Geofencing = self._entry_from_sources()
         self.Health_Data = self._entry_from_sources(
@@ -98,59 +78,35 @@ class IOSFunctionality:
                 "NSLocationAlwaysUsageDescription",
             },
             permission_keys=permission_keys,
-            opengrep_hits=opengrep_hits.get("Location", []),
         )
         self.Maps = self._maps_entry(url_schemes)
         self.Payment_Services = self._entry_from_sources(
-            entitlements=entitlements,
-            entitlement_keys={"merchant_ids", "in_app_payments"},
+            entitlements=entitlements, entitlement_keys={"merchant_ids", "in_app_payments"}
         )
         self.SMS = self._entry_from_sources()
         self.Bluetooth = self._entry_from_sources(
             plist_keys={"NSBluetoothAlwaysUsageDescription", "NSBluetoothPeripheralUsageDescription"},
             permission_keys=permission_keys,
-            opengrep_hits=opengrep_hits.get("Bluetooth", []),
         )
         self.Camera_Delegation = self._entry_from_sources()
         self.Calendar = self._entry_from_sources(
-            plist_keys={"NSCalendarsUsageDescription"},
-            permission_keys=permission_keys,
-            opengrep_hits=opengrep_hits.get("Calendar", []),
+            plist_keys={"NSCalendarsUsageDescription"}, permission_keys=permission_keys
         )
-        self.In_App_Purchases = self._in_app_purchases_entry(
-            opengrep_hits.get("In-App Purchases", []),
-            strings_outputs,
-        )
-        self.Keychain = self._entry_from_sources(
-            entitlements=entitlements,
-            entitlement_keys={"keychain_access_groups"},
-            opengrep_hits=opengrep_hits.get("Keychain", []),
-        )
+        self.In_App_Purchases = self._in_app_purchases_entry(strings_outputs)
+        self.Keychain = self._entry_from_sources(entitlements=entitlements, entitlement_keys={"keychain_access_groups"})
         self.Microphone = self._entry_from_sources(
-            plist_keys={"NSMicrophoneUsageDescription"},
-            permission_keys=permission_keys,
-            opengrep_hits=opengrep_hits.get("Microphone", []),
+            plist_keys={"NSMicrophoneUsageDescription"}, permission_keys=permission_keys
         )
-        self.NFC = self._nfc_entry(permission_keys, required_capabilities, opengrep_hits.get("NFC", []))
+        self.NFC = self._nfc_entry(permission_keys, required_capabilities)
         self.Photos = self._entry_from_sources(
             plist_keys={"NSPhotoLibraryUsageDescription", "NSPhotoLibraryAddUsageDescription"},
             permission_keys=permission_keys,
         )
         self.Sensors = self._entry_from_sources()
-        self.Telephony = self._telephony_entry(
-            url_schemes,
-            opengrep_hits.get("Telephony", []),
-            strings_outputs,
-        )
-        self.USB_Devices = self._usb_devices_entry(
-            loaded_outputs,
-            opengrep_hits.get("USB Devices", []),
-            strings_outputs,
-        )
+        self.Telephony = self._telephony_entry(url_schemes, strings_outputs)
+        self.USB_Devices = self._usb_devices_entry(loaded_outputs, strings_outputs)
         self.Nearby_Interaction = self._entry_from_sources(
-            plist_keys={"NSNearbyInteractionUsageDescription"},
-            permission_keys=permission_keys,
-            opengrep_hits=opengrep_hits.get("Nearby Interaction", []),
+            plist_keys={"NSNearbyInteractionUsageDescription"}, permission_keys=permission_keys
         )
 
     def _entry_from_sources(
@@ -162,44 +118,28 @@ class IOSFunctionality:
         entitlement_keys: set[str] | None = None,
         background_modes: set[str] | None = None,
         background_mode_values: set[str] | None = None,
-        opengrep_hits: list[str] | None = None,
     ) -> FunctionalityEntry:
         explanation_parts: list[str] = []
-
         for key in sorted((plist_keys or set()) & (permission_keys or set())):
             explanation_parts.append(f"plist key {key} present.")
-
         if entitlements and entitlement_keys:
             for key in sorted(entitlement_keys):
                 value = entitlements.get(key)
                 if self._has_entitlement_value(value):
                     explanation_parts.append(f"entitlement {key} present.")
-
         if background_modes and background_mode_values:
             for mode in sorted(background_mode_values & background_modes):
                 explanation_parts.append(f"background mode {mode} declared.")
-
-        for description in opengrep_hits or []:
-            if description and description not in explanation_parts:
-                explanation_parts.append(description)
-
         return self._entry(bool(explanation_parts), explanation_parts)
 
     def _networking_entry(
-        self,
-        loaded_outputs: dict[str, Any],
-        url_schemes: dict[str, set[str]],
-        opengrep_hits: list[str],
-        strings_outputs: dict[str, str],
+        self, loaded_outputs: dict[str, Any], url_schemes: dict[str, set[str]], strings_outputs: dict[str, str]
     ) -> FunctionalityEntry:
         explanation_parts: list[str] = []
         if self._has_ats_configuration(loaded_outputs):
             explanation_parts.append("Info.plist declares NSAppTransportSecurity.")
         if url_schemes.get("declared_schemes") or url_schemes.get("queried_schemes"):
             explanation_parts.append("Info.plist declares URL scheme handling.")
-        for description in opengrep_hits:
-            if description and description not in explanation_parts:
-                explanation_parts.append(description)
         if not explanation_parts and self._strings_indicate_networking(strings_outputs):
             explanation_parts.append("strings output contains URL or HTTP indicators.")
         return self._entry(bool(explanation_parts), explanation_parts)
@@ -214,63 +154,40 @@ class IOSFunctionality:
             return self._entry(False, [])
         return self._entry(True, [f"queried URL schemes {', '.join(matched)} declared."])
 
-    def _in_app_purchases_entry(
-        self,
-        opengrep_hits: list[str],
-        strings_outputs: dict[str, str],
-    ) -> FunctionalityEntry:
-        explanation_parts = [description for description in opengrep_hits if description]
+    def _in_app_purchases_entry(self, strings_outputs: dict[str, str]) -> FunctionalityEntry:
+        explanation_parts: list[str] = []
         if not explanation_parts and self._strings_indicate_in_app_purchases(strings_outputs):
             explanation_parts.append("strings output references Apple StoreKit purchase APIs.")
         return self._entry(bool(explanation_parts), explanation_parts)
 
-    def _nfc_entry(
-        self,
-        permission_keys: set[str],
-        required_capabilities: set[str],
-        opengrep_hits: list[str],
-    ) -> FunctionalityEntry:
+    def _nfc_entry(self, permission_keys: set[str], required_capabilities: set[str]) -> FunctionalityEntry:
         if "NFCReaderUsageDescription" in permission_keys:
             return self._entry(True, ["plist key NFCReaderUsageDescription present."])
-        matched_caps = sorted(cap for cap in required_capabilities if "nfc" in cap.lower())
+        matched_caps = sorted((cap for cap in required_capabilities if "nfc" in cap.lower()))
         if matched_caps:
             return self._entry(True, [f"required device capabilities include {', '.join(matched_caps)}."])
-        return self._entry(bool(opengrep_hits), opengrep_hits)
+        return self._entry(False, [])
 
-    def _telephony_entry(
-        self,
-        url_schemes: dict[str, set[str]],
-        opengrep_hits: list[str],
-        strings_outputs: dict[str, str],
-    ) -> FunctionalityEntry:
+    def _telephony_entry(self, url_schemes: dict[str, set[str]], strings_outputs: dict[str, str]) -> FunctionalityEntry:
         explanation_parts: list[str] = []
         matched = sorted(
-            scheme
-            for scheme in url_schemes.get("queried_schemes", set()) | url_schemes.get("declared_schemes", set())
-            if str(scheme).lower() in {"tel", "telprompt", "sms"}
+            (
+                scheme
+                for scheme in url_schemes.get("queried_schemes", set()) | url_schemes.get("declared_schemes", set())
+                if str(scheme).lower() in {"tel", "telprompt", "sms"}
+            )
         )
         if matched:
             explanation_parts.append(f"URL schemes {', '.join(matched)} declared or queried.")
-        for description in opengrep_hits:
-            if description and description not in explanation_parts:
-                explanation_parts.append(description)
         if not explanation_parts and self._strings_indicate_telephony(strings_outputs):
             explanation_parts.append("strings output references telephony APIs or URL schemes.")
         return self._entry(bool(explanation_parts), explanation_parts)
 
-    def _usb_devices_entry(
-        self,
-        loaded_outputs: dict[str, Any],
-        opengrep_hits: list[str],
-        strings_outputs: dict[str, str],
-    ) -> FunctionalityEntry:
+    def _usb_devices_entry(self, loaded_outputs: dict[str, Any], strings_outputs: dict[str, str]) -> FunctionalityEntry:
         explanation_parts: list[str] = []
         protocols = self._external_accessory_protocols(loaded_outputs)
         if protocols:
             explanation_parts.append(f"external accessory protocols declared: {', '.join(protocols)}.")
-        for description in opengrep_hits:
-            if description and description not in explanation_parts:
-                explanation_parts.append(description)
         if not explanation_parts and self._strings_indicate_usb(strings_outputs):
             explanation_parts.append("strings output references external accessory APIs.")
         return self._entry(bool(explanation_parts), explanation_parts)
@@ -366,29 +283,6 @@ class IOSFunctionality:
                 if text:
                     protocols.append(text)
         return list(dict.fromkeys(protocols))
-
-    @staticmethod
-    def _opengrep_descriptions_by_capability(loaded_outputs: dict[str, Any]) -> dict[str, list[str]]:
-        mapping: dict[str, list[str]] = {capability: [] for capability in set(FUNCTIONALITY_RULE_ID_TO_KEY.values())}
-        for result in (loaded_outputs.get("opengrep") or {}).get("results") or []:
-            if not isinstance(result, dict):
-                continue
-            capability = FUNCTIONALITY_RULE_ID_TO_KEY.get(str(result.get("check_id", "")).strip())
-            if capability is None:
-                continue
-            extra = result.get("extra") if isinstance(result, dict) else {}
-            phoenix = ((extra or {}).get("metadata") or {}).get("phoenix") or {}
-            description = str(
-                phoenix.get("description")
-                or phoenix.get("title")
-                or (extra or {}).get("lines")
-                or (extra or {}).get("message")
-                or result.get("check_id")
-            ).strip()
-            if not description:
-                continue
-            mapping[capability].append(description)
-        return {key: list(dict.fromkeys(values)) for key, values in mapping.items()}
 
     @staticmethod
     def _has_ats_configuration(loaded_outputs: dict[str, Any]) -> bool:

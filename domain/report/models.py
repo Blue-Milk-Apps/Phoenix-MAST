@@ -140,6 +140,14 @@ class SecurityCheck:
     remediation_link: str = ""
     platform_assessments: tuple[PlatformAssessment, ...] = ()
     status: AssessmentStatus | None = None
+    rule_id: str = ""
+    finding_type: str = ""
+    scope: str = ""
+    impact: str = ""
+    remediation: str = ""
+    references: tuple[str, ...] = ()
+    execution_status: str = ""
+    rule_file: str = ""
 
 
 @dataclass(frozen=True)
@@ -613,3 +621,6 @@ class ReportData:
     risk_summary: tuple[RiskSummary, ...]
     findings_severity: FindingSeverity
     platform_details: PlatformReportDetails
+    rule_coverage: tuple[dict[str, object], ...] = ()
+    rule_status: str = ""
+    rule_status_reason: str = ""

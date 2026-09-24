@@ -1,187 +1,114 @@
 import json
-from pathlib import Path
 
-from adapters.scanners.ios import section_opengrep_scanner as scanner_module
-from adapters.scanners.ios.rule_inventory import IOSRuleFile, IOSRuleInventory, IOSRuleSection
+from adapters.scanners.ios import section_opengrep_scanner as module
 from domain.models import ScanConfig, ScanResult, ScanType
+from domain.post_scan.rule_assessment import rule_assessments
+from tests.rule_fixtures import rule, write_rules
 
 
-def _config(tmp_path: Path) -> ScanConfig:
-    return ScanConfig(project_path=tmp_path / "project", output_path=tmp_path / "output", mode="source")
+def run_scan(tmp_path, monkeypatch, reports):
+    root = tmp_path / "source"
+    for category in reports:
+        write_rules(root / f"{category}.yml", rule(f"example.{category}"))
 
-
-def _inventory(tmp_path: Path) -> IOSRuleInventory:
-    files = tuple(
-        IOSRuleFile(tmp_path / f"{section.name.lower()}.yml", section, (f"{section.name.lower()}.rule",))
-        for section in (IOSRuleSection.CODE, IOSRuleSection.NETWORK)
-    )
-    return IOSRuleInventory(files=files)
-
-
-def test_runs_each_section_and_aggregates_success(monkeypatch, tmp_path: Path) -> None:
-    calls: list[Path] = []
-
-    class FakeOpenGrepScanner:
+    class FakeScanner:
         def __init__(self, rules_path, scan_paths):
-            calls.append(Path(rules_path))
+            self.category = rules_path.stem
 
         def scan(self, config):
-            _ = config
-            section = calls[-1].stem
-            return [
-                ScanResult(
-                    scanner_name="OpenGrep",
-                    scan_type=ScanType.OPENGREP_SOURCE,
-                    raw_output=json.dumps(
-                        {
-                            "results": [{"check_id": f"{section}.rule"}],
-                            "errors": [],
-                            "scan_metadata": {
-                                "status": "success",
-                                "configured_rule_ids": [f"{section}.rule"],
-                                "tool_version": "test",
-                            },
-                        }
-                    ),
-                )
-            ]
+            success, payload = reports[self.category]
+            return [ScanResult("OpenGrep", ScanType.OPENGREP_SOURCE, success=success, raw_output=json.dumps(payload))]
 
-    monkeypatch.setattr(scanner_module, "validate_ios_rule_inventory", lambda _path: _inventory(tmp_path))
-    monkeypatch.setattr(scanner_module, "OpenGrepScanner", FakeOpenGrepScanner)
-
-    result = scanner_module.IOSSectionOpenGrepScanner(tmp_path / "rules").scan(_config(tmp_path))[0]
-    payload = json.loads(result.raw_output)
-
-    assert result.success is True
-    assert payload["scan_metadata"]["status"] == "complete"
-    assert payload["scan_metadata"]["configured_rule_ids"] == ["code.rule", "network.rule"]
-    assert {finding["phoenix_scope"] for finding in payload["results"]} == {"code", "network"}
-    assert [path.stem for path in calls] == ["code", "network"]
+    monkeypatch.setattr(module, "OpenGrepScanner", FakeScanner)
+    result = module.IOSSectionOpenGrepScanner(root).scan(ScanConfig(tmp_path, tmp_path / "out", platform="IOS"))[0]
+    return json.loads(result.raw_output)
 
 
-def test_failed_section_produces_partial_result(monkeypatch, tmp_path: Path) -> None:
-    calls: list[Path] = []
-
-    class FakeOpenGrepScanner:
-        def __init__(self, rules_path, scan_paths):
-            calls.append(Path(rules_path))
-
-        def scan(self, config):
-            _ = config
-            section = calls[-1].stem
-            if section == "code":
-                return [
-                    ScanResult(
-                        scanner_name="OpenGrep",
-                        scan_type=ScanType.OPENGREP_SOURCE,
-                        success=False,
-                        error_message="code rules failed",
-                        raw_output=json.dumps(
-                            {"error": "code rules failed", "return_code": 2, "stderr": "invalid language"}
-                        ),
-                    )
-                ]
-            return [
-                ScanResult(
-                    scanner_name="OpenGrep",
-                    scan_type=ScanType.OPENGREP_SOURCE,
-                    raw_output=json.dumps(
-                        {
-                            "results": [{"check_id": "network.rule"}],
-                            "errors": [],
-                            "scan_metadata": {
-                                "status": "success",
-                                "configured_rule_ids": ["network.rule"],
-                            },
-                        }
-                    ),
-                )
-            ]
-
-    monkeypatch.setattr(scanner_module, "validate_ios_rule_inventory", lambda _path: _inventory(tmp_path))
-    monkeypatch.setattr(scanner_module, "OpenGrepScanner", FakeOpenGrepScanner)
-
-    result = scanner_module.IOSSectionOpenGrepScanner(tmp_path / "rules").scan(_config(tmp_path))[0]
-    payload = json.loads(result.raw_output)
-
-    assert result.success is True
-    assert payload["scan_metadata"]["status"] == "partial"
-    assert payload["scan_metadata"]["sections"]["code"]["status"] == "failed"
-    assert payload["scan_metadata"]["sections"]["network"]["status"] == "success"
-    assert payload["errors"][0]["section"] == "code"
-    assert payload["results"] == [{"check_id": "network.rule", "phoenix_scope": "network"}]
-
-
-def test_retries_rules_named_in_structured_section_errors(monkeypatch, tmp_path: Path) -> None:
-    calls: list[Path] = []
-    code_rules = (
-        {"id": "code.good", "metadata": {"phoenix": {"report_section": "Code"}}},
-        {"id": "code.bad", "metadata": {"phoenix": {"report_section": "Code"}}},
+def test_code_and_crypto_have_independent_execution_metadata(tmp_path, monkeypatch):
+    output = run_scan(
+        tmp_path,
+        monkeypatch,
+        {"code": (False, {"error": "bad config"}), "crypto": (True, {"results": [], "errors": []})},
     )
-    inventory = IOSRuleInventory(
-        files=(
-            IOSRuleFile(
-                tmp_path / "code.yml",
-                IOSRuleSection.CODE,
-                ("code.good", "code.bad"),
-                code_rules,
-            ),
-        )
+    assert output["scan_metadata"]["status"] == "partial"
+    assert set(output["scan_metadata"]["sections"]) == {"code.yml", "crypto.yml"}
+    assessments = {item["rule_id"]: item for item in rule_assessments(output)["rules"]}
+    assert assessments["example.code"]["status"] == "not_evaluated"
+    assert assessments["example.crypto"]["status"] == "not_present"
+
+
+def test_partial_matches_survive_errors(tmp_path, monkeypatch):
+    output = run_scan(
+        tmp_path,
+        monkeypatch,
+        {
+            "code": (
+                False,
+                {
+                    "raw_output": {
+                        "results": [{"check_id": "example.code", "path": "Example.swift", "start": {"line": 4}}],
+                        "errors": [{"message": "Timeout"}],
+                    }
+                },
+            )
+        },
     )
+    item = rule_assessments(output)["rules"][0]
+    assert item["status"] == "present"
+    assert item["execution_status"] == "not_evaluated"
+    assert item["matches"][0]["start"]["line"] == 4
 
-    class FakeOpenGrepScanner:
-        def __init__(self, rules_path, scan_paths):
-            _ = scan_paths
-            calls.append(Path(rules_path))
 
-        def scan(self, config):
-            _ = config
-            rules_path = calls[-1]
-            if rules_path.name == "code.yml":
-                return [
-                    ScanResult(
-                        scanner_name="OpenGrep",
-                        scan_type=ScanType.OPENGREP_SOURCE,
-                        success=False,
-                        error_message="code rules failed",
-                        raw_output=json.dumps(
-                            {
-                                "error": "code rules failed",
-                                "return_code": 2,
-                                "stderr": "invalid language",
-                                "raw_output": {
-                                    "results": [{"check_id": "code.good"}],
-                                    "errors": [{"rule_id": "code.bad", "message": "invalid language"}],
-                                },
-                            }
-                        ),
-                    )
-                ]
-            return [
-                ScanResult(
-                    scanner_name="OpenGrep",
-                    scan_type=ScanType.OPENGREP_SOURCE,
-                    raw_output=json.dumps(
-                        {
-                            "results": [{"check_id": "code.bad"}],
-                            "errors": [],
-                            "scan_metadata": {"configured_rule_ids": ["code.bad"]},
-                        }
-                    ),
-                )
-            ]
+def test_no_targets_is_not_a_clean_scan(tmp_path, monkeypatch):
+    output = run_scan(tmp_path, monkeypatch, {"code": (True, {"results": [], "paths": {"scanned": []}})})
+    assert rule_assessments(output)["rules"][0]["status"] == "not_evaluated"
 
-    monkeypatch.setattr(scanner_module, "validate_ios_rule_inventory", lambda _path: inventory)
-    monkeypatch.setattr(scanner_module, "OpenGrepScanner", FakeOpenGrepScanner)
 
-    result = scanner_module.IOSSectionOpenGrepScanner(tmp_path / "rules").scan(_config(tmp_path))[0]
-    payload = json.loads(result.raw_output)
-    section = payload["scan_metadata"]["sections"]["code"]
+def test_missing_binary_rules_never_fall_back_to_source(tmp_path):
+    write_rules(tmp_path / "source" / "code.yml", rule())
+    config = ScanConfig(tmp_path / "app.ipa", tmp_path / "out", mode="binary", platform="IOS")
+    for directory in (tmp_path / "binary", tmp_path / "source"):
+        result = module.IOSSectionOpenGrepScanner(directory).scan(config)[0]
+        assert not result.success
+        assert json.loads(result.raw_output)["scan_metadata"]["rule_catalog"] == []
 
-    assert result.success is True
-    assert section["status"] == "partial"
-    assert section["successful_rule_ids"] == ["code.bad", "code.good"]
-    assert section["failed_rule_ids"] == []
-    assert {finding["check_id"] for finding in payload["results"]} == {"code.good", "code.bad"}
-    assert calls[0].name == "code.yml"
-    assert calls[1].name == "code.bad.yml"
+
+def test_persisted_scan_generates_report_without_rule_files(tmp_path, monkeypatch):
+    from adapters.output.phoenix_report.builders.ios import NativeIOSReportDataBuilder
+    from adapters.post_scan.ios.native.scan_detail_extractor import NativeIOSScanDetailExtractor
+    from adapters.post_scan.ios.native.scan_output_loader import NativeIOSScanOutputLoader
+    from application.post_scan_processing_service import PostScanProcessingService
+    from application.report_generation_service import ReportGenerationService
+
+    output = run_scan(
+        tmp_path,
+        monkeypatch,
+        {
+            "custom": (
+                True,
+                {"results": [{"check_id": "example.custom", "path": "Example.swift", "start": {"line": 7}}]},
+            )
+        },
+    )
+    output_root = tmp_path / "out"
+    (output_root / "opengrep_source").mkdir(parents=True)
+    (output_root / "opengrep_source/opengrep_results.json").write_text(json.dumps(output))
+    (output_root / "scan_metadata.json").write_text(
+        json.dumps({"platform": "IOS", "stack": "NATIVE_IOS", "target_type": "SOURCE", "project_path": str(tmp_path)})
+    )
+    (tmp_path / "source/custom.yml").unlink()
+    data = PostScanProcessingService(NativeIOSScanOutputLoader(), NativeIOSScanDetailExtractor()).process(output_root)
+    from dataclasses import asdict
+
+    from domain.report import ReportTargetFactory
+
+    data["target_information"] = asdict(
+        ReportTargetFactory.from_scan_config(ScanConfig(tmp_path, output_root, platform="IOS", stack="NATIVE_IOS"))
+    )
+    report = ReportGenerationService([NativeIOSReportDataBuilder()]).build_report_data(data)
+    check = report.vulnerability_sections[-1].checks[0]
+    assert check.rule_id == "example.custom"
+    assert check.name == "Example check"
+    assert check.result.value == "present"
+    assert report.findings_severity.high == 1
+    assert "Example.swift:7" in check.evidence

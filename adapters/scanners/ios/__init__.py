@@ -8,7 +8,6 @@ from adapters.scanners.ios.rule_inventory import (
     IOSRuleFile,
     IOSRuleInventory,
     IOSRuleInventoryError,
-    IOSRuleSection,
     validate_ios_rule_inventory,
 )
 from adapters.scanners.ios.section_opengrep_scanner import IOSSectionOpenGrepScanner
@@ -22,6 +21,5 @@ __all__ = [
     "IOSRuleFile",
     "IOSRuleInventory",
     "IOSRuleInventoryError",
-    "IOSRuleSection",
     "validate_ios_rule_inventory",
 ]

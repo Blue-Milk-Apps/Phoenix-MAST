@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from typing import Any
 
@@ -10,12 +10,6 @@ from domain.post_scan.android.functionality import Functionality as AndroidFunct
 from domain.post_scan.flutter.scan_extraction_context import FlutterScanExtractionContext
 from domain.post_scan.flutter.security_evidence import opengrep_scope_applicable
 from domain.post_scan.ios.common.functionality import IOSFunctionality
-from domain.post_scan.ios.rule_registry import (
-    FUNCTIONALITY_RULE_ID_TO_KEY as IOS_FUNCTIONALITY_RULES,
-)
-from domain.post_scan.ios.rule_registry import (
-    PERMISSION_RULE_ID_TO_KEYS as IOS_PERMISSION_RULES,
-)
 from domain.report import AssessmentStatus
 
 
@@ -155,10 +149,7 @@ class FlutterFunctionality:
         if platform == "ios":
             if not context.ios_metadata_assessed or not isinstance(context.ios_metadata.get("permissions"), list):
                 return False
-            rule_ids = frozenset(rule_id for rule_id, name in IOS_FUNCTIONALITY_RULES.items() if name == capability)
-            if not context.opengrep_scope_assessed("ios"):
-                return False
-            return not rule_ids or rule_ids <= context.opengrep_configured_rule_ids("ios")
+            return True
 
         return False
 
@@ -204,14 +195,14 @@ class FlutterFunctionality:
             else set()
         )
         permission_keys.discard("")
-        for rule_id, keys in IOS_PERMISSION_RULES.items():
-            capability = IOS_FUNCTIONALITY_RULES.get(rule_id)
-            if capability not in evidence:
-                continue
-            for key in sorted(set(keys) & permission_keys):
-                detail = f"Declared iOS permission: {key}."
-                evidence[capability].append(detail)
-                platform_evidence["ios"][capability].append(detail)
+        model = IOSFunctionality(
+            {"plist_outputs": {"platform": {"privacy": {"permissions": [{"key": key} for key in permission_keys]}}}}
+        )
+        for key, item in asdict(model).items():
+            capability = key.replace("_", " ")
+            if item["present"] and capability in evidence:
+                evidence[capability].append(item["explanation"])
+                platform_evidence["ios"][capability].append(item["explanation"])
 
         for artifact in context.ios_entitlements:
             metadata = artifact.get("metadata")
@@ -244,7 +235,7 @@ class FlutterFunctionality:
         evidence: dict[str, list[str]],
         platform_evidence: dict[str, dict[str, list[str]]],
     ) -> None:
-        for scope, mapping in (("android", AndroidFunctionality.RULE_IDS), ("ios", IOS_FUNCTIONALITY_RULES)):
+        for scope, mapping in (("android", AndroidFunctionality.RULE_IDS),):
             for result in context.opengrep_results_for_scope(scope):
                 capability = mapping.get(context.first_non_empty(result.get("check_id")))
                 if capability not in evidence:

@@ -45,7 +45,7 @@ def test_combines_flutter_android_and_ios_network_findings() -> None:
     assert evidence.assessed is True
     assert evidence.sensitive_information_unencrypted_in_transit.details == ["lib/client.dart:10"]
     assert evidence.opens_listening_port.details == ["android/app/Server.kt:18"]
-    assert evidence.cookie_missing_secure_flag.details == ["ios/Runner/Cookies.swift:24"]
+    assert not hasattr(evidence, "cookie_missing_secure_flag")
 
 
 def test_shared_cleartext_result_requires_every_applicable_scope() -> None:

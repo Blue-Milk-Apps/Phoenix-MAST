@@ -135,6 +135,8 @@ class FlutterOpenGrepScanner(ScannerPort):
             "scan_paths": [str(path) for path in scan_paths],
             "configured_rule_ids": [],
         }
+        if scope == "ios":
+            base_metadata.update({"rule_catalog": [], "rule_execution": {}, "mode": "source"})
         if not scan_paths:
             base_metadata["reason"] = (
                 "No production Dart source paths were found."
@@ -160,6 +162,10 @@ class FlutterOpenGrepScanner(ScannerPort):
         report_metadata = report.get("scan_metadata")
         report_metadata = report_metadata if isinstance(report_metadata, dict) else {}
         tool_version = str(report_metadata.get("tool_version", "")).strip()
+
+        for key in ("rule_catalog", "rule_execution", "ruleset_fingerprint", "sections", "mode"):
+            if key in report_metadata:
+                base_metadata[key] = report_metadata[key]
 
         if not result.success:
             error = result.error_message or str(report.get("error", "")).strip() or "OpenGrep scope failed."
@@ -203,12 +209,7 @@ class FlutterOpenGrepScanner(ScannerPort):
     def _resolve_platform_rules_path(self, scope: str, explicit_path: Path | None) -> Path | None:
         if explicit_path is not None:
             return explicit_path.resolve()
-        candidates = [
-            self._flutter_rules_path.parent / scope,
-            Path(__file__).resolve().parents[3] / "rules" / scope,
-            Path("/app/rules") / scope,
-        ]
-        return next((path.resolve() for path in candidates if path.is_dir()), None)
+        return (self._flutter_rules_path.parent.parent / scope / "source").resolve()
 
     @classmethod
     def _flutter_scan_paths(cls, project_path: Path) -> list[Path]:

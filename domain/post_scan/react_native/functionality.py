@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from typing import Any
 
 from domain.post_scan.android.functionality import Functionality as AndroidFunctionality
 from domain.post_scan.android.rule_registry import FUNCTIONALITY_RULE_IDS as ANDROID_FUNCTIONALITY_RULE_IDS
-from domain.post_scan.ios.rule_registry import FUNCTIONALITY_RULE_ID_TO_KEY as IOS_FUNCTIONALITY_RULES
-from domain.post_scan.ios.rule_registry import PERMISSION_RULE_ID_TO_KEYS as IOS_PERMISSION_RULES
+from domain.post_scan.ios.common.functionality import IOSFunctionality
 from domain.post_scan.react_native.rule_registry import (
     FUNCTIONALITY_RULE_ID_TO_KEY as REACT_NATIVE_FUNCTIONALITY_RULES,
 )
@@ -41,7 +40,9 @@ class ReactNativeFunctionality:
     # Use native platform labels when a capability has an Android or iOS
     # counterpart in the scan. Keep React Native for capabilities that only
     # exist at the JavaScript/runtime layer, such as navigation.
-    PLATFORM_BACKED_CAPABILITIES = frozenset((*AndroidFunctionality.KEYS, *IOS_FUNCTIONALITY_RULES.values()))
+    PLATFORM_BACKED_CAPABILITIES = frozenset(
+        (*AndroidFunctionality.KEYS, *(field.name.replace("_", " ") for field in fields(IOSFunctionality)))
+    )
 
     def __init__(self, context: ReactNativeScanExtractionContext) -> None:
         evidence: dict[str, list[str]] = {capability: [] for capability in self.CAPABILITIES}
@@ -69,7 +70,7 @@ class ReactNativeFunctionality:
         if self._platform_applicable(context, "ios"):
             platform_assessments.append(
                 isinstance(context.ios_metadata.get("permissions"), list)
-                and context.opengrep_scope_assessed("ios", frozenset(IOS_FUNCTIONALITY_RULES))
+                and context.opengrep_scope_assessed("ios", frozenset())
             )
 
         self.applicable = bool(platform_assessments)
@@ -139,7 +140,7 @@ class ReactNativeFunctionality:
             return frozenset(REACT_NATIVE_FUNCTIONALITY_RULES.values())
         if scope == "android":
             return frozenset(AndroidFunctionality.KEYS)
-        return frozenset(IOS_FUNCTIONALITY_RULES.values())
+        return frozenset((field.name.replace("_", " ") for field in fields(IOSFunctionality)))
 
     @classmethod
     def _evidence_scopes(cls, context: ReactNativeScanExtractionContext, capability: str) -> tuple[str, ...]:
@@ -169,7 +170,7 @@ class ReactNativeFunctionality:
                 scope, ANDROID_FUNCTIONALITY_RULE_IDS
             )
         return isinstance(context.ios_metadata.get("permissions"), list) and context.opengrep_scope_assessed(
-            scope, frozenset(IOS_FUNCTIONALITY_RULES)
+            scope, frozenset()
         )
 
     @staticmethod
@@ -246,14 +247,14 @@ class ReactNativeFunctionality:
             for item in context.mapping_list(context.ios_metadata.get("permissions"))
         }
         permission_keys.discard("")
-        for rule_id, keys in IOS_PERMISSION_RULES.items():
-            capability = IOS_FUNCTIONALITY_RULES.get(rule_id)
-            if capability not in evidence:
-                continue
-            for key in sorted(set(keys) & permission_keys):
-                detail = f"Declared iOS permission: {key}."
-                evidence[capability].append(detail)
-                platform_evidence["ios"][capability].append(detail)
+        model = IOSFunctionality(
+            {"plist_outputs": {"platform": {"privacy": {"permissions": [{"key": key} for key in permission_keys]}}}}
+        )
+        for key, item in asdict(model).items():
+            capability = key.replace("_", " ")
+            if item["present"] and capability in evidence:
+                evidence[capability].append(item["explanation"])
+                platform_evidence["ios"][capability].append(item["explanation"])
 
         for artifact in context.mapping_list(context.ios_metadata.get("entitlements")):
             metadata = context.mapping(artifact.get("metadata"))
@@ -289,7 +290,6 @@ class ReactNativeFunctionality:
         for scope, mapping in (
             ("react_native", REACT_NATIVE_FUNCTIONALITY_RULES),
             ("android", AndroidFunctionality.RULE_IDS),
-            ("ios", IOS_FUNCTIONALITY_RULES),
         ):
             for result in context.opengrep_results_for_scope(scope):
                 capability = mapping.get(context.first_non_empty(result.get("check_id")))

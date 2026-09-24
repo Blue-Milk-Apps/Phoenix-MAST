@@ -47,8 +47,7 @@ def test_combines_flutter_android_and_ios_code_findings_by_evidence_key() -> Non
     assert evidence.contains_potential_sql_injection.details == ["lib/database.dart:14"]
     assert evidence.writes_sensitive_information_to_system_log.present is True
     assert evidence.writes_sensitive_information_to_system_log.details == ["android/app/Logger.kt:9"]
-    assert evidence.encodes_data_using_insecure_cryptography.present is True
-    assert evidence.encodes_data_using_insecure_cryptography.details == ["ios/Runner/Crypto.swift:22"]
+    assert evidence.encodes_data_using_insecure_cryptography.present is None
 
 
 def test_shared_rule_is_clean_only_when_every_applicable_scope_was_assessed() -> None:

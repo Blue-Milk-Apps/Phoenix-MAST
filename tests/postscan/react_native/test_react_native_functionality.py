@@ -1,7 +1,6 @@
 """Tests for React Native mobile functionality detection."""
 
 from domain.post_scan.android.rule_registry import FUNCTIONALITY_RULE_IDS as ANDROID_FUNCTIONALITY_RULE_IDS
-from domain.post_scan.ios.rule_registry import FUNCTIONALITY_RULE_ID_TO_KEY as IOS_FUNCTIONALITY_RULES
 from domain.post_scan.react_native import ReactNativeFunctionality
 from domain.post_scan.react_native.report_models import build_report_sections
 from domain.post_scan.react_native.rule_registry import (
@@ -23,7 +22,10 @@ def test_combines_android_ios_metadata_and_functionality_rules() -> None:
                 "ios": {
                     "available": True,
                     "metadata": {
-                        "permissions": [{"key": "NSMicrophoneUsageDescription", "purpose": "Record audio"}],
+                        "permissions": [
+                            {"key": "NSMicrophoneUsageDescription", "purpose": "Record audio"},
+                            {"key": "NSLocationWhenInUseUsageDescription", "purpose": "Nearby places"},
+                        ],
                         "background_modes": ["remote-notification"],
                         "entitlements": [
                             {
@@ -65,7 +67,7 @@ def test_combines_android_ios_metadata_and_functionality_rules() -> None:
     }
     assert functionality.items["Microphone"] == {
         "present": True,
-        "explanation": "Declared iOS permission: NSMicrophoneUsageDescription.",
+        "explanation": "plist key NSMicrophoneUsageDescription present.",
     }
     assert functionality.items["Maps"]["present"] is True
     assert "android/app/Map.kt:12" in functionality.items["Maps"]["explanation"]
@@ -77,7 +79,7 @@ def test_combines_android_ios_metadata_and_functionality_rules() -> None:
     assert set(functionality.platform_assessments["Camera"]) == {"android", "ios"}
     assert "react_native" not in functionality.platform_assessments["Camera"]
     assert set(functionality.platform_assessments["Keychain"]) == {"ios"}
-    assert set(functionality.platform_assessments["Maps"]) == {"android"}
+    assert set(functionality.platform_assessments["Maps"]) == {"android", "ios"}
 
 
 def test_absent_mobile_platform_does_not_block_negative_results() -> None:
@@ -134,7 +136,7 @@ def test_complete_ios_sources_allow_negative_functionality_inventory() -> None:
                         "ios": {
                             "status": "success",
                             "applicable": True,
-                            "configured_rule_ids": sorted(IOS_FUNCTIONALITY_RULES),
+                            "configured_rule_ids": [],
                         }
                     }
                 },

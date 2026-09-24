@@ -2,48 +2,49 @@ from pathlib import Path
 
 import pytest
 
-from adapters.scanners.ios.rule_inventory import IOSRuleInventory, IOSRuleInventoryError, validate_ios_rule_inventory
+from adapters.scanners.ios.rule_inventory import IOSRuleInventoryError, validate_ios_rule_inventory
+from tests.rule_fixtures import rule, write_rules
 
-REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
-
-def test_default_ios_rule_inventory_uses_current_section_files() -> None:
-    inventory = validate_ios_rule_inventory(REPOSITORY_ROOT / "rules" / "ios")
-
-    assert [(rule_file.section.value, len(rule_file.rule_ids)) for rule_file in inventory.files] == [
-        ("Code", 11),
-        ("Code", 13),
-        ("Functionality", 36),
-        ("Network", 7),
-        ("Data Evidence", 43),
+def test_categories_and_metadata_come_from_files(tmp_path: Path):
+    write_rules(tmp_path / "code.yml", rule("example.code"))
+    write_rules(tmp_path / "crypto.yml", rule("example.crypto", finding_type="review"))
+    inventory = validate_ios_rule_inventory(tmp_path)
+    assert [(item.category, item.rule_ids) for item in inventory.files] == [
+        ("code", ("example.code",)),
+        ("crypto", ("example.crypto",)),
     ]
+    assert inventory.catalog[1]["metadata"]["finding_type"] == "review"
+    assert len(inventory.fingerprint) == 64
+    assert "pattern-regex" not in inventory.catalog[0]
 
 
-def test_inventory_rejects_duplicate_rule_ids(tmp_path: Path) -> None:
-    for file_name, section in (("code.yml", "Code"), ("network.yml", "Network")):
-        (tmp_path / file_name).write_text(
-            f"""rules:
-  - id: duplicate-rule
-    metadata:
-      phoenix:
-        report_section: {section}
-""",
-            encoding="utf-8",
-        )
-
-    inventory = IOSRuleInventory.from_directory(tmp_path)
+def test_duplicate_ids_are_rejected(tmp_path: Path):
+    write_rules(tmp_path / "one.yml", rule())
+    write_rules(tmp_path / "two.yml", rule())
     with pytest.raises(IOSRuleInventoryError, match="duplicate rule IDs"):
-        inventory.validate(expected_rule_ids={"duplicate-rule"})
+        validate_ios_rule_inventory(tmp_path)
 
 
-def test_inventory_derives_section_from_file_name(tmp_path: Path) -> None:
-    (tmp_path / "code.yml").write_text(
-        """rules:
-  - id: code-rule
-""",
-        encoding="utf-8",
-    )
+@pytest.mark.parametrize(
+    "field,value",
+    [("finding_type", "vulnerability"), ("scope", None), ("category", "code"), ("capability_type", ["Source"])],
+)
+def test_invalid_metadata_is_rejected(tmp_path: Path, field, value):
+    definition = rule()
+    definition["metadata"][field] = value
+    write_rules(tmp_path / "anything.yml", definition)
+    with pytest.raises(IOSRuleInventoryError):
+        validate_ios_rule_inventory(tmp_path)
 
-    inventory = IOSRuleInventory.from_directory(tmp_path)
 
-    assert inventory.files[0].section.value == "Code"
+def test_fingerprint_changes_when_metadata_changes(tmp_path: Path):
+    write_rules(tmp_path / "custom.yml", rule())
+    first = validate_ios_rule_inventory(tmp_path).fingerprint
+    write_rules(tmp_path / "custom.yml", rule(title="New title"))
+    assert validate_ios_rule_inventory(tmp_path).fingerprint != first
+
+
+def test_missing_rule_directory_is_explicit(tmp_path: Path):
+    with pytest.raises(IOSRuleInventoryError, match="does not exist"):
+        validate_ios_rule_inventory(tmp_path / "absent")

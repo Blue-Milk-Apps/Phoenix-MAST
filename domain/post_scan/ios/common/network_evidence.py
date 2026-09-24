@@ -8,7 +8,6 @@ from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
 from domain.post_scan.ios.common.evidence import EvidenceEntry
-from domain.post_scan.ios.rule_registry import NETWORK_RULE_IDS_BY_EVIDENCE_KEY
 
 
 @dataclass
@@ -94,10 +93,6 @@ class IOSNetworkEvidence:
         "SecTrustSetAnchorCertificates",
     )
     WEAK_TLS_VERSIONS = {"tlsv1", "tlsv1.0", "tlsv1.1"}
-    ATS_DISABLED_RULE_IDS = NETWORK_RULE_IDS_BY_EVIDENCE_KEY["ats_disabled"]
-    ATS_EXCEPTIONS_RULE_IDS = NETWORK_RULE_IDS_BY_EVIDENCE_KEY["ats_exceptions_configured"]
-    COOKIE_MISSING_HTTPONLY_RULE_IDS = NETWORK_RULE_IDS_BY_EVIDENCE_KEY["cookie_missing_httponly"]
-    COOKIE_MISSING_SECURE_FLAG_RULE_IDS = NETWORK_RULE_IDS_BY_EVIDENCE_KEY["cookie_missing_secure_flag"]
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
         self.ats_disabled = self._ats_disabled_entry(loaded_outputs)
@@ -124,18 +119,12 @@ class IOSNetworkEvidence:
 
     @classmethod
     def _ats_disabled_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
-        opengrep_entry = cls._opengrep_entry_for_rule_ids(loaded_outputs, cls.ATS_DISABLED_RULE_IDS)
-        if opengrep_entry is not None:
-            return opengrep_entry
         for artifact_path, document in (loaded_outputs.get("plist_outputs") or {}).items():
             if not isinstance(document, dict) or not isinstance(document.get("app_meta"), dict):
                 continue
             ats = document.get("ats")
             if isinstance(ats, dict) and ats.get("allows_arbitrary_loads") is True:
-                return EvidenceEntry(
-                    True,
-                    f"{artifact_path}: NSAllowsArbitraryLoads=true",
-                )
+                return EvidenceEntry(True, f"{artifact_path}: NSAllowsArbitraryLoads=true")
         return EvidenceEntry(False, "no_ats_disabled_hits")
 
     @classmethod
@@ -384,9 +373,6 @@ class IOSNetworkEvidence:
 
     @classmethod
     def _ats_exceptions_configured_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
-        opengrep_entry = cls._opengrep_entry_for_rule_ids(loaded_outputs, cls.ATS_EXCEPTIONS_RULE_IDS)
-        if opengrep_entry is not None:
-            return opengrep_entry
         for path, document in (loaded_outputs.get("plist_outputs") or {}).items():
             if not isinstance(document, dict) or not isinstance(document.get("app_meta"), dict):
                 continue
@@ -402,66 +388,35 @@ class IOSNetworkEvidence:
                     continue
                 domain = str(exception.get("domain", "")).strip() or "unknown domain"
                 if exception.get("allows_insecure_http_loads") is True:
-                    return EvidenceEntry(
-                        True,
-                        f"{path}: {domain} (NSExceptionAllowsInsecureHTTPLoads=true)",
-                    )
+                    return EvidenceEntry(True, f"{path}: {domain} (NSExceptionAllowsInsecureHTTPLoads=true)")
                 minimum_tls_version = str(exception.get("minimum_tls_version", "")).strip().lower()
                 if minimum_tls_version in cls.WEAK_TLS_VERSIONS:
                     return EvidenceEntry(
-                        True,
-                        f"{path}: {domain} (NSExceptionMinimumTLSVersion={exception['minimum_tls_version']})",
+                        True, f"{path}: {domain} (NSExceptionMinimumTLSVersion={exception['minimum_tls_version']})"
                     )
                 if exception.get("requires_forward_secrecy") is False:
-                    return EvidenceEntry(
-                        True,
-                        f"{path}: {domain} (NSExceptionRequiresForwardSecrecy=false)",
-                    )
+                    return EvidenceEntry(True, f"{path}: {domain} (NSExceptionRequiresForwardSecrecy=false)")
         return EvidenceEntry(False, "no_ats_exceptions_configured_hits")
 
     @classmethod
     def _cookie_missing_httponly_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
-        opengrep_entry = cls._opengrep_entry_for_rule_ids(loaded_outputs, cls.COOKIE_MISSING_HTTPONLY_RULE_IDS)
-        if opengrep_entry is not None:
-            return opengrep_entry
-
         strings_outputs = loaded_outputs.get("strings_outputs") or {}
         if isinstance(strings_outputs, dict):
             for path, content in strings_outputs.items():
                 for cookie_value in cls.SET_COOKIE_PATTERN.findall(str(content or "")):
                     if not cls.HTTPONLY_ATTRIBUTE_PATTERN.search(cookie_value):
                         return EvidenceEntry(True, f"{path}: Set-Cookie: {cookie_value}")
-
         return EvidenceEntry(False, "no_cookie_missing_httponly_hits")
 
     @classmethod
     def _cookie_missing_secure_flag_entry(cls, loaded_outputs: dict[str, Any]) -> EvidenceEntry:
-        opengrep_entry = cls._opengrep_entry_for_rule_ids(loaded_outputs, cls.COOKIE_MISSING_SECURE_FLAG_RULE_IDS)
-        if opengrep_entry is not None:
-            return opengrep_entry
-
         strings_outputs = loaded_outputs.get("strings_outputs") or {}
         if isinstance(strings_outputs, dict):
             for path, content in strings_outputs.items():
                 for cookie_value in cls.SET_COOKIE_PATTERN.findall(str(content or "")):
                     if not cls.SECURE_ATTRIBUTE_PATTERN.search(cookie_value):
                         return EvidenceEntry(True, f"{path}: Set-Cookie: {cookie_value}")
-
         return EvidenceEntry(False, "no_cookie_missing_secure_flag_hits")
-
-    @staticmethod
-    def _opengrep_entry_for_rule_ids(
-        loaded_outputs: dict[str, Any],
-        rule_ids: frozenset[str],
-    ) -> EvidenceEntry | None:
-        for result in (loaded_outputs.get("opengrep") or {}).get("results") or []:
-            if not isinstance(result, dict) or result.get("check_id") not in rule_ids:
-                continue
-            extra = result.get("extra") or {}
-            evidence = str(extra.get("lines") or extra.get("message") or result.get("check_id")).strip()
-            path = str(result.get("path", "")).strip()
-            return EvidenceEntry(True, f"{path}: {evidence}" if path else evidence)
-        return None
 
     @staticmethod
     def _is_public_http_url(url: str) -> bool:

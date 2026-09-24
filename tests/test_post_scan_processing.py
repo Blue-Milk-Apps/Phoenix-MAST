@@ -36,159 +36,25 @@ def test_native_ios_scan_detail_extractor_identifies_source_assessment(tmp_path:
     assert result["meta"]["package_name"] == "com.example.app"
 
 
-def test_native_ios_code_evidence_uses_exact_opengrep_rule_ids() -> None:
+def test_native_ios_structured_evidence_does_not_interpret_rule_ids() -> None:
     result = NativeIOSScanDetailExtractor().extract_sections(
         {
             "opengrep": {
                 "results": [
                     {
-                        "check_id": "ios-deprecated-api-uiwebview",
-                        "path": "Sources/WebView.swift",
-                        "extra": {"lines": "let view = UIWebView()"},
-                    },
-                    {
-                        "check_id": "ios-insecure-serialization-nskeyedunarchiver",
-                        "path": "Sources/Archive.swift",
-                        "extra": {"lines": "NSKeyedUnarchiver.unarchiveObject(with:)"},
-                    },
-                    {
-                        "check_id": "ios-pbkdf2-low-iterations",
-                        "path": "Sources/Password.swift",
-                        "extra": {"lines": "PBKDF2 iteration count: 5000"},
-                    },
-                    {
-                        "check_id": "ios.unrelated.documentation",
-                        "path": "Sources/Docs.swift",
-                        "extra": {
-                            "message": "UIWebView, NSKeyedUnarchiver, and PBKDF2 migration notes",
-                        },
-                    },
-                ]
-            }
-        }
-    )
-
-    assert result["code_evidence"]["uses_uiwebview"] == {
-        "present": True,
-        "evidence": "Sources/WebView.swift: let view = UIWebView()",
-    }
-    assert result["code_evidence"]["insecure_nskeyedunarchiver_usage"] == {
-        "present": True,
-        "evidence": "Sources/Archive.swift: NSKeyedUnarchiver.unarchiveObject(with:)",
-    }
-    assert result["code_evidence"]["pbkdf2_iteration_count_below_10k"] == {
-        "present": True,
-        "evidence": "Sources/Password.swift: PBKDF2 iteration count: 5000",
-    }
-
-
-def test_native_ios_code_evidence_ignores_keywords_from_unmapped_rules() -> None:
-    result = NativeIOSScanDetailExtractor().extract_sections(
-        {
-            "opengrep": {
-                "results": [
-                    {
-                        "check_id": "ios.unrelated.documentation",
-                        "path": "Sources/Docs.swift",
-                        "extra": {
-                            "message": ("UIWebView NSKeyedUnarchiver PBKDF2 MD5 SHA1 DES 3DES RC4 ECB migration notes"),
-                        },
+                        "check_id": "example.new-rule",
+                        "extra": {"message": "UIWebView NSKeyedUnarchiver PBKDF2 MD5 migration notes"},
                     }
                 ]
             }
         }
     )
-
-    evidence = result["code_evidence"]
-    assert evidence["uses_uiwebview"]["present"] is False
-    assert evidence["insecure_nskeyedunarchiver_usage"]["present"] is False
-    assert evidence["pbkdf2_iteration_count_below_10k"]["present"] is False
-    assert evidence["encodes_data_using_insecure_cryptography"]["present"] is False
-    assert evidence["utilizes_insecure_cryptography"]["present"] is False
-
-
-def test_native_ios_crypto_operation_rules_only_populate_encoding_evidence() -> None:
-    operation_rule_ids = (
-        "ios-weak-crypto-md5",
-        "ios-weak-crypto-operation-3des",
-        "ios-weak-crypto-operation-des",
-        "ios-weak-crypto-operation-ecb",
-        "ios-weak-crypto-operation-rc4",
-        "ios-weak-crypto-sha1",
-    )
-    findings = [
-        {
-            "check_id": rule_id,
-            "path": f"Sources/{index:02d}Crypto.swift",
-            "extra": {"lines": rule_id},
-        }
-        for index, rule_id in enumerate(reversed(operation_rule_ids))
-    ]
-    findings.append(findings[0])
-    result = NativeIOSScanDetailExtractor().extract_sections(
-        {
-            "opengrep": {
-                "results": findings,
-            }
-        }
-    )
-
-    assert result["code_evidence"]["encodes_data_using_insecure_cryptography"] == {
-        "present": True,
-        "evidence": "; ".join(
-            sorted(
-                f"Sources/{index:02d}Crypto.swift: {rule_id}"
-                for index, rule_id in enumerate(reversed(operation_rule_ids))
-            )
-        ),
+    assert set(result["code_evidence"]) == {
+        "insecure_nanopb_library",
+        "hardcoded_api_keys_in_bundle",
+        "insecure_entitlements",
     }
-    assert result["code_evidence"]["utilizes_insecure_cryptography"] == {
-        "present": False,
-        "evidence": "no_utilizes_insecure_cryptography_hits",
-    }
-
-
-def test_native_ios_crypto_reference_rules_only_populate_utilization_evidence() -> None:
-    reference_rule_ids = (
-        "ios-weak-crypto-reference-3des",
-        "ios-weak-crypto-reference-des",
-        "ios-weak-crypto-reference-rc4",
-    )
-    result = NativeIOSScanDetailExtractor().extract_sections(
-        {
-            "opengrep": {
-                "results": [
-                    *[
-                        {
-                            "check_id": rule_id,
-                            "path": f"Sources/{index:02d}LegacyCrypto.swift",
-                            "extra": {"lines": rule_id},
-                        }
-                        for index, rule_id in enumerate(reversed(reference_rule_ids))
-                    ],
-                    {
-                        "check_id": "ios.unrelated.weak-crypto",
-                        "path": "Sources/Docs.swift",
-                        "extra": {"message": "Weak crypto DES reference documentation"},
-                    },
-                ]
-            }
-        }
-    )
-
-    assert result["code_evidence"]["encodes_data_using_insecure_cryptography"] == {
-        "present": False,
-        "evidence": "no_encodes_data_using_insecure_cryptography_hits",
-    }
-    assert result["code_evidence"]["utilizes_insecure_cryptography"] == {
-        "present": True,
-        "evidence": "; ".join(
-            sorted(
-                f"Sources/{index:02d}LegacyCrypto.swift: {rule_id}"
-                for index, rule_id in enumerate(reversed(reference_rule_ids))
-            )
-        ),
-    }
+    assert not any(item["present"] for item in result["code_evidence"].values())
 
 
 def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() -> None:
@@ -737,16 +603,16 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
     assert result["hardcoded_values"] == {"urls": [], "emails": [], "secrets": []}
     assert result["code_evidence"] == {
         "uses_uiwebview": {
-            "present": True,
-            "evidence": "UIWebView reference detected.",
+            "present": None,
+            "evidence": "Evaluated through configured binary YAML rules.",
         },
         "insecure_nanopb_library": {
             "present": False,
             "evidence": "no_insecure_nanopb_library_hits",
         },
         "insecure_nskeyedunarchiver_usage": {
-            "present": True,
-            "evidence": "decodeObject usage detected.",
+            "present": None,
+            "evidence": "Evaluated through configured binary YAML rules.",
         },
         "missing_arc": {
             "present": False,
@@ -769,16 +635,16 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
             "evidence": "no_malloc_instead_of_calloc_hits",
         },
         "encodes_data_using_insecure_cryptography": {
-            "present": False,
-            "evidence": "no_encodes_data_using_insecure_cryptography_hits",
+            "present": None,
+            "evidence": "Evaluated through configured binary YAML rules.",
         },
         "utilizes_insecure_cryptography": {
             "present": False,
             "evidence": "no_utilizes_insecure_cryptography_hits",
         },
         "pbkdf2_iteration_count_below_10k": {
-            "present": False,
-            "evidence": "no_pbkdf2_iteration_count_below_10k_hits",
+            "present": None,
+            "evidence": "Evaluated through configured binary YAML rules.",
         },
         "hardcoded_api_keys_in_bundle": {
             "present": True,
@@ -1039,7 +905,7 @@ def test_post_scan_processing_service_returns_direct_ios_contract(tmp_path: Path
 
     assert result["meta"]["platform"] == "iOS"
     assert result["meta"]["app_display_name"] == "ExampleApp"
-    assert result["code_evidence"]["uses_uiwebview"]["present"] is False
+    assert result["code_evidence"]["uses_uiwebview"]["present"] is None
     assert result["network_evidence"]["ats_disabled"]["present"] is False
 
 
@@ -1523,22 +1389,6 @@ def test_ios_network_evidence_detects_weak_ats_exceptions() -> None:
 
 
 def test_ios_network_evidence_detects_cookies_missing_httponly() -> None:
-    from_opengrep = IOSNetworkEvidence(
-        {
-            "opengrep": {
-                "results": [
-                    {
-                        "check_id": "ios.network.cookie-missing-httponly",
-                        "path": "Sources/Network.swift",
-                        "extra": {"lines": "Set-Cookie: session=abc; Path=/"},
-                    }
-                ]
-            }
-        }
-    )
-    assert from_opengrep.cookie_missing_httponly.present is True
-    assert from_opengrep.cookie_missing_httponly.evidence == "Sources/Network.swift: Set-Cookie: session=abc; Path=/"
-
     from_strings = IOSNetworkEvidence({"strings_outputs": {"main.txt": "Set-Cookie: session=abc; Path=/\n"}})
     assert from_strings.cookie_missing_httponly.present is True
     assert from_strings.cookie_missing_httponly.evidence == "main.txt: Set-Cookie: session=abc; Path=/"
@@ -1555,25 +1405,6 @@ def test_ios_network_evidence_detects_cookies_missing_httponly() -> None:
 
 
 def test_ios_network_evidence_detects_cookies_missing_secure_flag() -> None:
-    from_opengrep = IOSNetworkEvidence(
-        {
-            "opengrep": {
-                "results": [
-                    {
-                        "check_id": "ios.network.cookie-missing-secure-flag",
-                        "path": "Sources/Network.swift",
-                        "extra": {"lines": "Set-Cookie: session=abc; Path=/; HttpOnly"},
-                    }
-                ]
-            }
-        }
-    )
-    assert from_opengrep.cookie_missing_secure_flag.present is True
-    assert (
-        from_opengrep.cookie_missing_secure_flag.evidence
-        == "Sources/Network.swift: Set-Cookie: session=abc; Path=/; HttpOnly"
-    )
-
     from_strings = IOSNetworkEvidence({"strings_outputs": {"main.txt": "Set-Cookie: session=abc; Path=/; HttpOnly\n"}})
     assert from_strings.cookie_missing_secure_flag.present is True
     assert from_strings.cookie_missing_secure_flag.evidence == "main.txt: Set-Cookie: session=abc; Path=/; HttpOnly"
@@ -1682,11 +1513,11 @@ def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
     }
     assert sections["functionality"]["Networking"] == {
         "present": True,
-        "explanation": "Info.plist declares NSAppTransportSecurity. Info.plist declares URL scheme handling. Networking usage detected.",
+        "explanation": "Info.plist declares NSAppTransportSecurity. Info.plist declares URL scheme handling.",
     }
     assert sections["functionality"]["Secure RNG"] == {
-        "present": True,
-        "explanation": "Secure RNG usage detected.",
+        "present": False,
+        "explanation": "",
     }
     assert sections["functionality"]["Push Notifications"] == {
         "present": True,
@@ -1793,7 +1624,7 @@ def test_ios_functionality_derives_capabilities_from_loaded_outputs() -> None:
     ]
 
 
-def test_ios_code_evidence_uses_imports_and_opengrep_heuristics() -> None:
+def test_ios_binary_code_evidence_retains_imports_and_defers_rule_only_checks() -> None:
     loaded_outputs = {
         "lief_outputs": {
             "App.json": {
@@ -1888,12 +1719,12 @@ def test_ios_code_evidence_uses_imports_and_opengrep_heuristics() -> None:
         "evidence": "_malloc",
     }
     assert sections["code_evidence"]["pbkdf2_iteration_count_below_10k"] == {
-        "present": True,
-        "evidence": "PBKDF2 iteration count 5000 detected.",
+        "present": None,
+        "evidence": "Evaluated through configured binary YAML rules.",
     }
     assert sections["code_evidence"]["encodes_data_using_insecure_cryptography"] == {
-        "present": True,
-        "evidence": "MD5 hashing detected during encoding flow.",
+        "present": None,
+        "evidence": "Evaluated through configured binary YAML rules.",
     }
     assert sections["code_evidence"]["utilizes_insecure_cryptography"] == {
         "present": True,
@@ -1915,8 +1746,8 @@ def test_ios_code_evidence_does_not_treat_strings_only_crypto_hints_as_confirmed
     sections = IOSBinaryScanDetailExtractor().extract_sections(loaded_outputs)
 
     assert sections["code_evidence"]["encodes_data_using_insecure_cryptography"] == {
-        "present": False,
-        "evidence": "no_encodes_data_using_insecure_cryptography_hits",
+        "present": None,
+        "evidence": "Evaluated through configured binary YAML rules.",
     }
     assert sections["code_evidence"]["utilizes_insecure_cryptography"] == {
         "present": True,

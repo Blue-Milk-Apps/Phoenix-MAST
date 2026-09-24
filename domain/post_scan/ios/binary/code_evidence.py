@@ -8,7 +8,6 @@ from typing import Any
 
 from domain.post_scan.ios.binary.ipa_binary_evidence import IOSIPABinaryEvidence
 from domain.post_scan.ios.common.evidence import EvidenceEntry
-from domain.post_scan.ios.rule_registry import CODE_RULE_IDS_BY_EVIDENCE_KEY
 from domain.post_scan.utilities import first_non_empty
 
 
@@ -70,44 +69,23 @@ class IOSCodeEvidence:
         "com.apple.security.cs.disable-executable-page-protection",
     )
     NANOPB_VULNERABLE_VERSION_PATTERN = re.compile(r"^(0\.|1\.)")
-    UIWEBVIEW_RULE_IDS = CODE_RULE_IDS_BY_EVIDENCE_KEY["uses_uiwebview"]
-    INSECURE_NSKEYEDUNARCHIVER_RULE_IDS = CODE_RULE_IDS_BY_EVIDENCE_KEY["insecure_nskeyedunarchiver_usage"]
-    INSECURE_CRYPTO_ENCODING_RULE_IDS = CODE_RULE_IDS_BY_EVIDENCE_KEY["encodes_data_using_insecure_cryptography"]
-    INSECURE_CRYPTO_REFERENCE_RULE_IDS = CODE_RULE_IDS_BY_EVIDENCE_KEY["utilizes_insecure_cryptography"]
-    LOW_PBKDF2_ITERATION_RULE_IDS = CODE_RULE_IDS_BY_EVIDENCE_KEY["pbkdf2_iteration_count_below_10k"]
 
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
-        opengrep_results = (loaded_outputs.get("opengrep") or {}).get("results") or []
         ipa_binary_evidence = IOSIPABinaryEvidence(loaded_outputs)
         imported_functions = self._main_imported_functions(loaded_outputs)
         strings_outputs = loaded_outputs.get("strings_outputs") or {}
-
-        self.uses_uiwebview = self._opengrep_entry(
-            opengrep_results,
-            "no_uses_uiwebview_hits",
-            "uiwebview",
-            rule_ids=self.UIWEBVIEW_RULE_IDS,
-        )
+        self.uses_uiwebview = EvidenceEntry(None, "Evaluated through configured binary YAML rules.")
         self.insecure_nanopb_library = self._name_heuristic_entry(
-            loaded_outputs,
-            "no_insecure_nanopb_library_hits",
-            "nanopb",
+            loaded_outputs, "no_insecure_nanopb_library_hits", "nanopb"
         )
-        self.insecure_nskeyedunarchiver_usage = self._opengrep_entry(
-            opengrep_results,
-            "no_insecure_nskeyedunarchiver_usage_hits",
-            "nskeyedunarchiver",
-            rule_ids=self.INSECURE_NSKEYEDUNARCHIVER_RULE_IDS,
-        )
+        self.insecure_nskeyedunarchiver_usage = EvidenceEntry(None, "Evaluated through configured binary YAML rules.")
         self.missing_arc = self._binary_protection_inverse_entry(
             ipa_binary_evidence.arc,
             "no_missing_arc_hits",
             "main Mach-O imports do not expose _objc_release or _swift_release",
         )
         self.pic_not_enabled = self._binary_protection_inverse_entry(
-            ipa_binary_evidence.pie,
-            "no_pic_not_enabled_hits",
-            "PIE flag not detected in main Mach-O metadata",
+            ipa_binary_evidence.pie, "no_pic_not_enabled_hits", "PIE flag not detected in main Mach-O metadata"
         )
         self.stack_canaries_not_enabled = self._binary_protection_inverse_entry(
             ipa_binary_evidence.stack_canary,
@@ -115,120 +93,29 @@ class IOSCodeEvidence:
             "main Mach-O imports do not expose ___stack_chk_fail and ___stack_chk_guard",
         )
         self.insecure_api_usage_in_binary = self._import_match_entry(
-            imported_functions,
-            self.DANGEROUS_C_IMPORTS,
-            "no_insecure_api_usage_in_binary_hits",
+            imported_functions, self.DANGEROUS_C_IMPORTS, "no_insecure_api_usage_in_binary_hits"
         )
         self.malloc_instead_of_calloc = self._import_match_entry(
-            imported_functions,
-            ("_malloc",),
-            "no_malloc_instead_of_calloc_hits",
+            imported_functions, ("_malloc",), "no_malloc_instead_of_calloc_hits"
         )
-        # TODO: enrich this with stronger rule-specific evidence extraction once dedicated crypto
-        # operation rules land in OpenGrep and/or structured binary call-site evidence exists.
-        self.encodes_data_using_insecure_cryptography = self._confirmed_insecure_crypto_entry(
-            opengrep_results,
-            "no_encodes_data_using_insecure_cryptography_hits",
+        self.encodes_data_using_insecure_cryptography = EvidenceEntry(
+            None, "Evaluated through configured binary YAML rules."
         )
-        # TODO: refine heuristic evidence ranking for weak-crypto references once more dedicated
-        # OpenGrep reference rules and binary metadata signals are available.
         self.utilizes_insecure_cryptography = self._crypto_entry(
-            opengrep_results,
             imported_functions,
             strings_outputs,
             "no_utilizes_insecure_cryptography_hits",
-            opengrep_needles=("insecure cryptography", "weak crypto", "cipher"),
-            opengrep_rule_ids=self.INSECURE_CRYPTO_REFERENCE_RULE_IDS,
             term_candidates=self.OPERATIONAL_WEAK_CRYPTO_TERMS,
         )
-        self.pbkdf2_iteration_count_below_10k = self._pbkdf2_entry(
-            opengrep_results,
-            "no_pbkdf2_iteration_count_below_10k_hits",
-        )
+        self.pbkdf2_iteration_count_below_10k = EvidenceEntry(None, "Evaluated through configured binary YAML rules.")
         self.hardcoded_api_keys_in_bundle = self._hardcoded_api_keys_entry(
-            loaded_outputs,
-            "no_hardcoded_api_keys_in_bundle_hits",
+            loaded_outputs, "no_hardcoded_api_keys_in_bundle_hits"
         )
-        self.insecure_entitlements = self._insecure_entitlements_entry(
-            loaded_outputs,
-            "no_insecure_entitlements_hits",
-        )
+        self.insecure_entitlements = self._insecure_entitlements_entry(loaded_outputs, "no_insecure_entitlements_hits")
 
     @staticmethod
     def _entry(present: bool, evidence: str, absent_evidence: str) -> EvidenceEntry:
         return EvidenceEntry(present, evidence if present else absent_evidence)
-
-    @classmethod
-    def _opengrep_entry(
-        cls,
-        results: list[Any],
-        absent_evidence: str,
-        *needles: str,
-        rule_ids: frozenset[str] = frozenset(),
-    ) -> EvidenceEntry:
-        lowered_needles = [needle.strip().lower() for needle in needles if needle.strip()]
-        for result in results:
-            if not isinstance(result, dict):
-                continue
-            extra = result.get("extra") or {}
-            metadata = (extra.get("metadata") or {}).get("phoenix") or {}
-            haystacks = [
-                str(result.get("check_id", "")).strip().lower(),
-                str(metadata.get("title", "")).strip().lower(),
-                str(metadata.get("description", "")).strip().lower(),
-                str(extra.get("message", "")).strip().lower(),
-            ]
-            exact_rule_match = str(result.get("check_id", "")).strip() in rule_ids
-            if (
-                not exact_rule_match
-                and lowered_needles
-                and not all(any(needle in haystack for haystack in haystacks) for needle in lowered_needles)
-            ):
-                continue
-            evidence = first_non_empty(
-                metadata.get("description"),
-                metadata.get("title"),
-                extra.get("message"),
-                result.get("check_id"),
-            )
-            return cls._entry(True, str(evidence), absent_evidence)
-        return cls._entry(False, "", absent_evidence)
-
-    @classmethod
-    def _opengrep_any_entry(
-        cls,
-        results: list[Any],
-        absent_evidence: str,
-        *needles: str,
-        rule_ids: frozenset[str] = frozenset(),
-    ) -> EvidenceEntry:
-        lowered_needles = [needle.strip().lower() for needle in needles if needle.strip()]
-        for result in results:
-            if not isinstance(result, dict):
-                continue
-            extra = result.get("extra") or {}
-            metadata = (extra.get("metadata") or {}).get("phoenix") or {}
-            haystacks = [
-                str(result.get("check_id", "")).strip().lower(),
-                str(metadata.get("title", "")).strip().lower(),
-                str(metadata.get("description", "")).strip().lower(),
-                str(extra.get("message", "")).strip().lower(),
-            ]
-            exact_rule_match = str(result.get("check_id", "")).strip() in rule_ids
-            if (
-                not exact_rule_match
-                and lowered_needles
-                and not any(any(needle in haystack for haystack in haystacks) for needle in lowered_needles)
-            ):
-                continue
-            evidence = first_non_empty(
-                metadata.get("description"),
-                metadata.get("title"),
-                extra.get("message"),
-                result.get("check_id"),
-            )
-            return cls._entry(True, str(evidence), absent_evidence)
-        return cls._entry(False, "", absent_evidence)
 
     @classmethod
     def _binary_protection_inverse_entry(
@@ -250,79 +137,19 @@ class IOSCodeEvidence:
         return cls._entry(bool(matches), ", ".join(matches), absent_evidence)
 
     @classmethod
-    def _confirmed_insecure_crypto_entry(
-        cls,
-        opengrep_results: list[Any],
-        absent_evidence: str,
-    ) -> EvidenceEntry:
-        for result in opengrep_results:
-            if not isinstance(result, dict):
-                continue
-            if not cls._is_confirmed_insecure_crypto_result(result):
-                continue
-            extra = result.get("extra") or {}
-            metadata = (extra.get("metadata") or {}).get("phoenix") or {}
-            evidence = first_non_empty(
-                metadata.get("description"),
-                metadata.get("title"),
-                extra.get("message"),
-                result.get("check_id"),
-            )
-            return cls._entry(True, str(evidence), absent_evidence)
-        return cls._entry(False, "", absent_evidence)
-
-    @classmethod
-    def _is_confirmed_insecure_crypto_result(cls, result: dict[str, Any]) -> bool:
-        if str(result.get("check_id", "")).strip() in cls.INSECURE_CRYPTO_ENCODING_RULE_IDS:
-            return True
-        extra = result.get("extra") or {}
-        metadata = (extra.get("metadata") or {}).get("phoenix") or {}
-        haystack = " ".join(
-            [
-                str(result.get("check_id", "")).strip().lower(),
-                str(metadata.get("title", "")).strip().lower(),
-                str(metadata.get("description", "")).strip().lower(),
-                str(extra.get("message", "")).strip().lower(),
-            ]
-        )
-        if not haystack:
-            return False
-
-        has_weak_crypto_term = any(term in haystack for term in cls.CONFIRMED_WEAK_CRYPTO_TERMS)
-        has_operation_term = any(term in haystack for term in cls.CONFIRMED_CRYPTO_OPERATION_TERMS)
-        has_operation_style_rule_id = any(
-            token in str(result.get("check_id", "")).strip().lower()
-            for token in (".encoding.", ".insecure_operation.", ".operation.", ".pbkdf2.")
-        )
-        return has_weak_crypto_term and (has_operation_term or has_operation_style_rule_id)
-
-    @classmethod
     def _crypto_entry(
         cls,
-        opengrep_results: list[Any],
         imported_functions: set[str],
         strings_outputs: Any,
         absent_evidence: str,
         *,
-        opengrep_needles: tuple[str, ...],
-        opengrep_rule_ids: frozenset[str],
         term_candidates: tuple[str, ...],
     ) -> EvidenceEntry:
-        opengrep_entry = cls._opengrep_any_entry(
-            opengrep_results,
-            absent_evidence,
-            *opengrep_needles,
-            rule_ids=opengrep_rule_ids,
-        )
-        if opengrep_entry.present:
-            return opengrep_entry
-
         candidates: set[str] = set()
         for symbol in imported_functions:
             lowered = symbol.lower()
-            if any(term in lowered for term in term_candidates):
+            if any((term in lowered for term in term_candidates)):
                 candidates.add(symbol)
-
         if isinstance(strings_outputs, dict):
             for content in strings_outputs.values():
                 text = str(content or "")
@@ -330,79 +157,7 @@ class IOSCodeEvidence:
                 for term in term_candidates:
                     if term in lowered:
                         candidates.add(term)
-
         return cls._entry(bool(candidates), ", ".join(sorted(candidates)), absent_evidence)
-
-    @classmethod
-    def _pbkdf2_entry(
-        cls,
-        results: list[Any],
-        absent_evidence: str,
-    ) -> EvidenceEntry:
-        for result in results:
-            if not isinstance(result, dict):
-                continue
-            if str(result.get("check_id", "")).strip() in cls.LOW_PBKDF2_ITERATION_RULE_IDS:
-                extra = result.get("extra") or {}
-                metadata = (extra.get("metadata") or {}).get("phoenix") or {}
-                evidence = first_non_empty(
-                    cls._pbkdf2_count_evidence(result),
-                    metadata.get("description"),
-                    metadata.get("title"),
-                    extra.get("message"),
-                    result.get("check_id"),
-                )
-                return cls._entry(True, str(evidence), absent_evidence)
-            extra = result.get("extra") or {}
-            metadata = (extra.get("metadata") or {}).get("phoenix") or {}
-            haystacks = [
-                str(result.get("check_id", "")).strip().lower(),
-                str(metadata.get("title", "")).strip().lower(),
-                str(metadata.get("description", "")).strip().lower(),
-                str(extra.get("message", "")).strip().lower(),
-            ]
-            if "pbkdf2" not in " ".join(haystacks):
-                continue
-
-            evidence = first_non_empty(
-                cls._pbkdf2_count_evidence(result),
-                metadata.get("description"),
-                metadata.get("title"),
-                extra.get("message"),
-                result.get("check_id"),
-            )
-            return cls._entry(True, str(evidence), absent_evidence)
-
-        return cls._entry(False, "", absent_evidence)
-
-    @classmethod
-    def _pbkdf2_count_evidence(cls, result: dict[str, Any]) -> str:
-        extra = result.get("extra") or {}
-        metadata = (extra.get("metadata") or {}).get("phoenix") or {}
-        metavars = extra.get("metavars") or {}
-        candidates: list[str] = [
-            str(extra.get("message", "")).strip(),
-            str(metadata.get("description", "")).strip(),
-            str(metadata.get("title", "")).strip(),
-        ]
-        if isinstance(metavars, dict):
-            for value in metavars.values():
-                if isinstance(value, dict):
-                    candidates.extend(
-                        str(value.get(key, "")).strip()
-                        for key in ("abstract_content", "value")
-                        if str(value.get(key, "")).strip()
-                    )
-                else:
-                    text = str(value).strip()
-                    if text:
-                        candidates.append(text)
-
-        for candidate in candidates:
-            match = cls.PBKDF2_ITERATION_PATTERN.search(candidate)
-            if match:
-                return f"PBKDF2 iteration count {match.group(1)} detected."
-        return ""
 
     @classmethod
     def _hardcoded_api_keys_entry(cls, loaded_outputs: dict[str, Any], absent_evidence: str) -> EvidenceEntry:

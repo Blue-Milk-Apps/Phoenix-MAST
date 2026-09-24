@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import yaml
 
 from domain.post_scan.flutter.rule_registry import (
@@ -15,6 +13,7 @@ from domain.post_scan.flutter.rule_registry import (
     FlutterRuleDisposition,
     unclassified_flutter_rule_ids,
 )
+from tests.rule_fixtures import private_rules
 
 
 def test_flutter_rule_contract_classifies_every_planned_rule() -> None:
@@ -65,7 +64,7 @@ def test_unsafe_platform_channel_rule_remains_manual_review_only() -> None:
 
 
 def test_bundled_flutter_rules_match_the_registry_contract() -> None:
-    rules_root = Path(__file__).parents[3] / "rules" / "flutter"
+    rules_root = private_rules("flutter")
     bundled_rules: dict[str, dict[str, object]] = {}
     for rules_path in sorted(rules_root.glob("*.yml")):
         document = yaml.safe_load(rules_path.read_text(encoding="utf-8"))
@@ -77,7 +76,7 @@ def test_bundled_flutter_rules_match_the_registry_contract() -> None:
     assert set(bundled_rules) == set(FLUTTER_RULE_IDS)
     for rule_id, mapping in FLUTTER_RULE_REGISTRY.items():
         metadata = bundled_rules[rule_id]["metadata"]
-        assert metadata["severity"] == mapping.severity
+        assert bundled_rules[rule_id]["severity"].casefold() == mapping.severity.casefold()
         assert metadata["report_section"] == mapping.section
         if mapping.disposition is FlutterRuleDisposition.REPORT_VULNERABILITY:
             assert metadata["evidence_key"] == mapping.evidence_key

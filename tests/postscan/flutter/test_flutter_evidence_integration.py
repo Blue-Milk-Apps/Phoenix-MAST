@@ -23,14 +23,6 @@ from domain.post_scan.flutter.rule_registry import (
 from domain.post_scan.flutter.rule_registry import (
     REPORT_RULE_IDS_BY_SECTION as FLUTTER_REPORT_RULES,
 )
-from domain.post_scan.ios.rule_registry import (
-    IOS_RULE_REGISTRY,
-    POSITIVE_INFORMATIONAL_RULE_IDS,
-    IOSRuleDisposition,
-)
-from domain.post_scan.ios.rule_registry import (
-    REPORT_RULE_IDS_BY_SECTION as IOS_REPORT_RULES,
-)
 
 
 def test_every_registered_report_evidence_key_has_a_flutter_model_consumer() -> None:
@@ -41,7 +33,7 @@ def test_every_registered_report_evidence_key_has_a_flutter_model_consumer() -> 
         "Resilience": {field.name for field in fields(FlutterResilienceEvidence)},
     }
 
-    for registry in (FLUTTER_REPORT_RULES, ANDROID_REPORT_RULES, IOS_REPORT_RULES):
+    for registry in (FLUTTER_REPORT_RULES, ANDROID_REPORT_RULES):
         for section, evidence_groups in registry.items():
             assert set(evidence_groups) <= model_keys[section]
             assert all(rule_ids for rule_ids in evidence_groups.values())
@@ -115,7 +107,6 @@ def test_partial_multiplatform_scan_preserves_positives_and_unknowns() -> None:
                             "status": "success",
                             "configured_rule_ids": [
                                 "ios-weak-crypto-md5",
-                                "private-api-usage-dynamic",
                             ],
                         },
                     }
@@ -132,7 +123,7 @@ def test_partial_multiplatform_scan_preserves_positives_and_unknowns() -> None:
     manual_review = FlutterManualReviewInventory(context)
 
     assert code.contains_potential_sql_injection.present is True
-    assert code.encodes_data_using_insecure_cryptography.present is True
+    assert code.encodes_data_using_insecure_cryptography.present is None
     assert code.writes_sensitive_information_to_system_log.present is None
     assert network.sensitive_information_unencrypted_in_transit.present is None
     assert storage.sensitive_values_stored_insecurely.present is None
@@ -142,10 +133,9 @@ def test_partial_multiplatform_scan_preserves_positives_and_unknowns() -> None:
     assert functionality.items["SMS"]["present"] is None
     assert [finding.rule_id for finding in manual_review.findings] == [
         "flutter.source.unsafe-platform-channel",
-        "private-api-usage-dynamic",
     ]
     assert manual_review.assessed_scopes == ["flutter"]
-    assert manual_review.fully_assessed is False
+    assert manual_review.fully_assessed is True
 
     json.dumps(
         {
@@ -165,26 +155,15 @@ def test_raw_and_positive_informational_rules_cannot_enter_vulnerability_models(
         for rule_id, mapping in FLUTTER_RULE_REGISTRY.items()
         if mapping.disposition is FlutterRuleDisposition.RAW_ONLY
     }
-    ios_raw_ids = {
-        rule_id for rule_id, mapping in IOS_RULE_REGISTRY.items() if mapping.disposition is IOSRuleDisposition.RAW_ONLY
-    }
     results = [
         {
             "check_id": rule_id,
             "phoenix_scope": scope,
             "path": f"{scope}/{index}.source",
         }
-        for scope, rule_ids in (("flutter", flutter_raw_ids), ("ios", ios_raw_ids))
+        for scope, rule_ids in (("flutter", flutter_raw_ids),)
         for index, rule_id in enumerate(sorted(rule_ids))
     ]
-    results.extend(
-        {
-            "check_id": rule_id,
-            "phoenix_scope": "ios",
-            "path": f"ios/positive-{index}.swift",
-        }
-        for index, rule_id in enumerate(sorted(POSITIVE_INFORMATIONAL_RULE_IDS))
-    )
     context = FlutterScanExtractionContext(
         {
             "source_metadata": {
@@ -201,7 +180,7 @@ def test_raw_and_positive_informational_rules_cannot_enter_vulnerability_models(
                         },
                         "ios": {
                             "status": "success",
-                            "configured_rule_ids": sorted(ios_raw_ids | set(POSITIVE_INFORMATIONAL_RULE_IDS)),
+                            "configured_rule_ids": sorted(set()),
                         },
                     }
                 },
@@ -219,9 +198,8 @@ def test_raw_and_positive_informational_rules_cannot_enter_vulnerability_models(
     )
     manual_review = FlutterManualReviewInventory(context)
 
-    assert not any(rule_id in vulnerability_output for rule_id in flutter_raw_ids | ios_raw_ids)
-    assert not any(rule_id in vulnerability_output for rule_id in POSITIVE_INFORMATIONAL_RULE_IDS)
-    assert {finding.rule_id for finding in manual_review.findings} == flutter_raw_ids | ios_raw_ids
+    assert not any(rule_id in vulnerability_output for rule_id in flutter_raw_ids)
+    assert {finding.rule_id for finding in manual_review.findings} == flutter_raw_ids
 
 
 def test_step_four_models_are_public_flutter_exports() -> None:

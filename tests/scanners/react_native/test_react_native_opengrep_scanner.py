@@ -173,7 +173,7 @@ def test_workflow_selects_react_native_scoped_scanner(monkeypatch, tmp_path: Pat
     captured: dict[str, Path] = {}
 
     class RecordingScanner:
-        def __init__(self, react_native_rules_path: Path) -> None:
+        def __init__(self, react_native_rules_path: Path, **kwargs) -> None:
             captured["rules_path"] = react_native_rules_path
 
         def scan(self, config: ScanConfig) -> list[ScanResult]:

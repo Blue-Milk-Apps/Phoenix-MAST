@@ -180,3 +180,8 @@ table.compact th, table.compact td { font-size: 8pt; padding: 4px 6px; }
 .small { font-size: 8pt; color: #666; }
 .confidence-caveat { color: #8a6d1a; }
 .mono { font-family: "DejaVu Sans Mono", monospace; font-size: 8pt; word-break: break-all; }
+
+.rule-check { border-top: 1px solid #d9e2ec; padding: 10px 0; break-inside: avoid; }
+.rule-check h3 { break-after: avoid; }
+.rule-check p { overflow-wrap: anywhere; }
+.rule-evidence { white-space: pre-wrap; }

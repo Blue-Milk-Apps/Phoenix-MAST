@@ -390,15 +390,42 @@
   {% endif %}
 </div>
 
+{% if data.rule_status %}
+<div class="section">
+  <h2>Rule Coverage</h2>
+  <p>Status: {{ data.rule_status | e }}. {{ data.rule_status_reason | e }}</p>
+  {% for coverage in data.rule_coverage %}
+  <p>{{ coverage.platform | e }} / {{ coverage.mode | e }}: {{ coverage.status | e }}. {{ coverage.reason | e }}</p>
+  {% if coverage.ruleset_fingerprint %}<p class="small mono">Ruleset: {{ coverage.ruleset_fingerprint | e }}</p>{% endif %}
+  {% endfor %}
+  <p class="small">No matches means no evidence matched in the evaluated inputs. It does not establish application-wide security or control coverage.</p>
+</div>
+{% endif %}
 <!-- ===================== VULNERABILITY SECTIONS ===================== -->
 {% for section in data.vulnerability_sections %}
 <div class="section">
-  <h2>{{ section.section_name }}</h2>
+  <h2>{{ section.section_name | e }}</h2>
   {% if section.findings_text %}
   <h3>Findings</h3>
   <div class="vuln-findings">{{ section.findings_text }}</div>
   {% endif %}
-  {% if section.checks %}
+  {% if section.checks and section.checks[0].rule_id %}
+  {% for c in section.checks %}
+  <div class="rule-check">
+    <h3>{{ c.check | e }}</h3>
+    <p class="small"><strong>{{ c.finding_type | title | e }}</strong> · {{ c.severity | e }} · {% if c.result == 'Not Present' %}No matches{% elif c.result == 'Present' %}Matched{% else %}{{ c.result | e }}{% endif %}</p>
+    <p class="small mono">{{ c.rule_id | e }} · {{ c.rule_file | e }} · Scope: {{ c.scope | e }} · Execution: {{ c.execution_status | e }}</p>
+    <p>{{ c.explanation | e }}</p>
+    {% if c.result == 'Present' %}
+    <p><strong>Impact:</strong> {{ c.impact | e }}</p>
+    <p><strong>Guidance:</strong> {{ c.remediation | e }}</p>
+    <p class="small rule-evidence">{{ c.evidence | e }}</p>
+    {% endif %}
+    {% if c.compliance %}<p class="small">{{ c.compliance | e }}</p>{% endif %}
+    {% for reference in c.references %}<p class="small mono">{{ reference | e }}</p>{% endfor %}
+  </div>
+  {% endfor %}
+  {% elif section.checks %}
   <h3>Checks Conducted</h3>
   <table>
     <tr>

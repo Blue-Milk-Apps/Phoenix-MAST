@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from domain.post_scan.android.rule_registry import FUNCTIONALITY_RULE_IDS as ANDROID_FUNCTIONALITY_RULE_IDS
 from domain.post_scan.flutter import FlutterFunctionality, FlutterScanExtractionContext
-from domain.post_scan.ios.rule_registry import FUNCTIONALITY_RULE_ID_TO_KEY as IOS_FUNCTIONALITY_RULES
 
 
 def test_combines_android_ios_permissions_metadata_and_functionality_rules() -> None:
@@ -20,7 +19,10 @@ def test_combines_android_ios_permissions_metadata_and_functionality_rules() -> 
                 "ios": {
                     "available": True,
                     "metadata": {
-                        "permissions": [{"key": "NSMicrophoneUsageDescription", "purpose": "Record audio"}],
+                        "permissions": [
+                            {"key": "NSMicrophoneUsageDescription", "purpose": "Record audio"},
+                            {"key": "NSLocationWhenInUseUsageDescription", "purpose": "Nearby places"},
+                        ],
                         "app_transport_security": {},
                         "url_schemes": {},
                         "background_modes": ["remote-notification"],
@@ -64,7 +66,7 @@ def test_combines_android_ios_permissions_metadata_and_functionality_rules() -> 
     }
     assert functionality.items["Microphone"] == {
         "present": True,
-        "explanation": "Declared iOS permission: NSMicrophoneUsageDescription.",
+        "explanation": "plist key NSMicrophoneUsageDescription present.",
     }
     assert functionality.items["Maps"]["present"] is True
     assert "android/app/Map.kt:12" in functionality.items["Maps"]["explanation"]
@@ -92,7 +94,7 @@ def test_complete_platform_sources_allow_negative_functionality_inventory() -> N
                         },
                         "ios": {
                             "status": "success",
-                            "configured_rule_ids": sorted(IOS_FUNCTIONALITY_RULES),
+                            "configured_rule_ids": [],
                         },
                     }
                 },

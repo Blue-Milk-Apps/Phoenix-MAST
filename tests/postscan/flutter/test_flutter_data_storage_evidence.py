@@ -3,10 +3,6 @@
 from __future__ import annotations
 
 from domain.post_scan.flutter import FlutterDataStorageEvidence, FlutterScanExtractionContext
-from domain.post_scan.ios.rule_registry import (
-    COMPLETE_FILE_PROTECTION_RULE_IDS,
-    DATA_STORAGE_RULE_IDS_BY_EVIDENCE_KEY,
-)
 
 
 def test_combines_flutter_android_and_ios_storage_findings() -> None:
@@ -49,15 +45,15 @@ def test_combines_flutter_android_and_ios_storage_findings() -> None:
     assert evidence.assessed is True
     assert evidence.sensitive_values_stored_insecurely.details == ["lib/storage.dart:12"]
     assert evidence.sensitive_information_stored_in_external_storage.details == ["android/app/Storage.kt:20"]
-    assert evidence.deprecated_keychain_attributes.details == ["ios/Runner/Keychain.swift:28"]
+    assert not hasattr(evidence, "deprecated_keychain_attributes")
 
 
-def test_shared_flutter_and_ios_storage_result_requires_both_scopes() -> None:
+def test_flutter_storage_result_is_independent_of_ios_rule_coverage() -> None:
     complete = FlutterDataStorageEvidence(_sensitive_values_context(ios_rule_configured=True))
     incomplete = FlutterDataStorageEvidence(_sensitive_values_context(ios_rule_configured=False))
 
     assert complete.sensitive_values_stored_insecurely.present is False
-    assert incomplete.sensitive_values_stored_insecurely.present is None
+    assert incomplete.sensitive_values_stored_insecurely.present is False
 
 
 def test_builds_android_external_storage_permission_evidence() -> None:
@@ -77,43 +73,6 @@ def test_builds_android_external_storage_permission_evidence() -> None:
     assert negative.accesses_external_storage.present is False
     assert negative.accesses_external_storage.evidence == "no_external_storage_permissions"
     assert unknown.accesses_external_storage.present is None
-
-
-def test_positive_file_protection_rules_do_not_become_vulnerabilities() -> None:
-    weak_rule_ids = DATA_STORAGE_RULE_IDS_BY_EVIDENCE_KEY["weak_file_protection"]
-    context = FlutterScanExtractionContext(
-        {
-            "source_metadata": {
-                "platforms": {"ios": True},
-                "ios": {"available": True, "metadata": {}},
-            },
-            "opengrep": {
-                "results": [
-                    {
-                        "check_id": next(iter(COMPLETE_FILE_PROTECTION_RULE_IDS)),
-                        "phoenix_scope": "ios",
-                        "path": "ios/Runner/SecureStorage.swift",
-                    }
-                ],
-                "scan_metadata": {
-                    "scopes": {
-                        "ios": {
-                            "status": "success",
-                            "configured_rule_ids": [
-                                *sorted(weak_rule_ids),
-                                *sorted(COMPLETE_FILE_PROTECTION_RULE_IDS),
-                            ],
-                        }
-                    }
-                },
-            },
-        }
-    )
-
-    evidence = FlutterDataStorageEvidence(context)
-
-    assert evidence.weak_file_protection.present is False
-    assert "SecureStorage.swift" not in str(evidence.weak_file_protection)
 
 
 def test_missing_storage_inputs_remain_unassessed() -> None:

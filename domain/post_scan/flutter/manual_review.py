@@ -16,7 +16,6 @@ from domain.post_scan.flutter.rule_registry import (
 )
 from domain.post_scan.flutter.scan_extraction_context import FlutterScanExtractionContext
 from domain.post_scan.flutter.security_evidence import opengrep_scope_applicable
-from domain.post_scan.ios.rule_registry import IOS_RULE_REGISTRY, IOSRuleDisposition
 
 
 @dataclass(frozen=True)
@@ -81,11 +80,6 @@ class FlutterManualReviewInventory:
                 rule_id: mapping
                 for rule_id, mapping in ANDROID_RULE_REGISTRY.items()
                 if mapping.disposition is AndroidRuleDisposition.RAW_ONLY
-            },
-            "ios": {
-                rule_id: mapping
-                for rule_id, mapping in IOS_RULE_REGISTRY.items()
-                if mapping.disposition is IOSRuleDisposition.RAW_ONLY
             },
         }
 

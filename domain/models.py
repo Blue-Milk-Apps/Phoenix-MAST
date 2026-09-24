@@ -68,6 +68,7 @@ class ScanConfig:
     mode: str = "source"
     scan_label: str = ""
     opengrep_rules_path: Path | None = None
+    opengrep_rules_root: Path | None = None
     ignore_patterns: list[str] = field(default_factory=list)
     ignore_file: Path | None = None
     display_project_path: str = ""

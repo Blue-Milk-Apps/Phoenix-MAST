@@ -14,7 +14,6 @@ from domain.post_scan.flutter.security_evidence import (
     optional_bool_entry,
     scoped_opengrep_entry,
 )
-from domain.post_scan.ios.rule_registry import NETWORK_RULE_IDS_BY_EVIDENCE_KEY as IOS_NETWORK_RULE_IDS
 
 
 @dataclass
@@ -27,8 +26,6 @@ class FlutterNetworkEvidence:
     weak_certificate_validation_enables_mitm: FlutterEvidenceEntry
     ats_disabled: FlutterEvidenceEntry
     ats_exceptions_configured: FlutterEvidenceEntry
-    cookie_missing_httponly: FlutterEvidenceEntry
-    cookie_missing_secure_flag: FlutterEvidenceEntry
     assessed: bool
 
     WEAK_TLS_VERSIONS = frozenset({"tlsv1", "tlsv1.0", "tlsv1.1"})
@@ -39,9 +36,7 @@ class FlutterNetworkEvidence:
             label="uses_cleartext_traffic",
         )
 
-        rule_evidence_keys = (
-            set(FLUTTER_RULE_IDS["Network"]) | set(ANDROID_RULE_IDS["Network"]) | set(IOS_NETWORK_RULE_IDS)
-        )
+        rule_evidence_keys = set(FLUTTER_RULE_IDS["Network"]) | set(ANDROID_RULE_IDS["Network"])
         for evidence_key in rule_evidence_keys:
             setattr(self, evidence_key, self._rule_entry(context, evidence_key))
 
@@ -53,14 +48,8 @@ class FlutterNetworkEvidence:
             ],
             absent_evidence="no_weak_certificate_validation_hits",
         )
-        self.ats_disabled = combine_evidence_entries(
-            [self.ats_disabled, self._ats_disabled_metadata_entry(context)],
-            absent_evidence="no_ats_disabled_hits",
-        )
-        self.ats_exceptions_configured = combine_evidence_entries(
-            [self.ats_exceptions_configured, self._ats_exception_metadata_entry(context)],
-            absent_evidence="no_ats_exceptions_configured_hits",
-        )
+        self.ats_disabled = self._ats_disabled_metadata_entry(context)
+        self.ats_exceptions_configured = self._ats_exception_metadata_entry(context)
         self.assessed = any(
             entry.present is not None
             for name, entry in vars(self).items()
@@ -75,7 +64,6 @@ class FlutterNetworkEvidence:
         rules_by_scope = {
             "flutter": FLUTTER_RULE_IDS["Network"].get(evidence_key, frozenset()),
             "android": ANDROID_RULE_IDS["Network"].get(evidence_key, frozenset()),
-            "ios": IOS_NETWORK_RULE_IDS.get(evidence_key, frozenset()),
         }
         entries = [
             scoped_opengrep_entry(

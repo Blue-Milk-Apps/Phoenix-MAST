@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -13,12 +14,12 @@ from domain.models import ScanConfig
 
 DEFAULT_SYFT_OUTPUT_FORMAT = "syft-json"
 DEFAULT_OPENGREP_RULES_DIRS = {
-    "ios_binary": "ios",
-    "android_binary": "android",
-    "flutter_source": "flutter",
-    "react_native_source": "react_native",
-    "native_android_source": "android",
-    "native_ios_source": "ios",
+    "ios_binary": "ios/binary",
+    "android_binary": "android/binary",
+    "flutter_source": "flutter/source",
+    "react_native_source": "react_native/source",
+    "native_android_source": "android/source",
+    "native_ios_source": "ios/source",
 }
 
 
@@ -96,6 +97,13 @@ def _build_parser() -> argparse.ArgumentParser:
         "--syft-output-format",
         default=DEFAULT_SYFT_OUTPUT_FORMAT,
         help=(f"Syft SBOM output format to capture from stdout (default: {DEFAULT_SYFT_OUTPUT_FORMAT})"),
+    )
+    scan_parser.add_argument(
+        "--rules-root",
+        type=Path,
+        metavar="PATH",
+        default=os.environ.get("PHOENIX_RULES_ROOT") or None,
+        help="Root containing <platform>/<source|binary>/ rule directories (Docker default: /app/rules).",
     )
     scan_parser.add_argument("--ios-binary-opengrep-rules-path", type=Path, metavar="PATH")
     scan_parser.add_argument("--android-binary-opengrep-rules-path", type=Path, metavar="PATH")
@@ -192,6 +200,9 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
 
         case _:
             raise ValueError("No valid scan type provided")
+    rules_root = getattr(args, "rules_root", None)
+    if rules_root is not None and getattr(args, f"{scan_slug}_opengrep_rules_path", None) is None:
+        rules_path = rules_root.resolve() / DEFAULT_OPENGREP_RULES_DIRS[scan_slug]
     project_path = project_path.resolve()
     run_timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
     output_path = args.output.resolve() / f"SAST_{scan_slug}_{run_timestamp}"
@@ -203,6 +214,7 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
         platform=platform,
         stack=stack,
         opengrep_rules_path=rules_path,
+        opengrep_rules_root=rules_root.resolve() if rules_root else None,
         syft_output_format=args.syft_output_format,
     )
     return scan_config
@@ -226,7 +238,7 @@ def _resolve_opengrep_rules_path(
     for candidate in candidates:
         if candidate.exists():
             return candidate
-    return None
+    return candidates[0]
 
 
 if __name__ == "__main__":

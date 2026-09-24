@@ -1,13 +1,14 @@
 # syntax=docker/dockerfile:1.7
 FROM python:3.12-slim-bookworm AS phoenix
 
-LABEL org.opencontainers.image.source="https://github.com/Blue-Milk-Apps/phoenix"
+LABEL org.opencontainers.image.source="https://github.com/Blue-Milk-Apps/Phoenix-MAST"
 
 # 1. Environment & Global Settings
 ENV DEBIAN_FRONTEND=noninteractive \
     FORCE_COLOR=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    PHOENIX_RULES_ROOT=/app/rules \
     PATH="/opt/phoenix-venv/bin:/usr/local/bin:$PATH" \
     OPENGREP_OFFLINE=1 \
     OPENGREP_DISABLE_METRICS=1 \
@@ -19,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     bash git curl ca-certificates \
     apksigner \
     binutils libmagic1 \
+    libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-dejavu-core \
     openjdk-17-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
@@ -73,6 +75,9 @@ RUN python -m venv /opt/phoenix-venv \
 
 # 5. Application User and Source Code
 WORKDIR /app
+RUN useradd -m -u 1001 phoenix \
+    && install -d -o phoenix -g phoenix /app/rules
+
 COPY --chown=phoenix:phoenix README.md pyproject.toml ./
 COPY --chown=phoenix:phoenix __init__.py ./
 COPY --chown=phoenix:phoenix utilities ./utilities
@@ -81,10 +86,8 @@ COPY --chown=phoenix:phoenix application ./application
 COPY --chown=phoenix:phoenix domain ./domain
 COPY --chown=phoenix:phoenix entrypoints ./entrypoints
 COPY --chown=phoenix:phoenix ports ./ports
-COPY --chown=phoenix:phoenix rules ./rules
 
-RUN useradd -m -u 1001 phoenix \
-    && /opt/phoenix-venv/bin/pip install --no-cache-dir .
+RUN /opt/phoenix-venv/bin/pip install --no-cache-dir .
 
 # 6. Working Directory
 USER phoenix

@@ -235,10 +235,22 @@ class MobileAnalysisWorkflowService:
             if scan_config.stack == "FLUTTER":
                 opengrep_scanner = FlutterOpenGrepScanner(
                     flutter_rules_path=Path(open_grep_rules_path),
+                    android_rules_path=scan_config.opengrep_rules_root / "android/source"
+                    if scan_config.opengrep_rules_root
+                    else None,
+                    ios_rules_path=scan_config.opengrep_rules_root / "ios/source"
+                    if scan_config.opengrep_rules_root
+                    else None,
                 )
             elif scan_config.stack == "REACT_NATIVE":
                 opengrep_scanner = ReactNativeOpenGrepScanner(
                     react_native_rules_path=Path(open_grep_rules_path),
+                    android_rules_path=scan_config.opengrep_rules_root / "android/source"
+                    if scan_config.opengrep_rules_root
+                    else None,
+                    ios_rules_path=scan_config.opengrep_rules_root / "ios/source"
+                    if scan_config.opengrep_rules_root
+                    else None,
                 )
             elif scan_config.platform == "IOS":
                 opengrep_scanner = IOSSectionOpenGrepScanner(
@@ -257,13 +269,9 @@ class MobileAnalysisWorkflowService:
     def _get_opengrep_rules_path(self, config: ScanConfig) -> str | None:
         if config.opengrep_rules_path:
             return str(config.opengrep_rules_path)
-        if config.target_type == "SOURCE":
-            return None
-        if config.platform == "ANDROID":
-            return "opengrep_rules/android_binary"
-        if config.platform == "IOS":
-            return "opengrep_rules/ios_binary"
-        return None
+        platform = {"FLUTTER": "flutter", "REACT_NATIVE": "react_native"}.get(config.stack, config.platform.lower())
+        root = config.opengrep_rules_root or Path(__file__).resolve().parents[1] / "rules"
+        return str(root / platform / config.mode.lower())
 
     @staticmethod
     def _get_opengrep_scan_paths(config: ScanConfig) -> list[Path]:

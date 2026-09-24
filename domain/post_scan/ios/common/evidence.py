@@ -5,5 +5,5 @@ from dataclasses import dataclass
 
 @dataclass
 class EvidenceEntry:
-    present: bool = False
+    present: bool | None = False
     evidence: str = ""

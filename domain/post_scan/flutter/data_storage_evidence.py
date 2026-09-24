@@ -13,7 +13,6 @@ from domain.post_scan.flutter.security_evidence import (
     opengrep_scope_applicable,
     scoped_opengrep_entry,
 )
-from domain.post_scan.ios.rule_registry import DATA_STORAGE_RULE_IDS_BY_EVIDENCE_KEY as IOS_STORAGE_RULE_IDS
 
 
 @dataclass
@@ -21,25 +20,7 @@ class FlutterDataStorageEvidence:
     accesses_external_storage: FlutterEvidenceEntry
     sensitive_information_stored_in_world_readable_or_writable_file_in_internal_storage: FlutterEvidenceEntry
     sensitive_information_stored_in_external_storage: FlutterEvidenceEntry
-    weak_file_protection: FlutterEvidenceEntry
-    deprecated_keychain_attributes: FlutterEvidenceEntry
-    advertiser_id_stored_insecurely: FlutterEvidenceEntry
-    imei_labeled_value_stored_insecurely: FlutterEvidenceEntry
-    global_write_permissions: FlutterEvidenceEntry
-    location_data_stored_insecurely: FlutterEvidenceEntry
-    hardcoded_api_keys_stored_insecurely: FlutterEvidenceEntry
-    hardcoded_passwords_stored_insecurely: FlutterEvidenceEntry
     sensitive_values_stored_insecurely: FlutterEvidenceEntry
-    wifi_ip_stored_insecurely: FlutterEvidenceEntry
-    wifi_mac_stored_insecurely: FlutterEvidenceEntry
-    keychain_items_accessible_after_first_unlock: FlutterEvidenceEntry
-    sensitive_data_stored_in_user_defaults: FlutterEvidenceEntry
-    advertiser_id_logged_insecurely: FlutterEvidenceEntry
-    imei_logged_insecurely: FlutterEvidenceEntry
-    location_data_logged_insecurely: FlutterEvidenceEntry
-    sensitive_data_logged_insecurely: FlutterEvidenceEntry
-    wifi_mac_logged_insecurely: FlutterEvidenceEntry
-    keyboard_cache_exposure: FlutterEvidenceEntry
     assessed: bool
 
     EXTERNAL_STORAGE_PERMISSIONS = frozenset(
@@ -56,9 +37,7 @@ class FlutterDataStorageEvidence:
     def __init__(self, context: FlutterScanExtractionContext) -> None:
         self.accesses_external_storage = self._external_storage_entry(context)
 
-        rule_evidence_keys = (
-            set(FLUTTER_RULE_IDS["Data Storage"]) | set(ANDROID_RULE_IDS["Data Storage"]) | set(IOS_STORAGE_RULE_IDS)
-        )
+        rule_evidence_keys = set(FLUTTER_RULE_IDS["Data Storage"]) | set(ANDROID_RULE_IDS["Data Storage"])
         for evidence_key in rule_evidence_keys:
             setattr(self, evidence_key, self._rule_entry(context, evidence_key))
 
@@ -76,7 +55,6 @@ class FlutterDataStorageEvidence:
         rules_by_scope = {
             "flutter": FLUTTER_RULE_IDS["Data Storage"].get(evidence_key, frozenset()),
             "android": ANDROID_RULE_IDS["Data Storage"].get(evidence_key, frozenset()),
-            "ios": IOS_STORAGE_RULE_IDS.get(evidence_key, frozenset()),
         }
         entries = [
             scoped_opengrep_entry(

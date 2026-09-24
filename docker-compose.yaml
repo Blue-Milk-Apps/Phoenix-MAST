@@ -44,10 +44,13 @@ services:
     volumes:
       - ${PROJECT_MOUNT_PATH:-.}:/workspace:ro
       - ${OUTPUT_PATH:-./scan-results}:/app/results
+      - ${RULES_PATH:-./rules}:/app/rules:ro
     environment:
       - CI=true
-      - MOBSF_URL=
-    command: ["scan", "${SCAN_FLAG:?Set SCAN_FLAG to one phoenix scan target flag}", "${PHOENIX_SCAN_PATH:?Set PHOENIX_SCAN_PATH to the scan path inside the container}", "--output", "/app/results"]
+      - MOBSF_URL=${MOBSF_URL:-}
+    # Defaults also let sidecar-only and teardown commands parse this file.
+    entrypoint: ["phoenix"]
+    command: ["scan", "${SCAN_FLAG:---native-ios-source-path}", "${PHOENIX_SCAN_PATH:-/workspace}", "--output", "/app/results"]
 
 
   phoenix-secrets:
@@ -59,7 +62,9 @@ services:
     volumes:
       - ${PROJECT_MOUNT_PATH:-./sample-project}:/workspace:ro
       - ${OUTPUT_PATH:-./scan-results}:/app/results
-    command: ["scan", "${SCAN_FLAG:?Set SCAN_FLAG to one phoenix scan target flag}", "${PHOENIX_SCAN_PATH:?Set PHOENIX_SCAN_PATH to the scan path inside the container}", "--output", "/app/results"]
+      - ${RULES_PATH:-./rules}:/app/rules:ro
+    entrypoint: ["phoenix"]
+    command: ["scan", "${SCAN_FLAG:---native-ios-source-path}", "${PHOENIX_SCAN_PATH:-/workspace}", "--output", "/app/results"]
 
 networks:
   default:

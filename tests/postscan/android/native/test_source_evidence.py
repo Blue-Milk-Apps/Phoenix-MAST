@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from adapters.post_scan import NativeAndroidScanDetailExtractor
 from domain.post_scan.android.native import (
@@ -9,10 +8,11 @@ from domain.post_scan.android.native import (
     NativeAndroidHardcodedValues,
     NativeAndroidScanExtractionContext,
 )
+from tests.rule_fixtures import private_rules
 
 
 def test_android_rules_use_flat_metadata() -> None:
-    rules = (Path(__file__).parents[4] / "rules" / "android" / "android_rules.yml").read_text(encoding="utf-8")
+    rules = (private_rules("android") / "android_rules.yml").read_text(encoding="utf-8")
 
     assert "appcritiq:" not in rules
     assert "\n      phoenix:" not in rules

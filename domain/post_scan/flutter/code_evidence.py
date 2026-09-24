@@ -16,7 +16,6 @@ from domain.post_scan.flutter.security_evidence import (
     optional_bool_entry,
     scoped_opengrep_entry,
 )
-from domain.post_scan.ios.rule_registry import CODE_RULE_IDS_BY_EVIDENCE_KEY as IOS_CODE_RULE_IDS
 
 
 @dataclass
@@ -39,12 +38,9 @@ class FlutterCodeEvidence:
     writes_sensitive_information_to_system_log: FlutterEvidenceEntry
     uses_spoofable_values_for_authentication: FlutterEvidenceEntry
     copies_sensitive_information_into_clipboard_without_user_consent: FlutterEvidenceEntry
-    uses_uiwebview: FlutterEvidenceEntry
     insecure_nanopb_library: FlutterEvidenceEntry
-    insecure_nskeyedunarchiver_usage: FlutterEvidenceEntry
     encodes_data_using_insecure_cryptography: FlutterEvidenceEntry
     utilizes_insecure_cryptography: FlutterEvidenceEntry
-    pbkdf2_iteration_count_below_10k: FlutterEvidenceEntry
     hardcoded_api_keys_in_bundle: FlutterEvidenceEntry
     insecure_entitlements: FlutterEvidenceEntry
     assessed: bool
@@ -88,7 +84,7 @@ class FlutterCodeEvidence:
             "no_hardcoded_api_keys_in_bundle_hits",
         )
 
-        rule_evidence_keys = set(FLUTTER_RULE_IDS["Code"]) | set(ANDROID_RULE_IDS["Code"]) | set(IOS_CODE_RULE_IDS)
+        rule_evidence_keys = set(FLUTTER_RULE_IDS["Code"]) | set(ANDROID_RULE_IDS["Code"])
         for evidence_key in rule_evidence_keys:
             setattr(self, evidence_key, self._rule_entry(context, evidence_key))
 
@@ -109,7 +105,6 @@ class FlutterCodeEvidence:
         rules_by_scope = {
             "flutter": FLUTTER_RULE_IDS["Code"].get(evidence_key, frozenset()),
             "android": ANDROID_RULE_IDS["Code"].get(evidence_key, frozenset()),
-            "ios": IOS_CODE_RULE_IDS.get(evidence_key, frozenset()),
         }
         entries = [
             scoped_opengrep_entry(

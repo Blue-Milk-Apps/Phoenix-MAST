@@ -246,7 +246,7 @@ def test_workflow_selects_scoped_opengrep_for_flutter(tmp_path: Path, monkeypatc
     captured: list[Path] = []
 
     class FakeFlutterOpenGrepScanner:
-        def __init__(self, flutter_rules_path):
+        def __init__(self, flutter_rules_path, **kwargs):
             captured.append(Path(flutter_rules_path))
 
         def scan(self, scan_config):

@@ -4,12 +4,12 @@
 IMAGE_NAME ?= phoenix
 TAG ?= latest
 MOBSF_API_KEY ?= phoenix-local-mobsf-api-key
-MODE ?= source
 
 # Local Paths
 PROJECT_PATH ?= $(shell pwd)
 RESULTS_DIR ?= $(shell pwd)/scan-results
 PHOENIX_SCAN_PATH ?= /workspace
+RULES_PATH ?= $(shell pwd)/rules
 
 help:
 	@echo "Phoenix MAST"
@@ -34,7 +34,7 @@ build:
 		-t $(IMAGE_NAME):$(TAG) .
 
 run:
-	@mkdir -p $(RESULTS_DIR)
+	@mkdir -p "$(RESULTS_DIR)"
 	@if [ -z "$(SCAN_FLAG)" ]; then \
 		echo "Set SCAN_FLAG to one phoenix scan target flag"; \
 		exit 1; \
@@ -54,9 +54,10 @@ run:
 	fi; \
 	echo "Mounting: $$PROJECT_MOUNT_PATH -> /workspace"; \
 	echo "Scanning: $$SCAN_PATH"; \
-	docker run --rm \
+	docker run --rm --entrypoint phoenix \
 		-v "$$PROJECT_MOUNT_PATH:/workspace:ro" \
 		-v "$(RESULTS_DIR):/app/results" \
+		-v "$(RULES_PATH):/app/rules:ro" \
 		$(IMAGE_NAME):$(TAG) scan "$(SCAN_FLAG)" "$$SCAN_PATH" --output /app/results
 
 services-up:
@@ -100,34 +101,7 @@ compose-run:
 	echo "Mounting: $$PROJECT_MOUNT_PATH -> /workspace"; \
 	echo "Scanning: $$SCAN_PATH"; \
 	OUTPUT_PATH="$(RESULTS_DIR)" \
-	PROJECT_MOUNT_PATH="$$PROJECT_MOUNT_PATH" \
-	SCAN_FLAG="$(SCAN_FLAG)" \
-	PHOENIX_SCAN_PATH="$$SCAN_PATH" \
-	GITLEAKS_SCAN_PATH="$${GITLEAKS_SCAN_PATH:-}" \
-	docker compose up --build --exit-code-from phoenix phoenix
-
-compose-run:
-	@mkdir -p "$(RESULTS_DIR)"
-	@if [ -z "$(SCAN_FLAG)" ]; then \
-		echo "Set SCAN_FLAG to one phoenix scan target flag"; \
-		exit 1; \
-	fi; \
-	PROJECT_MOUNT_PATH="$(PROJECT_PATH)"; \
-	SCAN_PATH="$(PHOENIX_SCAN_PATH)"; \
-	if [ ! -e "$$PROJECT_MOUNT_PATH" ]; then \
-		echo "PROJECT_PATH does not exist: $$PROJECT_MOUNT_PATH"; \
-		echo "If the path contains spaces, wrap it in quotes."; \
-		exit 1; \
-	fi; \
-	if [ -f "$$PROJECT_MOUNT_PATH" ]; then \
-		if [ "$$SCAN_PATH" = "/workspace" ]; then \
-			SCAN_PATH="/workspace/$$(basename "$$PROJECT_MOUNT_PATH")"; \
-		fi; \
-		PROJECT_MOUNT_PATH="$$(dirname "$$PROJECT_MOUNT_PATH")"; \
-	fi; \
-	echo "Mounting: $$PROJECT_MOUNT_PATH -> /workspace"; \
-	echo "Scanning: $$SCAN_PATH"; \
-	OUTPUT_PATH="$(RESULTS_DIR)" \
+	RULES_PATH="$(RULES_PATH)" \
 	PROJECT_MOUNT_PATH="$$PROJECT_MOUNT_PATH" \
 	SCAN_FLAG="$(SCAN_FLAG)" \
 	PHOENIX_SCAN_PATH="$$SCAN_PATH" \

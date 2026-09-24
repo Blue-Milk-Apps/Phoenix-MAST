@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from domain.post_scan.flutter import FlutterManualReviewInventory, FlutterScanExtractionContext
-from domain.post_scan.ios.rule_registry import RAW_ONLY_RULE_REASONS as IOS_RAW_ONLY_RULE_REASONS
 
 
 def test_preserves_raw_only_findings_without_promoting_report_rules() -> None:
@@ -49,7 +48,7 @@ def test_preserves_raw_only_findings_without_promoting_report_rules() -> None:
                         },
                         "ios": {
                             "status": "success",
-                            "configured_rule_ids": sorted(IOS_RAW_ONLY_RULE_REASONS),
+                            "configured_rule_ids": ["example.review"],
                         },
                     }
                 },
@@ -61,18 +60,14 @@ def test_preserves_raw_only_findings_without_promoting_report_rules() -> None:
 
     assert inventory.assessed is True
     assert inventory.fully_assessed is True
-    assert inventory.assessed_scopes == ["flutter", "ios"]
+    assert inventory.assessed_scopes == ["flutter"]
     assert [finding.rule_id for finding in inventory.findings] == [
         "flutter.source.unsafe-platform-channel",
-        "private-api-usage-dynamic",
     ]
     assert inventory.findings[0].scope == "flutter"
     assert inventory.findings[0].severity == "Medium"
     assert inventory.findings[0].location == "lib/channel.dart:17"
     assert "manual review" in inventory.findings[0].reason.lower()
-    assert inventory.findings[1].scope == "ios"
-    assert inventory.findings[1].severity == "Info"
-    assert inventory.findings[1].location == "ios/Runner/Bridge.swift:8"
 
 
 def test_partial_raw_rule_inventory_is_not_fully_assessed() -> None:

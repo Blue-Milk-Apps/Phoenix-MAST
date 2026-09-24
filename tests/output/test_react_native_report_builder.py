@@ -99,7 +99,7 @@ def test_uses_native_platform_labels_for_platform_backed_items() -> None:
 def test_empty_react_native_data_has_four_empty_sections() -> None:
     report = ReactNativeReportDataBuilder().build({}, _metadata())
     assert len(report.vulnerability_sections) == 4
-    assert [len(section.checks) for section in report.vulnerability_sections] == [26, 28, 23, 1]
+    assert [len(section.checks) for section in report.vulnerability_sections] == [24, 23, 20, 1]
 
 
 def test_rejects_incompatible_target_kind() -> None:

@@ -4,18 +4,18 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
+import yaml
+
 from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
 
 REPORT_PATH = "opengrep_results.json"
-RULE_ID_PATTERN = re.compile(r"^\s*-\s+id:\s*([^\s#]+)")
 
 
 class OpenGrepScanner(ScannerPort):
@@ -23,7 +23,16 @@ class OpenGrepScanner(ScannerPort):
 
     DEFAULT_PROCESS_TIMEOUT_SECONDS = 300
 
-    def __init__(self, rules_path: Path | None = None, scan_paths: list[Path] | None = None) -> None:
+    def __init__(
+        self,
+        rules_path: Path | None = None,
+        scan_paths: list[Path] | None = None,
+        *,
+        rules_paths: list[Path] | None = None,
+    ) -> None:
+        if rules_path is not None and rules_paths is not None:
+            raise ValueError("Pass rules_path or rules_paths, not both.")
+        self._rules_paths = list(dict.fromkeys(path.resolve() for path in rules_paths)) if rules_paths else []
         self._rules_path = rules_path.resolve() if rules_path else None
         self._scan_paths = [path.resolve() for path in scan_paths] if scan_paths else None
         self._tool_version: str | None = None
@@ -73,19 +82,21 @@ class OpenGrepScanner(ScannerPort):
             return ""
 
         try:
-            completed = subprocess.run(
-                [executable, "--version"],
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                timeout=10,
-                check=False,
-            )
+            with tempfile.TemporaryDirectory(prefix="phoenix_opengrep_version_") as directory:
+                completed = subprocess.run(
+                    [executable, "--version"],
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=10,
+                    check=False,
+                    env=self._opengrep_env(Path(directory)),
+                )
         except Exception:
             self._tool_version = ""
             return ""
 
-        version_output = completed.stdout.strip() or completed.stderr.strip()
+        version_output = completed.stdout.strip() if completed.returncode == 0 else ""
         self._tool_version = version_output.splitlines()[0] if version_output else ""
         return self._tool_version
 
@@ -120,6 +131,9 @@ class OpenGrepScanner(ScannerPort):
         env.setdefault("OPENGREP_OFFLINE", "1")
         env.setdefault("OPENGREP_DISABLE_METRICS", "1")
         env.setdefault("OPENGREP_SEND_METRICS", "off")
+        env.setdefault("SEMGREP_SEND_METRICS", "off")
+        env.setdefault("SEMGREP_LOG_FILE", str(opengrep_home / "opengrep.log"))
+        env.setdefault("SEMGREP_SETTINGS_FILE", str(opengrep_home / "settings.yml"))
         return env
 
     def _get_scan_paths(self, config: ScanConfig) -> list[Path]:
@@ -133,11 +147,17 @@ class OpenGrepScanner(ScannerPort):
         command: list[str] | None = None
 
         try:
-            rules_path = self._get_rules_path(config)
+            rules_path = self._rules_paths or self._get_rules_path(config)
             if not rules_path:
                 return [self._failure("No rules path found. Please configure rules_path in config.")]
-            if not self._has_rule_files(rules_path):
-                return [self._failure(f"No OpenGrep rule files found in: {rules_path}")]
+            rule_paths = rules_path if isinstance(rules_path, list) else [rules_path]
+            for path in rule_paths:
+                mode_directory = path if path.is_dir() else path.parent
+                if mode_directory.name in {"source", "binary"} and mode_directory.name != config.mode.lower():
+                    return [self._failure("The selected rules directory conflicts with the execution mode.")]
+                if not self._has_rule_files(path):
+                    return [self._failure(f"No OpenGrep rule files found in: {path}")]
+            self._configured_rule_ids(rules_path)
 
             executable = self._opengrep_executable()
             if not executable:
@@ -154,8 +174,7 @@ class OpenGrepScanner(ScannerPort):
             command = [
                 executable,
                 "scan",
-                "--config",
-                str(rules_path),
+                *(argument for path in rule_paths for argument in ("--config", str(path))),
                 *(str(path) for path in scan_paths),
                 "--json",
                 "--no-rewrite-rule-ids",
@@ -193,12 +212,16 @@ class OpenGrepScanner(ScannerPort):
                     )
                 ]
 
+            report = self._report(stdout_data, rules_path, scan_paths)
+            payload = json.loads(report)
+            valid_output = isinstance(payload, dict) and payload.get("success") is not False
             return [
                 ScanResult(
                     scanner_name=self.name,
                     scan_type=self.scan_type,
-                    success=True,
-                    raw_output=self._report(stdout_data, rules_path, scan_paths),
+                    success=valid_output,
+                    error_message="" if valid_output else "OpenGrep returned invalid or incomplete output.",
+                    raw_output=report,
                     relative_target_path=REPORT_PATH,
                     description=self.description,
                 )
@@ -273,16 +296,23 @@ class OpenGrepScanner(ScannerPort):
                 report["raw_output"] = raw_output
         return json.dumps(report, indent=2, sort_keys=True)
 
-    def _report(self, raw_output: str, rules_path: Path, scan_paths: list[Path]) -> str:
+    def _report(self, raw_output: str, rules_path: Path | list[Path], scan_paths: list[Path]) -> str:
         if raw_output.strip():
             try:
                 payload = json.loads(raw_output)
             except json.JSONDecodeError:
-                payload = {"raw_output": raw_output}
+                payload = {
+                    "raw_output": raw_output,
+                    "success": False,
+                    "errors": [{"message": "Invalid OpenGrep JSON output."}],
+                }
         else:
-            payload = {"results": []}
+            payload = {"success": False, "errors": [{"message": "Empty OpenGrep output."}]}
 
         if isinstance(payload, dict):
+            if not isinstance(payload.get("results"), list):
+                payload["success"] = False
+                payload.setdefault("errors", []).append({"message": "OpenGrep did not return a findings list."})
             payload.setdefault("results", [])
             payload.setdefault("errors", [])
             payload.setdefault("success", True)
@@ -293,21 +323,33 @@ class OpenGrepScanner(ScannerPort):
                 "scan_type": self.scan_type.value,
                 "project_path": str(scan_paths[0]),
                 "scan_paths": [str(path) for path in scan_paths],
-                "rules_path": str(rules_path),
+                "rules_path": str(rules_path) if isinstance(rules_path, Path) else "",
+                "rules_paths": [str(path) for path in rules_path]
+                if isinstance(rules_path, list)
+                else [str(rules_path)],
                 "configured_rule_ids": self._configured_rule_ids(rules_path),
             }
 
         return json.dumps(payload, indent=2, sort_keys=True)
 
     @staticmethod
-    def _configured_rule_ids(rules_path: Path) -> list[str]:
+    def _configured_rule_ids(rules_path: Path | list[Path]) -> list[str]:
         rule_ids: set[str] = set()
-        paths = (rules_path,) if rules_path.is_file() else tuple(sorted(rules_path.rglob("*")))
-        for path in paths:
+        roots = rules_path if isinstance(rules_path, list) else [rules_path]
+        paths = set()
+        for root in roots:
+            paths.update([root] if root.is_file() else root.rglob("*"))
+        for path in sorted(paths):
             if not path.is_file() or path.suffix.lower() not in {".yml", ".yaml"}:
                 continue
-            for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
-                match = RULE_ID_PATTERN.match(line)
-                if match:
-                    rule_ids.add(match.group(1).strip("\"'"))
+            document = yaml.safe_load(path.read_text(encoding="utf-8"))
+            if not isinstance(document, dict) or not isinstance(document.get("rules"), list):
+                raise ValueError(f"Invalid rule configuration: {path}")
+            for rule in document["rules"]:
+                rule_id = rule.get("id") if isinstance(rule, dict) else None
+                if not isinstance(rule_id, str) or not rule_id.strip():
+                    raise ValueError(f"Rule with missing id in {path}")
+                if rule_id in rule_ids:
+                    raise ValueError(f"Duplicate rule id across selected configurations: {rule_id}")
+                rule_ids.add(rule_id)
         return sorted(rule_ids)

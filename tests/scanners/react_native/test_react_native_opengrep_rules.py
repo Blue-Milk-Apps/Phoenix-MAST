@@ -13,7 +13,7 @@ from adapters.scanners.common.opengrep_scanner import OpenGrepScanner
 from domain.post_scan.react_native import INVENTORY_RULE_ID_TO_KEY, REACT_NATIVE_RULE_IDS
 
 ROOT = Path(__file__).parents[3]
-RULES_PATH = ROOT / "rules" / "react_native"
+RULES_PATH = Path(os.environ.get("PHOENIX_RULES_ROOT", ROOT / "rules")) / "react_native" / "source"
 FIXTURES_PATH = Path(__file__).parent / "fixtures" / "opengrep"
 OPENGREP_AVAILABLE = all(shutil.which(executable) for executable in ("opengrep", "opengrep-core"))
 

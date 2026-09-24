@@ -28,7 +28,6 @@ from domain.post_scan.flutter import (
 )
 from domain.post_scan.flutter.rule_registry import REPORT_RULE_IDS_BY_SECTION as FLUTTER_RULES
 from domain.post_scan.flutter.security_evidence import opengrep_scope_applicable
-from domain.post_scan.ios.rule_registry import REPORT_RULE_IDS_BY_SECTION as IOS_RULES
 from domain.report import AssessmentStatus
 from ports.post_scan.scan_detail_extractor_port import ScanDetailExtractorPort
 
@@ -90,7 +89,7 @@ class FlutterScanDetailExtractor(ScanDetailExtractorPort):
     def _security_platform_assessments(context: FlutterScanExtractionContext) -> dict[str, dict[str, dict[str, Any]]]:
         """Retain scoped OpenGrep outcomes for later report generation."""
 
-        registries = {"flutter": FLUTTER_RULES, "android": ANDROID_RULES, "ios": IOS_RULES}
+        registries = {"flutter": FLUTTER_RULES, "android": ANDROID_RULES}
         keys = {
             evidence_key for registry in registries.values() for groups in registry.values() for evidence_key in groups
         }

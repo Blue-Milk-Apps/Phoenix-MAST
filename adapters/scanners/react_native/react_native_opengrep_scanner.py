@@ -220,6 +220,8 @@ class ReactNativeOpenGrepScanner(ScannerPort):
             "scan_paths": [str(path) for path in scan_paths],
             "configured_rule_ids": [],
         }
+        if scope == "ios":
+            metadata.update({"rule_catalog": [], "rule_execution": {}, "mode": "source"})
         if not applicable or not scan_paths:
             metadata["reason"] = (
                 "No eligible mobile JavaScript or TypeScript source files were found."
@@ -249,6 +251,10 @@ class ReactNativeOpenGrepScanner(ScannerPort):
         report_metadata = report.get("scan_metadata")
         report_metadata = report_metadata if isinstance(report_metadata, dict) else {}
         tool_version = str(report_metadata.get("tool_version", "")).strip()
+
+        for key in ("rule_catalog", "rule_execution", "ruleset_fingerprint", "sections", "mode"):
+            if key in report_metadata:
+                metadata[key] = report_metadata[key]
 
         if not result.success:
             error = result.error_message or str(report.get("error", "")).strip() or "OpenGrep scope failed."
@@ -286,12 +292,7 @@ class ReactNativeOpenGrepScanner(ScannerPort):
     def _resolve_platform_rules_path(self, scope: str, explicit_path: Path | None) -> Path | None:
         if explicit_path is not None:
             return explicit_path.resolve()
-        candidates = [
-            self._react_native_rules_path.parent / scope,
-            Path(__file__).resolve().parents[3] / "rules" / scope,
-            Path("/app/rules") / scope,
-        ]
-        return next((path.resolve() for path in candidates if path.is_dir()), None)
+        return (self._react_native_rules_path.parent.parent / scope / "source").resolve()
 
     @classmethod
     def _mobile_source_files(cls, project_path: Path) -> list[Path]:

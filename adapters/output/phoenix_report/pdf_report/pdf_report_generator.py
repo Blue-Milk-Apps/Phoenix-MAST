@@ -88,6 +88,7 @@ class PdfReportGenerator(ReportGeneratorPort):
             "endpoints",
             "url_schemes",
             "ipa_binary_protections",
+            "risk_summary",
         ):
             if key in presentation_data:
                 merged[key] = copy.deepcopy(presentation_data[key])
@@ -142,6 +143,9 @@ class PdfReportGenerator(ReportGeneratorPort):
                 "version_name": metadata.version_name,
             },
             **platform_details,
+            "rule_coverage": list(report_data.rule_coverage),
+            "rule_status": report_data.rule_status,
+            "rule_status_reason": report_data.rule_status_reason,
             "vulnerability_sections": [
                 {
                     "section_name": section.name,
@@ -149,6 +153,14 @@ class PdfReportGenerator(ReportGeneratorPort):
                     "checks": [
                         {
                             "check": check.name,
+                            "rule_id": check.rule_id,
+                            "finding_type": check.finding_type,
+                            "scope": check.scope,
+                            "impact": check.impact,
+                            "remediation": check.remediation,
+                            "references": list(check.references),
+                            "execution_status": check.execution_status,
+                            "rule_file": check.rule_file,
                             "result": (check.status.value if check.status else check.result.value)
                             .replace("_", " ")
                             .title(),
@@ -203,7 +215,7 @@ class PdfReportGenerator(ReportGeneratorPort):
             "Networking": "networking",
             "Data Storage": "data_storage",
             "Resilience": "resilience",
-        }[area]
+        }.get(area, area)
 
     @staticmethod
     def _configure_weasyprint_library_path() -> None:
