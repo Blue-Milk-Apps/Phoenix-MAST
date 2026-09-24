@@ -11,25 +11,25 @@ import pytest
 
 from adapters.scanners.common.opengrep_scanner import OpenGrepScanner
 from domain.post_scan.react_native import INVENTORY_RULE_ID_TO_KEY, REACT_NATIVE_RULE_IDS
+from tests.rule_fixtures import private_rules
 
-ROOT = Path(__file__).parents[3]
-RULES_PATH = Path(os.environ.get("PHOENIX_RULES_ROOT", ROOT / "rules")) / "react_native" / "source"
 FIXTURES_PATH = Path(__file__).parent / "fixtures" / "opengrep"
 OPENGREP_AVAILABLE = all(shutil.which(executable) for executable in ("opengrep", "opengrep-core"))
 
 
-@pytest.mark.skipif(not RULES_PATH.is_dir(), reason="Local React Native rules are not installed")
 def test_local_react_native_rule_ids_match_registry() -> None:
-    assert set(OpenGrepScanner._configured_rule_ids(RULES_PATH)) == set(REACT_NATIVE_RULE_IDS)
+    rules_path = private_rules("react_native")
+    assert set(OpenGrepScanner._configured_rule_ids(rules_path)) == set(REACT_NATIVE_RULE_IDS)
 
 
 @pytest.mark.skipif(
-    not RULES_PATH.is_dir() or not OPENGREP_AVAILABLE,
-    reason="Local React Native rules or both OpenGrep executables are not installed",
+    not OPENGREP_AVAILABLE,
+    reason="OpenGrep and opengrep-core are not both installed",
 )
 def test_react_native_rules_match_positive_fixture_and_ignore_negative_fixture() -> None:
-    positive = _scan(FIXTURES_PATH / "positive.tsx")
-    negative = _scan(FIXTURES_PATH / "negative.tsx")
+    rules_path = private_rules("react_native")
+    positive = _scan(rules_path, FIXTURES_PATH / "positive.tsx")
+    negative = _scan(rules_path, FIXTURES_PATH / "negative.tsx")
 
     assert {finding["check_id"] for finding in positive["results"]} == set(REACT_NATIVE_RULE_IDS)
     assert {finding["check_id"] for finding in negative["results"]} == {
@@ -37,7 +37,7 @@ def test_react_native_rules_match_positive_fixture_and_ignore_negative_fixture()
     }
 
 
-def _scan(source_path: Path) -> dict[str, object]:
+def _scan(rules_path: Path, source_path: Path) -> dict[str, object]:
     # OpenGrep writes its diagnostic log below the process home directory.
     # Keep scanner tests isolated from a read-only or developer-specific home.
     with tempfile.TemporaryDirectory(prefix="phoenix-opengrep-home-") as home:
@@ -47,7 +47,7 @@ def _scan(source_path: Path) -> dict[str, object]:
                 str(shutil.which("opengrep")),
                 "scan",
                 "--config",
-                str(RULES_PATH),
+                str(rules_path),
                 str(source_path),
                 "--json",
                 "--no-rewrite-rule-ids",
