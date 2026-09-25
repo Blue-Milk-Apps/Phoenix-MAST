@@ -856,7 +856,7 @@ def test_opengrep_rule_loading_failure_is_visible_in_terminal(tmp_path, capsys, 
     rules.mkdir(parents=True)
     config = cli._create_scan_config(_scan_args(tmp_path, "--ios-source", ["--ios-source-opengrep-rules", str(rules)]))
 
-    monkeypatch.setattr(workflow.IOSSectionOpenGrepScanner, "is_available", lambda self: True)
+    monkeypatch.setattr(workflow.CategoryOpenGrepScanner, "is_available", lambda self: True)
     monkeypatch.setattr(workflow.MobileScannerFactory, "build_scanner_list", lambda self, config: [])
 
     exit_code = cli.main(
@@ -874,6 +874,6 @@ def test_opengrep_rule_loading_failure_is_visible_in_terminal(tmp_path, capsys, 
     assert exit_code == 1
     error = capsys.readouterr().err
     assert "Phoenix scan failed: iOS Category OpenGrep Scanner failed:" in error
-    assert f"No iOS YAML rule files found in: {rules}" in error
+    assert f"No YAML rule files found in: {rules}" in error
     assert not list(config.output_path.rglob("post_scan_processing.json"))
     assert not list(config.output_path.rglob("*.pdf"))

@@ -50,6 +50,11 @@ class PdfPresentation:
             target_type=target_type,
             show_file_hashes=target_type == ReportTargetType.BINARY,
             show_ios_binary_analysis=target_kind == ReportTargetKind.IOS_BINARY,
-            show_url_schemes=target_kind == ReportTargetKind.IOS_BINARY,
+            show_url_schemes=target_kind
+            in {
+                ReportTargetKind.IOS_BINARY,
+                ReportTargetKind.NATIVE_IOS_SOURCE,
+                ReportTargetKind.NATIVE_ANDROID_SOURCE,
+            },
             show_binary_protections=target_kind == ReportTargetKind.IOS_BINARY,
         )

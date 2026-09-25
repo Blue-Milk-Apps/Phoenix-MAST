@@ -15,13 +15,15 @@ def test_native_ios_target_information_resolves_native_builder() -> None:
                 "stack": "native_ios",
             },
             "app_info": {"bundle_identifier": "com.example.ios", "version_name": "1.0", "icon_path": "app.png"},
-            "url_schemes": [{"url_name": "example"}],
+            "url_schemes": [{"url_name": "Example App", "schemes": ["dontdothis", "example"]}],
         }
     )
     assert report.metadata.target.target_kind == ReportTargetKind.NATIVE_IOS_SOURCE
     assert report.platform_details.bundle_identifier == "com.example.ios"
     assert PdfReportGenerator._presentation_data(report)["app_info"]["icon_path"] == "app.png"
-    assert map_native_ios_details(report.platform_details)["native_ios_details"]["url_schemes"] == ["example"]
+    expected = [{"url_name": "Example App", "schemes": ("dontdothis", "example")}]
+    assert map_native_ios_details(report.platform_details)["url_schemes"] == expected
+    assert PdfReportGenerator._merged_presentation_data(report)["url_schemes"] == expected
 
 
 def test_native_ios_maps_expanded_inventories() -> None:

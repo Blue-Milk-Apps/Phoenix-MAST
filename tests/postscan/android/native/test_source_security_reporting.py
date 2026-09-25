@@ -1,16 +1,17 @@
-import yaml
+import json
 
+from adapters.output.file_output import FileScanOutput
 from adapters.output.phoenix_report.builders.android import NativeAndroidReportDataBuilder
 from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
 from adapters.output.phoenix_report.pdf_report.common import build_charts
 from adapters.post_scan import NativeAndroidScanDetailExtractor
+from adapters.post_scan.android.native.scan_output_loader import NativeAndroidScanOutputLoader
+from adapters.scanners.common.opengrep_scanner import OpenGrepScanner, validate_rule_inventory
+from application.mobile_analysis_workflow_service import MobileAnalysisWorkflowService
+from application.post_scan_processing_service import PostScanProcessingService
 from application.report_generation_service import ReportGenerationService
-from domain.post_scan.android.rule_registry import (
-    ANDROID_RULE_REGISTRY,
-    AndroidRuleDisposition,
-    unclassified_android_rule_ids,
-)
-from tests.rule_fixtures import private_rules
+from domain.models import ScanConfig, ScanResult, ScanType
+from tests.rule_fixtures import private_rules, rule, write_rules
 
 
 def _report(sections: dict) -> object:
@@ -27,61 +28,80 @@ def _report(sections: dict) -> object:
 
 
 def test_all_bundled_android_rules_are_explicitly_classified() -> None:
-    rule_ids: set[str] = set()
-    rules_root = private_rules("android")
-    for rules_path in rules_root.glob("*.yml"):
-        document = yaml.safe_load(rules_path.read_text(encoding="utf-8"))
-        for rule in document["rules"]:
-            rule_id = rule["id"]
-            rule_ids.add(rule_id)
-            metadata = rule.get("metadata") or {}
-            mapping = ANDROID_RULE_REGISTRY[rule_id]
-            if mapping.disposition is AndroidRuleDisposition.REPORT_VULNERABILITY:
-                assert metadata["report_section"] == mapping.section
-                assert metadata["evidence_key"] == mapping.evidence_key
-
-    assert unclassified_android_rule_ids(rule_ids) == set()
-    assert set(ANDROID_RULE_REGISTRY) == rule_ids
+    inventory = validate_rule_inventory(private_rules("android"))
+    assert {item.category for item in inventory.files} == {
+        "code",
+        "network",
+        "data_storage",
+        "resilience",
+        "functionality",
+    }
+    for definition in inventory.catalog:
+        assert definition["metadata"]["finding_type"] in {"weakness", "review", "control", "observation"}
+        assert not {"evidence_key", "report_section", "capability_type", "category"} & definition["metadata"].keys()
 
 
-def test_source_security_evidence_uses_exact_rules_and_relative_locations() -> None:
-    sections = NativeAndroidScanDetailExtractor().extract_sections(
+def test_source_security_report_uses_persisted_rules_without_python_registration(tmp_path, monkeypatch) -> None:
+    rules = tmp_path / "rules" / "android" / "source"
+    matched = rule("example.new-android-check", title="Title supplied by YAML")
+    matched["metadata"]["impact"] = "Impact supplied by YAML"
+    path = write_rules(rules / "code.yml", matched, rule("example.no-match"))
+    permission = rule("example.new-permission", finding_type="observation", severity="INFO")
+    permission["metadata"].update(scope="app_declaration", functionality="Custom Capability")
+    permission_path = write_rules(rules / "functionality.yml", permission)
+    config = ScanConfig(
+        tmp_path, tmp_path / "out", platform="ANDROID", stack="NATIVE_ANDROID", opengrep_rules_path=rules
+    )
+    output = FileScanOutput(config.output_path)
+    output.write_scan_metadata(config)
+    raw = json.dumps(
         {
-            "scan_metadata": {"project_path": "/workspace/Example", "target_type": "SOURCE"},
-            "source_metadata": {
-                "application": {"debuggable": False, "allow_backup": True},
-                "components": {"activities": [{"name": "MainActivity", "exported": True}]},
-                "permissions": [],
-                "deep_links": [],
-            },
-            "opengrep": {
-                "success": True,
-                "scan_metadata": {
-                    "rules_path": "/phoenix/rules/android",
-                    "configured_rule_ids": ["android.source.sha1"],
+            "results": [
+                {
+                    "check_id": "example.new-android-check",
+                    "path": "app/src/main/Crypto.kt",
+                    "start": {"line": 18},
+                    "extra": {"lines": "EXAMPLE_MARKER"},
                 },
-                "results": [
-                    {
-                        "check_id": "android.source.sha1",
-                        "path": "/workspace/Example/app/src/main/Crypto.kt",
-                        "start": {"line": 18},
-                        "extra": {"message": "SHA-1 hashing usage was detected."},
-                    }
-                ],
-            },
+                {
+                    "check_id": "example.new-permission",
+                    "path": "app/src/main/AndroidManifest.xml",
+                    "start": {"line": 3},
+                    "extra": {"metavars": {"$PERMISSION": {"abstract_content": "example.permission.CUSTOM"}}},
+                },
+            ],
+            "errors": [],
         }
     )
-
-    assert sections["code_evidence"]["uses_sha1_hashing_algorithm"]["present"] is True
-    assert sections["code_evidence"]["uses_sha1_hashing_algorithm"]["evidence"] == (
-        "app/src/main/Crypto.kt:18: SHA-1 hashing usage was detected."
+    monkeypatch.setattr(OpenGrepScanner, "is_available", lambda self: True)
+    monkeypatch.setattr(
+        OpenGrepScanner, "scan", lambda self, config: [ScanResult(self.name, ScanType.OPENGREP_SOURCE, raw_output=raw)]
     )
+    result = MobileAnalysisWorkflowService()._perform_opengrep_scan(config, output)[0]
+    assert result.success
+    path.unlink()
+    permission_path.unlink()
+    sections = PostScanProcessingService(NativeAndroidScanOutputLoader(), NativeAndroidScanDetailExtractor()).process(
+        config.output_path
+    )
+    assessments = {item["rule_id"]: item for item in sections["rule_assessments"]["rules"]}
+    assert assessments["example.new-android-check"]["status"] == "present"
+    assert assessments["example.no-match"]["status"] == "not_present"
+    assert sections["functionality"]["Custom Capability"]["present"] is True
+    assert sections["permissions"][0]["permission"] == "example.permission.CUSTOM"
     report = _report(sections)
     code = next(section for section in report.vulnerability_sections if section.name == "Code")
-    checks = {check.name: check for check in code.checks}
-    assert checks["Uses SHA1 Hashing Algorithm"].result.value == "present"
-    assert "Contains Reflection Code" not in checks
-    assert sections["code_evidence"]["contains_reflection_code"]["present"] is None
+    assert len(code.checks) == 1
+    check = code.checks[0]
+    assert check.name == "Title supplied by YAML"
+    assert check.rule_id == "example.new-android-check"
+    assert check.impact == "Impact supplied by YAML"
+    assert check.remediation == matched["metadata"]["remediation"]["guidance"]
+    assert check.references == ("https://example.test/guide",)
+    assert check.platform_assessments[0].platform.value == "android"
+    assert "app/src/main/Crypto.kt:18" in check.evidence
+    assert report.findings_severity.high == 1
+    assert report.rule_coverage[0]["platform"] == "android"
 
 
 def test_missing_security_scanner_omits_unmatched_checks_from_report() -> None:
@@ -95,7 +115,7 @@ def test_missing_security_scanner_omits_unmatched_checks_from_report() -> None:
     report = _report(sections)
     assert not report.vulnerability_sections
     assert sections["code_evidence"]["app_is_debuggable"]["present"] is False
-    assert sections["code_evidence"]["contains_potential_sql_injection"]["present"] is None
+    assert "contains_potential_sql_injection" not in sections["code_evidence"]
     assert report.findings_severity.high == 0
     assert report.findings_severity.info == 0
 

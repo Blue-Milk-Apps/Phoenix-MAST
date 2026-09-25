@@ -11,8 +11,8 @@ from domain.report import (
     IOSBinaryEvidenceDetails,
     IOSBinaryReportDetails,
     IOSSDKCategoryDetails,
-    IOSUrlSchemeDetails,
     PermissionDetails,
+    UrlSchemeDetails,
 )
 
 
@@ -21,7 +21,7 @@ def test_ios_binary_mapper_preserves_typed_inventory() -> None:
         file_info=FileDetails(filename="Example.ipa"),
         app_info=AppDetails(name="Example"),
         binary_evidence=IOSBinaryEvidenceDetails(nx=True),
-        url_schemes=(IOSUrlSchemeDetails("example", ("example",)),),
+        url_schemes=(UrlSchemeDetails("example", ("example",)),),
         functionality=(FunctionalityDetails("Camera", True, "detected"),),
         third_party_sdks=(IOSSDKCategoryDetails("Analytics", ("SDK",)),),
         permissions=(PermissionDetails("camera"),),

@@ -43,9 +43,9 @@ from adapters.scanners.common import (
     SyftScanner,
     TrufflehogScanner,
 )
+from adapters.scanners.common.opengrep_scanner import CategoryOpenGrepScanner
 from adapters.scanners.flutter import FlutterOpenGrepScanner, FlutterSourceMetadataScanner
 from adapters.scanners.ios import (
-    IOSSectionOpenGrepScanner,
     IpswScanner,
     LIEFScanner,
     PlistBinaryScanner,
@@ -247,8 +247,9 @@ class MobileAnalysisWorkflowService:
                     if scan_config.opengrep_rules_root
                     else None,
                 )
-            elif scan_config.platform == "IOS":
-                opengrep_scanner = IOSSectionOpenGrepScanner(
+            elif scan_config.platform == "IOS" or scan_config.stack == "NATIVE_ANDROID":
+                opengrep_scanner = CategoryOpenGrepScanner(
+                    platform=scan_config.platform.lower(),
                     rules_directory=Path(open_grep_rules_path),
                     scan_paths=opengrep_scan_paths,
                 )

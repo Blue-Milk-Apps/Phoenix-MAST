@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from domain.post_scan.android.native.scan_extraction_context import NativeAndroidScanExtractionContext
-from domain.post_scan.android.permissions import Permissions
+from domain.post_scan.rule_assessment import rule_assessments
 
 
 @dataclass
@@ -15,25 +15,21 @@ class NativeAndroidPermissions:
     def __init__(self, context: NativeAndroidScanExtractionContext) -> None:
         self.items = []
         seen: set[str] = set()
-        for permission in context.permissions:
-            name = context.first_non_empty(permission.get("name"))
-            if not name or name in seen:
+        for rule in rule_assessments(context.loaded_outputs.get("opengrep"))["rules"]:
+            if rule["category"] != "functionality" or rule["metadata"]["scope"] != "app_declaration":
                 continue
-            seen.add(name)
-            self.items.append(
-                {
-                    "permission": name,
-                    "status": "",
-                    "info": "",
-                    "usage_description": "",
-                    "general_description": self._description(name),
-                }
-            )
-
-    @staticmethod
-    def _description(name: str) -> str:
-        description = Permissions.ANDROID_PERMISSION_DESCRIPTIONS.get(name)
-        if description:
-            return description
-        suffix = name.rsplit(".", 1)[-1].replace("_", " ").lower()
-        return suffix[:1].upper() + suffix[1:] + "." if suffix else ""
+            for match in rule["matches"]:
+                capture = ((match.get("extra") or {}).get("metavars") or {}).get("$PERMISSION") or {}
+                name = str(capture.get("abstract_content") or "").strip()
+                if not name or name in seen:
+                    continue
+                seen.add(name)
+                self.items.append(
+                    {
+                        "permission": name,
+                        "status": "",
+                        "info": "",
+                        "usage_description": "",
+                        "general_description": f"The app declares the {name} permission.",
+                    }
+                )

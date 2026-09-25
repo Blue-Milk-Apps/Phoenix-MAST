@@ -381,6 +381,7 @@ class NativeAndroidReportDetails(PlatformReportDetails):
     permissions: tuple[PermissionDetails, ...] = ()
     hardcoded_values: HardcodedValuesDetails = field(default_factory=lambda: HardcodedValuesDetails())
     endpoints: tuple[EndpointDetails, ...] = ()
+    url_schemes: tuple[UrlSchemeDetails, ...] = ()
 
     @property
     def target_kind(self) -> ReportTargetKind:
@@ -392,7 +393,7 @@ class NativeIOSReportDetails(PlatformReportDetails):
     bundle_identifier: str = ""
     version_name: str = ""
     minimum_os: str = ""
-    url_schemes: tuple[str, ...] = ()
+    url_schemes: tuple[UrlSchemeDetails, ...] = ()
     functionality: tuple[FunctionalityDetails, ...] = ()
     permissions: tuple[PermissionDetails, ...] = ()
     hardcoded_values: HardcodedValuesDetails = field(default_factory=lambda: HardcodedValuesDetails())
@@ -576,8 +577,8 @@ class IOSBinaryEvidenceDetails:
 
 
 @dataclass(frozen=True)
-class IOSUrlSchemeDetails:
-    """A declared iOS URL scheme handler."""
+class UrlSchemeDetails:
+    """A declared custom URL or URI scheme handler."""
 
     url_name: str
     schemes: tuple[str, ...] = ()
@@ -598,7 +599,7 @@ class IOSBinaryReportDetails(PlatformReportDetails):
     file_info: FileDetails
     app_info: AppDetails
     binary_evidence: IOSBinaryEvidenceDetails
-    url_schemes: tuple[IOSUrlSchemeDetails, ...]
+    url_schemes: tuple[UrlSchemeDetails, ...]
     functionality: tuple[FunctionalityDetails, ...]
     third_party_sdks: tuple[IOSSDKCategoryDetails, ...]
     permissions: tuple[PermissionDetails, ...]

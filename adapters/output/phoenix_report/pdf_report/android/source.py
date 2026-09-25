@@ -8,6 +8,7 @@ from domain.report.models import NativeAndroidReportDetails
 
 def map_native_android_details(details: NativeAndroidReportDetails) -> dict[str, object]:
     return {
+        "url_schemes": [asdict(item) for item in details.url_schemes],
         "application": asdict(details.application),
         "app_components": asdict(details.app_components),
         "functionality": map_functionality(details.functionality),

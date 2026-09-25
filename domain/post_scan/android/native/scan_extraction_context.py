@@ -6,8 +6,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from domain.post_scan.android.rule_registry import REPORT_RULE_IDS_BY_SECTION
-
 
 class NativeAndroidScanExtractionContext:
     """Provide typed views over persisted native Android source artifacts."""
@@ -58,10 +56,6 @@ class NativeAndroidScanExtractionContext:
         return path if path.is_absolute() else self.project_path / path
 
     @property
-    def permissions(self) -> list[dict[str, Any]]:
-        return self._mapping_list(self.source_metadata.get("permissions"))
-
-    @property
     def components(self) -> dict[str, list[dict[str, Any]]]:
         value = self._mapping(self.source_metadata.get("components"))
         return {key: self._mapping_list(value.get(key)) for key in self.COMPONENT_KEYS}
@@ -75,10 +69,6 @@ class NativeAndroidScanExtractionContext:
         return self.string_list(self.extraction.get("warnings"))
 
     @property
-    def manifest_permissions_assessed(self) -> bool:
-        return isinstance(self.source_metadata.get("permissions"), list)
-
-    @property
     def opengrep_assessed(self) -> bool:
         opengrep = self.loaded_outputs.get("opengrep")
         return (
@@ -86,26 +76,6 @@ class NativeAndroidScanExtractionContext:
             and opengrep.get("success") is not False
             and isinstance(opengrep.get("results"), list)
         )
-
-    @property
-    def opengrep_security_assessed(self) -> bool:
-        """Whether OpenGrep confirms that every registered security rule ran."""
-
-        if not self.opengrep_assessed:
-            return False
-        opengrep = self._mapping(self.loaded_outputs.get("opengrep"))
-        metadata = self._mapping(opengrep.get("scan_metadata"))
-        configured = metadata.get("configured_rule_ids")
-        if not isinstance(configured, list):
-            return False
-        configured_rule_ids = {str(rule_id).strip() for rule_id in configured if str(rule_id).strip()}
-        required_rule_ids = {
-            rule_id
-            for section in REPORT_RULE_IDS_BY_SECTION.values()
-            for rule_ids in section.values()
-            for rule_id in rule_ids
-        }
-        return required_rule_ids <= configured_rule_ids
 
     @property
     def gitleaks_assessed(self) -> bool:

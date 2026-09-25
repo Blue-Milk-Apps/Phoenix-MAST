@@ -2,14 +2,14 @@ from pathlib import Path
 
 import pytest
 
-from adapters.scanners.ios.rule_inventory import IOSRuleInventoryError, validate_ios_rule_inventory
+from adapters.scanners.common.opengrep_scanner import RuleInventoryError, validate_rule_inventory
 from tests.rule_fixtures import rule, write_rules
 
 
 def test_categories_and_metadata_come_from_files(tmp_path: Path):
     write_rules(tmp_path / "code.yml", rule("example.code"))
     write_rules(tmp_path / "crypto.yml", rule("example.crypto", finding_type="review"))
-    inventory = validate_ios_rule_inventory(tmp_path)
+    inventory = validate_rule_inventory(tmp_path)
     assert [(item.category, item.rule_ids) for item in inventory.files] == [
         ("code", ("example.code",)),
         ("crypto", ("example.crypto",)),
@@ -22,8 +22,8 @@ def test_categories_and_metadata_come_from_files(tmp_path: Path):
 def test_duplicate_ids_are_rejected(tmp_path: Path):
     write_rules(tmp_path / "one.yml", rule())
     write_rules(tmp_path / "two.yml", rule())
-    with pytest.raises(IOSRuleInventoryError, match="duplicate rule IDs"):
-        validate_ios_rule_inventory(tmp_path)
+    with pytest.raises(RuleInventoryError, match="duplicate rule IDs"):
+        validate_rule_inventory(tmp_path)
 
 
 @pytest.mark.parametrize(
@@ -34,17 +34,17 @@ def test_invalid_metadata_is_rejected(tmp_path: Path, field, value):
     definition = rule()
     definition["metadata"][field] = value
     write_rules(tmp_path / "anything.yml", definition)
-    with pytest.raises(IOSRuleInventoryError):
-        validate_ios_rule_inventory(tmp_path)
+    with pytest.raises(RuleInventoryError):
+        validate_rule_inventory(tmp_path)
 
 
 def test_fingerprint_changes_when_metadata_changes(tmp_path: Path):
     write_rules(tmp_path / "custom.yml", rule())
-    first = validate_ios_rule_inventory(tmp_path).fingerprint
+    first = validate_rule_inventory(tmp_path).fingerprint
     write_rules(tmp_path / "custom.yml", rule(title="New title"))
-    assert validate_ios_rule_inventory(tmp_path).fingerprint != first
+    assert validate_rule_inventory(tmp_path).fingerprint != first
 
 
 def test_missing_rule_directory_is_explicit(tmp_path: Path):
-    with pytest.raises(IOSRuleInventoryError, match="does not exist"):
-        validate_ios_rule_inventory(tmp_path / "absent")
+    with pytest.raises(RuleInventoryError, match="does not exist"):
+        validate_rule_inventory(tmp_path / "absent")

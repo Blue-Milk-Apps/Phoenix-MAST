@@ -48,7 +48,7 @@ def test_scans_each_flutter_platform_with_only_its_scoped_rules(tmp_path: Path, 
         FakeOpenGrepScanner,
     )
 
-    class FakeIOSSectionOpenGrepScanner:
+    class FakeCategoryOpenGrepScanner:
         def __init__(self, rules_directory=None, scan_paths=None):
             _ = rules_directory
             calls.append(("ios", list(scan_paths)))
@@ -71,8 +71,8 @@ def test_scans_each_flutter_platform_with_only_its_scoped_rules(tmp_path: Path, 
             ]
 
     monkeypatch.setattr(
-        "adapters.scanners.flutter.flutter_opengrep_scanner.IOSSectionOpenGrepScanner",
-        FakeIOSSectionOpenGrepScanner,
+        "adapters.scanners.flutter.flutter_opengrep_scanner.CategoryOpenGrepScanner",
+        FakeCategoryOpenGrepScanner,
     )
 
     result = FlutterOpenGrepScanner(

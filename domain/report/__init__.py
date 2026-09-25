@@ -29,7 +29,6 @@ from domain.report.models import (
     IOSBinaryEvidenceDetails,
     IOSBinaryReportDetails,
     IOSSDKCategoryDetails,
-    IOSUrlSchemeDetails,
     ManualReviewFinding,
     NativeAndroidReportDetails,
     NativeIOSReportDetails,
@@ -50,6 +49,7 @@ from domain.report.models import (
     RiskSummary,
     SecurityCheck,
     SignatureVersions,
+    UrlSchemeDetails,
     VulnerabilitySection,
 )
 from domain.report.target_factory import ReportTargetFactory
@@ -87,7 +87,7 @@ __all__ = [
     "NativeAndroidReportDetails",
     "NativeIOSReportDetails",
     "IOSSDKCategoryDetails",
-    "IOSUrlSchemeDetails",
+    "UrlSchemeDetails",
     "CheckSeverity",
     "FindingSeverity",
     "OverallEvaluation",

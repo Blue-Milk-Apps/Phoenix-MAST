@@ -22,7 +22,6 @@ from domain.report import (
     IOSBinaryEvidenceDetails,
     IOSBinaryReportDetails,
     IOSSDKCategoryDetails,
-    IOSUrlSchemeDetails,
     ManualReviewFinding,
     OverallEvaluation,
     PermissionDetails,
@@ -33,6 +32,7 @@ from domain.report import (
     RiskLevel,
     RiskSummary,
     SecurityCheck,
+    UrlSchemeDetails,
     VulnerabilitySection,
 )
 
@@ -102,7 +102,7 @@ class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
                 }
             ),
             url_schemes=tuple(
-                IOSUrlSchemeDetails(cls._text(x, "url_name"), tuple(x.get("schemes", ())))
+                UrlSchemeDetails(cls._text(x, "url_name"), tuple(x.get("schemes", ())))
                 for x in data.get("url_schemes", ())
                 if isinstance(x, Mapping)
             ),

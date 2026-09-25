@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from adapters.scanners.common import OpenGrepScanner
-from adapters.scanners.ios import IOSSectionOpenGrepScanner
+from adapters.scanners.common.opengrep_scanner import CategoryOpenGrepScanner
 from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
 
@@ -155,7 +155,7 @@ class FlutterOpenGrepScanner(ScannerPort):
             return base_metadata, [], [], ""
 
         scanner = (
-            IOSSectionOpenGrepScanner(rules_directory=rules_path, scan_paths=scan_paths)
+            CategoryOpenGrepScanner(rules_directory=rules_path, scan_paths=scan_paths)
             if scope == "ios"
             else OpenGrepScanner(rules_path=rules_path, scan_paths=scan_paths)
         )

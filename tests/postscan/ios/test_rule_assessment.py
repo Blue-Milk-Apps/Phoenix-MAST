@@ -88,6 +88,7 @@ def test_pdf_projection_keeps_metadata_and_dynamic_categories():
     report = build(
         assessment_payload(rule(finding_type="review"), results=[{"check_id": "example.check"}]),
         functionality={"Camera": {"present": False, "explanation": "No camera capability recorded."}},
+        url_schemes=[{"url_name": "Example App", "schemes": ["dontdothis"]}],
     )
     data = PdfReportGenerator._merged_presentation_data(report)
     check = data["vulnerability_sections"][-1]["checks"][0]
@@ -122,6 +123,9 @@ def test_pdf_projection_keeps_metadata_and_dynamic_categories():
     assert "No camera capability recorded." in html
     assert "Application Functionality" in html
     assert "Custom URL Schemes" in html
+    scheme_section = html.split('<div class="url-schemes">')[1].split("</div>")[0]
+    assert "dontdothis" in scheme_section
+    assert "No custom URL schemes" not in scheme_section
     assert "Hard-Coded Values Found" not in html
     assert "Hardcoded Secrets" in html
     assert "Secret-scanner results were not included" in html

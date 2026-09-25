@@ -2,92 +2,85 @@ from __future__ import annotations
 
 import json
 
+import yaml
+
 from adapters.post_scan import NativeAndroidScanDetailExtractor
 from domain.post_scan.android.native import (
     NativeAndroidFunctionality,
     NativeAndroidHardcodedValues,
     NativeAndroidScanExtractionContext,
 )
-from tests.rule_fixtures import private_rules
+from tests.rule_fixtures import assessment_payload, private_rules, rule
 
 
 def test_android_rules_use_flat_metadata() -> None:
-    rules = (private_rules("android") / "android_rules.yml").read_text(encoding="utf-8")
+    rules = yaml.safe_load((private_rules("android") / "functionality.yml").read_text())["rules"]
+    assert len(rules) == 48
+    for definition in rules:
+        metadata = definition["metadata"]
+        assert metadata["finding_type"] == "observation"
+        assert metadata.get("functionality") or (
+            metadata["scope"] == "app_declaration" and "(?P<PERMISSION>" in definition["patterns"][0]["pattern-regex"]
+        )
+        assert not {"appcritiq", "phoenix", "report_section", "capability_type", "category"} & metadata.keys()
 
-    assert "appcritiq:" not in rules
-    assert "\n      phoenix:" not in rules
-    assert rules.count("\n      report_section:") == 27
 
-
-def test_functionality_combines_manifest_permissions_and_phoenix_opengrep_metadata() -> None:
+def test_functionality_uses_opengrep_metadata_without_python_permission_mapping() -> None:
+    camera = rule("example.camera", finding_type="observation")
+    camera["metadata"].update(functionality="Camera", description="Camera functionality detected.")
+    maps = rule("example.maps", finding_type="observation")
+    maps["metadata"].update(functionality="Maps", description="Maps usage detected.")
+    custom = rule("example.custom", finding_type="observation")
+    custom["metadata"].update(functionality="Custom Capability")
+    opengrep = assessment_payload(
+        camera,
+        maps,
+        custom,
+        platform="android",
+        category="functionality",
+        results=[
+            {"check_id": "example.camera"},
+            {"check_id": "example.maps"},
+        ],
+    )
     context = NativeAndroidScanExtractionContext(
         {
-            "source_metadata": {
-                "permissions": [{"name": "android.permission.CAMERA"}],
-            },
-            "opengrep": {
-                "success": True,
-                "results": [
-                    {
-                        "check_id": "android.camera.usage.present",
-                        "path": "app/src/main/java/Camera.kt",
-                        "start": {"line": 12},
-                        "extra": {
-                            "message": "Camera API matched.",
-                            "metadata": {
-                                "phoenix": {
-                                    "check_id": 53,
-                                    "description": "Camera functionality detected.",
-                                }
-                            },
-                        },
-                    },
-                    {
-                        "check_id": "android.maps.usage.present",
-                        "extra": {
-                            "metadata": {
-                                "phoenix": {
-                                    "check_id": 62,
-                                    "title": "Maps usage detected.",
-                                }
-                            }
-                        },
-                    },
-                ],
-            },
+            "source_metadata": {"permissions": [{"name": "android.permission.NFC"}]},
+            "opengrep": opengrep,
         }
     )
-
     functionality = NativeAndroidFunctionality(context)
-
     assert functionality.assessed is True
     assert functionality.items["Camera"] == {
         "present": True,
-        "explanation": ("Camera functionality detected. Declared permission: android.permission.CAMERA."),
+        "explanation": "Camera functionality detected.",
     }
-    assert functionality.items["Maps"] == {
-        "present": True,
-        "explanation": "Maps usage detected.",
-    }
-    assert functionality.items["Networking"]["present"] is False
+    assert functionality.items["Maps"] == {"present": True, "explanation": "Maps usage detected."}
+    assert set(functionality.items) == {"Camera", "Maps", "Custom Capability"}
+    assert functionality.items["Custom Capability"]["present"] is False
 
 
 def test_functionality_is_unknown_when_source_evidence_is_unavailable() -> None:
-    functionality = NativeAndroidFunctionality(NativeAndroidScanExtractionContext({}))
+    loaded = {"source_metadata": {"permissions": [{"name": "android.permission.CAMERA"}]}}
+    functionality = NativeAndroidFunctionality(NativeAndroidScanExtractionContext(loaded))
 
     assert functionality.assessed is False
-    assert all(item["present"] is None for item in functionality.items.values())
+    assert functionality.items == {}
     sections = NativeAndroidScanDetailExtractor().extract_sections({})
     assert sections["functionality"] == functionality.items
+    camera = rule("example.camera", finding_type="observation")
+    camera["metadata"]["functionality"] = "Camera"
+    loaded["opengrep"] = assessment_payload(camera, status="failed", platform="android", category="functionality")
+    assert NativeAndroidFunctionality(NativeAndroidScanExtractionContext(loaded)).items["Camera"]["present"] is None
 
 
-def test_successful_empty_opengrep_is_assessed() -> None:
+def test_empty_opengrep_without_rule_coverage_cannot_establish_functionality_absence() -> None:
     loaded_outputs = {"opengrep": {"success": True, "results": []}}
     context = NativeAndroidScanExtractionContext(loaded_outputs)
 
     assert context.opengrep_assessed is True
     sections = NativeAndroidScanDetailExtractor().extract_sections(loaded_outputs)
-    assert all(item["present"] is False for item in sections["functionality"].values())
+    assert sections["functionality"] == {}
 
 
 def test_secret_findings_are_redacted_normalized_and_deduplicated() -> None:

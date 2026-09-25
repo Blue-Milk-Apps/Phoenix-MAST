@@ -55,7 +55,7 @@ def test_scopes_mobile_source_and_excludes_web(monkeypatch, tmp_path: Path) -> N
     FakeOpenGrepScanner.calls = []
     monkeypatch.setattr(scanner_module, "OpenGrepScanner", FakeOpenGrepScanner)
 
-    class FakeIOSSectionOpenGrepScanner:
+    class FakeCategoryOpenGrepScanner:
         def __init__(self, rules_directory=None, scan_paths=None):
             _ = rules_directory
             self.scan_paths = list(scan_paths)
@@ -80,7 +80,7 @@ def test_scopes_mobile_source_and_excludes_web(monkeypatch, tmp_path: Path) -> N
                 )
             ]
 
-    monkeypatch.setattr(scanner_module, "IOSSectionOpenGrepScanner", FakeIOSSectionOpenGrepScanner)
+    monkeypatch.setattr(scanner_module, "CategoryOpenGrepScanner", FakeCategoryOpenGrepScanner)
     scanner = ReactNativeOpenGrepScanner(
         rules / "react_native",
         android_rules_path=rules / "android",

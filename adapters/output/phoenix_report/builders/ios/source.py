@@ -12,6 +12,7 @@ from domain.report.models import (
     PermissionDetails,
     ReportPlatform,
     ReportTargetKind,
+    UrlSchemeDetails,
 )
 
 
@@ -32,7 +33,11 @@ class NativeIOSReportDataBuilder(SourceReportDataBuilder):
             bundle_identifier=str(app.get("bundle_identifier") or app.get("package_name") or ""),
             version_name=str(app.get("version_name") or ""),
             minimum_os=str(app.get("minimum_os") or app.get("min_sdk") or ""),
-            url_schemes=tuple(str(item.get("url_name") if isinstance(item, Mapping) else item) for item in schemes),
+            url_schemes=tuple(
+                UrlSchemeDetails(str(item.get("url_name") or ""), tuple(item.get("schemes") or ()))
+                for item in schemes
+                if isinstance(item, Mapping) and item.get("schemes")
+            ),
             functionality=tuple(
                 self._single_platform_functionality(
                     name,

@@ -8,10 +8,8 @@ from domain.post_scan.android.native.hardcoded_values import NativeAndroidHardco
 from domain.post_scan.android.native.scan_extraction_context import NativeAndroidScanExtractionContext
 from domain.post_scan.android.native.security_evidence import (
     NativeAndroidEvidenceEntry,
-    opengrep_entry,
     optional_bool_entry,
 )
-from domain.post_scan.android.rule_registry import REPORT_RULE_IDS_BY_SECTION
 
 
 @dataclass
@@ -24,16 +22,6 @@ class NativeAndroidCodeEvidence:
     application_uses_custom_url_schemes_or_deep_links: NativeAndroidEvidenceEntry
     contains_hard_coded_cryptographic_key: NativeAndroidEvidenceEntry
     contains_potential_hard_coded_password: NativeAndroidEvidenceEntry
-    contains_potential_sql_injection: NativeAndroidEvidenceEntry
-    contains_reflection_code: NativeAndroidEvidenceEntry
-    creates_blowfish_key_with_weak_length: NativeAndroidEvidenceEntry
-    creates_rsa_keys_with_weak_modulus_length: NativeAndroidEvidenceEntry
-    requests_root_access: NativeAndroidEvidenceEntry
-    uses_sha1_hashing_algorithm: NativeAndroidEvidenceEntry
-    weakly_configured_xml_parser: NativeAndroidEvidenceEntry
-    writes_sensitive_information_to_system_log: NativeAndroidEvidenceEntry
-    uses_spoofable_values_for_authentication: NativeAndroidEvidenceEntry
-    copies_sensitive_information_into_clipboard_without_user_consent: NativeAndroidEvidenceEntry
     assessed: bool
 
     def __init__(self, context: NativeAndroidScanExtractionContext) -> None:
@@ -61,16 +49,6 @@ class NativeAndroidCodeEvidence:
             "no_hardcoded_password_hits",
         )
 
-        for evidence_key in REPORT_RULE_IDS_BY_SECTION["Code"]:
-            setattr(
-                self,
-                evidence_key,
-                opengrep_entry(
-                    context,
-                    REPORT_RULE_IDS_BY_SECTION["Code"][evidence_key],
-                    f"no_{evidence_key}_hits",
-                ),
-            )
         self.assessed = any(
             entry.present is not None
             for name, entry in vars(self).items()

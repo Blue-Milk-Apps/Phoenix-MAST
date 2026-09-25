@@ -663,12 +663,12 @@ SOFTWARE.
 
 <!-- ===================== SECRET SCANNERS ===================== -->
 <div class="section">
-  {% if data.meta.platform == 'iOS' %}
+  {% if presentation.show_url_schemes %}
   <div class="url-schemes">
-    <h2>Custom URL Schemes</h2>
+    <h2>{{ 'Custom URI Schemes' if data.meta.platform == 'Android' else 'Custom URL Schemes' }}</h2>
     {% if data.url_schemes %}
     <table class="compact">
-      <thead><tr><th>URL Name</th><th>Schemes</th></tr></thead>
+      <thead><tr><th>{{ 'Component' if data.meta.platform == 'Android' else 'URL Name' }}</th><th>Schemes</th></tr></thead>
       <tbody>
       {% for u in data.url_schemes %}
       <tr><td class="mono">{{ u.url_name | e }}</td><td class="mono">{{ u.schemes | join(', ') | e }}</td></tr>
@@ -676,7 +676,7 @@ SOFTWARE.
       </tbody>
     </table>
     {% else %}
-    <p class="small">No custom URL schemes were declared by this app.</p>
+    <p class="small">No custom {{ 'URI' if data.meta.platform == 'Android' else 'URL' }} schemes were declared by this app.</p>
     {% endif %}
   </div>
   {% endif %}

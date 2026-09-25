@@ -49,16 +49,16 @@ def private_rules(platform: str) -> Path:
     return path
 
 
-def assessment_payload(*definitions, status="success", results=()):
+def assessment_payload(*definitions, status="success", results=(), platform="ios", category="custom"):
     return {
         "results": list(results),
         "scan_metadata": {
-            "platform": "ios",
+            "platform": platform,
             "mode": "source",
             "status": status,
             "rule_catalog": [
                 RuleDefinition.from_rule(
-                    item, category="custom", rule_file="custom.yml", fingerprint="example"
+                    item, category=category, rule_file=f"{category}.yml", fingerprint="example"
                 ).snapshot()
                 for item in definitions
             ],

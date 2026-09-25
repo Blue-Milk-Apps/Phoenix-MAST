@@ -1,9 +1,16 @@
 from __future__ import annotations
 
 from adapters.post_scan import NativeAndroidScanDetailExtractor
+from tests.rule_fixtures import assessment_payload, rule
 
 
 def test_extracts_native_android_source_metadata_sections() -> None:
+    camera = rule("example.camera", finding_type="observation")
+    camera["metadata"].update(
+        functionality="Camera", scope="app_declaration", description="Camera permission declared."
+    )
+    inventory = rule("example.permissions", finding_type="observation")
+    inventory["metadata"]["scope"] = "app_declaration"
     loaded_outputs = {
         "scan_output_path": "/tmp/SAST_native_android_source_2026-08-27_12-00-00",
         "scan_metadata": {
@@ -27,11 +34,7 @@ def test_extracts_native_android_source_metadata_sections() -> None:
                 "uses_cleartext_traffic": None,
                 "icon": "@mipmap/ic_launcher",
             },
-            "permissions": [
-                {"name": "android.permission.CAMERA"},
-                {"name": "com.example.permission.CUSTOM"},
-                {"name": "android.permission.CAMERA"},
-            ],
+            "permissions": [{"name": "android.permission.NFC"}],
             "components": {
                 "activities": [
                     {"name": "com.example.app.MainActivity", "exported": True},
@@ -44,6 +47,23 @@ def test_extracts_native_android_source_metadata_sections() -> None:
             "deep_links": [{"component": "com.example.app.MainActivity", "scheme": "example"}],
         },
     }
+    loaded_outputs["opengrep"] = assessment_payload(
+        camera,
+        inventory,
+        platform="android",
+        category="functionality",
+        results=[
+            {
+                "check_id": rule_id,
+                "extra": {"metavars": {"$PERMISSION": {"abstract_content": permission}}},
+            }
+            for rule_id, permission in (
+                ("example.camera", "android.permission.CAMERA"),
+                ("example.permissions", "android.permission.CAMERA"),
+                ("example.permissions", "com.example.permission.CUSTOM"),
+            )
+        ],
+    )
 
     sections = NativeAndroidScanDetailExtractor().extract_sections(loaded_outputs)
 
@@ -57,7 +77,6 @@ def test_extracts_native_android_source_metadata_sections() -> None:
         "deep_links",
         "functionality",
         "code_evidence",
-        "data_storage_evidence",
     }
     assert sections["meta"] == {
         "app_display_name": "Example",
@@ -102,16 +121,16 @@ def test_extracts_native_android_source_metadata_sections() -> None:
         "status": "",
         "info": "",
         "usage_description": "",
-        "general_description": "Allows the app to access the device camera.",
+        "general_description": "The app declares the android.permission.CAMERA permission.",
     }
-    assert sections["permissions"][1]["general_description"] == "Custom."
+    assert sections["permissions"][1]["permission"] == "com.example.permission.CUSTOM"
     assert len(sections["permissions"]) == 2
     assert sections["deep_links"] == {
         "deep_links": [{"component": "com.example.app.MainActivity", "scheme": "example"}]
     }
     assert sections["functionality"]["Camera"] == {
         "present": True,
-        "explanation": "Declared permission: android.permission.CAMERA.",
+        "explanation": "Camera permission declared.",
     }
     assert sections["code_evidence"]["app_is_debuggable"]["present"] is False
     assert sections["code_evidence"]["activities_accessible_to_other_apps"] == {
@@ -119,7 +138,7 @@ def test_extracts_native_android_source_metadata_sections() -> None:
         "evidence": "exported_activities=1",
         "details": ["com.example.app.MainActivity"],
     }
-    assert sections["data_storage_evidence"]["accesses_external_storage"]["present"] is False
+    assert "data_storage_evidence" not in sections
 
 
 def test_missing_source_metadata_preserves_unknown_values() -> None:

@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from adapters.scanners.ios import section_opengrep_scanner as module
+from adapters.scanners.common import opengrep_scanner as module
 from domain.models import ScanConfig, ScanResult, ScanType
 from domain.post_scan.rule_assessment import rule_assessments
 from tests.rule_fixtures import rule, write_rules
@@ -24,7 +24,7 @@ def run_scan(tmp_path, monkeypatch, payload, *, categories=("code", "crypto"), s
             return [ScanResult("OpenGrep", ScanType.OPENGREP_SOURCE, success=success, raw_output=json.dumps(payload))]
 
     monkeypatch.setattr(module, "OpenGrepScanner", FakeScanner)
-    result = module.IOSSectionOpenGrepScanner(root).scan(ScanConfig(tmp_path, tmp_path / "out", platform="IOS"))[0]
+    result = module.CategoryOpenGrepScanner(root).scan(ScanConfig(tmp_path, tmp_path / "out", platform="IOS"))[0]
     assert len(calls) == 1
     output = json.loads(result.raw_output)
     assert result.success == (output["scan_metadata"]["status"] == "success")
@@ -93,7 +93,7 @@ def test_missing_binary_rules_never_fall_back_to_source(tmp_path):
     write_rules(tmp_path / "source" / "code.yml", rule())
     config = ScanConfig(tmp_path / "app.ipa", tmp_path / "out", mode="binary", platform="IOS")
     for directory in (tmp_path / "binary", tmp_path / "source"):
-        result = module.IOSSectionOpenGrepScanner(directory).scan(config)[0]
+        result = module.CategoryOpenGrepScanner(directory).scan(config)[0]
         assert not result.success
         assert json.loads(result.raw_output)["scan_metadata"]["rule_catalog"] == []
 
