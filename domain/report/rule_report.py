@@ -23,14 +23,17 @@ from domain.report.models import (
 def with_rule_assessments(report: ReportData, data: Mapping[str, Any]) -> ReportData:
     assessment = data.get("rule_assessments")
     if not isinstance(assessment, Mapping):
-        return report
-    if (
-        not assessment.get("coverage")
-        and not assessment.get("rules")
-        and report.metadata.target.platform != ReportPlatform.IOS
-    ):
-        return report
-    groups: dict[tuple[str, str], list[SecurityCheck]] = {}
+        assessment = {}
+    groups: dict[str, list[SecurityCheck]] = {}
+    for section in report.vulnerability_sections:
+        # Preserve positive evidence even when another platform was not evaluated.
+        checks = [
+            replace(check, result=AssessmentStatus.PRESENT, status=AssessmentStatus.PRESENT)
+            if AssessmentStatus.PRESENT in (check.result, check.status)
+            else check
+            for check in section.checks
+        ]
+        groups.setdefault(section.name.replace("_", " ").title(), []).extend(checks)
     for rule in assessment.get("rules", ()):
         metadata = rule["metadata"]
         platform = ReportPlatform(rule["platform"])
@@ -45,17 +48,12 @@ def with_rule_assessments(report: ReportData, data: Mapping[str, Any]) -> Report
             path = str(match.get("path", ""))
             line = (match.get("start") or {}).get("line")
             location = f"{path}:{line}" if line is not None else path
-            text = str(extra.get("lines") or extra.get("message") or "").strip()
+            text = str(extra.get("lines") or "").strip()
             evidence.append(f"{location}: {text}".strip(": "))
         execution = rule["execution_status"]
-        if status == AssessmentStatus.PRESENT:
-            explanation = metadata["description"]
-            if execution != "success":
-                explanation += " Matches were retained from an incomplete scan."
-        elif status == AssessmentStatus.NOT_PRESENT:
-            explanation = "No matches were found in the inputs evaluated by this rule."
-        else:
-            explanation = rule.get("execution_reason") or "This rule was not evaluated successfully."
+        explanation = metadata["description"]
+        if status == AssessmentStatus.PRESENT and execution != "success":
+            explanation += " Matches were retained from an incomplete scan."
         remediation = metadata.get("remediation", {})
         references = [
             str(resource["url"])
@@ -81,52 +79,55 @@ def with_rule_assessments(report: ReportData, data: Mapping[str, Any]) -> Report
             execution_status=execution,
             rule_file=rule["rule_file"],
         )
-        groups.setdefault((platform.value, category), []).append(check)
+        label = category.replace("_", " ").title()
+        if platform != report.metadata.target.platform:
+            platform_label = "iOS" if platform == ReportPlatform.IOS else platform.value.replace("_", " ").title()
+            label = f"{platform_label} / {label}"
+        groups.setdefault(label, []).append(check)
     sections = []
     evaluations = []
     summaries = []
-    counts = {
-        key: getattr(report.findings_severity, key) for key in ("critical", "high", "medium", "low", "info", "secure")
-    }
-    for (platform, category), checks in sorted(groups.items()):
-        platform_label = "iOS" if platform == "ios" else platform.replace("_", " ").title()
-        label = f"{platform_label} / {category.replace('_', ' ').title()}"
-        sections.append(
-            VulnerabilitySection(
-                label, "Rule outcomes are limited to each check's stated evidence scope.", tuple(checks)
-            )
-        )
-        weaknesses = [check for check in checks if check.finding_type == "weakness"]
-        matches = [check for check in weaknesses if check.result == AssessmentStatus.PRESENT]
-        for check in matches:
-            counts[check.severity.value] += 1
-        risk = RiskLevel.NOT_EVALUATED
+    counts = dict.fromkeys(("critical", "high", "medium", "low", "info", "secure"), 0)
+    for label, checks in groups.items():
+        matches = tuple(check for check in checks if check.result == AssessmentStatus.PRESENT)
         if matches:
+            sections.append(VulnerabilitySection(label, "", matches))
+        weaknesses = [check for check in checks if check.finding_type in {"", "weakness"}]
+        weakness_matches = [check for check in weaknesses if check.result == AssessmentStatus.PRESENT]
+        for check in weakness_matches:
+            if check.severity.value in counts:
+                counts[check.severity.value] += 1
+        if label.rsplit("/", 1)[-1].strip().casefold() == "functionality":
+            continue
+        risk = RiskLevel.NOT_EVALUATED
+        if weakness_matches:
             risk = next(
                 (
                     level
                     for level in (RiskLevel.CRITICAL, RiskLevel.HIGH, RiskLevel.MEDIUM)
-                    if any(check.severity.value == level.value for check in matches)
+                    if any(check.severity.value == level.value for check in weakness_matches)
                 ),
                 RiskLevel.LOW,
             )
-        elif weaknesses and all(check.execution_status == "success" for check in weaknesses):
+        elif weaknesses and all(check.result == AssessmentStatus.NOT_PRESENT for check in weaknesses):
             risk = RiskLevel.LOW
-        descriptions = tuple(check.name for check in matches) or (
-            "No matching weaknesses in the evaluated inputs."
-            if risk == RiskLevel.LOW
-            else "Weakness coverage is incomplete or this category contains only review, control, or observation rules.",
-        )
+        descriptions = tuple(check.name for check in weakness_matches)
+        if not descriptions:
+            descriptions = (
+                "No weakness findings in the evaluated inputs."
+                if risk == RiskLevel.LOW
+                else "No confirmed weakness findings; checks are incomplete or informational only.",
+            )
         evaluations.append(OverallEvaluation(label, risk, descriptions))
         summaries.append(RiskSummary(label, risk))
     return replace(
         report,
-        vulnerability_sections=report.vulnerability_sections + tuple(sections),
-        overall_evaluation=report.overall_evaluation + tuple(evaluations),
-        risk_summary=report.risk_summary + tuple(summaries),
+        vulnerability_sections=tuple(sections),
+        overall_evaluation=tuple(evaluations),
+        risk_summary=tuple(summaries),
         findings_severity=FindingSeverity(**counts),
         rule_coverage=tuple(assessment.get("coverage", ())),
-        rule_status=str(assessment.get("status", "not_evaluated")),
+        rule_status=str(assessment.get("status", "")),
         rule_status_reason=str(assessment.get("reason", "")),
     )
 
@@ -136,12 +137,8 @@ def _compliance(value: Mapping[str, Any]) -> str:
     for framework, entries in value.items():
         if not isinstance(entries, list):
             entries = [entries]
-        labels = []
         for entry in entries:
-            if isinstance(entry, Mapping):
-                relationship = entry.get("relationship")
-                labels.append(str(entry.get("id", "")) + (f" ({relationship})" if relationship else ""))
-            else:
-                labels.append(str(entry))
-        rows.append(f"{framework}: {', '.join(labels)}")
-    return "; ".join(rows)
+            control = str(entry.get("id", "") if isinstance(entry, Mapping) else entry).strip()
+            if control:
+                rows.append(f"{framework.replace('_', ' ').upper()}: {control}")
+    return "\n".join(dict.fromkeys(rows))

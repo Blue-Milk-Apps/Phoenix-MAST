@@ -80,10 +80,11 @@ def test_source_security_evidence_uses_exact_rules_and_relative_locations() -> N
     code = next(section for section in report.vulnerability_sections if section.name == "Code")
     checks = {check.name: check for check in code.checks}
     assert checks["Uses SHA1 Hashing Algorithm"].result.value == "present"
-    assert checks["Contains Reflection Code"].result.value == "not_evaluated"
+    assert "Contains Reflection Code" not in checks
+    assert sections["code_evidence"]["contains_reflection_code"]["present"] is None
 
 
-def test_missing_security_scanner_keeps_canonical_checks_not_evaluated() -> None:
+def test_missing_security_scanner_omits_unmatched_checks_from_report() -> None:
     sections = NativeAndroidScanDetailExtractor().extract_sections(
         {
             "scan_metadata": {"project_path": "/workspace/Example", "target_type": "SOURCE"},
@@ -92,10 +93,9 @@ def test_missing_security_scanner_keeps_canonical_checks_not_evaluated() -> None
     )
 
     report = _report(sections)
-    code = next(section for section in report.vulnerability_sections if section.name == "Code")
-    checks = {check.name: check for check in code.checks}
-    assert checks["App is Debuggable"].result.value == "not_present"
-    assert checks["Contains Potential SQL Injection"].result.value == "not_evaluated"
+    assert not report.vulnerability_sections
+    assert sections["code_evidence"]["app_is_debuggable"]["present"] is False
+    assert sections["code_evidence"]["contains_potential_sql_injection"]["present"] is None
     assert report.findings_severity.high == 0
     assert report.findings_severity.info == 0
 

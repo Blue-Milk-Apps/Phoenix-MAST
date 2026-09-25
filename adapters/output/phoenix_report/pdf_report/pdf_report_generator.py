@@ -137,15 +137,19 @@ class PdfReportGenerator(ReportGeneratorPort):
                 "version_code": metadata.version_code,
                 "reviewer_org": metadata.reviewer_org,
             },
+            **platform_details,
             "app_info": {
                 "name": metadata.app_display_name,
                 "package_name": metadata.package_name,
                 "version_name": metadata.version_name,
+                **platform_details.get("app_info", {}),
+                "icon_path": metadata.app_icon_path or platform_details.get("app_info", {}).get("icon_path", ""),
+                "icon_data_uri": metadata.app_icon_data_uri,
             },
-            **platform_details,
             "rule_coverage": list(report_data.rule_coverage),
             "rule_status": report_data.rule_status,
             "rule_status_reason": report_data.rule_status_reason,
+            "secret_scans": [asdict(summary) for summary in report_data.secret_scans],
             "vulnerability_sections": [
                 {
                     "section_name": section.name,

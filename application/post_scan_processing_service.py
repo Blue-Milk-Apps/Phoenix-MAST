@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
 from domain.post_scan.rule_assessment import rule_assessments
+from domain.post_scan.utilities import summarize_secret_scans
 from ports.post_scan.scan_detail_extractor_port import ScanDetailExtractorPort
 from ports.post_scan.scan_output_loader_port import ScanOutputLoaderPort
 
@@ -29,4 +31,5 @@ class PostScanProcessingService:
         scanner_outputs = self._scan_output_loader.load(scan_output_path)
         sections = self._scan_detail_extractor.extract_sections(scanner_outputs)
         sections["rule_assessments"] = rule_assessments(scanner_outputs.get("opengrep"))
+        sections["secret_scans"] = [asdict(summary) for summary in summarize_secret_scans(scanner_outputs)]
         return sections

@@ -119,10 +119,9 @@ def test_react_native_extractor_builds_mobile_only_report_and_pdf(tmp_path: Path
     checks = {
         section.name: {item.name: item for item in section.checks} for section in canonical.vulnerability_sections
     }
-    assert checks["Code"]["App is Debuggable"].result.value == "not_present"
-    assert checks["Code"]["Contains Reflection Code"].result.value == "not_evaluated"
-    assert checks["Network"]["Contains HostnameVerifier That Accepts All Hostnames"].result.value == "not_evaluated"
-    assert checks["Data Storage"]["Accesses External Storage"].result.value == "not_present"
+    assert set(checks) == {"Network"}
+    assert all(check.result.value == "present" for check in checks["Network"].values())
+    assert "Contains HostnameVerifier That Accepts All Hostnames" not in checks["Network"]
 
     pdf_path = PdfReportGenerator().generate(canonical, tmp_path / "react-native-report.pdf")
     assert pdf_path.is_file()

@@ -21,21 +21,20 @@
     </div>
   </div>
   <div class="cover-heading">
-    <img class="cover-icon" src="{{ app_icon_uri }}">
+    <img class="cover-icon" src="{{ app_icon_uri }}" alt="{{ data.meta.app_display_name | e }} app icon">
     <div class="cover-heading-text">
       <div class="title">{{ data.meta.app_display_name }}</div>
       <div class="subtitle">{{ presentation.assessment_title }}</div>
     </div>
   </div>
+  <div class="cover-details">
   <table class="meta-table">
+    {% if presentation.target_type != 'source' %}
     <tr><td class="label">{{ presentation.target_label }}</td><td class="value">{{ data.meta.file_name }}</td></tr>
-    <tr><td class="label">Assessment Type</td><td class="value">{{ presentation.assessment_label }}</td></tr>
+    {% endif %}
     <tr><td class="label">{{ 'Bundle Identifier' if is_ios_report else 'Package Name' }}</td><td class="value">{{ data.native_ios_details.bundle_identifier if is_native_ios_source else data.meta.package_name }}</td></tr>
     {% if data.meta.version_name or data.meta.version_code %}
     <tr><td class="label">Version</td><td class="value">{% if data.meta.version_name and data.meta.version_code %}{{ data.meta.version_name }} ({{ data.meta.version_code }}){% else %}{{ data.meta.version_name or data.meta.version_code }}{% endif %}</td></tr>
-    {% endif %}
-    {% if is_native_ios_source %}
-    <tr><td class="label">Minimum iOS</td><td class="value">{{ data.native_ios_details.minimum_os or 'Not declared' }}</td></tr>
     {% endif %}
     {% if presentation.show_file_hashes and is_ios_report %}
     {% if data.app_info.main_activity %}<tr><td class="label">Main Executable</td><td class="value">{{ data.app_info.main_activity }}</td></tr>{% endif %}
@@ -46,48 +45,51 @@
     {% endif %}
     <tr><td class="label">Scan Date</td><td class="value">{{ data.meta.scan_date }}</td></tr>
     <tr><td class="label">Platform</td><td class="value">{{ data.meta.platform }}</td></tr>
-    {% if presentation.target_type != 'source' or data.app_info.app_store_id %}
+    {% if data.app_info.app_store_id %}
     <tr><td class="label">{{ 'App Store' if data.meta.platform == 'iOS' else 'Play Store' }}</td><td class="value">{{ data.app_info.app_store_id }}</td></tr>
     {% endif %}
-    {% if presentation.target_type != 'source' or data.app_info.developer %}
+    {% if data.app_info.developer %}
     <tr><td class="label">Developer</td><td class="value">{{ data.app_info.developer }}</td></tr>
     {% endif %}
-    {% if presentation.target_type != 'source' or data.app_info.categories %}
+    {% if data.app_info.categories %}
     <tr><td class="label">Categories</td><td class="value">{{ data.app_info.categories }}</td></tr>
     {% endif %}
-    {% if presentation.target_type != 'source' or data.app_info.trackers_detected %}
+    {% if data.app_info.trackers_detected %}
     <tr><td class="label">Trackers Detected</td><td class="value">{{ data.app_info.trackers_detected }}</td></tr>
     {% endif %}
   </table>
-</div>
-
-<!-- ===================== FINDINGS BY SEVERITY ===================== -->
-<div class="section">
-  <h2>Findings by Severity</h2>
-  <div class="section-sub">Number of individual checks that returned each severity level</div>
-  {% for level, color, key in [('Critical','#8e1b1b','critical'), ('High','#c0392b','high'), ('Medium','#e08e0b','medium'), ('Low','#5499c7','low'), ('Info','#2980b9','info'), ('Secure','#27ae60','secure')] %}
-  {% set count = data.findings_severity.get(key, 0) %}
-  {% set max_count = [data.findings_severity.values() | max, 1] | max %}
-  <div class="bar-block">
-    <div class="bar-label-row">
-      <span class="bar-label">{{ level }}</span>
-      <span class="bar-count-chip" style="background:{{ color }};">{{ count }}</span>
-    </div>
-    <div class="bar-track"><div class="bar-fill" style="width:{{ (count / max_count * 100) | round(1) }}%; background:{{ color }};"></div></div>
   </div>
-  {% endfor %}
 </div>
 
 <!-- ===================== OVERALL RISK ===================== -->
 <div class="section">
   <h2>Overall Security</h2>
-  <div class="risk-graph-wrap no-break">
-    <img class="polar-chart" src="data:image/png;base64,{{ charts.overall_risk_polar }}">
+  <div class="security-overview no-break">
+    <div class="severity-bars" aria-label="Finding counts by severity">
+      {% set max_count = [data.findings_severity.values() | max, 1] | max %}
+      {% for level, color, key in [('Critical','#8e1b1b','critical'), ('High','#c0392b','high'), ('Medium','#e08e0b','medium'), ('Low','#5499c7','low'), ('Info','#2980b9','info'), ('Secure','#27ae60','secure')] %}
+      {% set count = data.findings_severity.get(key, 0) %}
+      <div class="bar-block">
+        <div class="bar-label-row">
+          <span class="bar-label">{{ level }}</span>
+          <span class="bar-count-chip" style="background:{{ color }};">{{ count }}</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill" style="width:{{ (count / max_count * 100) | round(1) }}%; background:{{ color }};"></div></div>
+      </div>
+      {% endfor %}
+    </div>
+    {% if data.overall_evaluation %}
+    <div class="risk-graph-wrap">
+      <img class="polar-chart" src="data:image/png;base64,{{ charts.overall_risk_polar }}" alt="Overall security by area">
+    </div>
+    {% endif %}
   </div>
 
-  <h2>Overall Evaluation Results</h2>
-  <table>
-    <tr><th class="col-check">Area of Concern</th><th class="col-result">Risk Rating</th><th>Summary of Findings</th></tr>
+  <h2>Summary</h2>
+  {% if data.overall_evaluation %}
+  <table class="summary-table">
+    <thead><tr><th class="col-area">Area</th><th class="col-summary-severity">Severity</th><th>Findings Summary</th></tr></thead>
+    <tbody>
     {% for row in data.overall_evaluation %}
     <tr>
       <td>{{ row.area_of_concern }}</td>
@@ -95,7 +97,11 @@
       <td class="eval-findings"><ul>{% for f in row.summary_findings %}<li>{{ f }}</li>{% endfor %}</ul></td>
     </tr>
     {% endfor %}
+    </tbody>
   </table>
+  {% else %}
+  <p>No matching findings were recorded. Review scan coverage for any incomplete or unavailable checks.</p>
+  {% endif %}
 </div>
 
 <!-- ===================== CERTIFICATE / FILE / APP INFO ===================== -->
@@ -349,121 +355,283 @@
 {% endif %}
 
 <!-- ===================== FUNCTIONALITY ===================== -->
-<div class="section">
-  <h2>Functionality</h2>
-  <table>
-    <tr><th class="col-check">Functionality</th><th class="col-result">Status</th><th>Details</th></tr>
-    {% for name, f in data.functionality.items() %}
-    <tr>
-      <td>{{ name }}</td>
-      <td>
-        {% if f.status %}{{ assessment_badge(f.status) }}
-        {% elif f.present is none %}{{ assessment_badge('not_evaluated') }}
-        {% else %}{{ assessment_badge('present' if f.present else 'not_present') }}{% endif %}
-      </td>
-      <td>
-        {{ f.explanation }}
-        {% if f.platform_assessments %}
-        <div class="small">
-          {% for assessment in f.platform_assessments %}
-          {{ assessment.platform|replace('_', ' ')|title }}: {{ assessment.status|replace('_', ' ')|title }}{% if not loop.last %}; {% endif %}
-          {% endfor %}
-        </div>
-        {% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </table>
+{#
+Lucide SVG icons, embedded for offline PDF rendering.
+Source: https://github.com/lucide-icons/lucide/tree/66d8f9fc394b8530377e5f6112f0b8908ba01280/icons
+ISC License
 
-  {% if data.meta.platform == 'iOS' %}
-  <h3>Custom URL Schemes</h3>
-  {% if data.url_schemes %}
-  <table class="compact">
-    <tr><th>URL Name</th><th>Schemes</th></tr>
-    {% for u in data.url_schemes %}
-    <tr><td class="mono">{{ u.url_name }}</td><td class="mono">{{ u.schemes | join(', ') }}</td></tr>
-    {% endfor %}
-  </table>
+Copyright (c) 2026 Lucide Icons and Contributors
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+---
+
+The following Lucide icons are derived from the Feather project:
+
+airplay, alert-circle, alert-octagon, alert-triangle, aperture, arrow-down-circle, arrow-down-left, arrow-down-right, arrow-down, arrow-left-circle, arrow-left, arrow-right-circle, arrow-right, arrow-up-circle, arrow-up-left, arrow-up-right, arrow-up, at-sign, calendar, cast, check, chevron-down, chevron-left, chevron-right, chevron-up, chevrons-down, chevrons-left, chevrons-right, chevrons-up, circle, clipboard, clock, code, columns, command, compass, corner-down-left, corner-down-right, corner-left-down, corner-left-up, corner-right-down, corner-right-up, corner-up-left, corner-up-right, crosshair, database, divide-circle, divide-square, dollar-sign, download, external-link, feather, frown, hash, headphones, help-circle, info, italic, key, layout, life-buoy, link-2, link, loader, lock, log-in, log-out, maximize, meh, minimize, minimize-2, minus-circle, minus-square, minus, monitor, moon, more-horizontal, more-vertical, move, music, navigation-2, navigation, octagon, pause-circle, percent, plus-circle, plus-square, plus, power, radio, rss, search, server, share, shopping-bag, sidebar, smartphone, smile, square, table-2, tablet, target, terminal, trash-2, trash, triangle, tv, type, upload, x-circle, x-octagon, x-square, x, zoom-in, zoom-out
+
+The MIT License (MIT) (for the icons listed above)
+
+Copyright (c) 2013-present Cole Bemis
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+#}
+{% macro functionality_icon(name, present) %}
+{% set icon = name | lower | replace('_', ' ') | replace('-', ' ') %}
+{% set tint = '#16233c' if present else '#b6bec9' %}
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" color="{{ tint }}" stroke="{{ tint }}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  {% if icon == 'audio' %}
+<path d="M9 18V5l12-2v13" />
+  <circle cx="6" cy="18" r="3" />
+  <circle cx="18" cy="16" r="3" />
+  {% elif icon in ['biometric authentication', 'fingerprint'] %}
+<path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4" />
+  <path d="M14 13.12c0 2.38 0 6.38-1 8.88" />
+  <path d="M17.29 21.02c.12-.6.43-2.3.5-3.02" />
+  <path d="M2 12a10 10 0 0 1 18-6" />
+  <path d="M2 16h.01" />
+  <path d="M21.8 16c.2-2 .131-5.354 0-6" />
+  <path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2" />
+  <path d="M8.65 22c.21-.66.45-1.32.57-2" />
+  <path d="M9 6.8a6 6 0 0 1 9 5.2v2" />
+  {% elif icon == 'bluetooth' %}
+<path d="m7 7 10 10-5 5V2l5 5L7 17" />
+  {% elif icon == 'calendar' %}
+<path d="M8 2v3" />
+  <path d="M16 2v3" />
+  <rect x="3" y="3" width="18" height="18" rx="2" />
+  <path d="M3 9h18" />
+  <path d="M8 13h.01" />
+  <path d="M12 13h.01" />
+  <path d="M16 13h.01" />
+  <path d="M8 17h.01" />
+  <path d="M12 17h.01" />
+  <path d="M16 17h.01" />
+  {% elif icon == 'camera' %}
+<path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z" />
+  <circle cx="12" cy="13" r="3" />
+  {% elif icon == 'camera delegation' %}
+<path d="M11 19H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5" />
+  <path d="M13 5h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-5" />
+  <circle cx="12" cy="12" r="3" />
+  <path d="m18 22-3-3 3-3" />
+  <path d="m6 2 3 3-3 3" />
+  {% elif icon == 'contacts' %}
+<path d="M16 2v2" />
+  <path d="M17.915 21a6 6 0 10-12 0" />
+  <path d="M8 2v2" />
+  <circle cx="12" cy="11" r="4" />
+  <rect x="3" y="3" width="18" height="18" rx="2" />
+  {% elif icon == 'geofencing' %}
+<line x1="2" x2="5" y1="12" y2="12" />
+  <line x1="19" x2="22" y1="12" y2="12" />
+  <line x1="12" x2="12" y1="2" y2="5" />
+  <line x1="12" x2="12" y1="19" y2="22" />
+  <circle cx="12" cy="12" r="7" />
+  <circle cx="12" cy="12" r="3" />
+  {% elif icon == 'health data' %}
+<path d="M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5" />
+  <path d="M3.22 13H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27" />
+  {% elif icon == 'in app purchases' %}
+<path d="M16 10a4 4 0 0 1-8 0" />
+  <path d="M3.103 6.034h17.794" />
+  <path d="M3.4 5.467a2 2 0 0 0-.4 1.2V20a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.667a2 2 0 0 0-.4-1.2l-2-2.667A2 2 0 0 0 17 2H7a2 2 0 0 0-1.6.8z" />
+  {% elif icon in ['keychain', 'keystore'] %}
+<path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z" />
+  <circle cx="16.5" cy="7.5" r=".5" fill="currentColor" />
+  {% elif icon == 'location' %}
+<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+  <circle cx="12" cy="10" r="3" />
+  {% elif icon == 'maps' %}
+<path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z" />
+  <path d="M15 5.764v15" />
+  <path d="M9 3.236v15" />
+  {% elif icon == 'microphone' %}
+<path d="M12 19v3" />
+  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+  <rect x="9" y="2" width="6" height="13" rx="3" />
+  {% elif icon == 'nfc' %}
+<path d="M6 8.32a7.43 7.43 0 0 1 0 7.36" />
+  <path d="M9.46 6.21a11.76 11.76 0 0 1 0 11.58" />
+  <path d="M12.91 4.1a15.91 15.91 0 0 1 .01 15.8" />
+  <path d="M16.37 2a20.16 20.16 0 0 1 0 20" />
+  {% elif icon == 'nearby interaction' %}
+<path d="M19.07 4.93A10 10 0 0 0 6.99 3.34" />
+  <path d="M4 6h.01" />
+  <path d="M2.29 9.62A10 10 0 1 0 21.31 8.35" />
+  <path d="M16.24 7.76A6 6 0 1 0 8.23 16.67" />
+  <path d="M12 18h.01" />
+  <path d="M17.99 11.66A6 6 0 0 1 15.77 16.67" />
+  <circle cx="12" cy="12" r="2" />
+  <path d="m13.41 10.59 5.66-5.66" />
+  {% elif icon == 'networking' %}
+<circle cx="12" cy="12" r="10" />
+  <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
+  <path d="M2 12h20" />
+  {% elif icon == 'payment services' %}
+<rect width="20" height="14" x="2" y="5" rx="2" />
+  <line x1="2" x2="22" y1="10" y2="10" />
+  <path d="M6 14h2" />
+  {% elif icon == 'photos' %}
+<path d="m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16" />
+  <path d="M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2" />
+  <circle cx="13" cy="7" r="1" fill="currentColor" />
+  <rect x="8" y="2" width="14" height="14" rx="2" />
+  {% elif icon in ['push notifications', 'google cloud messaging'] %}
+<path d="M10.268 21a2 2 0 0 0 3.464 0" />
+  <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
+  {% elif icon == 'sms' %}
+<path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z" />
+  {% elif icon == 'secure rng' %}
+<rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+  <path d="M16 8h.01" />
+  <path d="M8 8h.01" />
+  <path d="M8 16h.01" />
+  <path d="M16 16h.01" />
+  <path d="M12 12h.01" />
+  {% elif icon == 'sensors' %}
+<path d="M4.9 16.1C1 12.2 1 5.8 4.9 1.9" />
+  <path d="M7.8 4.7a6.14 6.14 0 0 0-.8 7.5" />
+  <circle cx="12" cy="9" r="2" />
+  <path d="M16.2 4.8c2 2 2.26 5.11.8 7.47" />
+  <path d="M19.1 1.9a9.96 9.96 0 0 1 0 14.1" />
+  <path d="M9.5 18h5" />
+  <path d="m8 22 4-11 4 11" />
+  {% elif icon == 'telephony' %}
+<path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384" />
+  {% elif icon == 'usb devices' %}
+<circle cx="10" cy="7" r="1" />
+  <circle cx="4" cy="20" r="1" />
+  <path d="M4.7 19.3 19 5" />
+  <path d="m21 3-3 1 2 2Z" />
+  <path d="M9.26 7.68 5 12l2 5" />
+  <path d="m10 14 5 2 3.5-3.5" />
+  <path d="m18 12 1-1 1 1-1 1Z" />
+  {% elif icon == 'background execution' %}
+<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+  <path d="M21 3v5h-5" />
+  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+  <path d="M8 16H3v5" />
+  {% elif icon == 'device administrator' %}
+<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+  <path d="m9 12 2 2 4-4" />
+  {% elif icon == 'infrared led' %}
+<path d="M12 13v1" />
+  <path d="M17 2a1 1 0 0 1 1 1v4a3 3 0 0 1-.6 1.8l-.6.8A4 4 0 0 0 16 12v8a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-8a4 4 0 0 0-.8-2.4l-.6-.8A3 3 0 0 1 6 7V3a1 1 0 0 1 1-1z" />
+  <path d="M6 6h12" />
   {% else %}
-  <p class="small">No custom URL schemes were declared by this app.</p>
+<path d="M12 20v2" />
+  <path d="M12 2v2" />
+  <path d="M17 20v2" />
+  <path d="M17 2v2" />
+  <path d="M2 12h2" />
+  <path d="M2 17h2" />
+  <path d="M2 7h2" />
+  <path d="M20 12h2" />
+  <path d="M20 17h2" />
+  <path d="M20 7h2" />
+  <path d="M7 20v2" />
+  <path d="M7 2v2" />
+  <rect x="4" y="4" width="16" height="16" rx="2" />
+  <rect x="8" y="8" width="8" height="8" rx="1" />
   {% endif %}
-  {% endif %}
+</svg>
+{% endmacro %}
+<div class="section">
+  <h2>Application Functionality</h2>
+  <p class="func-legend"><span class="func-legend-present">Detected</span><span class="func-legend-absent">Not detected</span></p>
+  <div class="func-grid" role="list">
+    {% for name, f in data.functionality.items() %}
+    {% set present = f.present is sameas true or f.status == 'present' %}
+    {% set status = f.status or ('present' if present else 'not_evaluated' if f.present is none else 'not_present') %}
+    <div class="func-item {{ 'func-present' if present else 'func-absent' }}" role="listitem" title="{{ f.explanation | e }}" aria-label="{{ name | e }}: {{ status | replace('_', ' ') | e }}">
+      {{ functionality_icon(name, present) }}
+      <div class="func-name">{{ name | e }}</div>
+      {% if status not in ['present', 'not_present'] %}
+      <div class="func-status">{{ status | replace('_', ' ') | capitalize | e }}</div>
+      {% endif %}
+    </div>
+    {% else %}
+    <p class="small">Functionality was not evaluated for this scan.</p>
+    {% endfor %}
+  </div>
 </div>
 
-{% if data.rule_status %}
-<div class="section">
-  <h2>Rule Coverage</h2>
-  <p>Status: {{ data.rule_status | e }}. {{ data.rule_status_reason | e }}</p>
-  {% for coverage in data.rule_coverage %}
-  <p>{{ coverage.platform | e }} / {{ coverage.mode | e }}: {{ coverage.status | e }}. {{ coverage.reason | e }}</p>
-  {% if coverage.ruleset_fingerprint %}<p class="small mono">Ruleset: {{ coverage.ruleset_fingerprint | e }}</p>{% endif %}
-  {% endfor %}
-  <p class="small">No matches means no evidence matched in the evaluated inputs. It does not establish application-wide security or control coverage.</p>
-</div>
-{% endif %}
 <!-- ===================== VULNERABILITY SECTIONS ===================== -->
 {% for section in data.vulnerability_sections %}
-<div class="section">
+<div class="section checks-section">
   <h2>{{ section.section_name | e }}</h2>
   {% if section.findings_text %}
   <h3>Findings</h3>
   <div class="vuln-findings">{{ section.findings_text }}</div>
   {% endif %}
-  {% if section.checks and section.checks[0].rule_id %}
-  {% for c in section.checks %}
-  <div class="rule-check">
-    <h3>{{ c.check | e }}</h3>
-    <p class="small"><strong>{{ c.finding_type | title | e }}</strong> · {{ c.severity | e }} · {% if c.result == 'Not Present' %}No matches{% elif c.result == 'Present' %}Matched{% else %}{{ c.result | e }}{% endif %}</p>
-    <p class="small mono">{{ c.rule_id | e }} · {{ c.rule_file | e }} · Scope: {{ c.scope | e }} · Execution: {{ c.execution_status | e }}</p>
-    <p>{{ c.explanation | e }}</p>
-    {% if c.result == 'Present' %}
-    <p><strong>Impact:</strong> {{ c.impact | e }}</p>
-    <p><strong>Guidance:</strong> {{ c.remediation | e }}</p>
-    <p class="small rule-evidence">{{ c.evidence | e }}</p>
-    {% endif %}
-    {% if c.compliance %}<p class="small">{{ c.compliance | e }}</p>{% endif %}
-    {% for reference in c.references %}<p class="small mono">{{ reference | e }}</p>{% endfor %}
-  </div>
-  {% endfor %}
-  {% elif section.checks %}
-  <h3>Checks Conducted</h3>
-  <table>
+  {% if section.checks %}
+  <table class="findings-table">
+    <thead>
     <tr>
       <th class="col-check">Check</th>
-      <th class="col-result">Result</th>
       <th class="col-severity">Severity</th>
+      <th class="col-finding-type">Finding Type</th>
       <th class="col-explain">Explanation</th>
       <th class="col-compliance">Compliance</th>
       <th class="col-evidence">Evidence</th>
     </tr>
+    </thead>
+    <tbody>
     {% for c in section.checks %}
     <tr>
-      <td>{{ c.check }}</td>
-      <td>{{ result_badge(c.result) }}</td>
+      <td>{{ c.check | e }}</td>
       <td>{{ risk_badge(c.severity) }}</td>
+      <td>{{ (c.finding_type or ('control' if c.severity == 'Secure' else 'review' if c.severity == 'Hotspot' else 'weakness')) | title | e }}</td>
       <td>
-        {{ c.explanation }}
-        {% if c.platform_assessments %}
+        {{ c.explanation | e }}
+        {% if c.platform_assessments | length > 1 %}
         <div class="small">
           {% for assessment in c.platform_assessments %}
           {{ assessment.platform|replace('_', ' ')|title }}: {{ assessment.status }}{% if not loop.last %}; {% endif %}
           {% endfor %}
         </div>
         {% endif %}
-        {% if c.remediation_link %}<br><span class="small">Remediation: {{ c.remediation_link }}</span>{% endif %}{% if c.confidence_caveat and show_confidence_caveats %}<br><span class="small confidence-caveat">⚠ {{ c.confidence_caveat }}</span>{% endif %}
+        {% if c.remediation_link %}<br><span class="small">Remediation: {{ c.remediation_link | e }}</span>{% endif %}{% if c.confidence_caveat and show_confidence_caveats %}<br><span class="small confidence-caveat">⚠ {{ c.confidence_caveat | e }}</span>{% endif %}
       </td>
-      <td class="small">{{ c.compliance }}</td>
-      <td class="small">{{ c.evidence }}</td>
+      <td class="small finding-compliance">{{ c.compliance | e }}</td>
+      <td class="small rule-evidence">{{ c.evidence | e }}</td>
     </tr>
     {% endfor %}
+    </tbody>
   </table>
-  {% else %}
-  <p class="small">No individual checks were logged for this section in the current scan.</p>
   {% endif %}
 </div>
 {% endfor %}
 
 <!-- ===================== HARDCODED VALUES ===================== -->
+{% if presentation.target_type == 'binary' %}
 <div class="section">
   <h2>Hard-Coded Values Found</h2>
   <h3>URLs</h3>
@@ -490,16 +658,57 @@
   <p class="small">No hard-coded email addresses were found.</p>
   {% endif %}
 
-  <h3>Hardcoded Secrets</h3>
-  {% if data.hardcoded_values.secrets %}
-  <table class="compact">
-    <tr><th>Secret</th></tr>
-    {% for s in data.hardcoded_values.secrets %}
-    <tr><td class="mono">{{ s.value if s.value is defined else s }}</td></tr>
+</div>
+{% endif %}
+
+<!-- ===================== SECRET SCANNERS ===================== -->
+<div class="section">
+  {% if data.meta.platform == 'iOS' %}
+  <div class="url-schemes">
+    <h2>Custom URL Schemes</h2>
+    {% if data.url_schemes %}
+    <table class="compact">
+      <thead><tr><th>URL Name</th><th>Schemes</th></tr></thead>
+      <tbody>
+      {% for u in data.url_schemes %}
+      <tr><td class="mono">{{ u.url_name | e }}</td><td class="mono">{{ u.schemes | join(', ') | e }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="small">No custom URL schemes were declared by this app.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+  <h2>Hardcoded Secrets</h2>
+  {% if data.secret_scans %}
+  <p class="small">Findings are counted separately for each scanner and may overlap.</p>
+  <table>
+    <thead><tr><th>Scanner</th><th>Status</th><th>Findings</th><th>Verified</th></tr></thead>
+    <tbody>
+    {% for scan in data.secret_scans %}
+    <tr>
+      <td>{{ scan.scanner | e }}</td>
+      <td>{{ scan.status | e }}{% if scan.reason %}<div class="small">{{ scan.reason | e }}</div>{% endif %}</td>
+      <td>{{ scan.findings | length if scan.status in ['Completed', 'Partial'] else 'Unknown' }}</td>
+      <td>{{ scan.findings | selectattr('verification', 'equalto', 'Verified') | list | length if scan.scanner == 'TruffleHog' and scan.status in ['Completed', 'Partial'] else 'Not assessed' }}</td>
+    </tr>
     {% endfor %}
+    </tbody>
   </table>
+  {% for scan in data.secret_scans if scan.findings %}
+  <h3>{{ scan.scanner | e }} Findings</h3>
+  <table class="secret-findings">
+    <thead><tr><th>Detector</th><th>Location</th><th>Verification</th></tr></thead>
+    <tbody>
+    {% for finding in scan.findings %}
+    <tr><td>{{ finding.detector | e }}</td><td>{{ finding.location | e }}</td><td>{{ finding.verification | e }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endfor %}
   {% else %}
-  <p class="small">No hardcoded secrets were found.</p>
+  <p class="small">Secret-scanner results were not included in this saved report.</p>
   {% endif %}
 </div>
 

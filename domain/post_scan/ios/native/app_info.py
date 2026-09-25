@@ -11,6 +11,7 @@ from domain.post_scan.ios.native.scan_extraction_context import NativeIOSScanExt
 @dataclass
 class NativeIOSAppInfo:
     icon_path: str
+    icon_data_uri: str
     name: str
     package_name: str
     main_activity: str
@@ -28,6 +29,7 @@ class NativeIOSAppInfo:
         else:
             version = meta.version_name or meta.version_code
         self.icon_path = ""
+        self.icon_data_uri = context.first_non_empty(app_meta.get("icon_data_uri"))
         self.name = meta.app_display_name
         self.package_name = meta.package_name
         self.main_activity = context.first_non_empty(app_meta.get("executable"))

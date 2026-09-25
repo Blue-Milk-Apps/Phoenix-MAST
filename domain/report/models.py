@@ -115,6 +115,8 @@ class ReportMetadata:
     version_name: str = ""
     version_code: str = ""
     reviewer_org: str = ""
+    app_icon_path: str = ""
+    app_icon_data_uri: str = ""
 
 
 @dataclass(frozen=True)
@@ -612,6 +614,21 @@ class IOSBinaryReportDetails(PlatformReportDetails):
 
 
 @dataclass(frozen=True)
+class SecretFindingSummary:
+    detector: str
+    location: str
+    verification: str = "Not checked"
+
+
+@dataclass(frozen=True)
+class SecretScanSummary:
+    scanner: str
+    status: str
+    findings: tuple[SecretFindingSummary, ...] = ()
+    reason: str = ""
+
+
+@dataclass(frozen=True)
 class ReportData:
     """Standard, format-independent output of a report data builder."""
 
@@ -624,3 +641,4 @@ class ReportData:
     rule_coverage: tuple[dict[str, object], ...] = ()
     rule_status: str = ""
     rule_status_reason: str = ""
+    secret_scans: tuple[SecretScanSummary, ...] = ()

@@ -578,6 +578,7 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
     assert result["file_info"]["sha256"] != ""
     assert result["app_info"] == {
         "icon_path": "",
+        "icon_data_uri": "",
         "name": "DVIA-v2",
         "package_name": "com.highaltitudehacks.DVIAswiftv2",
         "main_activity": "DVIA",
@@ -2694,3 +2695,64 @@ def test_android_binary_scan_detail_extractor_marks_password_not_hashed_in_trans
 
 def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_secret_scan_summary_preserves_counts_locations_and_verification(tmp_path: Path) -> None:
+    from adapters.post_scan.ios.native.scan_output_loader import NativeIOSScanOutputLoader
+
+    fixtures = {
+        "scan_metadata.json": {"project_path": "/app"},
+        "trufflehog/trufflehog_results.json": [
+            {
+                "DetectorName": "Example token",
+                "Verified": True,
+                "Raw": "do-not-copy-trufflehog-value",
+                "SourceMetadata": {"Data": {"Filesystem": {"file": "/app/Config.swift", "line": 4}}},
+            }
+        ],
+        "gitleaks/gitleaks_report.json": [
+            {
+                "RuleID": "example-key",
+                "File": "/app/Config.swift",
+                "StartLine": 8,
+                "Secret": "do-not-copy-gitleaks-value",
+            }
+        ],
+    }
+    for name, content in fixtures.items():
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(content))
+    data = PostScanProcessingService(NativeIOSScanOutputLoader(), NativeIOSScanDetailExtractor()).process(tmp_path)
+    trufflehog, gitleaks = data["secret_scans"]
+    assert trufflehog["status"] == gitleaks["status"] == "Completed"
+    assert trufflehog["findings"] == (
+        {"detector": "Example token", "location": "Config.swift:4", "verification": "Verified"},
+    )
+    assert gitleaks["findings"] == (
+        {"detector": "example-key", "location": "Config.swift:8", "verification": "Not checked"},
+    )
+    assert "do-not-copy" not in json.dumps(data["secret_scans"])
+
+
+def test_secret_scan_summary_distinguishes_missing_empty_and_partial_results() -> None:
+    from domain.post_scan.utilities import summarize_secret_scans
+
+    partial, missing = summarize_secret_scans(
+        {
+            "trufflehog_outputs": {
+                "trufflehog_results.json": {
+                    "success": False,
+                    "error": "Scanner interrupted",
+                    "raw_output": [{"DetectorName": "Example token", "Verified": False}],
+                }
+            },
+        }
+    )
+    assert partial.status == "Partial"
+    assert len(partial.findings) == 1
+    assert partial.reason == "Scanner interrupted"
+    assert missing.status == "Unavailable"
+    completed = summarize_secret_scans({"gitleaks_outputs": {"gitleaks_report.json": []}})[1]
+    assert completed.status == "Completed"
+    assert completed.findings == ()

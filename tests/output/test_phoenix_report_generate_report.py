@@ -38,7 +38,7 @@ def test_modular_report_data_contains_canonical_android_sections() -> None:
     assert activities.result.value == "present"
     assert activities.severity.value == "high"
     assert activities.compliance
-    assert len(report.vulnerability_sections) == 4
+    assert [section.name for section in report.vulnerability_sections] == ["Code"]
     assert report.platform_details.app_components.exported_activities == 1
 
 

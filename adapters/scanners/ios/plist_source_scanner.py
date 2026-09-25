@@ -69,6 +69,7 @@ class PlistSourceScanner(ScannerPort):
             base_path=config.project_path.parent if config.project_path.is_file() else config.project_path,
             output_format=self._output_format,
             plist_transform=lambda data: self._resolve_xcode_variables(data, variables),
+            app_icon_name=variables.get("ASSETCATALOG_COMPILER_APPICON_NAME", "AppIcon"),
         ).build(plist_files)
 
     def _collect_plist_files(self, project_path: Path) -> list[Path]:

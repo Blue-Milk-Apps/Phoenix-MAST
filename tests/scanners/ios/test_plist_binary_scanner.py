@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import base64
+import io
 import json
 import plistlib
 import zipfile
 from pathlib import Path
 
+from PIL import Image
+
 from adapters.output import FileScanOutput
 from adapters.scanners.ios.plist_binary_scanner import PlistBinaryScanner
 from domain.models import ScanConfig, ScanType
+from domain.post_scan.ios.binary.app_info import IOSAppInfo
 
 
 def test_plist_binary_metadata() -> None:
@@ -21,6 +26,8 @@ def test_plist_binary_metadata() -> None:
 def test_plist_binary_scan_writes_normalized_plists(tmp_path: Path) -> None:
     project_path = tmp_path / "project.ipa"
     app_bundle_name = "Test.app"
+    icon = io.BytesIO()
+    Image.new("RGB", (32, 32), "red").save(icon, format="PNG")
 
     with zipfile.ZipFile(project_path, "w") as archive:
         archive.writestr(
@@ -30,11 +37,13 @@ def test_plist_binary_scan_writes_normalized_plists(tmp_path: Path) -> None:
                     "CFBundleIdentifier": "com.example.app",
                     "CFBundleName": "ExampleApp",
                     "CFBundleExecutable": "Test",
+                    "CFBundleIcons": {"CFBundlePrimaryIcon": {"CFBundleIconFiles": ["AppIcon60x60"]}},
                 },
                 fmt=plistlib.FMT_BINARY,
             ),
         )
         archive.writestr(f"Payload/{app_bundle_name}/Test", b"stub-binary")
+        archive.writestr(f"Payload/{app_bundle_name}/AppIcon60x60@3x.png", icon.getvalue())
         archive.writestr(
             f"Payload/{app_bundle_name}/Frameworks/Foo.framework/Info.plist",
             plistlib.dumps(
@@ -59,6 +68,8 @@ def test_plist_binary_scan_writes_normalized_plists(tmp_path: Path) -> None:
     assert outputs["Info.json"]["app_meta"]["bundle_identifier"] == "com.example.app"
     assert outputs["Info.json"]["app_meta"]["executable"] == "Test"
     assert outputs["Info.json"]["plist"]["CFBundleName"] == "ExampleApp"
+    app_info = IOSAppInfo({"plist_outputs": outputs})
+    assert base64.b64decode(app_info.icon_data_uri.split(",")[1]) == icon.getvalue()
     assert outputs["Frameworks/Foo.framework/Info.json"]["framework_meta"]["bundle_identifier"] == ("com.example.foo")
     assert outputs["Frameworks/Foo.framework/Info.json"]["plist"]["CFBundleIdentifier"] == ("com.example.foo")
     assert outputs["scan_index.json"]["emitted_plist_count"] == 2

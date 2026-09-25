@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import replace
 from typing import Any, Mapping
 
 from domain.report import (
@@ -14,6 +15,7 @@ from domain.report import (
     ReportTargetKind,
     ReportTargetType,
 )
+from domain.report.models import SecretFindingSummary, SecretScanSummary
 from domain.report.rule_report import with_rule_assessments
 from ports.report_data_builder_port import ReportDataBuilderPort
 
@@ -44,7 +46,17 @@ class ReportGenerationService:
 
         metadata = self._metadata_from(post_scan_data)
         builder = self._builder_resolver.resolve(metadata.target.target_kind)
-        return with_rule_assessments(builder.build(post_scan_data, metadata), post_scan_data)
+        report = with_rule_assessments(builder.build(post_scan_data, metadata), post_scan_data)
+        summaries = tuple(
+            SecretScanSummary(
+                scanner=item["scanner"],
+                status=item["status"],
+                reason=item.get("reason", ""),
+                findings=tuple(SecretFindingSummary(**finding) for finding in item.get("findings", ())),
+            )
+            for item in post_scan_data.get("secret_scans", ())
+        )
+        return replace(report, secret_scans=summaries)
 
     @classmethod
     def _metadata_from(cls, post_scan_data: Mapping[str, Any]) -> ReportMetadata:
@@ -67,6 +79,8 @@ class ReportGenerationService:
             version_name=cls._text(meta, "version_name") or cls._text(app_info, "version_name"),
             version_code=cls._text(meta, "version_code"),
             reviewer_org=cls._text(meta, "reviewer_org"),
+            app_icon_path=cls._text(app_info, "icon_path"),
+            app_icon_data_uri=cls._text(app_info, "icon_data_uri"),
         )
 
     @staticmethod

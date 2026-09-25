@@ -20,9 +20,7 @@ def make_overall_risk_polar_chart(risk_summary: dict[str, str]) -> str:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    preferred_order = ["code_vulnerability", "data_storage", "networking", "resilience"]
-    keys = [key for key in preferred_order if key in risk_summary]
-    keys.extend(key for key in risk_summary if key not in keys)
+    keys = list(risk_summary)
     categories = [(key.replace("_", " ").title(), risk_summary.get(key, "Low")) for key in keys]
     if not categories:
         fig, ax = plt.subplots(figsize=(5.6, 4.8))
@@ -44,9 +42,10 @@ def make_overall_risk_polar_chart(risk_summary: dict[str, str]) -> str:
             edgecolor="white",
             linewidth=2,
         )
-        ax.set_ylim(0, 5.2)
+        ax.set_ylim(0, 4)
         ax.set_yticks([1, 2, 3, 4])
         ax.set_yticklabels(["Low", "Medium", "High", "Critical"], fontsize=7.5, color="#888")
+        ax.spines["polar"].set_visible(False)
         ax.set_xticks(theta)
         ax.set_xticklabels([label.title() for label, _ in categories], fontsize=10, fontweight="bold", color="#16233c")
         ax.set_facecolor("none")
