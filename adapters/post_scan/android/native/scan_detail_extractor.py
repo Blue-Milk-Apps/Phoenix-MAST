@@ -9,14 +9,12 @@ from domain.post_scan.android.native import (
     NativeAndroidAppComponents,
     NativeAndroidAppInfo,
     NativeAndroidApplication,
-    NativeAndroidCodeEvidence,
     NativeAndroidDeepLinks,
     NativeAndroidEndpoints,
     NativeAndroidFileInfo,
     NativeAndroidFunctionality,
     NativeAndroidHardcodedValues,
     NativeAndroidMeta,
-    NativeAndroidNetworkEvidence,
     NativeAndroidPermissions,
     NativeAndroidScanExtractionContext,
 )
@@ -50,14 +48,4 @@ class NativeAndroidScanDetailExtractor(ScanDetailExtractorPort):
             }
             sections["endpoints"] = NativeAndroidEndpoints(hardcoded_values).items
 
-        evidence_models = (
-            ("code_evidence", NativeAndroidCodeEvidence(context)),
-            ("network_evidence", NativeAndroidNetworkEvidence(context)),
-        )
-        for section_name, model in evidence_models:
-            if not model.assessed:
-                continue
-            evidence = asdict(model)
-            evidence.pop("assessed", None)
-            sections[section_name] = evidence
         return sections

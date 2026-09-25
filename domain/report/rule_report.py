@@ -89,7 +89,7 @@ def with_rule_assessments(report: ReportData, data: Mapping[str, Any]) -> Report
     summaries = []
     counts = dict.fromkeys(("critical", "high", "medium", "low", "info", "secure"), 0)
     for label, checks in groups.items():
-        if label.rsplit("/", 1)[-1].strip().casefold() == "functionality":
+        if not checks or label.rsplit("/", 1)[-1].strip().casefold() == "functionality":
             continue
         matches = tuple(check for check in checks if check.result == AssessmentStatus.PRESENT)
         if matches:

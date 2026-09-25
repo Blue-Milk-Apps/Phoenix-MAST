@@ -2,6 +2,8 @@ from adapters.output.phoenix_report.builders.android import NativeAndroidReportD
 from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
 from adapters.output.phoenix_report.pdf_report.common import build_charts
 from application.report_generation_service import ReportGenerationService
+from domain.post_scan.rule_assessment import rule_assessments
+from tests.rule_fixtures import assessment_payload, rule
 
 
 def _android_source_report(data: dict) -> object:
@@ -23,21 +25,25 @@ def test_modular_report_data_contains_canonical_android_sections() -> None:
             "app_info": {"package_name": "com.example", "target_sdk": "35"},
             "application": {"allow_backup": True},
             "app_components": {"activities": 1, "exported_activities": 1},
-            "code_evidence": {
-                "activities_accessible_to_other_apps": {
-                    "present": True,
-                    "evidence": "exported_activities=1",
-                }
-            },
+            "rule_assessments": rule_assessments(
+                assessment_payload(
+                    rule("example.exported", title="Exported component", finding_type="review"),
+                    platform="android",
+                    category="code",
+                    results=[{"check_id": "example.exported", "path": "AndroidManifest.xml"}],
+                )
+            ),
             "functionality": {"Camera": {"present": None}},
         }
     )
 
     code = next(section for section in report.vulnerability_sections if section.name == "Code")
-    activities = next(check for check in code.checks if check.name == "Activities Accessible to Other Apps")
+    activities = next(check for check in code.checks if check.name == "Exported component")
     assert activities.result.value == "present"
     assert activities.severity.value == "high"
     assert activities.compliance
+    assert activities.finding_type == "review"
+    assert report.findings_severity.high == 0
     assert [section.name for section in report.vulnerability_sections] == ["Code"]
     assert report.platform_details.app_components.exported_activities == 1
 

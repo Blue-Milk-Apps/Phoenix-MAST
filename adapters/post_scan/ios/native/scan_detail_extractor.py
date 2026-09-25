@@ -9,7 +9,6 @@ from domain.post_scan.ios.common.functionality import IOSFunctionality
 from domain.post_scan.ios.common.permissions import IOSPermissions
 from domain.post_scan.ios.common.third_party_sdks import IOSThirdPartySDKs
 from domain.post_scan.ios.native.app_info import NativeIOSAppInfo
-from domain.post_scan.ios.native.code_evidence import NativeIOSCodeEvidence
 from domain.post_scan.ios.native.file_info import NativeIOSFileInfo
 from domain.post_scan.ios.native.meta import NativeIOSMeta
 from domain.post_scan.ios.native.scan_extraction_context import NativeIOSScanExtractionContext
@@ -33,7 +32,6 @@ class NativeIOSScanDetailExtractor(ScanDetailExtractorPort):
             "functionality": {key.replace("_", " "): value for key, value in functionality.items()},
             "third_party_sdks": {key.replace("_", " "): value for key, value in third_party_sdks.items()},
             "permissions": IOSPermissions(loaded_outputs).items,
-            "code_evidence": asdict(NativeIOSCodeEvidence(context)),
             "hardcoded_values": {"urls": [], "emails": [], "secrets": []},
             "endpoints": [],
         }

@@ -1,6 +1,5 @@
 from typing import Any, Mapping
 
-from adapters.output.phoenix_report.builders.ios.source_check_catalog import IOS_SOURCE_SECTION_CHECKS
 from adapters.output.phoenix_report.builders.source import SourceReportDataBuilder
 from domain.report.models import (
     EndpointDetails,
@@ -17,7 +16,6 @@ from domain.report.models import (
 
 
 class NativeIOSReportDataBuilder(SourceReportDataBuilder):
-    check_sections = IOS_SOURCE_SECTION_CHECKS
     _excluded_functionalities = frozenset({"fingerprint", "google cloud messaging", "infrared led"})
 
     @property

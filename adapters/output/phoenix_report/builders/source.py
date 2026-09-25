@@ -45,21 +45,7 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
     def build(self, post_scan_data: Mapping[str, Any], metadata: ReportMetadata) -> ReportData:
         if metadata.target.target_kind != self.target_kind:
             raise ValueError(f"Source report builder requires target_kind={self.target_kind.value}")
-        if self.check_sections:
-            sections = tuple(
-                self._catalog_section(name, key, definitions, post_scan_data)
-                for name, key, definitions in self.check_sections
-            )
-        else:
-            sections = tuple(
-                self._section(name, key, post_scan_data)
-                for name, key in (
-                    ("Code", "code_evidence"),
-                    ("Network", "network_evidence"),
-                    ("Data Storage", "data_storage_evidence"),
-                    ("Resilience", "resilience_evidence"),
-                )
-            )
+        sections = self._sections(post_scan_data)
         sections = self._attach_platform_assessments(sections, metadata)
         evaluations = tuple(
             OverallEvaluation(
@@ -77,6 +63,11 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
             tuple(RiskSummary(e.area, e.risk_level) for e in evaluations),
             self._severity(sections),
             self._build_details(post_scan_data),
+        )
+
+    def _sections(self, data: Mapping[str, Any]) -> tuple[VulnerabilitySection, ...]:
+        return tuple(
+            self._catalog_section(name, key, definitions, data) for name, key, definitions in self.check_sections
         )
 
     @classmethod

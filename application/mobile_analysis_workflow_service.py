@@ -137,7 +137,11 @@ class MobileScannerFactory:
     @staticmethod
     def _get_opengrep_scan_paths(config: ScanConfig) -> list[Path]:
         if config.target_type == "SOURCE":
-            return [config.project_path]
+            paths = [config.project_path]
+            plist_output = config.output_path / ScanType.PLIST_SOURCE.value
+            if config.stack == "NATIVE_IOS" and plist_output.is_dir():
+                paths.append(plist_output)
+            return paths
         if config.target_type == "BINARY":
             strings_output_path = config.output_path / ScanType.STRINGS.value
             if not strings_output_path.is_dir():

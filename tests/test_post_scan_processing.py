@@ -49,12 +49,7 @@ def test_native_ios_structured_evidence_does_not_interpret_rule_ids() -> None:
             }
         }
     )
-    assert set(result["code_evidence"]) == {
-        "insecure_nanopb_library",
-        "hardcoded_api_keys_in_bundle",
-        "insecure_entitlements",
-    }
-    assert not any(item["present"] for item in result["code_evidence"].values())
+    assert "code_evidence" not in result
 
 
 def test_android_binary_scan_detail_extractor_builds_app_info_and_certificate() -> None:

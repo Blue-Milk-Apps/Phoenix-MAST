@@ -51,7 +51,7 @@ jobs:
           tags: |
             type=ref,event=branch,prefix=branch-
             type=ref,event=pr
-            type=sha,format=long
+            type=sha,format=long,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
       - name: Build image for verification
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7

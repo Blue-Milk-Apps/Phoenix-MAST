@@ -21,7 +21,6 @@ from domain.post_scan.ios.common import (
 )
 from domain.post_scan.ios.native import (
     NativeIOSAppInfo,
-    NativeIOSCodeEvidence,
     NativeIOSFileInfo,
     NativeIOSMeta,
     NativeIOSScanExtractionContext,
@@ -45,7 +44,6 @@ __all__ = [
     "IOSThirdPartySDKs",
     "IOSURLSchemes",
     "NativeIOSAppInfo",
-    "NativeIOSCodeEvidence",
     "NativeIOSFileInfo",
     "NativeIOSMeta",
     "NativeIOSScanExtractionContext",

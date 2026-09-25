@@ -668,18 +668,23 @@ def test_scan_command_passes_syft_output_format(tmp_path: Path, monkeypatch) -> 
     assert captured["output_format"] == "spdx-json"
 
 
-def test_get_opengrep_scan_paths_for_source_returns_project_only(tmp_path: Path) -> None:
+@pytest.mark.parametrize("stack", ["FLUTTER", "REACT_NATIVE", "NATIVE_ANDROID", "NATIVE_IOS"])
+def test_get_opengrep_scan_paths_for_source_includes_native_ios_plist_artifacts(tmp_path: Path, stack: str) -> None:
     config = ScanConfig(
         project_path=tmp_path / "project",
         output_path=tmp_path / "scan-results",
         mode="source",
         platform="ANY",
-        stack="FLUTTER",
+        stack=stack,
     )
 
     paths = workflow.MobileScannerFactory()._get_opengrep_scan_paths(config)
 
     assert paths == [config.project_path]
+    plist_output = config.output_path / "plist_source"
+    plist_output.mkdir(parents=True)
+    expected = [config.project_path, plist_output] if stack == "NATIVE_IOS" else [config.project_path]
+    assert workflow.MobileScannerFactory()._get_opengrep_scan_paths(config) == expected
 
 
 def test_get_opengrep_scan_paths_for_binary_returns_strings_artifact_directory_only(tmp_path: Path) -> None:

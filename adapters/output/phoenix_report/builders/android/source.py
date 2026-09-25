@@ -1,12 +1,6 @@
-from dataclasses import fields
 from typing import Any, Mapping
 
-from adapters.output.phoenix_report.builders.android.source_check_catalog import ANDROID_SOURCE_SECTION_CHECKS
 from adapters.output.phoenix_report.builders.source import SourceReportDataBuilder
-from domain.post_scan.android.native import (
-    NativeAndroidCodeEvidence,
-    NativeAndroidNetworkEvidence,
-)
 from domain.report.models import (
     AndroidApplicationDetails,
     AppComponentSummary,
@@ -21,18 +15,8 @@ from domain.report.models import (
     UrlSchemeDetails,
 )
 
-# The shared catalog still supplies legacy Flutter checks until its migration.
-_STRUCTURED_EVIDENCE_KEYS = frozenset(
-    field.name for model in (NativeAndroidCodeEvidence, NativeAndroidNetworkEvidence) for field in fields(model)
-)
-
 
 class NativeAndroidReportDataBuilder(SourceReportDataBuilder):
-    check_sections = tuple(
-        (section, key, tuple(check for check in checks if check.evidence_key in _STRUCTURED_EVIDENCE_KEYS))
-        for section, key, checks in ANDROID_SOURCE_SECTION_CHECKS
-    )
-
     @property
     def target_kind(self) -> ReportTargetKind:
         return ReportTargetKind.NATIVE_ANDROID_SOURCE

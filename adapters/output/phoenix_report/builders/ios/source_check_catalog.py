@@ -1,4 +1,4 @@
-"""Checks backed by structured scanners; OpenGrep content comes from YAML."""
+"""Legacy iOS checks for Flutter and React Native; native reports use YAML."""
 
 from adapters.output.phoenix_report.builders.source import SourceCheckDefinition
 from domain.report import CheckSeverity

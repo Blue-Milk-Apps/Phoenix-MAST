@@ -1,4 +1,4 @@
-"""Canonical native Android source checks and their evidence bindings."""
+"""Legacy Android checks for Flutter and React Native; native reports use YAML."""
 
 from dataclasses import replace
 

@@ -76,7 +76,6 @@ def test_extracts_native_android_source_metadata_sections() -> None:
         "permissions",
         "deep_links",
         "functionality",
-        "code_evidence",
     }
     assert sections["meta"] == {
         "app_display_name": "Example",
@@ -132,12 +131,8 @@ def test_extracts_native_android_source_metadata_sections() -> None:
         "present": True,
         "explanation": "Camera permission declared.",
     }
-    assert sections["code_evidence"]["app_is_debuggable"]["present"] is False
-    assert sections["code_evidence"]["activities_accessible_to_other_apps"] == {
-        "present": True,
-        "evidence": "exported_activities=1",
-        "details": ["com.example.app.MainActivity"],
-    }
+    assert "code_evidence" not in sections
+    assert "network_evidence" not in sections
     assert "data_storage_evidence" not in sections
 
 

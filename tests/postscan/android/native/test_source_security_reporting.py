@@ -29,13 +29,6 @@ def _report(sections: dict) -> object:
 
 def test_all_bundled_android_rules_are_explicitly_classified() -> None:
     inventory = validate_rule_inventory(private_rules("android"))
-    assert {item.category for item in inventory.files} == {
-        "code",
-        "network",
-        "data_storage",
-        "resilience",
-        "functionality",
-    }
     for definition in inventory.catalog:
         assert definition["metadata"]["finding_type"] in {"weakness", "review", "control", "observation"}
         assert not {"evidence_key", "report_section", "capability_type", "category"} & definition["metadata"].keys()
@@ -114,8 +107,10 @@ def test_missing_security_scanner_omits_unmatched_checks_from_report() -> None:
 
     report = _report(sections)
     assert not report.vulnerability_sections
-    assert sections["code_evidence"]["app_is_debuggable"]["present"] is False
-    assert "contains_potential_sql_injection" not in sections["code_evidence"]
+    assert sections["application"]["debuggable"] is False
+    assert "code_evidence" not in sections
+    assert "network_evidence" not in sections
+    assert report.risk_summary == ()
     assert report.findings_severity.high == 0
     assert report.findings_severity.info == 0
 

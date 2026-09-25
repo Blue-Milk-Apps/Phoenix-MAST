@@ -45,6 +45,17 @@ class FlutterReportDataBuilder(SourceReportDataBuilder):
     def _build_details(self, post_scan_data: Mapping[str, Any]) -> FlutterReportDetails:
         return self._details(post_scan_data)
 
+    def _sections(self, data: Mapping[str, Any]) -> tuple[VulnerabilitySection, ...]:
+        return tuple(
+            self._section(name, key, data)
+            for name, key in (
+                ("Code", "code_evidence"),
+                ("Network", "network_evidence"),
+                ("Data Storage", "data_storage_evidence"),
+                ("Resilience", "resilience_evidence"),
+            )
+        )
+
     @classmethod
     def _section(cls, name: str, key: str, data: Mapping[str, Any]) -> VulnerabilitySection:
         evidence = data.get(key) if isinstance(data.get(key), Mapping) else {}
