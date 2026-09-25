@@ -32,9 +32,21 @@
     {% if presentation.target_type != 'source' %}
     <tr><td class="label">{{ presentation.target_label }}</td><td class="value">{{ data.meta.file_name }}</td></tr>
     {% endif %}
-    <tr><td class="label">{{ 'Bundle Identifier' if is_ios_report else 'Package Name' }}</td><td class="value">{{ data.native_ios_details.bundle_identifier if is_native_ios_source else data.meta.package_name }}</td></tr>
+    {% set package_name = data.native_ios_details.bundle_identifier if is_native_ios_source else data.meta.package_name %}
+    {% if package_name %}
+    <tr><td class="label">{{ 'Bundle Identifier' if is_ios_report else 'Package Name' }}</td><td class="value">{{ package_name | e }}</td></tr>
+    {% endif %}
     {% if data.meta.version_name or data.meta.version_code %}
     <tr><td class="label">Version</td><td class="value">{% if data.meta.version_name and data.meta.version_code %}{{ data.meta.version_name }} ({{ data.meta.version_code }}){% else %}{{ data.meta.version_name or data.meta.version_code }}{% endif %}</td></tr>
+    {% endif %}
+    {% if data.meta.platform == 'Android' %}
+    {% set android_info = data.native_android_details if presentation.target_type == 'source' else data.app_info %}
+    {% if android_info.main_activity %}<tr><td class="label">Main Activity</td><td class="value">{{ android_info.main_activity | e }}</td></tr>{% endif %}
+    {% if android_info.target_sdk %}<tr><td class="label">Target SDK</td><td class="value">{{ android_info.target_sdk | e }}</td></tr>{% endif %}
+    {% if android_info.min_sdk %}<tr><td class="label">Min SDK</td><td class="value">{{ android_info.min_sdk | e }}</td></tr>{% endif %}
+    {% if android_info.max_sdk %}<tr><td class="label">Max SDK</td><td class="value">{{ android_info.max_sdk | e }}</td></tr>{% endif %}
+    {% elif is_native_ios_source and data.native_ios_details.minimum_os %}
+    <tr><td class="label">Minimum OS</td><td class="value">{{ data.native_ios_details.minimum_os | e }}</td></tr>
     {% endif %}
     {% if presentation.show_file_hashes and is_ios_report %}
     {% if data.app_info.main_activity %}<tr><td class="label">Main Executable</td><td class="value">{{ data.app_info.main_activity }}</td></tr>{% endif %}
@@ -104,7 +116,7 @@
   {% endif %}
 </div>
 
-<!-- ===================== CERTIFICATE / FILE / APP INFO ===================== -->
+<!-- ===================== CERTIFICATE / FILE / COMPONENTS ===================== -->
 {% if not is_native_ios_source %}
 <div class="section">
   {% if presentation.target_type != 'source' and data.meta.platform != 'iOS' %}
@@ -129,7 +141,7 @@
   </table>
   {% endif %}
 
-  {% if not is_ios_report %}
+  {% if presentation.show_file_hashes and not is_ios_report %}
     <h2>{{ presentation.target_information_heading }}</h2>
     <table class="kv-table">
       <tr><td class="k">{{ presentation.target_label }}</td><td class="v">{{ data.file_info.filename }}</td></tr>
@@ -141,18 +153,6 @@
       {% endif %}
     </table>
 
-    <h2>App Information</h2>
-    <table class="kv-table">
-      <tr><td class="k">Name</td><td class="v">{{ data.app_info.name }}</td></tr>
-      <tr><td class="k">Package Name</td><td class="v">{{ data.app_info.package_name }}</td></tr>
-      <tr><td class="k">Main Activity</td><td class="v">{{ data.app_info.main_activity }}</td></tr>
-      {% if data.meta.platform != 'iOS' %}
-      <tr><td class="k">Target SDK</td><td class="v">{{ data.app_info.target_sdk }}</td></tr>
-      <tr><td class="k">Min SDK</td><td class="v">{{ data.app_info.min_sdk }}</td></tr>
-      <tr><td class="k">Max SDK</td><td class="v">{{ data.app_info.max_sdk }}</td></tr>
-      {% endif %}
-      <tr><td class="k">Version Name</td><td class="v">{{ data.app_info.version_name }}</td></tr>
-    </table>
   {% endif %}
 
   {% if presentation.show_ios_binary_analysis %}

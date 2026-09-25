@@ -382,6 +382,7 @@ class NativeAndroidReportDetails(PlatformReportDetails):
     hardcoded_values: HardcodedValuesDetails = field(default_factory=lambda: HardcodedValuesDetails())
     endpoints: tuple[EndpointDetails, ...] = ()
     url_schemes: tuple[UrlSchemeDetails, ...] = ()
+    main_activity: str = ""
 
     @property
     def target_kind(self) -> ReportTargetKind:

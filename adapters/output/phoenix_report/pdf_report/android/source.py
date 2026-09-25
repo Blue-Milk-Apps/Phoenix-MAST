@@ -41,5 +41,6 @@ def map_native_android_details(details: NativeAndroidReportDetails) -> dict[str,
             "version_name": details.version_name,
             "target_sdk": details.target_sdk,
             "min_sdk": details.min_sdk,
+            "main_activity": details.main_activity,
         },
     }

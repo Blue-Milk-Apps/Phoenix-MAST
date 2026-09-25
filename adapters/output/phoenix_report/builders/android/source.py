@@ -56,6 +56,7 @@ class NativeAndroidReportDataBuilder(SourceReportDataBuilder):
             version_name=str(app.get("version_name") or ""),
             target_sdk=str(app.get("target_sdk") or ""),
             min_sdk=str(app.get("min_sdk") or ""),
+            main_activity=str(app.get("main_activity") or ""),
             url_schemes=tuple(
                 UrlSchemeDetails(component, tuple(dict.fromkeys(values))) for component, values in schemes.items()
             ),
