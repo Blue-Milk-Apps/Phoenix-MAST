@@ -36,7 +36,7 @@ def summarize_secret_scans(loaded_outputs: dict[str, Any]) -> tuple[SecretScanSu
                 malformed = True
                 continue
             detector = item.get("DetectorName") if scanner == "TruffleHog" else item.get("RuleID")
-            if not detector:
+            if not isinstance(detector, str) or not detector.strip():
                 malformed = True
                 continue
             if scanner == "TruffleHog":

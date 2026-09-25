@@ -4,6 +4,9 @@ import pytest
 
 from adapters.output.phoenix_report.builders.ios import NativeIOSReportDataBuilder
 from adapters.output.phoenix_report.pdf_report.pdf_report_generator import PdfReportGenerator
+from adapters.post_scan.ios.native.scan_detail_extractor import NativeIOSScanDetailExtractor
+from adapters.post_scan.ios.native.scan_output_loader import NativeIOSScanOutputLoader
+from application.post_scan_processing_service import PostScanProcessingService
 from application.report_generation_service import ReportGenerationService
 from domain.post_scan.rule_assessment import rule_assessments
 from domain.report.models import AssessmentStatus
@@ -173,3 +176,182 @@ def test_summary_includes_unmatched_crypto_and_excludes_functionality():
         "Crypto": "low",
     }
     assert {row.area for row in report.risk_summary} == {"Code", "Crypto"}
+
+
+def source_scan_report(tmp_path, artifacts):
+    """Exercise persisted scanner artifacts through aggregation and PDF projection."""
+    for relative_path, payload in artifacts.items():
+        path = tmp_path / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload), encoding="utf-8")
+    sections = PostScanProcessingService(NativeIOSScanOutputLoader(), NativeIOSScanDetailExtractor()).process(tmp_path)
+    # The workflow persists this snapshot before building the report.
+    sections = json.loads(json.dumps(sections))
+    report = build(None, **sections)
+    return sections, report, PdfReportGenerator._merged_presentation_data(report)
+
+
+@pytest.fixture
+def completed_source_artifacts():
+    return {
+        "syft/sbom.json": {"artifacts": []},
+        "gitleaks/gitleaks_report.json": [],
+        "trufflehog/trufflehog_results.json": [],
+        "plist_source/App.entitlements.json": {"plist": {"get-task-allow": False}},
+        "plist_source/scan_index.json": {
+            "parse_failures": 0,
+            "plist_count": 1,
+            "plists": [
+                {
+                    "output_path": "App.entitlements.json",
+                    "parse_status": "success",
+                    "role": "entitlements",
+                    "skipped": False,
+                }
+            ],
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [None, {}, {"success": False, "error": "Failed"}, {"skipped": True, "error": "Unavailable"}, "invalid output"],
+)
+def test_missing_or_failed_source_evidence_cannot_produce_low_risk(tmp_path, payload):
+    sections, report, presentation = source_scan_report(
+        tmp_path,
+        {
+            "syft/sbom.json": payload,
+            "gitleaks/gitleaks_report.json": payload,
+            "trufflehog/trufflehog_results.json": payload,
+            "plist_source/App.entitlements.json": payload,
+            "plist_source/scan_index.json": payload,
+        },
+    )
+    assert all(item["present"] is None for item in sections["code_evidence"].values())
+    assert all(item["not_evaluated_reason"] for item in sections["code_evidence"].values())
+    assert report.vulnerability_sections == ()
+    assert report.findings_severity.high == report.findings_severity.medium == 0
+    assert presentation["risk_summary"]["Code"] == "not_evaluated"
+    assert "incomplete" in presentation["overall_evaluation"][0]["summary_findings"][0]
+
+
+def test_absent_source_artifacts_are_not_evaluated(tmp_path):
+    sections, _, presentation = source_scan_report(tmp_path, {})
+    assert all(item["present"] is None for item in sections["code_evidence"].values())
+    assert presentation["risk_summary"]["Code"] == "not_evaluated"
+
+
+def test_completed_source_scans_without_hits_remain_distinct(tmp_path, completed_source_artifacts):
+    sections, report, presentation = source_scan_report(tmp_path, completed_source_artifacts)
+    assert all(item["present"] is False for item in sections["code_evidence"].values())
+    assert all(item["execution_status"] == "success" for item in sections["code_evidence"].values())
+    assert report.vulnerability_sections == ()
+    assert presentation["risk_summary"]["Code"] == "low"
+
+
+@pytest.mark.parametrize(
+    "path,payload,check",
+    [
+        ("syft/sbom.json", {"artifacts": [None]}, "insecure_nanopb_library"),
+        ("syft/sbom.json", {"artifacts": {}}, "insecure_nanopb_library"),
+        ("syft/sbom.json", {"unexpected_format": []}, "insecure_nanopb_library"),
+        ("gitleaks/gitleaks_report.json", [None], "hardcoded_api_keys_in_bundle"),
+        ("gitleaks/gitleaks_report.json", [{"RuleID": 42}], "hardcoded_api_keys_in_bundle"),
+        ("trufflehog/trufflehog_results.json", None, "hardcoded_api_keys_in_bundle"),
+        ("plist_source/App.entitlements.json", None, "insecure_entitlements"),
+        ("plist_source/scan_index.json", {"plists": []}, "insecure_entitlements"),
+    ],
+)
+def test_one_incomplete_input_prevents_clean_code_summary(tmp_path, completed_source_artifacts, path, payload, check):
+    completed_source_artifacts[path] = payload
+    sections, _, presentation = source_scan_report(tmp_path, completed_source_artifacts)
+    assert sections["code_evidence"][check]["present"] is None
+    assert presentation["risk_summary"]["Code"] == "not_evaluated"
+
+
+def test_partial_source_scans_retain_positive_findings(tmp_path, completed_source_artifacts):
+    completed_source_artifacts.update(
+        {
+            "syft/sbom.json": {
+                "success": False,
+                "error": "Scan interrupted",
+                "raw_output": {"artifacts": [{"name": "nanopb", "version": "1.0.0"}]},
+            },
+            "gitleaks/gitleaks_report.json": {
+                "success": False,
+                "error": "Scan interrupted",
+                "raw_output": [{"RuleID": "generic-api-key", "File": "Config.swift", "StartLine": 7}],
+            },
+            "plist_source/App.entitlements.json": {"plist": {"get-task-allow": True}},
+            "plist_source/Broken.entitlements.json": {"success": False, "error": "Invalid plist"},
+        }
+    )
+    index = completed_source_artifacts["plist_source/scan_index.json"]
+    index.update(parse_failures=1, plist_count=2)
+    index["plists"].append({"output_path": "Broken.entitlements.json", "parse_status": "failed"})
+
+    sections, report, presentation = source_scan_report(tmp_path, completed_source_artifacts)
+
+    assert all(item["present"] is True for item in sections["code_evidence"].values())
+    assert all(item["execution_status"] == "partial" for item in sections["code_evidence"].values())
+    checks = report.vulnerability_sections[0].checks
+    assert len(checks) == 3
+    assert all(check.result == AssessmentStatus.PRESENT and check.execution_status == "partial" for check in checks)
+    assert all("incomplete scan" in check.explanation for check in checks)
+    assert report.findings_severity.high == 2
+    assert report.findings_severity.medium == 1
+    assert presentation["risk_summary"]["Code"] == "high"
+
+
+def test_secret_scanner_error_text_is_not_a_finding(tmp_path, completed_source_artifacts):
+    completed_source_artifacts["gitleaks/gitleaks_report.json"] = {
+        "success": False,
+        "error": "generic-api-key detector failed to initialize",
+    }
+    sections, report, _ = source_scan_report(tmp_path, completed_source_artifacts)
+    assert sections["code_evidence"]["hardcoded_api_keys_in_bundle"]["present"] is None
+    assert report.vulnerability_sections == ()
+
+
+@pytest.mark.parametrize("partial", [False, True])
+def test_api_key_finding_descriptions_are_retained(tmp_path, completed_source_artifacts, partial):
+    findings = [{"RuleID": "vendor-credential", "Description": "Vendor API Key", "File": "Config.swift"}]
+    completed_source_artifacts["gitleaks/gitleaks_report.json"] = (
+        {"success": False, "error": "Scan interrupted", "raw_output": findings} if partial else findings
+    )
+    sections, report, _ = source_scan_report(tmp_path, completed_source_artifacts)
+    evidence = sections["code_evidence"]["hardcoded_api_keys_in_bundle"]
+    assert evidence["present"] is True
+    assert evidence["execution_status"] == ("partial" if partial else "success")
+    assert report.findings_severity.high == 1
+
+
+@pytest.mark.parametrize("content", [b'{"artifacts":', b"\xff\xfe"])
+def test_corrupt_json_is_not_a_clean_scan(tmp_path, completed_source_artifacts, content):
+    source_scan_report(tmp_path, completed_source_artifacts)
+    (tmp_path / "syft/sbom.json").write_bytes(content)
+    sections, _, presentation = source_scan_report(tmp_path, {})
+    assert sections["code_evidence"]["insecure_nanopb_library"]["present"] is None
+    assert presentation["risk_summary"]["Code"] == "not_evaluated"
+
+
+@pytest.mark.parametrize("path", ["Missing.entitlements.json", ["invalid path"]])
+def test_incomplete_plist_index_cannot_establish_absence(tmp_path, completed_source_artifacts, path):
+    completed_source_artifacts["plist_source/scan_index.json"]["plists"][0]["output_path"] = path
+    sections, _, presentation = source_scan_report(tmp_path, completed_source_artifacts)
+    assert sections["code_evidence"]["insecure_entitlements"]["present"] is None
+    assert presentation["risk_summary"]["Code"] == "not_evaluated"
+
+
+def test_completed_source_scans_retain_positive_findings(tmp_path, completed_source_artifacts):
+    completed_source_artifacts["syft/sbom.json"] = {"components": [{"name": "nanopb", "version": "1.0.0"}]}
+    completed_source_artifacts["gitleaks/gitleaks_report.json"] = [
+        {"RuleID": "generic-api-key", "File": "Config.swift", "StartLine": 7}
+    ]
+    completed_source_artifacts["plist_source/App.entitlements.json"] = {"plist": {"get-task-allow": True}}
+    sections, report, presentation = source_scan_report(tmp_path, completed_source_artifacts)
+    assert all(item["present"] is True for item in sections["code_evidence"].values())
+    assert all(item["execution_status"] == "success" for item in sections["code_evidence"].values())
+    assert all("incomplete" not in check.explanation for check in report.vulnerability_sections[0].checks)
+    assert presentation["risk_summary"]["Code"] == "high"

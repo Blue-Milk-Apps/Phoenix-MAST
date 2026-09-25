@@ -35,7 +35,7 @@ class NativeIOSScanOutputLoader(ScanOutputLoaderPort):
 
         try:
             return json.loads(path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
+        except (OSError, UnicodeError, json.JSONDecodeError):
             return None
 
     @classmethod

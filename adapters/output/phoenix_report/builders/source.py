@@ -181,6 +181,9 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
                     entry_available=entry_available,
                 )
             )
+        execution_status = str(entry.get("execution_status") or "")
+        if result == AssessmentStatus.PRESENT and execution_status and execution_status != "success":
+            explanation += " Matches were retained from an incomplete scan."
         return SecurityCheck(
             name=definition.name,
             severity=definition.severity,
@@ -191,6 +194,7 @@ class SourceReportDataBuilder(ReportDataBuilderPort, ABC):
             remediation_link=str(entry.get("remediation_link") or ""),
             platform_assessments=cls._platform_assessments(platform_rows, definition.applicable_platforms),
             status=cls._aggregate_status(platform_rows, definition.applicable_platforms),
+            execution_status=execution_status,
         )
 
     @staticmethod
