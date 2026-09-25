@@ -17,7 +17,6 @@ from domain.report import (
     AppDetails,
     AssessmentStatus,
     CertificateDetails,
-    CheckSeverity,
     EndpointDetails,
     FileDetails,
     FindingSeverity,
@@ -25,14 +24,11 @@ from domain.report import (
     HardcodedSecretDetails,
     HardcodedUrlDetails,
     HardcodedValuesDetails,
-    OverallEvaluation,
     PermissionDetails,
     ReportData,
     ReportMetadata,
     ReportPlatform,
     ReportTargetKind,
-    RiskLevel,
-    RiskSummary,
     SecurityCheck,
     SignatureVersions,
     VulnerabilitySection,
@@ -65,17 +61,12 @@ class AndroidBinaryReportDataBuilder(BinaryReportDataBuilder):
             for name, _area, evidence_key, checks in SECTION_CHECKS
         )
         sections = self._attach_single_platform_assessments(sections, ReportPlatform.ANDROID)
-        findings_severity = self._findings_severity(sections)
-
         return ReportData(
             metadata=metadata,
             vulnerability_sections=sections,
-            overall_evaluation=self._overall_evaluation(sections),
-            risk_summary=tuple(
-                RiskSummary(area=evaluation.area, risk_level=evaluation.risk_level)
-                for evaluation in self._overall_evaluation(sections)
-            ),
-            findings_severity=findings_severity,
+            overall_evaluation=(),
+            risk_summary=(),
+            findings_severity=FindingSeverity(),
             platform_details=AndroidBinaryReportDetails(
                 certificate=self._certificate_details(post_scan_data),
                 file_info=self._file_details(post_scan_data),
@@ -199,58 +190,6 @@ class AndroidBinaryReportDataBuilder(BinaryReportDataBuilder):
         if result == AssessmentStatus.PRESENT:
             return f"Evidence indicates that {check_name.lower()}."
         return f"No evidence indicates that {check_name.lower()}."
-
-    @staticmethod
-    def _overall_evaluation(
-        sections: tuple[VulnerabilitySection, ...],
-    ) -> tuple[OverallEvaluation, ...]:
-        area_by_section = {name: area for name, area, _evidence_key, _checks in SECTION_CHECKS}
-        return tuple(
-            OverallEvaluation(
-                area=area_by_section[section.name],
-                risk_level=AndroidBinaryReportDataBuilder._risk_level(section),
-                findings=tuple(
-                    check.name
-                    for check in section.checks
-                    if check.result == AssessmentStatus.PRESENT
-                    and check.severity not in {CheckSeverity.INFO, CheckSeverity.SECURE}
-                )
-                or ("No findings identified in this scan",),
-            )
-            for section in sections
-        )
-
-    @staticmethod
-    def _risk_level(section: VulnerabilitySection) -> RiskLevel:
-        evaluated = tuple(check for check in section.checks if check.result != AssessmentStatus.NOT_EVALUATED)
-        if not evaluated:
-            return RiskLevel.NOT_EVALUATED
-        severities = {check.severity for check in evaluated if check.result == AssessmentStatus.PRESENT}
-        if CheckSeverity.CRITICAL in severities:
-            return RiskLevel.CRITICAL
-        if CheckSeverity.HIGH in severities:
-            return RiskLevel.HIGH
-        if CheckSeverity.MEDIUM in severities:
-            return RiskLevel.MEDIUM
-        return RiskLevel.LOW
-
-    @staticmethod
-    def _findings_severity(
-        sections: tuple[VulnerabilitySection, ...],
-    ) -> FindingSeverity:
-        counts = {severity: 0 for severity in CheckSeverity}
-        for section in sections:
-            for check in section.checks:
-                if check.result == AssessmentStatus.PRESENT:
-                    counts[check.severity] += 1
-        return FindingSeverity(
-            critical=counts[CheckSeverity.CRITICAL],
-            high=counts[CheckSeverity.HIGH],
-            medium=counts[CheckSeverity.MEDIUM],
-            low=counts[CheckSeverity.LOW],
-            info=counts[CheckSeverity.INFO],
-            secure=counts[CheckSeverity.SECURE],
-        )
 
     @staticmethod
     def _mapping(data: Mapping[str, Any], key: str) -> Mapping[str, Any]:

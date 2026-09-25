@@ -12,7 +12,6 @@ from adapters.output.phoenix_report.builders.ios.binary_check_catalog import (
 from domain.report import (
     AppDetails,
     AssessmentStatus,
-    CheckSeverity,
     EndpointDetails,
     FileDetails,
     FindingSeverity,
@@ -23,14 +22,11 @@ from domain.report import (
     IOSBinaryReportDetails,
     IOSSDKCategoryDetails,
     ManualReviewFinding,
-    OverallEvaluation,
     PermissionDetails,
     ReportData,
     ReportMetadata,
     ReportPlatform,
     ReportTargetKind,
-    RiskLevel,
-    RiskSummary,
     SecurityCheck,
     UrlSchemeDetails,
     VulnerabilitySection,
@@ -56,21 +52,12 @@ class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
             )
         sections = self._sections(post_scan_data)
         sections = self._attach_single_platform_assessments(sections, ReportPlatform.IOS)
-        evaluations = tuple(
-            OverallEvaluation(
-                area=area,
-                risk_level=self._risk_level(section),
-                findings=tuple(c.name for c in section.checks if c.result == AssessmentStatus.PRESENT)
-                or ("No findings identified in this scan",),
-            )
-            for section, (_name, area, _key, _defs) in zip(sections, SECTION_CHECKS)
-        )
         return ReportData(
             metadata=metadata,
             vulnerability_sections=sections,
-            overall_evaluation=evaluations,
-            risk_summary=tuple(RiskSummary(area=e.area, risk_level=e.risk_level) for e in evaluations),
-            findings_severity=self._finding_severity(sections),
+            overall_evaluation=(),
+            risk_summary=(),
+            findings_severity=FindingSeverity(),
             platform_details=self._details(post_scan_data),
         )
 
@@ -288,41 +275,6 @@ class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
         if not entry:
             return "Not evaluated because post-scan analysis did not produce evidence for this check."
         return "Not evaluated because the scanner did not return a conclusive result."
-
-    @staticmethod
-    def _finding_severity(sections: tuple[VulnerabilitySection, ...]) -> FindingSeverity:
-        counts = {severity: 0 for severity in CheckSeverity}
-        for section in sections:
-            for check in section.checks:
-                if check.result == AssessmentStatus.PRESENT:
-                    counts[check.severity] += 1
-        return FindingSeverity(
-            **{
-                severity.value: counts[severity]
-                for severity in (
-                    CheckSeverity.CRITICAL,
-                    CheckSeverity.HIGH,
-                    CheckSeverity.MEDIUM,
-                    CheckSeverity.LOW,
-                    CheckSeverity.INFO,
-                    CheckSeverity.SECURE,
-                )
-            }
-        )
-
-    @staticmethod
-    def _risk_level(section: VulnerabilitySection) -> RiskLevel:
-        evaluated = tuple(check for check in section.checks if check.result != AssessmentStatus.NOT_EVALUATED)
-        if not evaluated:
-            return RiskLevel.NOT_EVALUATED
-        present = [check.severity for check in evaluated if check.result == AssessmentStatus.PRESENT]
-        if CheckSeverity.CRITICAL in present:
-            return RiskLevel.CRITICAL
-        if CheckSeverity.HIGH in present:
-            return RiskLevel.HIGH
-        if CheckSeverity.MEDIUM in present:
-            return RiskLevel.MEDIUM
-        return RiskLevel.LOW
 
     @staticmethod
     def _mapping(data: Mapping[str, Any], key: str) -> Mapping[str, Any]:

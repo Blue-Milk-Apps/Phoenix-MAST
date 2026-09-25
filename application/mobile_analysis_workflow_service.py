@@ -56,7 +56,7 @@ from application.post_scan_processing_service import PostScanProcessingService
 from application.report_generation_service import ReportGenerationService
 from application.scanner_service import ScannerService
 from domain.models import ExtractedBinary, ScanConfig, ScanType
-from domain.report import ReportTargetFactory, ReportTargetKind
+from domain.report import ReportMetadata, ReportTargetFactory
 from ports.scanner_port import ScannerPort
 from utilities.apk_utils import extract_apk, is_apk_file
 from utilities.ipa_utils import extract_ipa, is_ipa_file
@@ -177,37 +177,24 @@ class MobileAnalysisWorkflowService:
             scan_results.extend(opengrep_results)
 
             post_scan_output = self._run_post_scan_processing(scan_config.output_path, scan_config)
-            if post_scan_output:
-                post_scan_output["target_information"] = asdict(ReportTargetFactory.from_scan_config(scan_config))
+            post_scan_output["target_information"] = asdict(ReportTargetFactory.from_scan_config(scan_config))
+            report_data = ReportGenerationService(
+                [
+                    AndroidBinaryReportDataBuilder(),
+                    IOSBinaryReportDataBuilder(),
+                    FlutterReportDataBuilder(),
+                    ReactNativeReportDataBuilder(),
+                    NativeAndroidReportDataBuilder(),
+                    NativeIOSReportDataBuilder(),
+                ]
+            ).build_report_data(post_scan_output)
             target = scan_config.output_path / self.POST_SCAN_OUTPUT_FILE_NAME
             target.write_text(
-                json.dumps(post_scan_output, indent=2, sort_keys=True),
+                json.dumps(report_data.to_dict(), indent=2, sort_keys=True),
                 encoding="utf-8",
             )
-            if post_scan_output:
-                report_path = self._report_output_path(scan_config.output_path, post_scan_output)
-                target_kind = ReportTargetFactory.from_scan_config(scan_config).target_kind
-                if target_kind in {
-                    ReportTargetKind.ANDROID_BINARY,
-                    ReportTargetKind.IOS_BINARY,
-                    ReportTargetKind.FLUTTER_SOURCE,
-                    ReportTargetKind.REACT_NATIVE_SOURCE,
-                    ReportTargetKind.NATIVE_ANDROID_SOURCE,
-                    ReportTargetKind.NATIVE_IOS_SOURCE,
-                }:
-                    report_data = ReportGenerationService(
-                        [
-                            AndroidBinaryReportDataBuilder(),
-                            IOSBinaryReportDataBuilder(),
-                            FlutterReportDataBuilder(),
-                            ReactNativeReportDataBuilder(),
-                            NativeAndroidReportDataBuilder(),
-                            NativeIOSReportDataBuilder(),
-                        ]
-                    ).build_report_data(post_scan_output)
-                    PdfReportGenerator().generate(report_data, report_path)
-                else:
-                    raise ValueError(f"No modular report builder is registered for {target_kind.value}")
+            report_path = self._report_output_path(scan_config.output_path, report_data.metadata)
+            PdfReportGenerator().generate(report_data, report_path)
             print(f"Results: {len(scan_results)}")
             print(f"Duration: {time.perf_counter() - wall_start:.2f} seconds")
         finally:
@@ -278,23 +265,15 @@ class MobileAnalysisWorkflowService:
 
     def _run_post_scan_processing(self, output_path: Path, scan_config: ScanConfig) -> dict:
         service = self._build_post_scan_processing_service(scan_config)
-        if service is None:
-            return {}
+        return service.process(output_path)
 
-        post_scan_output = service.process(output_path)
-        return post_scan_output
-
-    def _report_output_path(self, output_path: Path, post_scan_output: dict) -> Path:
-        file_stem = self._report_file_stem(post_scan_output)
+    def _report_output_path(self, output_path: Path, metadata: ReportMetadata) -> Path:
+        file_stem = self._report_file_stem(metadata)
         return output_path / f"{file_stem}_{self.GENERATED_REPORT_FILE_NAME}"
 
     @staticmethod
-    def _report_file_stem(post_scan_output: dict) -> str:
-        candidates = (
-            (post_scan_output.get("meta") or {}).get("app_display_name"),
-            (post_scan_output.get("file_info") or {}).get("filename"),
-            (post_scan_output.get("meta") or {}).get("file_name"),
-        )
+    def _report_file_stem(metadata: ReportMetadata) -> str:
+        candidates = (metadata.app_display_name, metadata.file_name)
         for candidate in candidates:
             text = str(candidate or "").strip()
             if not text:
@@ -307,7 +286,7 @@ class MobileAnalysisWorkflowService:
     @staticmethod
     def _build_post_scan_processing_service(
         scan_config: ScanConfig,
-    ) -> PostScanProcessingService | None:
+    ) -> PostScanProcessingService:
         match (scan_config.target_type, scan_config.platform, scan_config.stack):
             case ("BINARY", "ANDROID", _):
                 return PostScanProcessingService(
@@ -340,8 +319,7 @@ class MobileAnalysisWorkflowService:
                     scan_detail_extractor=NativeAndroidScanDetailExtractor(),
                 )
             case _:
-                print(
+                raise ValueError(
                     f"Post-scan processing not supported for target_type={scan_config.target_type}, "
                     f"platform={scan_config.platform}, stack={scan_config.stack}"
                 )
-                return None

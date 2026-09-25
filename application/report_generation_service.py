@@ -1,4 +1,4 @@
-"""Build standard report data from persisted post-scan output."""
+"""Aggregate normalized scanner data into the shared JSON and PDF report model."""
 
 from __future__ import annotations
 
@@ -36,13 +36,13 @@ class ReportDataBuilderResolver:
 
 
 class ReportGenerationService:
-    """Create format-independent report data from persisted scan output."""
+    """Calculate findings and summaries once, before saving or rendering a report."""
 
     def __init__(self, builders: Iterable[ReportDataBuilderPort]) -> None:
         self._builder_resolver = ReportDataBuilderResolver(builders)
 
     def build_report_data(self, post_scan_data: Mapping[str, Any]) -> ReportData:
-        """Build report data using the target information stored with a scan."""
+        """Build the final aggregate from normalized scanner data and its target."""
 
         metadata = self._metadata_from(post_scan_data)
         builder = self._builder_resolver.resolve(metadata.target.target_kind)

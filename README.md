@@ -75,7 +75,21 @@ Binary OpenGrep scans run against extracted `strings` output.
 
 Source workflows include Gitleaks, TruffleHog, Syft, OpenGrep, and platform metadata extraction. Binary workflows use Strings plus platform tools such as LIEF, ipsw, Androguard, Apktool, Apksigner, and APKiD. Missing external tools are recorded as unavailable rather than as completed clean scans.
 
-The output directory contains per-scanner artifacts, `opengrep_results.json`, scan metadata, `post_scan_processing.json`, and the PDF report. OpenGrep coverage and individual rule outcomes are included in the report. Artifact filenames and subdirectories for other tools depend on the target.
+The output directory contains per-scanner artifacts, `opengrep_results.json`, scan metadata, `post_scan_processing.json`, and the PDF report. Artifact filenames and subdirectories for other tools depend on the target.
+
+`post_scan_processing.json` is the final report aggregate (`schema_version: 1`). JSON and PDF use the same findings, severity counts, risk summaries, coverage, secret-scan results, and platform details. The aggregate replaces the previous intermediate JSON structure:
+
+| Content | Aggregate field |
+| --- | --- |
+| App identity and scan target | `metadata`, `metadata.target` |
+| Matched checks, evidence, and remediation | `vulnerability_sections[].checks[]` |
+| Weakness counts by severity | `findings_severity` |
+| Category risks and explanations | `risk_summary`, `overall_evaluation` |
+| OpenGrep execution coverage | `rule_status`, `rule_status_reason`, `rule_coverage` |
+| Functionality, URL schemes, and other platform details | `platform_details` |
+| Secret-scanner outcomes | `secret_scans` |
+
+Raw scanner artifacts retain the original rule definitions and scanner output. To render a saved aggregate without rerunning scanners or assessments, use `ReportData.from_dict(json.loads(path.read_text()))` from `domain.report`, then pass that model to `PdfReportGenerator.generate`. The loader requires schema version 1 and complete model fields; it does not convert older intermediate JSON or fill missing findings with defaults.
 
 ## Local development
 

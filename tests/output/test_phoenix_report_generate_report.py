@@ -1,8 +1,11 @@
+import json
+
 from adapters.output.phoenix_report.builders.android import NativeAndroidReportDataBuilder
 from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
 from adapters.output.phoenix_report.pdf_report.common import build_charts
 from application.report_generation_service import ReportGenerationService
 from domain.post_scan.rule_assessment import rule_assessments
+from domain.report import ReportData
 from tests.rule_fixtures import assessment_payload, rule
 
 
@@ -46,6 +49,8 @@ def test_modular_report_data_contains_canonical_android_sections() -> None:
     assert report.findings_severity.high == 0
     assert [section.name for section in report.vulnerability_sections] == ["Code"]
     assert report.platform_details.app_components.exported_activities == 1
+    saved = json.loads(json.dumps(report.to_dict()))
+    assert ReportData.from_dict(saved) == report
 
 
 def test_pdf_presentation_maps_android_details_and_charts() -> None:
@@ -59,7 +64,9 @@ def test_pdf_presentation_maps_android_details_and_charts() -> None:
         }
     )
 
-    presentation = PdfReportGenerator._presentation_data(report)
+    restored = ReportData.from_dict(json.loads(json.dumps(report.to_dict())))
+    presentation = PdfReportGenerator._presentation_data(restored)
+    assert presentation == PdfReportGenerator._presentation_data(report)
     assert presentation["application"]["debuggable"] is False
     assert presentation["app_components"]["activities"] == 2
     assert presentation["functionality"]["Camera"]["present"] is True

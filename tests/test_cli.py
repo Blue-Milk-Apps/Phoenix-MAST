@@ -303,6 +303,7 @@ def test_ios_workflow_shares_and_cleans_extracted_binary(tmp_path: Path, monkeyp
         "_run_post_scan_processing",
         lambda self, output_path, scan_config: {},
     )
+    monkeypatch.setattr(workflow.PdfReportGenerator, "generate", lambda self, data, path: path)
 
     workflow.MobileAnalysisWorkflowService().run(config)
 

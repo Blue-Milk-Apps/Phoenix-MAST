@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, fields, is_dataclass
 from enum import StrEnum
-from typing import Iterable
+from types import UnionType
+from typing import Any, Iterable, Mapping, get_args, get_origin, get_type_hints
 
 
 class RiskLevel(StrEnum):
@@ -632,7 +633,7 @@ class SecretScanSummary:
 
 @dataclass(frozen=True)
 class ReportData:
-    """Standard, format-independent output of a report data builder."""
+    """The final scan aggregate shared by JSON output and report renderers."""
 
     metadata: ReportMetadata
     vulnerability_sections: tuple[VulnerabilitySection, ...]
@@ -644,3 +645,62 @@ class ReportData:
     rule_status: str = ""
     rule_status_reason: str = ""
     secret_scans: tuple[SecretScanSummary, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return the versioned aggregate for JSON serialization."""
+
+        return {"schema_version": 1, **asdict(self)}
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> ReportData:
+        """Restore a saved aggregate without rebuilding checks or recalculating risk."""
+
+        if not isinstance(data, Mapping) or type(data.get("schema_version")) is not int or data["schema_version"] != 1:
+            raise ValueError("Expected a report aggregate with schema_version=1")
+
+        detail_types = {
+            ReportTargetKind.ANDROID_BINARY: AndroidBinaryReportDetails,
+            ReportTargetKind.IOS_BINARY: IOSBinaryReportDetails,
+            ReportTargetKind.FLUTTER_SOURCE: FlutterReportDetails,
+            ReportTargetKind.REACT_NATIVE_SOURCE: ReactNativeReportDetails,
+            ReportTargetKind.NATIVE_ANDROID_SOURCE: NativeAndroidReportDetails,
+            ReportTargetKind.NATIVE_IOS_SOURCE: NativeIOSReportDetails,
+        }
+
+        def restore(model: Any, value: Any, path: str) -> Any:
+            if model is PlatformReportDetails:
+                model = detail_types[metadata.target.target_kind]
+            if get_origin(model) is UnionType:
+                if value is None:
+                    return None
+                model = next(member for member in get_args(model) if member is not type(None))
+            if is_dataclass(model):
+                names = {item.name for item in fields(model)}
+                if not isinstance(value, Mapping) or set(value) != names:
+                    raise ValueError(f"Invalid aggregate fields at {path}")
+                hints = get_type_hints(model)
+                return model(**{key: restore(hints[key], value[key], f"{path}.{key}") for key in names})
+            if get_origin(model) is tuple:
+                if not isinstance(value, (list, tuple)):
+                    raise ValueError(f"Expected an array at {path}")
+                return tuple(restore(get_args(model)[0], item, f"{path}[{index}]") for index, item in enumerate(value))
+            if get_origin(model) is dict:
+                if not isinstance(value, Mapping):
+                    raise ValueError(f"Expected an object at {path}")
+                key_type, value_type = get_args(model)
+                return {
+                    restore(key_type, key, path): restore(value_type, item, f"{path}.{key}")
+                    for key, item in value.items()
+                }
+            if isinstance(model, type) and issubclass(model, StrEnum):
+                try:
+                    return model(value)
+                except (TypeError, ValueError) as error:
+                    raise ValueError(f"Invalid {model.__name__} at {path}: {value!r}") from error
+            if model is not object and type(value) is not model:
+                raise ValueError(f"Expected {model.__name__} at {path}")
+            return value
+
+        # Resolve the platform detail model from the saved target, never from scan files.
+        metadata = restore(ReportMetadata, data.get("metadata"), "metadata")
+        return restore(cls, {key: value for key, value in data.items() if key != "schema_version"}, "report")

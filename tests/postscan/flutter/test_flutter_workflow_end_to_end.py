@@ -7,6 +7,7 @@ from pathlib import Path
 
 from application import mobile_analysis_workflow_service as workflow
 from domain.models import ScanConfig, ScanResult, ScanType
+from domain.report import ReportData
 from tests.rule_fixtures import assessment_payload, rule, scoped_payload
 
 
@@ -103,7 +104,7 @@ def test_flutter_workflow_persists_post_scan_output_and_requests_report(
         ),
         relative_target_path="opengrep_results.json",
     )
-    generated_reports: list[tuple[dict, Path]] = []
+    generated_reports: list[tuple[ReportData, Path]] = []
 
     monkeypatch.setattr(
         workflow.MobileScannerFactory,
@@ -134,16 +135,20 @@ def test_flutter_workflow_persists_post_scan_output_and_requests_report(
 
     post_scan_path = output_path / workflow.MobileAnalysisWorkflowService.POST_SCAN_OUTPUT_FILE_NAME
     post_scan = json.loads(post_scan_path.read_text(encoding="utf-8"))
-    assert post_scan["meta"]["platform"] == "Flutter"
-    assert post_scan["meta"]["target_type"] == "SOURCE"
-    assert post_scan["dependency_inventory"]["declared"][0]["name"] == "http"
-    assessment = post_scan["rule_assessments"]["rules"][0]
+    assert post_scan["schema_version"] == 1
+    assert post_scan["metadata"]["target"]["platform"] == "flutter"
+    assert post_scan["metadata"]["target"]["target_type"] == "source"
+    assert post_scan["platform_details"]["presentation"]["dependencies"]["declared"][0]["name"] == "http"
+    assessment = post_scan["vulnerability_sections"][0]["checks"][0]
     assert assessment["rule_id"] == "example.database"
-    assert assessment["status"] == "present"
-    assert assessment["matches"][0]["start"]["line"] == 12
-    assert "code_evidence" not in post_scan
+    assert assessment["result"] == "present"
+    assert "database.dart:12" in assessment["evidence"]
+    assert post_scan["findings_severity"]["high"] == 1
+    assert post_scan["risk_summary"][0]["risk_level"] == "high"
     assert len(generated_reports) == 1
     report_data, report_path = generated_reports[0]
+    assert ReportData.from_dict(post_scan) == report_data
+    assert post_scan == json.loads(json.dumps(report_data.to_dict()))
     assert report_data.metadata.target.target_kind.value == "flutter_source"
     assert report_data.vulnerability_sections[0].checks[0].name == "Database query review"
     assert report_path.name == "example_app_phoenix_Report.pdf"
