@@ -165,8 +165,9 @@ def test_summary_includes_unmatched_crypto_and_excludes_functionality():
     )
     for definition in output["scan_metadata"]["rule_catalog"]:
         definition["category"] = definition["rule_id"].split(".")[0]
-    report = build(output)
-    assert [section.name for section in report.vulnerability_sections] == ["Functionality"]
+    report = build(output, functionality={"Camera": {"present": True}})
+    assert report.vulnerability_sections == ()
+    assert PdfReportGenerator._presentation_data(report)["functionality"]["Camera"]["present"] is True
     assert {row.area: row.risk_level.value for row in report.overall_evaluation} == {
         "Code": "not_evaluated",
         "Crypto": "low",

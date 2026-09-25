@@ -89,6 +89,8 @@ def with_rule_assessments(report: ReportData, data: Mapping[str, Any]) -> Report
     summaries = []
     counts = dict.fromkeys(("critical", "high", "medium", "low", "info", "secure"), 0)
     for label, checks in groups.items():
+        if label.rsplit("/", 1)[-1].strip().casefold() == "functionality":
+            continue
         matches = tuple(check for check in checks if check.result == AssessmentStatus.PRESENT)
         if matches:
             sections.append(VulnerabilitySection(label, "", matches))
@@ -97,8 +99,6 @@ def with_rule_assessments(report: ReportData, data: Mapping[str, Any]) -> Report
         for check in weakness_matches:
             if check.severity.value in counts:
                 counts[check.severity.value] += 1
-        if label.rsplit("/", 1)[-1].strip().casefold() == "functionality":
-            continue
         risk = RiskLevel.NOT_EVALUATED
         if weakness_matches:
             risk = next(
