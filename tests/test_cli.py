@@ -815,3 +815,48 @@ def test_explicit_rules_root_overrides_environment(tmp_path, monkeypatch):
     config = cli._create_scan_config(_scan_args(tmp_path, "--flutter-source", ["--rules-root", str(selected)]))
     assert config.opengrep_rules_root == selected
     assert config.opengrep_rules_path == selected / "flutter/source"
+
+
+@pytest.mark.parametrize(
+    "flag,relative",
+    [
+        ("--ios-source", "ios/source"),
+        ("--ios-binary", "ios/binary"),
+        ("--android-source", "android/source"),
+        ("--android-binary", "android/binary"),
+        ("--flutter-source", "flutter/source"),
+        ("--react-native-source", "react_native/source"),
+    ],
+)
+def test_whole_rules_tree_override_selects_execution_scope(tmp_path, monkeypatch, flag, relative):
+    monkeypatch.setenv("PHOENIX_RULES_ROOT", "/app/rules")
+    root = tmp_path / "PhoenixRules" / "rules"
+    (root / relative).mkdir(parents=True)
+
+    config = cli._create_scan_config(_scan_args(tmp_path, flag, [f"{flag}-opengrep-rules", str(root)]))
+
+    assert config.opengrep_rules_path == root / relative
+    assert config.opengrep_rules_root == root
+
+
+@pytest.mark.parametrize("platform", ["ios", "android"])
+def test_rules_tree_with_only_source_rules_does_not_supply_binary_rules(tmp_path, platform):
+    root = tmp_path / "rules"
+    (root / platform / "source").mkdir(parents=True)
+    flag = f"--{platform}-binary"
+
+    config = cli._create_scan_config(_scan_args(tmp_path, flag, [f"{flag}-opengrep-rules", str(root)]))
+
+    assert config.opengrep_rules_path == root / platform / "binary"
+    assert not config.opengrep_rules_path.exists()
+
+
+def test_opengrep_rule_loading_failure_is_visible_in_terminal(tmp_path, capsys):
+    rules = tmp_path / "rules" / "ios" / "source"
+    rules.mkdir(parents=True)
+    config = cli._create_scan_config(_scan_args(tmp_path, "--ios-source", ["--ios-source-opengrep-rules", str(rules)]))
+
+    results = workflow.MobileAnalysisWorkflowService()._perform_opengrep_scan(config, None)
+
+    assert not results[0].success
+    assert f"OpenGrep failed: No iOS YAML rule files found in: {rules}" in capsys.readouterr().err

@@ -207,7 +207,11 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
         case _:
             raise ValueError("No valid scan type provided")
     rules_root = getattr(args, "rules_root", None)
-    if rules_root is not None and getattr(args, f"{scan_slug}_opengrep_rules", None) is None:
+    rules_override = getattr(args, f"{scan_slug}_opengrep_rules", None)
+    if rules_override is not None and rules_path == rules_override.resolve() / DEFAULT_OPENGREP_RULES_DIRS[scan_slug]:
+        # A whole-tree override also supplies embedded iOS/Android rules for framework scans.
+        rules_root = rules_override.resolve()
+    elif rules_root is not None and rules_override is None:
         rules_path = rules_root.resolve() / DEFAULT_OPENGREP_RULES_DIRS[scan_slug]
     project_path = project_path.resolve()
     run_timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
@@ -230,10 +234,16 @@ def _resolve_opengrep_rules_path(
     override_path: Path | None,
     scan_slug: str,
 ) -> Path | None:
-    if override_path is not None:
-        return override_path.resolve()
-
     default_dir = DEFAULT_OPENGREP_RULES_DIRS.get(scan_slug)
+    if override_path is not None:
+        override_path = override_path.resolve()
+        if default_dir and any(
+            (override_path / Path(relative).parts[0]).is_dir() for relative in DEFAULT_OPENGREP_RULES_DIRS.values()
+        ):
+            # Select the requested scope even if it is missing; never substitute another mode.
+            return override_path / default_dir
+        return override_path
+
     if not default_dir:
         return None
 

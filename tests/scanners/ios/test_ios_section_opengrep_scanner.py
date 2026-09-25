@@ -1,66 +1,89 @@
 import json
 
+import pytest
+
 from adapters.scanners.ios import section_opengrep_scanner as module
 from domain.models import ScanConfig, ScanResult, ScanType
 from domain.post_scan.rule_assessment import rule_assessments
 from tests.rule_fixtures import rule, write_rules
 
 
-def run_scan(tmp_path, monkeypatch, reports):
+def run_scan(tmp_path, monkeypatch, payload, *, categories=("code", "crypto"), success=True):
     root = tmp_path / "source"
-    for category in reports:
+    for category in categories:
         write_rules(root / f"{category}.yml", rule(f"example.{category}"))
+    calls = []
 
     class FakeScanner:
-        def __init__(self, rules_path, scan_paths):
-            self.category = rules_path.stem
+        def __init__(self, *, rules_paths, scan_paths):
+            assert rules_paths == sorted(root / f"{category}.yml" for category in categories)
+            assert scan_paths == [tmp_path]
 
         def scan(self, config):
-            success, payload = reports[self.category]
+            calls.append(config)
             return [ScanResult("OpenGrep", ScanType.OPENGREP_SOURCE, success=success, raw_output=json.dumps(payload))]
 
     monkeypatch.setattr(module, "OpenGrepScanner", FakeScanner)
     result = module.IOSSectionOpenGrepScanner(root).scan(ScanConfig(tmp_path, tmp_path / "out", platform="IOS"))[0]
+    assert len(calls) == 1
     return json.loads(result.raw_output)
 
 
-def test_code_and_crypto_have_independent_execution_metadata(tmp_path, monkeypatch):
+def test_categories_share_one_scan_and_keep_yaml_reporting_metadata(tmp_path, monkeypatch):
     output = run_scan(
         tmp_path,
         monkeypatch,
-        {"code": (False, {"error": "bad config"}), "crypto": (True, {"results": [], "errors": []})},
+        {"results": [{"check_id": "example.crypto"}, {"check_id": "example.code"}], "errors": []},
     )
-    assert output["scan_metadata"]["status"] == "partial"
+    assert output["scan_metadata"]["status"] == "success"
     assert set(output["scan_metadata"]["sections"]) == {"code.yml", "crypto.yml"}
+    assert [item["phoenix_category"] for item in output["results"]] == ["crypto", "code"]
+    assert all(item["phoenix_scope"] == "ios" for item in output["results"])
+    assert all(item["status"] == "present" for item in rule_assessments(output)["rules"])
+
+
+def test_completed_scan_without_matches_is_clean_for_all_categories(tmp_path, monkeypatch):
+    output = run_scan(tmp_path, monkeypatch, {"results": [], "errors": []})
+    assert output["scan_metadata"]["status"] == "success"
+    assert all(item["status"] == "not_present" for item in rule_assessments(output)["rules"])
+
+
+@pytest.mark.parametrize(
+    "payload", [{"error": "bad config"}, "invalid", {"results": [], "errors": [{"message": "bad rule"}]}]
+)
+def test_incomplete_scan_does_not_certify_any_category_clean(tmp_path, monkeypatch, payload):
+    output = run_scan(tmp_path, monkeypatch, payload)
+    assert output["scan_metadata"]["status"] == "failed"
     assessments = {item["rule_id"]: item for item in rule_assessments(output)["rules"]}
     assert assessments["example.code"]["status"] == "not_evaluated"
-    assert assessments["example.crypto"]["status"] == "not_present"
+    assert assessments["example.crypto"]["status"] == "not_evaluated"
+    assert output["errors"]
 
 
-def test_partial_matches_survive_errors(tmp_path, monkeypatch):
+@pytest.mark.parametrize("success", [True, False])
+def test_partial_matches_survive_errors(tmp_path, monkeypatch, success):
     output = run_scan(
         tmp_path,
         monkeypatch,
         {
-            "code": (
-                False,
-                {
-                    "raw_output": {
-                        "results": [{"check_id": "example.code", "path": "Example.swift", "start": {"line": 4}}],
-                        "errors": [{"message": "Timeout"}],
-                    }
-                },
-            )
+            "raw_output": {
+                "results": [{"check_id": "example.code", "path": "Example.swift", "start": {"line": 4}}],
+                "errors": [{"message": "Timeout"}],
+            }
         },
+        success=success,
     )
+    assert output["scan_metadata"]["status"] == "partial"
     item = rule_assessments(output)["rules"][0]
     assert item["status"] == "present"
     assert item["execution_status"] == "not_evaluated"
     assert item["matches"][0]["start"]["line"] == 4
+    assert rule_assessments(output)["rules"][1]["status"] == "not_evaluated"
+    assert len(output["errors"]) == 2
 
 
 def test_no_targets_is_not_a_clean_scan(tmp_path, monkeypatch):
-    output = run_scan(tmp_path, monkeypatch, {"code": (True, {"results": [], "paths": {"scanned": []}})})
+    output = run_scan(tmp_path, monkeypatch, {"results": [], "paths": {"scanned": []}})
     assert rule_assessments(output)["rules"][0]["status"] == "not_evaluated"
 
 
@@ -83,12 +106,8 @@ def test_persisted_scan_generates_report_without_rule_files(tmp_path, monkeypatc
     output = run_scan(
         tmp_path,
         monkeypatch,
-        {
-            "custom": (
-                True,
-                {"results": [{"check_id": "example.custom", "path": "Example.swift", "start": {"line": 7}}]},
-            )
-        },
+        {"results": [{"check_id": "example.custom", "path": "Example.swift", "start": {"line": 7}}]},
+        categories=("custom",),
     )
     output_root = tmp_path / "out"
     (output_root / "opengrep_source").mkdir(parents=True)

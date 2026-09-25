@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import time
 from dataclasses import asdict
 from pathlib import Path
@@ -263,6 +264,9 @@ class MobileAnalysisWorkflowService:
                     scan_paths=opengrep_scan_paths,
                 )
             results = opengrep_scanner.scan(scan_config)
+            for result in results:
+                if not result.success:
+                    print(f"OpenGrep failed: {result.error_message or 'No scan completed.'}", file=sys.stderr)
             opengrep_results.extend(results)
         return opengrep_results
 
