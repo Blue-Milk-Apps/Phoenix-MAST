@@ -32,12 +32,12 @@ def test_trufflehog_scan_success_returns_raw_output(monkeypatch, tmp_path, scan_
         def __init__(self, cmd: list[str]) -> None:
             captured_cmd.extend(cmd)
 
-        def communicate(self) -> tuple[str, str]:
-            return '{"SourceMetadata": {}}\n', "status line\n"
+        stdout = '{"SourceMetadata": {}}\n'
+        stderr = "status line\n"
 
     monkeypatch.setattr(
         trufflehog_scanner.subprocess,
-        "Popen",
+        "run",
         lambda cmd, *args, **kwargs: FakeProcess(cmd),
     )
 
@@ -48,6 +48,7 @@ def test_trufflehog_scan_success_returns_raw_output(monkeypatch, tmp_path, scan_
     assert json.loads(results[0].raw_output) == [{"SourceMetadata": {}}]
     assert results[0].relative_target_path == "trufflehog_results.json"
     assert "--only-verified" not in captured_cmd
+    assert "--fail-on-scan-errors" in captured_cmd
 
 
 def test_trufflehog_ios_binary_scan_uses_extracted_app_bundle_and_skips_verified_only(
@@ -70,12 +71,12 @@ def test_trufflehog_ios_binary_scan_uses_extracted_app_bundle_and_skips_verified
             assert Path(cmd[2]).is_dir()
             assert Path(cmd[2]).name == "Demo.app"
 
-        def communicate(self) -> tuple[str, str]:
-            return '{"SourceMetadata": {}}\n', ""
+        stdout = '{"SourceMetadata": {}}\n'
+        stderr = ""
 
     monkeypatch.setattr(
         trufflehog_scanner.subprocess,
-        "Popen",
+        "run",
         lambda cmd, *args, **kwargs: FakeProcess(cmd),
     )
     monkeypatch.setattr(trufflehog_scanner.shutil, "which", lambda _: "/usr/local/bin/trufflehog")

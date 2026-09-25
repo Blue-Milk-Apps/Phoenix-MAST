@@ -30,10 +30,10 @@ def test_syft_scan_success_loads_raw_output(monkeypatch, tmp_path: Path, scan_co
             self.cmd = cmd
             self.returncode = 0
 
-        def communicate(self) -> tuple[str, str]:
-            return '{"components": []}', ""
+        stdout = '{"components": []}'
+        stderr = ""
 
-    monkeypatch.setattr(syft_scanner.subprocess, "Popen", lambda cmd, *args, **kwargs: FakeProcess(cmd))
+    monkeypatch.setattr(syft_scanner.subprocess, "run", lambda cmd, *args, **kwargs: FakeProcess(cmd))
 
     results = SyftScanner().scan(config)
 
@@ -53,10 +53,10 @@ def test_syft_scan_uses_configured_stdout_format(monkeypatch, tmp_path, scan_con
             captured_cmd.extend(cmd)
             self.returncode = 0
 
-        def communicate(self) -> tuple[str, str]:
-            return '{"spdxVersion": "SPDX-2.3"}', ""
+        stdout = '{"spdxVersion": "SPDX-2.3"}'
+        stderr = ""
 
-    monkeypatch.setattr(syft_scanner.subprocess, "Popen", lambda cmd, *args, **kwargs: FakeProcess(cmd))
+    monkeypatch.setattr(syft_scanner.subprocess, "run", lambda cmd, *args, **kwargs: FakeProcess(cmd))
 
     results = SyftScanner(output_format="spdx-json").scan(config)
 
@@ -76,14 +76,14 @@ def test_syft_scans_shared_extracted_binary_root(monkeypatch, tmp_path: Path, sc
     class FakeProcess:
         returncode = 0
 
-        def communicate(self) -> tuple[str, str]:
-            return '{"components": []}', ""
+        stdout = '{"components": []}'
+        stderr = ""
 
-    def fake_popen(cmd: list[str], *args, **kwargs):
+    def fake_run(cmd: list[str], *args, **kwargs):
         captured_cmd.extend(cmd)
         return FakeProcess()
 
-    monkeypatch.setattr(syft_scanner.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(syft_scanner.subprocess, "run", fake_run)
 
     results = SyftScanner().scan(config)
 

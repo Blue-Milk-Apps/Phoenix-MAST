@@ -145,7 +145,7 @@ def test_applicable_native_scope_without_rules_makes_report_partial(monkeypatch,
     result = scanner.scan(ScanConfig(project_path=project, output_path=tmp_path / "output"))[0]
     report = json.loads(result.raw_output)
 
-    assert result.success
+    assert not result.success
     assert report["scan_metadata"]["status"] == "partial"
     assert report["scan_metadata"]["scopes"]["react_native"]["status"] == "success"
     assert report["scan_metadata"]["scopes"]["android"]["status"] == "skipped"
@@ -173,12 +173,17 @@ def test_workflow_selects_react_native_scoped_scanner(monkeypatch, tmp_path: Pat
     captured: dict[str, Path] = {}
 
     class RecordingScanner:
+        name = "React Native Scoped OpenGrep Scanner"
+
         def __init__(self, react_native_rules_path: Path, **kwargs) -> None:
             captured["rules_path"] = react_native_rules_path
 
+        def is_available(self):
+            return True
+
         def scan(self, config: ScanConfig) -> list[ScanResult]:
             captured["project_path"] = config.project_path
-            return []
+            return [ScanResult(self.name, ScanType.OPENGREP_SOURCE, raw_output='{"results": []}')]
 
     monkeypatch.setattr(workflow, "ReactNativeOpenGrepScanner", RecordingScanner)
     config = ScanConfig(
@@ -188,7 +193,7 @@ def test_workflow_selects_react_native_scoped_scanner(monkeypatch, tmp_path: Pat
         opengrep_rules_path=rules,
     )
 
-    results = workflow.MobileAnalysisWorkflowService()._perform_opengrep_scan(config, object())
+    results = workflow.MobileAnalysisWorkflowService()._perform_opengrep_scan(config, None)
 
-    assert results == []
+    assert len(results) == 1
     assert captured == {"rules_path": rules, "project_path": project}

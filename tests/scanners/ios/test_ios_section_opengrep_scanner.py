@@ -26,7 +26,9 @@ def run_scan(tmp_path, monkeypatch, payload, *, categories=("code", "crypto"), s
     monkeypatch.setattr(module, "OpenGrepScanner", FakeScanner)
     result = module.IOSSectionOpenGrepScanner(root).scan(ScanConfig(tmp_path, tmp_path / "out", platform="IOS"))[0]
     assert len(calls) == 1
-    return json.loads(result.raw_output)
+    output = json.loads(result.raw_output)
+    assert result.success == (output["scan_metadata"]["status"] == "success")
+    return output
 
 
 def test_categories_share_one_scan_and_keep_yaml_reporting_metadata(tmp_path, monkeypatch):

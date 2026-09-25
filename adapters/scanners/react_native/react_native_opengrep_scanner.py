@@ -163,10 +163,16 @@ class ReactNativeOpenGrepScanner(ScannerPort):
                 configured_rule_ids.update(metadata["configured_rule_ids"])
             if tool_version:
                 tool_versions.add(tool_version)
+            if (metadata["required"] or metadata["applicable"]) and metadata["status"] != "success":
+                break
 
         status = self._aggregate_status(scopes)
-        success = status != "failed"
-        error_message = "No required React Native OpenGrep scope completed successfully." if not success else ""
+        success = status == "complete"
+        error_message = "; ".join(
+            f"{scope}: {metadata.get('reason', 'OpenGrep scope did not complete.')}"
+            for scope, metadata in scopes.items()
+            if (metadata["required"] or metadata["applicable"]) and metadata["status"] != "success"
+        )
         payload = {
             "results": findings,
             "errors": errors,
@@ -256,10 +262,14 @@ class ReactNativeOpenGrepScanner(ScannerPort):
             if key in report_metadata:
                 metadata[key] = report_metadata[key]
 
+        findings = [
+            {**finding, "phoenix_scope": scope} for finding in report.get("results", []) if isinstance(finding, dict)
+        ]
+
         if not result.success:
             error = result.error_message or str(report.get("error", "")).strip() or "OpenGrep scope failed."
             metadata.update({"status": "failed", "reason": error})
-            return metadata, [], [{"scope": scope, "error": error}], tool_version
+            return metadata, findings, [{"scope": scope, "error": error}], tool_version
 
         rule_ids = report_metadata.get("configured_rule_ids")
         configured = sorted(
@@ -271,9 +281,6 @@ class ReactNativeOpenGrepScanner(ScannerPort):
         if scope_status == "complete":
             scope_status = "success"
         metadata.update({"status": scope_status, "configured_rule_ids": configured})
-        findings = [
-            {**finding, "phoenix_scope": scope} for finding in report.get("results", []) if isinstance(finding, dict)
-        ]
         errors = [{**error, "scope": scope} for error in report.get("errors", []) if isinstance(error, dict)]
         return metadata, findings, errors, tool_version
 

@@ -177,6 +177,7 @@ class OpenGrepScanner(ScannerPort):
                 *(argument for path in rule_paths for argument in ("--config", str(path))),
                 *(str(path) for path in scan_paths),
                 "--json",
+                "--strict",
                 "--no-rewrite-rule-ids",
                 "--no-git-ignore",
                 "--disable-version-check",
@@ -201,7 +202,7 @@ class OpenGrepScanner(ScannerPort):
                 if clean_line:
                     print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}{clean_line}")
 
-            if process.returncode not in (0, 1):
+            if process.returncode != 0:
                 return [
                     self._failure(
                         f"OpenGrep error with return code {process.returncode}",
@@ -215,12 +216,15 @@ class OpenGrepScanner(ScannerPort):
             report = self._report(stdout_data, rules_path, scan_paths)
             payload = json.loads(report)
             valid_output = isinstance(payload, dict) and payload.get("success") is not False
+            errors = payload.get("errors", []) if isinstance(payload, dict) else []
             return [
                 ScanResult(
                     scanner_name=self.name,
                     scan_type=self.scan_type,
                     success=valid_output,
-                    error_message="" if valid_output else "OpenGrep returned invalid or incomplete output.",
+                    error_message=""
+                    if valid_output
+                    else f"OpenGrep returned invalid or incomplete output: {json.dumps(errors)}",
                     raw_output=report,
                     relative_target_path=REPORT_PATH,
                     description=self.description,
@@ -255,6 +259,8 @@ class OpenGrepScanner(ScannerPort):
         command: list[str] | None = None,
         return_code: int | None = None,
     ) -> ScanResult:
+        if stderr_output.strip():
+            error_message = f"{error_message}: {stderr_output.strip()}"
         return ScanResult(
             scanner_name=self.name,
             scan_type=self.scan_type,
@@ -316,6 +322,10 @@ class OpenGrepScanner(ScannerPort):
             payload.setdefault("results", [])
             payload.setdefault("errors", [])
             payload.setdefault("success", True)
+            if isinstance(payload.get("paths"), dict) and payload["paths"].get("scanned") == []:
+                payload["errors"].append({"message": "No eligible files were scanned."})
+            if payload["errors"]:
+                payload["success"] = False
             payload["scan_metadata"] = {
                 "tool": "opengrep",
                 "tool_version": self._opengrep_version(),

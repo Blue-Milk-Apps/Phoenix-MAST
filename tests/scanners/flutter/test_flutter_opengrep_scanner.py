@@ -229,7 +229,7 @@ def test_failed_native_scope_makes_report_partial_without_discarding_flutter_res
     ).scan(_config(project, tmp_path))[0]
     payload = json.loads(result.raw_output)
 
-    assert result.success is True
+    assert result.success is False
     assert payload["scan_metadata"]["status"] == "partial"
     assert payload["scan_metadata"]["configured_rule_ids"] == ["flutter.source.cleartext-http"]
     assert payload["scan_metadata"]["scopes"]["android"]["status"] == "failed"
@@ -246,8 +246,13 @@ def test_workflow_selects_scoped_opengrep_for_flutter(tmp_path: Path, monkeypatc
     captured: list[Path] = []
 
     class FakeFlutterOpenGrepScanner:
+        name = "Flutter Scoped OpenGrep Scanner"
+
         def __init__(self, flutter_rules_path, **kwargs):
             captured.append(Path(flutter_rules_path))
+
+        def is_available(self):
+            return True
 
         def scan(self, scan_config):
             assert scan_config is config

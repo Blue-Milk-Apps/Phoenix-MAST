@@ -284,7 +284,7 @@ def test_ios_workflow_shares_and_cleans_extracted_binary(tmp_path: Path, monkeyp
         def __init__(self, scanners):
             _ = scanners
 
-        def scan_project(self, scan_config):
+        def scan_project(self, scan_config, output=None):
             captured.append(scan_config.extracted_binary)
             assert scan_config.project_path == ipa_path
             assert scan_config.extracted_binary is not None
@@ -576,7 +576,7 @@ def test_scan_command_prints_selected_scan_details(tmp_path: Path, capsys, monke
     )
 
     output = capsys.readouterr().out
-    assert exit_code == 0
+    assert exit_code == 1
     assert "Phoenix scan" in output
     assert f"Project: {tmp_path.resolve()}" in output
     assert "Scan type: Android binary" in output
@@ -597,7 +597,7 @@ def test_scan_command_writes_scan_metadata(tmp_path: Path, monkeypatch) -> None:
     )
 
     scan_dirs = list((tmp_path / "results").iterdir())
-    assert exit_code == 0
+    assert exit_code == 1
     assert len(scan_dirs) == 1
     metadata_path = scan_dirs[0] / "scan_metadata.json"
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
@@ -851,12 +851,29 @@ def test_rules_tree_with_only_source_rules_does_not_supply_binary_rules(tmp_path
     assert not config.opengrep_rules_path.exists()
 
 
-def test_opengrep_rule_loading_failure_is_visible_in_terminal(tmp_path, capsys):
+def test_opengrep_rule_loading_failure_is_visible_in_terminal(tmp_path, capsys, monkeypatch):
     rules = tmp_path / "rules" / "ios" / "source"
     rules.mkdir(parents=True)
     config = cli._create_scan_config(_scan_args(tmp_path, "--ios-source", ["--ios-source-opengrep-rules", str(rules)]))
 
-    results = workflow.MobileAnalysisWorkflowService()._perform_opengrep_scan(config, None)
+    monkeypatch.setattr(workflow.IOSSectionOpenGrepScanner, "is_available", lambda self: True)
+    monkeypatch.setattr(workflow.MobileScannerFactory, "build_scanner_list", lambda self, config: [])
 
-    assert not results[0].success
-    assert f"OpenGrep failed: No iOS YAML rule files found in: {rules}" in capsys.readouterr().err
+    exit_code = cli.main(
+        [
+            "scan",
+            "--ios-source",
+            str(tmp_path),
+            "--output",
+            str(config.output_path),
+            "--ios-source-opengrep-rules",
+            str(rules),
+        ]
+    )
+
+    assert exit_code == 1
+    error = capsys.readouterr().err
+    assert "Phoenix scan failed: iOS Category OpenGrep Scanner failed:" in error
+    assert f"No iOS YAML rule files found in: {rules}" in error
+    assert not list(config.output_path.rglob("post_scan_processing.json"))
+    assert not list(config.output_path.rglob("*.pdf"))

@@ -106,7 +106,7 @@ class IOSSectionOpenGrepScanner(ScannerPort):
         except IOSRuleInventoryError as exc:
             metadata["reason"] = str(exc)
             errors.append({"message": str(exc)})
-        success = metadata["status"] in {"success", "partial"}
+        success = metadata["status"] == "success"
         return [
             ScanResult(
                 scanner_name=self.name,

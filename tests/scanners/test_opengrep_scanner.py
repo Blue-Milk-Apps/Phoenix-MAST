@@ -40,5 +40,6 @@ def test_opengrep_command_receives_one_strings_directory(tmp_path: Path, monkeyp
     )[0]
 
     assert result.success is True
+    assert "--strict" in command
     assert command[4:5] == [str(strings_path.resolve())]
     assert str(strings_path / "classes.txt") not in command

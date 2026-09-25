@@ -14,6 +14,7 @@ class SyftScanner(ScannerPort):
     """Scanner for generating Software Bill of Materials using Syft."""
 
     DEFAULT_OUTPUT_FORMAT = "syft-json"
+    DEFAULT_PROCESS_TIMEOUT_SECONDS = 300
 
     def __init__(self, output_format: str = DEFAULT_OUTPUT_FORMAT) -> None:
         self.output_format = output_format
@@ -53,14 +54,16 @@ class SyftScanner(ScannerPort):
 
             print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}Scanning filesystem...")
 
-            process = subprocess.Popen(
+            process = subprocess.run(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                check=False,
+                timeout=self.DEFAULT_PROCESS_TIMEOUT_SECONDS,
             )
 
-            stdout_data, stderr_data = process.communicate()
+            stdout_data, stderr_data = process.stdout, process.stderr
 
             for line in stderr_data.splitlines():
                 clean_line = line.replace("\r", "").strip()
@@ -69,7 +72,7 @@ class SyftScanner(ScannerPort):
                 print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}{clean_line}")
 
             if process.returncode != 0:
-                error_message = f"Syft error: {process.returncode}"
+                error_message = f"Syft error with code {process.returncode}: {stderr_data.strip()}"
                 return [
                     ScanResult(
                         scanner_name=self.name,

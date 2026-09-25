@@ -17,6 +17,7 @@ class StringsScanner(ScannerPort):
     """Scanner for extracting strings from binary files."""
 
     DEFAULT_MIN_LENGTH = 10
+    DEFAULT_PROCESS_TIMEOUT_SECONDS = 300
 
     @property
     def scan_type(self) -> ScanType:
@@ -65,6 +66,7 @@ class StringsScanner(ScannerPort):
                     capture_output=True,
                     text=True,
                     check=False,
+                    timeout=self.DEFAULT_PROCESS_TIMEOUT_SECONDS,
                 )
 
                 if result.returncode != 0:

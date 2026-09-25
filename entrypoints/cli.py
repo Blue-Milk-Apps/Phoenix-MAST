@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -123,9 +124,12 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _scan_command(args: argparse.Namespace) -> int:
-    scan_config: ScanConfig = _create_scan_config(args)
-
-    MobileAnalysisWorkflowService().run(scan_config)
+    try:
+        scan_config: ScanConfig = _create_scan_config(args)
+        MobileAnalysisWorkflowService().run(scan_config)
+    except Exception as exc:
+        print(f"Phoenix scan failed: {exc}", file=sys.stderr)
+        return 1
     return 0
 
 

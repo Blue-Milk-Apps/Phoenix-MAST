@@ -1,6 +1,5 @@
 import json
 import os
-import sys
 import time
 from dataclasses import asdict
 from pathlib import Path
@@ -168,14 +167,10 @@ class MobileAnalysisWorkflowService:
             scanner_service = ScannerService(scanners)
 
             wall_start = time.perf_counter()
-            scan_results = scanner_service.scan_project(scan_config)
-            for result in scan_results:
-                scan_output_method.write_result(result)
+            scan_results = scanner_service.scan_project(scan_config, output=scan_output_method)
 
             opengrep_results = self._perform_opengrep_scan(scan_config, scan_output_method)
             scan_results.extend(opengrep_results)
-            for result in opengrep_results:
-                scan_output_method.write_result(result)
 
             post_scan_output = self._run_post_scan_processing(scan_config.output_path, scan_config)
             if post_scan_output:
@@ -231,7 +226,6 @@ class MobileAnalysisWorkflowService:
         opengrep_scan_paths = self._get_opengrep_scan_paths(scan_config)
         print(f"OpenGrep rules path: {open_grep_rules_path}")
         print(f"OpenGrep scan paths: {opengrep_scan_paths}")
-        opengrep_results = []
         if open_grep_rules_path and opengrep_scan_paths:
             if scan_config.stack == "FLUTTER":
                 opengrep_scanner = FlutterOpenGrepScanner(
@@ -263,12 +257,8 @@ class MobileAnalysisWorkflowService:
                     rules_path=Path(open_grep_rules_path),
                     scan_paths=opengrep_scan_paths,
                 )
-            results = opengrep_scanner.scan(scan_config)
-            for result in results:
-                if not result.success:
-                    print(f"OpenGrep failed: {result.error_message or 'No scan completed.'}", file=sys.stderr)
-            opengrep_results.extend(results)
-        return opengrep_results
+            return ScannerService([opengrep_scanner]).scan_project(scan_config, output=scan_output_method)
+        raise RuntimeError("OpenGrep cannot run without a rules path and scan inputs.")
 
     def _get_opengrep_rules_path(self, config: ScanConfig) -> str | None:
         if config.opengrep_rules_path:

@@ -113,7 +113,9 @@ class GitleaksScanner(ScannerPort):
                 "--no-banner",
                 "--no-color",
                 "--log-level",
-                "fatal",
+                "error",
+                "--exit-code",
+                "0",  # Findings belong in the report; nonzero exits indicate execution errors.
                 "--report-format",
                 "json",
                 "--report-path",
@@ -140,8 +142,8 @@ class GitleaksScanner(ScannerPort):
                     if clean_line:
                         print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}{clean_line}")
 
-            if process.returncode not in (0, 1):
-                error_message = f"Gitleaks error with return code {process.returncode}"
+            if process.returncode != 0:
+                error_message = f"Gitleaks error with return code {process.returncode}: {stderr_data.strip()}"
                 return [
                     ScanResult(
                         scanner_name=self.name,

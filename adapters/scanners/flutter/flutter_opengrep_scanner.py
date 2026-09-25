@@ -85,10 +85,16 @@ class FlutterOpenGrepScanner(ScannerPort):
                 configured_rule_ids.update(scope_metadata["configured_rule_ids"])
             if tool_version:
                 tool_versions.add(tool_version)
+            if (scope_metadata["required"] or scope_metadata["applicable"]) and scope_metadata["status"] != "success":
+                break
 
         status = self._aggregate_status(scopes)
-        success = status != "failed"
-        error_message = "No required Flutter OpenGrep scope completed successfully." if not success else ""
+        success = status == "complete"
+        error_message = "; ".join(
+            f"{scope}: {metadata.get('reason', 'OpenGrep scope did not complete.')}"
+            for scope, metadata in scopes.items()
+            if (metadata["required"] or metadata["applicable"]) and metadata["status"] != "success"
+        )
         payload = {
             "results": findings,
             "errors": errors,
@@ -167,6 +173,10 @@ class FlutterOpenGrepScanner(ScannerPort):
             if key in report_metadata:
                 base_metadata[key] = report_metadata[key]
 
+        findings = [
+            {**finding, "phoenix_scope": scope} for finding in report.get("results", []) if isinstance(finding, dict)
+        ]
+
         if not result.success:
             error = result.error_message or str(report.get("error", "")).strip() or "OpenGrep scope failed."
             base_metadata.update({"status": "failed", "reason": error})
@@ -176,7 +186,7 @@ class FlutterOpenGrepScanner(ScannerPort):
                     error_details[key] = report[key]
             if "raw_output" in report:
                 error_details["stdout"] = report["raw_output"]
-            return base_metadata, [], [error_details], tool_version
+            return base_metadata, findings, [error_details], tool_version
 
         rule_ids = report_metadata.get("configured_rule_ids")
         configured = sorted(
@@ -188,9 +198,6 @@ class FlutterOpenGrepScanner(ScannerPort):
         if scope_status == "complete":
             scope_status = "success"
         base_metadata.update({"status": scope_status, "configured_rule_ids": configured})
-        findings = [
-            {**finding, "phoenix_scope": scope} for finding in report.get("results", []) if isinstance(finding, dict)
-        ]
         errors = [{**error, "scope": scope} for error in report.get("errors", []) if isinstance(error, dict)]
         return base_metadata, findings, errors, tool_version
 

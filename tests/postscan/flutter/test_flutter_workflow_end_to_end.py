@@ -114,10 +114,15 @@ def test_flutter_workflow_persists_post_scan_output_and_requests_report(
         "build_scanner_list",
         lambda self, scan_config: [_ArtifactScanner(scanner_results)],
     )
+
+    def scan_opengrep(self, scan_config, scan_output_method):
+        scan_output_method.write_result(opengrep_result)
+        return [opengrep_result]
+
     monkeypatch.setattr(
         workflow.MobileAnalysisWorkflowService,
         "_perform_opengrep_scan",
-        lambda self, scan_config, scan_output_method: [opengrep_result],
+        scan_opengrep,
     )
 
     def fake_pdf_generation(data, report_path: Path) -> Path:
