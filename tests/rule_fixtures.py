@@ -65,3 +65,24 @@ def assessment_payload(*definitions, status="success", results=(), platform="ios
             "rule_execution": {item["id"]: {"status": status} for item in definitions},
         },
     }
+
+
+def scoped_payload(**scopes):
+    return {
+        "results": [
+            {**match, "phoenix_scope": scope} for scope, payload in scopes.items() for match in payload["results"]
+        ],
+        "scan_metadata": {
+            "status": "complete"
+            if all(payload["scan_metadata"]["status"] == "success" for payload in scopes.values())
+            else "failed",
+            "scopes": {
+                scope: {
+                    **payload["scan_metadata"],
+                    "applicable": True,
+                    "configured_rule_ids": [rule["rule_id"] for rule in payload["scan_metadata"]["rule_catalog"]],
+                }
+                for scope, payload in scopes.items()
+            },
+        },
+    }

@@ -7,7 +7,7 @@ import json
 from adapters.post_scan.flutter import FlutterScanDetailExtractor
 
 
-def test_emits_assessed_functionality_secrets_and_manual_review_sections() -> None:
+def test_does_not_infer_functionality_from_legacy_metadata() -> None:
     loaded_outputs = {
         "scan_metadata": {"project_path": "/workspace/app"},
         "source_metadata": {
@@ -33,19 +33,10 @@ def test_emits_assessed_functionality_secrets_and_manual_review_sections() -> No
 
     sections = FlutterScanDetailExtractor().extract_sections(loaded_outputs)
 
-    assert sections["functionality"]["Camera"] == {
-        "present": True,
-        "explanation": "Declared Android permission: android.permission.CAMERA.",
-    }
-    assert sections["functionality"]["SMS"]["present"] is None
+    assert sections["functionality"] == {}
     assert sections["hardcoded_values"] == {"urls": [], "emails": [], "secrets": []}
     assert sections["endpoints"] == []
-    assert sections["manual_review"] == {
-        "findings": [],
-        "assessed_scopes": ["flutter"],
-        "assessed": True,
-        "fully_assessed": True,
-    }
+    assert "manual_review" not in sections
     json.dumps(sections)
 
 
@@ -86,9 +77,7 @@ def test_preserves_positive_legacy_secret_and_raw_finding_from_partial_outputs()
         {"value": "Legacy token credential (redacted)", "location": "lib/config.dart:5"}
     ]
     assert sections["endpoints"] == []
-    assert sections["manual_review"]["assessed"] is False
-    assert sections["manual_review"]["fully_assessed"] is False
-    assert sections["manual_review"]["findings"][0]["rule_id"] == ("flutter.source.unsafe-platform-channel")
+    assert "manual_review" not in sections
     assert raw_secret not in serialized
 
 
@@ -96,7 +85,7 @@ def test_emits_unassessed_empty_supporting_sections() -> None:
     sections = FlutterScanDetailExtractor().extract_sections({})
 
     assert "functionality" in sections
-    assert all(item["present"] is None for item in sections["functionality"].values())
+    assert sections["functionality"] == {}
     assert "hardcoded_values" not in sections
     assert "endpoints" not in sections
     assert "manual_review" not in sections

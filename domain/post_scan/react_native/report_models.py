@@ -2,30 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from domain.post_scan.android.rule_registry import REPORT_RULE_IDS_BY_SECTION as ANDROID_RULES
-from domain.post_scan.react_native.endpoints import ReactNativeEndpoints
 from domain.post_scan.react_native.functionality import ReactNativeFunctionality
-from domain.post_scan.react_native.opengrep_assessment import ReactNativeOpenGrepAssessment
 from domain.post_scan.react_native.permissions import ReactNativePermissions
-from domain.post_scan.react_native.rule_registry import (
-    REACT_NATIVE_RULE_REGISTRY,
-    ReactNativeRuleDisposition,
-)
-from domain.post_scan.react_native.rule_registry import (
-    REPORT_RULE_IDS_BY_SECTION as REACT_NATIVE_RULES,
-)
 from domain.post_scan.react_native.scan_extraction_context import ReactNativeScanExtractionContext
-from domain.post_scan.react_native.security_evidence import (
-    ReactNativeEvidenceEntry,
-    combine_evidence_entries,
-    derived_evidence,
-    scope_catalog_applicable,
-)
-from domain.report import AssessmentStatus
 
 
 def build_report_sections(context: ReactNativeScanExtractionContext) -> dict[str, Any]:
@@ -83,38 +65,12 @@ def build_report_sections(context: ReactNativeScanExtractionContext) -> dict[str
         "url_schemes": context.mapping(context.ios_metadata.get("url_schemes")).get("declared", []),
     }
 
-    for section, output_key in (
-        ("Code", "code_evidence"),
-        ("Network", "network_evidence"),
-        ("Data Storage", "data_storage_evidence"),
-        ("Resilience", "resilience_evidence"),
-    ):
-        evidence = _evidence_section(context, section)
-        if evidence:
-            sections[output_key] = evidence
-
-    endpoints = ReactNativeEndpoints(context)
     hardcoded = _hardcoded_values(context)
-    hardcoded["urls"] = endpoints.urls
-    if hardcoded["assessed"] or hardcoded["secrets"] or endpoints.assessed or endpoints.items:
+    if hardcoded["assessed"] or hardcoded["secrets"]:
         sections["hardcoded_values"] = {key: hardcoded[key] for key in ("urls", "emails", "secrets")}
-        sections["endpoints"] = endpoints.items
     functionality = ReactNativeFunctionality(context)
-    if functionality.applicable or functionality.assessed:
-        sections["functionality"] = functionality.items
-        sections["platform_inventory"]["runtime"] = {
-            **sections["platform_inventory"]["runtime"],
-            "functionality_platform_assessments": functionality.platform_assessments,
-            "security_check_platform_assessments": _security_platform_assessments(context),
-        }
-    else:
-        sections["platform_inventory"]["runtime"] = {
-            **sections["platform_inventory"]["runtime"],
-            "security_check_platform_assessments": _security_platform_assessments(context),
-        }
-    manual_review = _manual_review(context)
-    if manual_review["assessed"] or manual_review["findings"]:
-        sections["manual_review"] = manual_review
+    sections["functionality"] = functionality.items
+    sections["platform_inventory"]["runtime"]["functionality_platform_assessments"] = functionality.platform_assessments
     return sections
 
 
@@ -147,43 +103,6 @@ def _dependency_inventory(context: ReactNativeScanExtractionContext) -> dict[str
     }
 
 
-def _security_platform_assessments(context: ReactNativeScanExtractionContext) -> dict[str, dict[str, dict[str, Any]]]:
-    """Retain scoped OpenGrep outcomes for later report generation."""
-
-    registries = {"react_native": REACT_NATIVE_RULES, "android": ANDROID_RULES}
-    keys = {evidence_key for registry in registries.values() for groups in registry.values() for evidence_key in groups}
-    assessment = ReactNativeOpenGrepAssessment(context)
-    output: dict[str, dict[str, dict[str, Any]]] = {}
-    for key in sorted(keys):
-        rows: dict[str, dict[str, Any]] = {}
-        for scope, registry in registries.items():
-            rule_ids = frozenset(
-                rule_id
-                for groups in registry.values()
-                for evidence_key, values in groups.items()
-                if evidence_key == key
-                for rule_id in values
-            )
-            if not rule_ids or not scope_catalog_applicable(context, scope):
-                continue
-            entry = assessment.assess(scope, rule_ids, key)
-            status = (
-                AssessmentStatus.PRESENT
-                if entry.present is True
-                else AssessmentStatus.NOT_PRESENT
-                if entry.present is False
-                else AssessmentStatus.NOT_EVALUATED
-            )
-            rows[scope] = {
-                "status": status.value,
-                "explanation": entry.evidence,
-                "evidence": list(entry.details),
-            }
-        if rows:
-            output[key] = rows
-    return output
-
-
 def _component_counts(context: ReactNativeScanExtractionContext) -> dict[str, int | None]:
     components = context.mapping(context.android_metadata.get("components"))
     result: dict[str, int | None] = {}
@@ -195,64 +114,6 @@ def _component_counts(context: ReactNativeScanExtractionContext) -> dict[str, in
             sum(item.get("exported") is True for item in records) if records is not None else None
         )
     return result
-
-
-def _evidence_section(context: ReactNativeScanExtractionContext, section: str) -> dict[str, dict[str, Any]]:
-    assessment = ReactNativeOpenGrepAssessment(context)
-    registries = {"react_native": REACT_NATIVE_RULES, "android": ANDROID_RULES}
-    preferred_sections = {
-        evidence_key: report_section for report_section, groups in REACT_NATIVE_RULES.items() for evidence_key in groups
-    }
-    scoped_groups: dict[str, dict[str, frozenset[str]]] = {}
-    for scope, registry in registries.items():
-        groups: dict[str, frozenset[str]] = {}
-        for registry_section, registry_groups in registry.items():
-            for evidence_key, rule_ids in registry_groups.items():
-                if preferred_sections.get(evidence_key, registry_section) == section:
-                    groups[evidence_key] = groups.get(evidence_key, frozenset()) | rule_ids
-        scoped_groups[scope] = groups
-
-    keys = set().union(*(groups for groups in scoped_groups.values()))
-    output: dict[str, dict[str, Any]] = {}
-    for key in sorted(keys):
-        entries = [
-            assessment.assess(scope, groups[key], key)
-            for scope, groups in scoped_groups.items()
-            if key in groups and scope_catalog_applicable(context, scope)
-        ]
-        if not entries:
-            continue
-        present = (
-            True
-            if any(item.present is True for item in entries)
-            else False
-            if entries and all(item.present is False for item in entries)
-            else None
-        )
-        details = list(dict.fromkeys(detail for item in entries for detail in item.details))
-        evidence = "; ".join(item.evidence for item in entries if item.evidence)
-        output[key] = asdict(ReactNativeEvidenceEntry(present, evidence, details))
-
-    for key, derived in derived_evidence(context, section).items():
-        existing = output.get(key)
-        if existing is None:
-            output[key] = asdict(derived)
-            continue
-        if derived.present is None:
-            continue
-        combined = combine_evidence_entries(
-            [
-                ReactNativeEvidenceEntry(
-                    existing.get("present"),
-                    str(existing.get("evidence") or ""),
-                    [str(item) for item in existing.get("details") or []],
-                ),
-                derived,
-            ],
-            absent_evidence=f"no_{key}_hits",
-        )
-        output[key] = asdict(combined)
-    return output
 
 
 def _hardcoded_values(context: ReactNativeScanExtractionContext) -> dict[str, Any]:
@@ -277,38 +138,6 @@ def _hardcoded_values(context: ReactNativeScanExtractionContext) -> dict[str, An
         "emails": [],
         "secrets": list(unique.values()),
         "assessed": context.gitleaks_assessed or context.trufflehog_assessed,
-    }
-
-
-def _manual_review(context: ReactNativeScanExtractionContext) -> dict[str, Any]:
-    raw_rules = {
-        rule_id: mapping
-        for rule_id, mapping in REACT_NATIVE_RULE_REGISTRY.items()
-        if mapping.disposition is ReactNativeRuleDisposition.RAW_ONLY
-    }
-    assessed = context.opengrep_scope_assessed("react_native", frozenset(raw_rules))
-    findings = []
-    for finding in context.opengrep_results_for_scope("react_native"):
-        rule_id = context.first_non_empty(finding.get("check_id"))
-        mapping = raw_rules.get(rule_id)
-        if mapping:
-            findings.append(
-                {
-                    "rule_id": rule_id,
-                    "scope": "react_native",
-                    "severity": mapping.severity,
-                    "reason": mapping.reason,
-                    "location": _location(
-                        context, finding.get("path"), context.mapping(finding.get("start")).get("line")
-                    ),
-                    "message": context.first_non_empty(context.mapping(finding.get("extra")).get("message"), rule_id),
-                }
-            )
-    return {
-        "findings": findings,
-        "assessed_scopes": ["react_native"] if assessed else [],
-        "assessed": assessed,
-        "fully_assessed": assessed,
     }
 
 

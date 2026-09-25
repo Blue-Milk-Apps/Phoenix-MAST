@@ -13,16 +13,19 @@ def _metadata(kind: ReportTargetKind = ReportTargetKind.REACT_NATIVE_SOURCE) -> 
 def test_maps_react_native_details_and_inventories() -> None:
     report = ReactNativeReportDataBuilder().build(
         {
-            "source_metadata": {
-                "identity": {"package_name": "com.example.app", "version": "2.0"},
+            "app_info": {"package_name": "com.example.app", "version_name": "2.0"},
+            "platform_inventory": {
                 "runtime": {"react_native_constraint": "0.81.0", "expo_constraint": "~54.0"},
-                "platforms": {"android": True, "ios": False},
-                "dependencies": {"declared": [{"name": "react", "constraint": "^19"}]},
+                "android": {"detected": True},
+                "ios": {"detected": False},
             },
+            "dependency_inventory": {"declared": [{"name": "react", "constraint": "^19"}]},
             "functionality": {"Camera": {"present": True}},
-            "permissions": [{"name": "camera", "status": "requested"}],
+            "permissions": [
+                {"name": "camera", "status": "requested", "info": "Runtime request", "usage_description": "Take photos"}
+            ],
             "hardcoded_values": {"emails": ["security@example.test"]},
-            "endpoints": [{"endpoint": "https://api.example.test"}],
+            "endpoints": [{"endpoint": "https://api.example.test", "tags": "HTTP API"}],
             "code_evidence": {"uses_dynamic_code_execution": {"present": True, "evidence": "src/App.tsx:4"}},
             "data_storage_evidence": {"deprecated_keychain_attributes": {"present": True}},
         },
@@ -35,20 +38,16 @@ def test_maps_react_native_details_and_inventories() -> None:
     assert details.dependencies[0].name == "react"
     assert details.functionality[0].name == "Camera"
     assert details.permissions[0].permission == "camera"
+    assert details.permissions[0].info == "Runtime request"
+    assert details.permissions[0].usage_description == "Take photos"
     assert details.hardcoded_values.emails == ("security@example.test",)
     assert details.endpoints[0].endpoint == "https://api.example.test"
-    assert report.findings_severity.high == 1
-    keychain = next(
-        check
-        for section in report.vulnerability_sections
-        if section.name == "Data Storage"
-        for check in section.checks
-        if check.name == "Application Utilizes Deprecated Keychain Attributes"
-    )
-    assert keychain.severity.value == "medium"
+    assert details.endpoints[0].tags == "HTTP API"
+    assert report.findings_severity.high == 0
+    assert report.vulnerability_sections == ()
 
 
-def test_uses_native_platform_labels_for_platform_backed_items() -> None:
+def test_preserves_actual_platform_labels_for_functionality() -> None:
     report = ReactNativeReportDataBuilder().build(
         {
             "functionality": {
@@ -85,21 +84,17 @@ def test_uses_native_platform_labels_for_platform_backed_items() -> None:
 
     details = report.platform_details
     camera = next(item for item in details.functionality if item.name == "Camera")
-    assert {item.platform.value for item in camera.platform_assessments} == {"android", "ios"}
+    assert {item.platform.value for item in camera.platform_assessments} == {"react_native", "android", "ios"}
     navigation = next(item for item in details.functionality if item.name == "Navigation")
     assert [item.platform.value for item in navigation.platform_assessments] == ["react_native"]
 
-    checks = {item.name: item for section in report.vulnerability_sections for item in section.checks}
-    assert [item.platform.value for item in checks["Uses Dynamic Code Execution"].platform_assessments] == [
-        "react_native"
-    ]
-    assert [item.platform.value for item in checks["Uses SHA1 Hashing Algorithm"].platform_assessments] == ["android"]
+    assert report.vulnerability_sections == ()
 
 
-def test_empty_react_native_data_has_four_empty_sections() -> None:
+def test_empty_react_native_data_has_no_invented_checks() -> None:
     report = ReactNativeReportDataBuilder().build({}, _metadata())
-    assert len(report.vulnerability_sections) == 4
-    assert [len(section.checks) for section in report.vulnerability_sections] == [24, 23, 20, 1]
+    assert report.vulnerability_sections == ()
+    assert report.risk_summary == ()
 
 
 def test_rejects_incompatible_target_kind() -> None:

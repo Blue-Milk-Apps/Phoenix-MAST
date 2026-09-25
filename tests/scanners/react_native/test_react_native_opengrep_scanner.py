@@ -10,7 +10,8 @@ from domain.models import ScanConfig, ScanResult, ScanType
 class FakeOpenGrepScanner:
     calls: list[tuple[Path, list[Path], ScanConfig]] = []
 
-    def __init__(self, rules_path: Path | None = None, scan_paths: list[Path] | None = None) -> None:
+    def __init__(self, rules_directory: Path | None = None, scan_paths: list[Path] | None = None, **kwargs) -> None:
+        rules_path = rules_directory
         self.rules_path = rules_path or Path()
         self.scan_paths = scan_paths or []
 
@@ -53,34 +54,8 @@ def test_scopes_mobile_source_and_excludes_web(monkeypatch, tmp_path: Path) -> N
     (project / "node_modules" / "dependency.js").write_text("module.exports = {}", encoding="utf-8")
 
     FakeOpenGrepScanner.calls = []
-    monkeypatch.setattr(scanner_module, "OpenGrepScanner", FakeOpenGrepScanner)
+    monkeypatch.setattr(scanner_module, "CategoryOpenGrepScanner", FakeOpenGrepScanner)
 
-    class FakeCategoryOpenGrepScanner:
-        def __init__(self, rules_directory=None, scan_paths=None):
-            _ = rules_directory
-            self.scan_paths = list(scan_paths)
-
-        def scan(self, config):
-            FakeOpenGrepScanner.calls.append((Path("ios"), self.scan_paths, config))
-            return [
-                ScanResult(
-                    scanner_name="Fake OpenGrep",
-                    scan_type=ScanType.OPENGREP_SOURCE,
-                    raw_output=json.dumps(
-                        {
-                            "results": [{"check_id": "ios.rule"}],
-                            "errors": [],
-                            "scan_metadata": {
-                                "status": "complete",
-                                "configured_rule_ids": ["ios.rule"],
-                                "tool_version": "test",
-                            },
-                        }
-                    ),
-                )
-            ]
-
-    monkeypatch.setattr(scanner_module, "CategoryOpenGrepScanner", FakeCategoryOpenGrepScanner)
     scanner = ReactNativeOpenGrepScanner(
         rules / "react_native",
         android_rules_path=rules / "android",
@@ -115,7 +90,7 @@ def test_web_only_project_does_not_run_opengrep(monkeypatch, tmp_path: Path) -> 
     rules.mkdir(parents=True)
 
     FakeOpenGrepScanner.calls = []
-    monkeypatch.setattr(scanner_module, "OpenGrepScanner", FakeOpenGrepScanner)
+    monkeypatch.setattr(scanner_module, "CategoryOpenGrepScanner", FakeOpenGrepScanner)
     result = ReactNativeOpenGrepScanner(rules).scan(
         ScanConfig(project_path=project, output_path=tmp_path / "output", stack="REACT_NATIVE")
     )[0]
@@ -127,16 +102,17 @@ def test_web_only_project_does_not_run_opengrep(monkeypatch, tmp_path: Path) -> 
     assert FakeOpenGrepScanner.calls == []
 
 
-def test_applicable_native_scope_without_rules_makes_report_partial(monkeypatch, tmp_path: Path) -> None:
+def test_missing_required_android_rules_stops_before_ios(monkeypatch, tmp_path: Path) -> None:
     project = tmp_path / "project"
     project.mkdir()
     (project / "App.tsx").write_text("export default App", encoding="utf-8")
     (project / "android").mkdir()
+    (project / "ios").mkdir()
     react_native_rules = tmp_path / "rules" / "react_native"
     react_native_rules.mkdir(parents=True)
 
     FakeOpenGrepScanner.calls = []
-    monkeypatch.setattr(scanner_module, "OpenGrepScanner", FakeOpenGrepScanner)
+    monkeypatch.setattr(scanner_module, "CategoryOpenGrepScanner", FakeOpenGrepScanner)
     scanner = ReactNativeOpenGrepScanner(
         react_native_rules,
         android_rules_path=tmp_path / "missing-android-rules",
@@ -145,6 +121,8 @@ def test_applicable_native_scope_without_rules_makes_report_partial(monkeypatch,
     result = scanner.scan(ScanConfig(project_path=project, output_path=tmp_path / "output"))[0]
     report = json.loads(result.raw_output)
 
+    assert len(FakeOpenGrepScanner.calls) == 1
+    assert "android" in result.error_message.lower()
     assert not result.success
     assert report["scan_metadata"]["status"] == "partial"
     assert report["scan_metadata"]["scopes"]["react_native"]["status"] == "success"

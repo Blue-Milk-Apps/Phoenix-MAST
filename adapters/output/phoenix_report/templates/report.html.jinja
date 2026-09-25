@@ -567,7 +567,9 @@ SOFTWARE.
   <h2>Application Functionality</h2>
   <p class="func-legend"><span class="func-legend-present">Detected</span><span class="func-legend-absent">Not detected</span></p>
   <div class="func-grid" role="list">
-    {% for name, f in data.functionality.items() %}
+    {% for row in data.functionality.items() | batch(5) %}
+    <div class="func-row">
+    {% for name, f in row %}
     {% set present = f.present is sameas true or f.status == 'present' %}
     {% set status = f.status or ('present' if present else 'not_evaluated' if f.present is none else 'not_present') %}
     <div class="func-item {{ 'func-present' if present else 'func-absent' }}" role="listitem" title="{{ f.explanation | e }}" aria-label="{{ name | e }}: {{ status | replace('_', ' ') | e }}">
@@ -576,6 +578,8 @@ SOFTWARE.
       {% if status not in ['present', 'not_present'] %}
       <div class="func-status">{{ status | replace('_', ' ') | capitalize | e }}</div>
       {% endif %}
+    </div>
+    {% endfor %}
     </div>
     {% else %}
     <p class="small">Functionality was not evaluated for this scan.</p>

@@ -9,8 +9,7 @@ values -> endpoint connections.
 
 The generator also supports source-oriented presentation. Flutter source
 payloads receive Flutter-specific project, generated-platform, dependency,
-application-link, and manual-review sections alongside the standard
-vulnerability sections.
+and application-link sections alongside the YAML-driven security sections.
 
 ## Files
 
@@ -93,18 +92,17 @@ following additional objects:
   dependencies, and packages observed in the Syft SBOM.
 - `deep_links`, `url_schemes`, and `queried_url_schemes` - Android and iOS
   application-link declarations.
-- `manual_review` - raw-only OpenGrep findings that require human validation,
-  together with the scopes that were successfully assessed.
-- `code_evidence`, `network_evidence`, `data_storage_evidence`, and
-  `resilience_evidence` - structured findings from Dart and applicable
-  embedded Android/iOS source.
+- `rule_assessments` - the persisted YAML definitions, execution outcomes,
+  and matches for the framework and embedded native scopes. Reviews and
+  weakness findings use the same reporting contract.
 
-All source reports emit Code, Network, Data Storage, and Resilience sections.
-Individual checks with incomplete evidence render as `Not Evaluated`; they are
-not converted into clean `Not Present` results. Positive findings from partial
-scans remain visible, and multi-platform source checks expose one assessment
-row per platform. Source reports omit binary-only certificate and file-hash
-presentation.
+Source reports derive their categories from the loaded rule files: `code.yml`,
+`crypto.yml`, `networking.yml`, and `storage.yml`. Categories without configured
+rules are omitted. Capability observations from `functionality.yml` remain outside the vulnerability
+summary. React Native runtime-permission and endpoint inventory rules are omitted. Matches retain their
+framework, Android, or iOS origin. Scanner failures stop the workflow; saved
+failure artifacts preserve diagnostic evidence without marking unevaluated
+checks clean. Source reports omit binary-only certificate and file-hash presentation.
 
 React Native reports retain `React Native` as the target identity. Functionality
 and checks backed by embedded native inventories are labeled `Android` or `iOS`

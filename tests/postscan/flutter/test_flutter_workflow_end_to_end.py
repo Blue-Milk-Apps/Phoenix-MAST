@@ -7,6 +7,7 @@ from pathlib import Path
 
 from application import mobile_analysis_workflow_service as workflow
 from domain.models import ScanConfig, ScanResult, ScanType
+from tests.rule_fixtures import assessment_payload, rule, scoped_payload
 
 
 class _ArtifactScanner:
@@ -86,24 +87,19 @@ def test_flutter_workflow_persists_post_scan_output_and_requests_report(
         scanner_name="Flutter Scoped OpenGrep Scanner",
         scan_type=ScanType.OPENGREP_SOURCE,
         raw_output=json.dumps(
-            {
-                "results": [
-                    {
-                        "check_id": "flutter.source.sql-injection",
-                        "phoenix_scope": "flutter",
-                        "path": str(project_path / "lib" / "database.dart"),
-                        "start": {"line": 12},
-                    }
-                ],
-                "scan_metadata": {
-                    "scopes": {
-                        "flutter": {
-                            "status": "success",
-                            "configured_rule_ids": ["flutter.source.sql-injection"],
+            scoped_payload(
+                flutter=assessment_payload(
+                    rule("example.database", title="Database query review"),
+                    category="code",
+                    results=[
+                        {
+                            "check_id": "example.database",
+                            "path": str(project_path / "lib" / "database.dart"),
+                            "start": {"line": 12},
                         }
-                    }
-                },
-            }
+                    ],
+                )
+            )
         ),
         relative_target_path="opengrep_results.json",
     )
@@ -141,13 +137,14 @@ def test_flutter_workflow_persists_post_scan_output_and_requests_report(
     assert post_scan["meta"]["platform"] == "Flutter"
     assert post_scan["meta"]["target_type"] == "SOURCE"
     assert post_scan["dependency_inventory"]["declared"][0]["name"] == "http"
-    assert post_scan["code_evidence"]["contains_potential_sql_injection"] == {
-        "present": True,
-        "evidence": "lib/database.dart:12",
-        "details": ["lib/database.dart:12"],
-    }
+    assessment = post_scan["rule_assessments"]["rules"][0]
+    assert assessment["rule_id"] == "example.database"
+    assert assessment["status"] == "present"
+    assert assessment["matches"][0]["start"]["line"] == 12
+    assert "code_evidence" not in post_scan
     assert len(generated_reports) == 1
     report_data, report_path = generated_reports[0]
     assert report_data.metadata.target.target_kind.value == "flutter_source"
+    assert report_data.vulnerability_sections[0].checks[0].name == "Database query review"
     assert report_path.name == "example_app_phoenix_Report.pdf"
     assert report_path.read_bytes() == b"%PDF-fake"

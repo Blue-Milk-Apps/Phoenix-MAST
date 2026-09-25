@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 
-from domain.post_scan.android.permissions import Permissions as AndroidPermissions
+from domain.post_scan.android.native.permissions import NativeAndroidPermissions
 from domain.post_scan.flutter.scan_extraction_context import FlutterScanExtractionContext
 from domain.post_scan.ios.common.permissions import PERMISSION_DETAILS as IOS_PERMISSION_DETAILS
+from domain.post_scan.rule_assessment import rule_assessments
 
 
 @dataclass(frozen=True)
@@ -35,15 +36,18 @@ class FlutterPermissions:
         return [asdict(entry) for entry in self.entries]
 
     def _add_android(self, context: FlutterScanExtractionContext) -> None:
-        permissions = context.android_metadata.get("permissions")
-        if not isinstance(permissions, list):
+        permissions = NativeAndroidPermissions(context).items
+        if not any(
+            rule["platform"] == "android" and rule["category"] == "functionality"
+            for rule in rule_assessments(context.loaded_outputs.get("opengrep"))["rules"]
+        ):
             return
         self.assessed_platforms.append("android")
         seen: set[str] = set()
         for permission in permissions:
             if not isinstance(permission, dict):
                 continue
-            name = context.first_non_empty(permission.get("name"))
+            name = permission["permission"]
             if not name or name in seen:
                 continue
             seen.add(name)
@@ -54,7 +58,7 @@ class FlutterPermissions:
                     status="",
                     info="",
                     usage_description="",
-                    general_description=self._android_description(name),
+                    general_description=permission["general_description"],
                 )
             )
 
@@ -82,11 +86,3 @@ class FlutterPermissions:
                     general_description=details.get("general_description", ""),
                 )
             )
-
-    @staticmethod
-    def _android_description(name: str) -> str:
-        description = AndroidPermissions.ANDROID_PERMISSION_DESCRIPTIONS.get(name)
-        if description:
-            return description
-        suffix = name.rsplit(".", 1)[-1].replace("_", " ").lower()
-        return suffix[:1].upper() + suffix[1:] + "." if suffix else ""

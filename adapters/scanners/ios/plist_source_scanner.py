@@ -38,7 +38,8 @@ class PlistSourceScanner(ScannerPort):
         return True
 
     def scan(self, config: ScanConfig) -> list[ScanResult]:
-        plist_files = self._collect_plist_files(config.project_path)
+        target = config.project_path / "ios" if config.stack in {"FLUTTER", "REACT_NATIVE"} else config.project_path
+        plist_files = self._collect_plist_files(target)
         if not plist_files:
             error_message = "No plist files, entitlements, or privacy manifests found in the source project."
             raw_output = json.dumps(

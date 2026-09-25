@@ -38,6 +38,8 @@ def with_rule_assessments(report: ReportData, data: Mapping[str, Any]) -> Report
         metadata = rule["metadata"]
         platform = ReportPlatform(rule["platform"])
         category = str(rule["category"])
+        if category == "functionality":
+            continue
         status = AssessmentStatus(rule["status"])
         severity = {"error": "high", "warning": "medium", "inventory": "info", "experiment": "info"}.get(
             rule["severity"], rule["severity"]

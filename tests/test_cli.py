@@ -366,7 +366,6 @@ def test_create_scan_config_for_flutter_source(tmp_path: Path) -> None:
             ScanType.FLUTTER_SOURCE_METADATA,
             ScanType.TRUFFLEHOG,
             ScanType.GITLEAKS,
-            ScanType.PLIST_SOURCE,
             ScanType.SYFT,
         },
     )
@@ -385,6 +384,7 @@ def test_create_scan_config_for_flutter_source_includes_opengrep_when_rules_path
 
     config = cli._create_scan_config(args)
 
+    (config.project_path / "ios").mkdir()
     assert config.opengrep_rules_path == rules_path.resolve()
     assert {scanner.scan_type for scanner in _build_scanners(config)} == {
         ScanType.FLUTTER_SOURCE_METADATA,
@@ -440,7 +440,6 @@ def test_create_scan_config_for_react_native_source(tmp_path: Path, monkeypatch)
             ScanType.REACT_NATIVE_SOURCE_METADATA,
             ScanType.TRUFFLEHOG,
             ScanType.GITLEAKS,
-            ScanType.PLIST_SOURCE,
             ScanType.SYFT,
         },
     )
@@ -459,6 +458,7 @@ def test_create_scan_config_for_react_native_source_includes_opengrep_when_rules
 
     config = cli._create_scan_config(args)
 
+    (config.project_path / "ios").mkdir()
     assert config.opengrep_rules_path == rules_path.resolve()
     assert {scanner.scan_type for scanner in _build_scanners(config)} == {
         ScanType.REACT_NATIVE_SOURCE_METADATA,

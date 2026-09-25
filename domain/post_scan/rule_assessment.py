@@ -120,3 +120,64 @@ def rule_assessments(opengrep: object) -> dict[str, Any]:
         "coverage": coverage,
         "rules": assessments,
     }
+
+
+class RuleFunctionality:
+    """Group declared YAML functionality labels, preserving each scanner scope."""
+
+    def __init__(self, opengrep: object) -> None:
+        groups: dict[str, dict[str, list[dict[str, Any]]]] = {}
+        for rule in rule_assessments(opengrep)["rules"]:
+            label = rule["metadata"].get("functionality")
+            if rule["category"] == "functionality" and isinstance(label, str) and label.strip():
+                groups.setdefault(label, {}).setdefault(rule["platform"], []).append(rule)
+        self.items = {}
+        self.platform_assessments = {}
+        for label, scopes in groups.items():
+            rows = {}
+            for scope, rules in scopes.items():
+                matches = [rule for rule in rules if rule["status"] == "present"]
+                status = (
+                    "present"
+                    if matches
+                    else "not_present"
+                    if all(rule["status"] == "not_present" for rule in rules)
+                    else "not_evaluated"
+                )
+                descriptions = list(dict.fromkeys(rule["metadata"]["description"] for rule in matches))
+                locations = []
+                for rule in matches:
+                    for match in rule["matches"]:
+                        path = str(match.get("path") or "")
+                        line = (match.get("start") or {}).get("line")
+                        if path:
+                            locations.append(f"{path}:{line}" if line is not None else path)
+                rows[scope] = {
+                    "status": status,
+                    "explanation": " ".join(descriptions)
+                    or (
+                        f"No evaluated source rule indicated {label.lower()} functionality."
+                        if status == "not_present"
+                        else "Required rule evidence was unavailable."
+                    ),
+                    "evidence": list(dict.fromkeys(locations)),
+                }
+            statuses = [row["status"] for row in rows.values()]
+            present = (
+                True
+                if "present" in statuses
+                else False
+                if all(status == "not_present" for status in statuses)
+                else None
+            )
+            selected = [row for row in rows.values() if row["status"] == "present"] or list(rows.values())
+            self.items[label] = {
+                "present": present,
+                "explanation": " ".join(dict.fromkeys(row["explanation"] for row in selected)),
+            }
+            self.platform_assessments[label] = rows
+        self.applicable = bool(groups)
+        self.fully_assessed = self.applicable and all(
+            row["status"] != "not_evaluated" for rows in self.platform_assessments.values() for row in rows.values()
+        )
+        self.assessed = self.fully_assessed or any(item["present"] is True for item in self.items.values())

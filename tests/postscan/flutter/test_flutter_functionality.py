@@ -1,117 +1,44 @@
-"""Tests for Flutter embedded-platform functionality inventory."""
-
-from __future__ import annotations
-
-from domain.post_scan.android.rule_registry import FUNCTIONALITY_RULE_IDS as ANDROID_FUNCTIONALITY_RULE_IDS
 from domain.post_scan.flutter import FlutterFunctionality, FlutterScanExtractionContext
+from tests.rule_fixtures import assessment_payload, rule, scoped_payload
 
 
-def test_combines_android_ios_permissions_metadata_and_functionality_rules() -> None:
-    context = FlutterScanExtractionContext(
-        {
-            "scan_metadata": {"project_path": "/workspace/app"},
-            "source_metadata": {
-                "platforms": {"android": True, "ios": True},
-                "android": {
-                    "available": True,
-                    "metadata": {"permissions": [{"name": "android.permission.CAMERA"}]},
-                },
-                "ios": {
-                    "available": True,
-                    "metadata": {
-                        "permissions": [
-                            {"key": "NSMicrophoneUsageDescription", "purpose": "Record audio"},
-                            {"key": "NSLocationWhenInUseUsageDescription", "purpose": "Nearby places"},
-                        ],
-                        "app_transport_security": {},
-                        "url_schemes": {},
-                        "background_modes": ["remote-notification"],
-                        "entitlements": [
-                            {
-                                "path": "Runner.entitlements",
-                                "metadata": {"keychain_access_groups": ["com.example.shared"]},
-                            }
-                        ],
-                    },
-                },
-            },
-            "opengrep": {
-                "results": [
-                    {
-                        "check_id": "android.maps.usage.present",
-                        "phoenix_scope": "android",
-                        "path": "/workspace/app/android/app/Map.kt",
-                        "start": {"line": 12},
-                        "extra": {"metadata": {"phoenix": {"description": "Maps API detected"}}},
-                    },
-                    {
-                        "check_id": "loc-usage-desc",
-                        "phoenix_scope": "ios",
-                        "path": "/workspace/app/ios/Runner/Info.plist",
-                        "extra": {"message": "Location usage description detected"},
-                    },
-                ],
-                "scan_metadata": {"scopes": {}},
-            },
-        }
+def _capability(rule_id, name="Camera"):
+    definition = rule(rule_id, finding_type="observation", severity="INFO")
+    definition["metadata"]["functionality"] = name
+    return definition
+
+
+def test_combines_scoped_yaml_capabilities_and_preserves_platform_evidence():
+    output = scoped_payload(
+        android=assessment_payload(
+            _capability("customer.camera"),
+            category="functionality",
+            results=[{"check_id": "customer.camera", "path": "android/AndroidManifest.xml"}],
+        ),
+        ios=assessment_payload(_capability("other.camera"), category="functionality"),
     )
-
-    functionality = FlutterFunctionality(context)
-
-    assert functionality.assessed is True
-    assert functionality.fully_assessed is False
-    assert functionality.items["Camera"] == {
-        "present": True,
-        "explanation": "Declared Android permission: android.permission.CAMERA.",
-    }
-    assert functionality.items["Microphone"] == {
-        "present": True,
-        "explanation": "plist key NSMicrophoneUsageDescription present.",
-    }
-    assert functionality.items["Maps"]["present"] is True
-    assert "android/app/Map.kt:12" in functionality.items["Maps"]["explanation"]
-    assert functionality.items["Location"]["present"] is True
-    assert functionality.items["Keychain"]["present"] is True
-    assert functionality.items["Push Notifications"]["present"] is True
-    assert functionality.items["SMS"]["present"] is None
+    model = FlutterFunctionality(FlutterScanExtractionContext({"opengrep": output}))
+    assert model.items["Camera"]["present"] is True
+    assert model.platform_assessments["Camera"]["android"]["status"] == "present"
+    assert model.platform_assessments["Camera"]["ios"]["status"] == "not_present"
+    assert model.platform_assessments["Camera"]["android"]["evidence"] == ["android/AndroidManifest.xml"]
+    assert model.fully_assessed
 
 
-def test_complete_platform_sources_allow_negative_functionality_inventory() -> None:
-    context = FlutterScanExtractionContext(
-        {
-            "source_metadata": {
-                "platforms": {"android": True, "ios": True},
-                "android": {"available": True, "metadata": {"permissions": []}},
-                "ios": {"available": True, "metadata": {"permissions": []}},
-            },
-            "opengrep": {
-                "results": [],
-                "scan_metadata": {
-                    "scopes": {
-                        "android": {
-                            "status": "success",
-                            "configured_rule_ids": sorted(ANDROID_FUNCTIONALITY_RULE_IDS),
-                        },
-                        "ios": {
-                            "status": "success",
-                            "configured_rule_ids": [],
-                        },
-                    }
-                },
-            },
-        }
+def test_incomplete_rules_cannot_establish_functionality_absence():
+    output = scoped_payload(
+        android=assessment_payload(_capability("new.camera"), category="functionality", status="failed")
     )
-
-    functionality = FlutterFunctionality(context)
-
-    assert functionality.assessed is True
-    assert functionality.fully_assessed is True
-    assert all(item["present"] is False for item in functionality.items.values())
+    model = FlutterFunctionality(FlutterScanExtractionContext({"opengrep": output}))
+    assert model.items["Camera"]["present"] is None
+    assert not model.fully_assessed
 
 
-def test_missing_functionality_sources_remain_unknown() -> None:
-    functionality = FlutterFunctionality(FlutterScanExtractionContext({}))
-
-    assert functionality.assessed is False
-    assert functionality.fully_assessed is False
-    assert all(item["present"] is None for item in functionality.items.values())
+def test_missing_catalog_does_not_invent_capabilities_from_metadata():
+    model = FlutterFunctionality(
+        FlutterScanExtractionContext(
+            {"source_metadata": {"android": {"metadata": {"permissions": [{"name": "android.permission.CAMERA"}]}}}}
+        )
+    )
+    assert model.items == {}
+    assert not model.assessed

@@ -1,11 +1,11 @@
 from pathlib import Path
 
 from domain.post_scan.react_native import ReactNativePermissions
-from domain.post_scan.react_native.rule_registry import PERMISSION_INVENTORY_RULE_ID_TO_KEY
 from domain.post_scan.react_native.scan_extraction_context import ReactNativeScanExtractionContext
+from tests.rule_fixtures import assessment_payload, rule, scoped_payload
 
 
-def test_correlates_native_expo_and_runtime_permissions() -> None:
+def test_collects_yaml_and_explicit_expo_declarations_without_runtime_inference() -> None:
     project = Path("/workspace/mobile")
     context = ReactNativeScanExtractionContext(
         {
@@ -69,7 +69,7 @@ def test_correlates_native_expo_and_runtime_permissions() -> None:
                         "react_native": {
                             "status": "success",
                             "applicable": True,
-                            "configured_rule_ids": sorted(PERMISSION_INVENTORY_RULE_ID_TO_KEY),
+                            "configured_rule_ids": [],
                         }
                     }
                 },
@@ -77,17 +77,33 @@ def test_correlates_native_expo_and_runtime_permissions() -> None:
         }
     )
 
+    permission = rule("custom.manifest", finding_type="observation")
+    permission["metadata"]["scope"] = "app_declaration"
+    legacy_runtime_matches = context.opengrep_results
+    context.loaded_outputs["opengrep"] = scoped_payload(
+        android=assessment_payload(
+            permission,
+            category="functionality",
+            results=[
+                {
+                    "check_id": "custom.manifest",
+                    "extra": {"metavars": {"$PERMISSION": {"abstract_content": "android.permission.INTERNET"}}},
+                }
+            ],
+        ),
+    )
+
+    context.loaded_outputs["opengrep"]["results"].extend(legacy_runtime_matches)
     permissions = ReactNativePermissions(context)
     items = {(item["platform"], item["permission"]): item for item in permissions.items}
 
-    assert permissions.assessed is True
-    assert items[("Android", "android.permission.CAMERA")]["status"] == "Declared and Requested"
-    assert items[("Android", "android.permission.RECORD_AUDIO")]["status"] == "Requested but Blocked"
+    assert items[("Android", "android.permission.CAMERA")]["status"] == "Declared Only"
+    assert items[("Android", "android.permission.RECORD_AUDIO")]["status"] == "Blocked by Expo Configuration"
     assert items[("Android", "android.permission.READ_CONTACTS")]["status"] == "Blocked by Expo Configuration"
     assert items[("Android", "android.permission.INTERNET")]["status"] == "Declared Only"
-    assert items[("iOS", "NSMicrophoneUsageDescription")]["status"] == "Declared and Requested"
-    assert items[("iOS", "NSPhotoLibraryUsageDescription")]["status"] == "Requested but Not Declared"
-    assert items[("Android/iOS", "Location")]["status"] == "Requested and Inferred from Expo Plugin"
+    assert items[("iOS", "NSMicrophoneUsageDescription")]["status"] == "Declared Only"
+    assert ("iOS", "NSPhotoLibraryUsageDescription") not in items
+    assert ("Android/iOS", "Location") not in items
     assert items[("iOS", "NSCameraUsageDescription")]["usage_description"] == "Take profile photos"
     assert "cannot determine the final permissions" in permissions.DISCLAIMER
 

@@ -99,7 +99,7 @@ class MobileScannerFactory:
                     FlutterSourceMetadataScanner(),
                     TrufflehogScanner(),
                     GitleaksScanner(),
-                    PlistSourceScanner(),
+                    *([PlistSourceScanner()] if (config.project_path / "ios").is_dir() else []),
                     SyftScanner(output_format=config.syft_output_format),
                 ]
             case ("SOURCE", _, "REACT_NATIVE"):
@@ -107,7 +107,7 @@ class MobileScannerFactory:
                     ReactNativeSourceMetadataScanner(),
                     TrufflehogScanner(),
                     GitleaksScanner(),
-                    PlistSourceScanner(),
+                    *([PlistSourceScanner()] if (config.project_path / "ios").is_dir() else []),
                     SyftScanner(output_format=config.syft_output_format),
                 ]
             case ("SOURCE", "ANDROID", "NATIVE_ANDROID"):

@@ -21,13 +21,13 @@ def make_overall_risk_polar_chart(risk_summary: dict[str, str]) -> str:
     import matplotlib.pyplot as plt
 
     keys = list(risk_summary)
-    categories = [(key.replace("_", " ").title(), risk_summary.get(key, "Low")) for key in keys]
+    categories = [(key.replace("_", " ").title() if key.islower() else key, risk_summary[key]) for key in keys]
     if not categories:
         fig, ax = plt.subplots(figsize=(5.6, 4.8))
         ax.axis("off")
         ax.text(0.5, 0.5, "No security sections were evaluated", ha="center", va="center", fontsize=12, color="#667085")
     else:
-        theta = np.linspace(0.0, 2 * np.pi, len(categories), endpoint=False) + (np.pi / 2)
+        theta = np.linspace(0.0, 2 * np.pi, len(categories), endpoint=False)
         radii = [RISK_LEVEL_ORDER.get(level.strip().lower(), 0) for _, level in categories]
         colors = [RISK_LEVEL_COLOR.get(level.strip().lower(), "#98a2b3") for _, level in categories]
         fig = plt.figure(figsize=(5.6, 4.8))
@@ -45,9 +45,11 @@ def make_overall_risk_polar_chart(risk_summary: dict[str, str]) -> str:
         ax.set_ylim(0, 4)
         ax.set_yticks([1, 2, 3, 4])
         ax.set_yticklabels(["Low", "Medium", "High", "Critical"], fontsize=7.5, color="#888")
+        ax.set_rlabel_position(15)
         ax.spines["polar"].set_visible(False)
         ax.set_xticks(theta)
-        ax.set_xticklabels([label.title() for label, _ in categories], fontsize=10, fontweight="bold", color="#16233c")
+        ax.set_xticklabels([label for label, _ in categories], fontsize=10, fontweight="bold", color="#16233c")
+        ax.tick_params(axis="x", pad=18)
         ax.set_facecolor("none")
         fig.patch.set_alpha(0)
     buf = io.BytesIO()

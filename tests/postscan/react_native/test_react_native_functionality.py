@@ -1,277 +1,80 @@
-"""Tests for React Native mobile functionality detection."""
-
-from domain.post_scan.android.rule_registry import FUNCTIONALITY_RULE_IDS as ANDROID_FUNCTIONALITY_RULE_IDS
 from domain.post_scan.react_native import ReactNativeFunctionality
-from domain.post_scan.react_native.report_models import build_report_sections
-from domain.post_scan.react_native.rule_registry import (
-    FUNCTIONALITY_RULE_ID_TO_KEY as REACT_NATIVE_FUNCTIONALITY_RULES,
-)
 from domain.post_scan.react_native.scan_extraction_context import ReactNativeScanExtractionContext
+from tests.rule_fixtures import assessment_payload, rule, scoped_payload
 
 
-def test_combines_android_ios_metadata_and_functionality_rules() -> None:
-    context = ReactNativeScanExtractionContext(
-        {
-            "scan_metadata": {"project_path": "/workspace/app"},
-            "source_metadata": {
-                "platforms": {"android": True, "ios": True, "web": True},
-                "android": {
-                    "available": True,
-                    "metadata": {"permissions": [{"name": "android.permission.CAMERA"}]},
-                },
-                "ios": {
-                    "available": True,
-                    "metadata": {
-                        "permissions": [
-                            {"key": "NSMicrophoneUsageDescription", "purpose": "Record audio"},
-                            {"key": "NSLocationWhenInUseUsageDescription", "purpose": "Nearby places"},
-                        ],
-                        "background_modes": ["remote-notification"],
-                        "entitlements": [
-                            {
-                                "path": "Runner.entitlements",
-                                "metadata": {"keychain_access_groups": ["com.example.shared"]},
-                            }
-                        ],
-                    },
-                },
-            },
-            "opengrep": {
-                "results": [
-                    {
-                        "check_id": "android.maps.usage.present",
-                        "phoenix_scope": "android",
-                        "path": "/workspace/app/android/app/Map.kt",
-                        "start": {"line": 12},
-                        "extra": {"metadata": {"phoenix": {"description": "Maps API detected"}}},
-                    },
-                    {
-                        "check_id": "loc-usage-desc",
-                        "phoenix_scope": "ios",
-                        "path": "/workspace/app/ios/Runner/Info.plist",
-                        "extra": {"message": "Location usage description detected"},
-                    },
-                ],
-                "scan_metadata": {"scopes": {}},
-            },
-        }
+def _capability(rule_id, label="Camera"):
+    definition = rule(rule_id, finding_type="observation")
+    definition["metadata"]["functionality"] = label
+    return definition
+
+
+def test_javascript_findings_keep_their_actual_scope_when_native_platforms_exist():
+    output = scoped_payload(
+        react_native=assessment_payload(
+            _capability("runtime.camera"), category="functionality", results=[{"check_id": "runtime.camera"}]
+        ),
+        android=assessment_payload(_capability("manifest.camera"), category="functionality"),
+        ios=assessment_payload(_capability("plist.camera"), category="functionality"),
     )
-
-    functionality = ReactNativeFunctionality(context)
-
-    assert functionality.assessed is True
-    assert functionality.fully_assessed is False
-    assert functionality.items["Camera"] == {
-        "present": True,
-        "explanation": "Declared Android permission: android.permission.CAMERA.",
-    }
-    assert functionality.items["Microphone"] == {
-        "present": True,
-        "explanation": "plist key NSMicrophoneUsageDescription present.",
-    }
-    assert functionality.items["Maps"]["present"] is True
-    assert "android/app/Map.kt:12" in functionality.items["Maps"]["explanation"]
-    assert functionality.items["Location"]["present"] is True
-    assert functionality.items["Keychain"]["present"] is True
-    assert functionality.items["Push Notifications"]["present"] is True
-    assert functionality.items["SMS"]["present"] is None
-    assert "Web" not in functionality.items
-    assert set(functionality.platform_assessments["Camera"]) == {"android", "ios"}
-    assert "react_native" not in functionality.platform_assessments["Camera"]
-    assert set(functionality.platform_assessments["Keychain"]) == {"ios"}
-    assert set(functionality.platform_assessments["Maps"]) == {"android", "ios"}
+    model = ReactNativeFunctionality(ReactNativeScanExtractionContext({"opengrep": output}))
+    assert model.items["Camera"]["present"] is True
+    rows = model.platform_assessments["Camera"]
+    assert rows["react_native"]["status"] == "present"
+    assert rows["android"]["status"] == rows["ios"]["status"] == "not_present"
 
 
-def test_absent_mobile_platform_does_not_block_negative_results() -> None:
-    context = ReactNativeScanExtractionContext(
-        {
-            "source_metadata": {
-                "platforms": {"android": True, "ios": False},
-                "android": {"available": True, "metadata": {"permissions": []}},
-                "ios": {"available": False, "metadata": None},
-            },
-            "opengrep": {
-                "results": [],
-                "scan_metadata": {
-                    "scopes": {
-                        "android": {
-                            "status": "success",
-                            "applicable": True,
-                            "configured_rule_ids": sorted(ANDROID_FUNCTIONALITY_RULE_IDS),
-                        },
-                        "ios": {"status": "skipped", "applicable": False, "configured_rule_ids": []},
-                    }
-                },
-            },
-        }
+def test_absent_mobile_platform_does_not_block_negative_results():
+    output = scoped_payload(react_native=assessment_payload(_capability("customer.camera"), category="functionality"))
+    model = ReactNativeFunctionality(ReactNativeScanExtractionContext({"opengrep": output}))
+    assert model.items["Camera"]["present"] is False
+    assert model.fully_assessed
+
+
+def test_missing_functionality_sources_remain_unknown():
+    model = ReactNativeFunctionality(ReactNativeScanExtractionContext({}))
+    assert model.items == {}
+    assert not model.assessed
+
+
+def test_failed_ios_rules_do_not_imply_a_clean_capability():
+    output = scoped_payload(ios=assessment_payload(_capability("camera"), category="functionality", status="failed"))
+    model = ReactNativeFunctionality(ReactNativeScanExtractionContext({"opengrep": output}))
+    assert model.items["Camera"]["present"] is None
+    assert not model.fully_assessed
+
+
+def test_customer_functionality_labels_need_no_registry():
+    output = scoped_payload(
+        react_native=assessment_payload(
+            _capability("new.id", "Custom capability"), category="functionality", results=[{"check_id": "new.id"}]
+        )
     )
-
-    functionality = ReactNativeFunctionality(context)
-
-    assert functionality.assessed is True
-    assert functionality.fully_assessed is True
-    assert all(item["present"] is False for item in functionality.items.values())
+    model = ReactNativeFunctionality(ReactNativeScanExtractionContext({"opengrep": output}))
+    assert model.items["Custom capability"]["present"] is True
 
 
-def test_missing_functionality_sources_remain_unknown() -> None:
-    functionality = ReactNativeFunctionality(ReactNativeScanExtractionContext({}))
+def test_older_scan_without_catalog_does_not_claim_assessment():
+    output = {"results": [{"check_id": "react-native.functionality.camera"}], "scan_metadata": {"status": "success"}}
+    model = ReactNativeFunctionality(ReactNativeScanExtractionContext({"opengrep": output}))
+    assert model.items == {}
+    assert not model.fully_assessed
 
-    assert functionality.assessed is False
-    assert functionality.fully_assessed is False
-    assert all(item["present"] is None for item in functionality.items.values())
 
-
-def test_complete_ios_sources_allow_negative_functionality_inventory() -> None:
-    context = ReactNativeScanExtractionContext(
-        {
-            "source_metadata": {
-                "platforms": {"android": False, "ios": True},
-                "android": {"available": False, "metadata": None},
-                "ios": {"available": True, "metadata": {"permissions": []}},
-            },
-            "opengrep": {
-                "results": [],
-                "scan_metadata": {
-                    "scopes": {
-                        "ios": {
-                            "status": "success",
-                            "applicable": True,
-                            "configured_rule_ids": [],
-                        }
-                    }
-                },
-            },
-        }
+def test_dependency_declarations_are_reported_from_yaml_observations():
+    definition = _capability("package.navigation", "Navigation")
+    definition["metadata"].update(scope="app_declaration", description="Navigation dependency declared.")
+    output = scoped_payload(
+        react_native=assessment_payload(
+            definition, category="functionality", results=[{"check_id": "package.navigation", "path": "package.json"}]
+        )
     )
-
-    functionality = ReactNativeFunctionality(context)
-
-    assert functionality.fully_assessed is True
-    assert all(item["present"] is False for item in functionality.items.values())
+    model = ReactNativeFunctionality(ReactNativeScanExtractionContext({"opengrep": output}))
+    assert model.items["Navigation"] == {"present": True, "explanation": "Navigation dependency declared."}
 
 
-def test_javascript_only_react_native_scope_detects_functionality() -> None:
-    context = ReactNativeScanExtractionContext(
-        {
-            "scan_metadata": {"project_path": "/workspace/app"},
-            "source_metadata": {"platforms": {"android": False, "ios": False}},
-            "opengrep": {
-                "results": [
-                    {
-                        "check_id": "react-native.functionality.networking",
-                        "phoenix_scope": "react_native",
-                        "path": "/workspace/app/src/network.ts",
-                        "start": {"line": 4},
-                        "extra": {"message": "React Native-specific networking functionality is used."},
-                    }
-                ],
-                "scan_metadata": {
-                    "scopes": {
-                        "react_native": {
-                            "status": "success",
-                            "applicable": True,
-                            "configured_rule_ids": sorted(REACT_NATIVE_FUNCTIONALITY_RULES),
-                        }
-                    }
-                },
-            },
-        }
+def test_dependencies_without_rule_observations_do_not_infer_functionality():
+    model = ReactNativeFunctionality(
+        ReactNativeScanExtractionContext({"source_metadata": {"dependencies": {"declared": [{"name": "axios"}]}}})
     )
-
-    functionality = ReactNativeFunctionality(context)
-
-    assert functionality.applicable is True
-    assert functionality.fully_assessed is True
-    assert functionality.items["Networking"]["present"] is True
-    assert "src/network.ts:4" in functionality.items["Networking"]["explanation"]
-    assert functionality.items["Camera"]["present"] is False
-
-
-def test_older_react_native_scan_without_functionality_rules_is_applicable_but_unknown() -> None:
-    context = ReactNativeScanExtractionContext(
-        {
-            "source_metadata": {"platforms": {"android": False, "ios": False}},
-            "opengrep": {
-                "results": [],
-                "scan_metadata": {
-                    "scopes": {
-                        "react_native": {
-                            "status": "success",
-                            "applicable": True,
-                            "configured_rule_ids": ["react-native.source.cleartext-http"],
-                        }
-                    }
-                },
-            },
-        }
-    )
-
-    functionality = ReactNativeFunctionality(context)
-
-    assert functionality.applicable is True
-    assert functionality.assessed is False
-    assert functionality.fully_assessed is False
-    assert all(item["present"] is None for item in functionality.items.values())
-    assert all(item["present"] is None for item in build_report_sections(context)["functionality"].values())
-
-
-def test_managed_expo_project_uses_react_native_scope_and_dependency_evidence() -> None:
-    context = ReactNativeScanExtractionContext(
-        {
-            "source_metadata": {
-                "runtime": {"react_native_constraint": "0.81.5", "expo_constraint": "~54.0.33"},
-                "platforms": {"android": True, "ios": True},
-                "android": {"available": False, "metadata": None},
-                "ios": {"available": False, "metadata": None},
-                "dependencies": {
-                    "declared": [
-                        {"name": "@react-native-async-storage/async-storage"},
-                        {"name": "@react-navigation/native"},
-                        {"name": "axios"},
-                    ],
-                    "resolved": [],
-                },
-            },
-            "opengrep": {
-                "results": [],
-                "scan_metadata": {
-                    "scopes": {
-                        "react_native": {
-                            "status": "success",
-                            "applicable": True,
-                            "configured_rule_ids": sorted(REACT_NATIVE_FUNCTIONALITY_RULES),
-                        },
-                        "android": {"status": "skipped", "applicable": False, "configured_rule_ids": []},
-                        "ios": {"status": "skipped", "applicable": False, "configured_rule_ids": []},
-                    }
-                },
-            },
-        }
-    )
-
-    functionality = ReactNativeFunctionality(context)
-
-    assert functionality.fully_assessed is True
-    assert functionality.items["Data Storage"]["present"] is True
-    assert functionality.items["Navigation"]["present"] is True
-    assert functionality.items["Networking"]["present"] is True
-    assert functionality.items["Camera"]["present"] is False
-
-
-def test_web_react_dependencies_do_not_produce_mobile_functionality() -> None:
-    context = ReactNativeScanExtractionContext(
-        {
-            "source_metadata": {
-                "runtime": {"react_native_constraint": "", "expo_constraint": ""},
-                "dependencies": {
-                    "declared": [{"name": "axios"}, {"name": "react-router-dom"}],
-                    "resolved": [],
-                },
-            }
-        }
-    )
-
-    functionality = ReactNativeFunctionality(context)
-
-    assert functionality.items["Networking"]["present"] is None
-    assert functionality.items["Navigation"]["present"] is None
+    assert model.items == {}

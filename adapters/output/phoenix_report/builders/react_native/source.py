@@ -2,9 +2,7 @@
 
 from typing import Any, Mapping
 
-from adapters.output.phoenix_report.builders.react_native.source_check_catalog import REACT_NATIVE_SOURCE_SECTION_CHECKS
 from adapters.output.phoenix_report.builders.source import SourceReportDataBuilder
-from domain.post_scan.react_native.functionality import ReactNativeFunctionality
 from domain.report import (
     AssessmentStatus,
     EndpointDetails,
@@ -28,8 +26,6 @@ from domain.report import (
 class ReactNativeReportDataBuilder(SourceReportDataBuilder):
     """Apply the standard source report assembly to React Native evidence."""
 
-    check_sections = REACT_NATIVE_SOURCE_SECTION_CHECKS
-
     @property
     def target_kind(self) -> ReportTargetKind:
         return ReportTargetKind.REACT_NATIVE_SOURCE
@@ -40,11 +36,12 @@ class ReactNativeReportDataBuilder(SourceReportDataBuilder):
         return super().build(post_scan_data, metadata)
 
     def _build_details(self, data: Mapping[str, Any]) -> ReactNativeReportDetails:
-        source = data.get("source_metadata") if isinstance(data.get("source_metadata"), Mapping) else {}
-        identity = source.get("identity") if isinstance(source.get("identity"), Mapping) else {}
-        runtime = source.get("runtime") if isinstance(source.get("runtime"), Mapping) else {}
-        platforms = source.get("platforms") if isinstance(source.get("platforms"), Mapping) else {}
-        dependencies = source.get("dependencies") if isinstance(source.get("dependencies"), Mapping) else {}
+        identity = data.get("app_info") if isinstance(data.get("app_info"), Mapping) else {}
+        inventory = data.get("platform_inventory") if isinstance(data.get("platform_inventory"), Mapping) else {}
+        runtime = inventory.get("runtime") if isinstance(inventory.get("runtime"), Mapping) else {}
+        android = inventory.get("android") if isinstance(inventory.get("android"), Mapping) else {}
+        ios = inventory.get("ios") if isinstance(inventory.get("ios"), Mapping) else {}
+        dependencies = data.get("dependency_inventory") if isinstance(data.get("dependency_inventory"), Mapping) else {}
         dependency_items = tuple(
             FlutterDependencyDetails(
                 name=str(item.get("name") or ""),
@@ -58,7 +55,6 @@ class ReactNativeReportDataBuilder(SourceReportDataBuilder):
             if isinstance(item, Mapping) and item.get("name")
         )
         functionality = data.get("functionality") if isinstance(data.get("functionality"), Mapping) else {}
-        inventory = data.get("platform_inventory") if isinstance(data.get("platform_inventory"), Mapping) else {}
         runtime_assessments = (
             inventory.get("runtime", {}).get("functionality_platform_assessments")
             if isinstance(inventory.get("runtime"), Mapping)
@@ -69,11 +65,11 @@ class ReactNativeReportDataBuilder(SourceReportDataBuilder):
         hardcoded = data.get("hardcoded_values") if isinstance(data.get("hardcoded_values"), Mapping) else {}
         return ReactNativeReportDetails(
             package_name=str(identity.get("package_name") or ""),
-            version_name=str(identity.get("version") or ""),
+            version_name=str(identity.get("version_name") or ""),
             runtime=ReactNativeRuntimeDetails(
                 str(runtime.get("react_native_constraint") or ""), str(runtime.get("expo_constraint") or "")
             ),
-            platforms=ReactNativePlatformDetails(platforms.get("android") is True, platforms.get("ios") is True),
+            platforms=ReactNativePlatformDetails(android.get("detected") is True, ios.get("detected") is True),
             dependencies=dependency_items,
             functionality=tuple(
                 ReactNativeReportDataBuilder._functionality_detail(name, item, assessments.get(name))
@@ -81,7 +77,13 @@ class ReactNativeReportDataBuilder(SourceReportDataBuilder):
                 if isinstance(item, Mapping)
             ),
             permissions=tuple(
-                PermissionDetails(str(item.get("permission") or item.get("name") or ""), str(item.get("status") or ""))
+                PermissionDetails(
+                    permission=str(item.get("permission") or item.get("name") or ""),
+                    status=str(item.get("status") or ""),
+                    info=str(item.get("info") or ""),
+                    usage_description=str(item.get("usage_description") or ""),
+                    general_description=str(item.get("general_description") or ""),
+                )
                 for item in data.get("permissions", ())
                 if isinstance(item, Mapping)
             ),
@@ -99,7 +101,12 @@ class ReactNativeReportDataBuilder(SourceReportDataBuilder):
                 ),
             ),
             endpoints=tuple(
-                EndpointDetails(str(item.get("endpoint") or ""), country=str(item.get("country") or ""))
+                EndpointDetails(
+                    endpoint=str(item.get("endpoint") or ""),
+                    tags=str(item.get("tags") or ""),
+                    ip_address=str(item.get("ip_address") or ""),
+                    country=str(item.get("country") or ""),
+                )
                 for item in data.get("endpoints", ())
                 if isinstance(item, Mapping)
             ),
@@ -113,15 +120,9 @@ class ReactNativeReportDataBuilder(SourceReportDataBuilder):
         raw_assessments: object,
     ) -> FunctionalityDetails:
         rows = raw_assessments if isinstance(raw_assessments, Mapping) else {}
-        has_native_assessment = any(str(platform) in {"android", "ios"} for platform in rows)
         platform_assessments = tuple(
             assessment
             for platform_name, row in rows.items()
-            if not (
-                str(platform_name) == "react_native"
-                and str(name) in ReactNativeFunctionality.PLATFORM_BACKED_CAPABILITIES
-                and has_native_assessment
-            )
             if isinstance(row, Mapping) and (assessment := cls._platform_assessment(platform_name, row)) is not None
         )
         status = AssessmentStatus.aggregate(item.status for item in platform_assessments)

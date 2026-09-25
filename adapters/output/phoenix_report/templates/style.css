@@ -176,7 +176,8 @@ table.compact th, table.compact td { font-size: 8pt; padding: 4px 6px; }
 .func-legend-present::before { background: #16233c; }
 .func-legend-absent { color: #7b8492; }
 .func-legend-absent::before { background: #b6bec9; }
-.func-grid { display: flex; flex-wrap: wrap; margin: 0 -4px; }
+.func-grid { margin: 0 -4px; }
+.func-row { display: flex; break-inside: avoid; }
 .func-item { width: 20%; min-height: 108px; padding: 12px 8px; text-align: center; break-inside: avoid; }
 .func-item svg { display: block; margin: 0 auto 10px; }
 .func-name { font-size: 8.5pt; line-height: 1.35; font-weight: normal; }

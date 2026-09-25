@@ -1,219 +1,95 @@
-"""Registry coverage and cross-model tests for Flutter evidence."""
-
-from __future__ import annotations
+"""Framework checks consume the same persisted YAML contract as native checks."""
 
 import json
-from dataclasses import asdict, fields
 
-import domain.post_scan.flutter as flutter_models
-from domain.post_scan.android.rule_registry import REPORT_RULE_IDS_BY_SECTION as ANDROID_REPORT_RULES
-from domain.post_scan.flutter import (
-    FlutterCodeEvidence,
-    FlutterDataStorageEvidence,
-    FlutterFunctionality,
-    FlutterManualReviewInventory,
-    FlutterNetworkEvidence,
-    FlutterResilienceEvidence,
-    FlutterScanExtractionContext,
-)
-from domain.post_scan.flutter.rule_registry import (
-    FLUTTER_RULE_REGISTRY,
-    FlutterRuleDisposition,
-)
-from domain.post_scan.flutter.rule_registry import (
-    REPORT_RULE_IDS_BY_SECTION as FLUTTER_REPORT_RULES,
-)
+import pytest
+
+from adapters.output.phoenix_report.builders.flutter import FlutterReportDataBuilder
+from adapters.output.phoenix_report.builders.react_native import ReactNativeReportDataBuilder
+from application.report_generation_service import ReportGenerationService
+from domain.post_scan.rule_assessment import rule_assessments
+from tests.rule_fixtures import assessment_payload, rule, scoped_payload
 
 
-def test_every_registered_report_evidence_key_has_a_flutter_model_consumer() -> None:
-    model_keys = {
-        "Code": {field.name for field in fields(FlutterCodeEvidence)},
-        "Network": {field.name for field in fields(FlutterNetworkEvidence)},
-        "Data Storage": {field.name for field in fields(FlutterDataStorageEvidence)},
-        "Resilience": {field.name for field in fields(FlutterResilienceEvidence)},
+def _build(framework, payload):
+    return ReportGenerationService([FlutterReportDataBuilder(), ReactNativeReportDataBuilder()]).build_report_data(
+        {
+            "target_information": {
+                "target_kind": framework + "_source",
+                "target_type": "source",
+                "platform": framework,
+                "stack": framework,
+            },
+            "rule_assessments": rule_assessments(json.loads(json.dumps(payload))),
+        }
+    )
+
+
+@pytest.mark.parametrize("framework", ["flutter", "react_native"])
+def test_arbitrary_rule_ids_categories_and_metadata_need_no_python_registration(framework):
+    definition = rule("example.custom", title="Customer supplied title", severity="MEDIUM")
+    payload = scoped_payload(
+        **{
+            framework: assessment_payload(
+                definition,
+                category="new_category",
+                results=[{"check_id": "example.custom", "path": "source.file", "start": {"line": 7}}],
+            )
+        }
+    )
+    report = _build(framework, payload)
+    check = report.vulnerability_sections[0].checks[0]
+    assert report.vulnerability_sections[0].name == "New Category"
+    assert check.name == "Customer supplied title"
+    assert check.severity.value == "medium"
+    assert check.evidence == "source.file:7"
+    assert check.remediation == definition["metadata"]["remediation"]["guidance"]
+    assert check.compliance == "EXAMPLE STANDARD: A1"
+    assert report.findings_severity.medium == 1
+
+
+@pytest.mark.parametrize("framework", ["flutter", "react_native"])
+def test_scoped_snapshots_preserve_positives_and_unknowns(framework):
+    payload = scoped_payload(
+        **{
+            framework: assessment_payload(rule("example.shared"), category="crypto"),
+            "android": assessment_payload(
+                rule("example.shared"), category="crypto", results=[{"check_id": "example.shared"}]
+            ),
+            "ios": assessment_payload(rule("example.shared"), category="crypto", status="failed"),
+        }
+    )
+    report = _build(framework, payload)
+    assert {r.area: r.risk_level.value for r in report.risk_summary} == {
+        "Crypto": "low",
+        "Android / Crypto": "high",
+        "iOS / Crypto": "not_evaluated",
     }
-
-    for registry in (FLUTTER_REPORT_RULES, ANDROID_REPORT_RULES):
-        for section, evidence_groups in registry.items():
-            assert set(evidence_groups) <= model_keys[section]
-            assert all(rule_ids for rule_ids in evidence_groups.values())
+    assert [s.name for s in report.vulnerability_sections] == ["Android / Crypto"]
+    assert report.findings_severity.high == 1
+    assert report.rule_status == "failed"
 
 
-def test_partial_multiplatform_scan_preserves_positives_and_unknowns() -> None:
-    context = FlutterScanExtractionContext(
-        {
-            "scan_metadata": {"project_path": "/workspace/app"},
-            "source_metadata": {
-                "platforms": {"android": True, "ios": True},
-                "android": {
-                    "available": True,
-                    "metadata": {
-                        "application": {"debuggable": False},
-                        "permissions": [{"name": "android.permission.CAMERA"}],
-                    },
-                },
-                "ios": {
-                    "available": True,
-                    "metadata": {
-                        "permissions": [{"key": "NSMicrophoneUsageDescription", "purpose": "Record audio"}],
-                    },
-                },
-            },
-            "gitleaks_outputs": {"gitleaks_report.json": []},
-            "opengrep": {
-                "results": [
-                    {
-                        "check_id": "flutter.source.sql-injection",
-                        "phoenix_scope": "flutter",
-                        "path": "/workspace/app/lib/database.dart",
-                        "start": {"line": 7},
-                    },
-                    {
-                        "check_id": "flutter.source.unsafe-platform-channel",
-                        "phoenix_scope": "flutter",
-                        "path": "/workspace/app/lib/channel.dart",
-                        "start": {"line": 11},
-                    },
-                    {
-                        "check_id": "android.source.unsafe-biometric-auth",
-                        "phoenix_scope": "android",
-                        "path": "/workspace/app/android/app/Auth.kt",
-                        "start": {"line": 18},
-                    },
-                    {
-                        "check_id": "ios-weak-crypto-md5",
-                        "phoenix_scope": "ios",
-                        "path": "/workspace/app/ios/Runner/Crypto.swift",
-                        "start": {"line": 23},
-                    },
-                    {
-                        "check_id": "private-api-usage-dynamic",
-                        "phoenix_scope": "ios",
-                        "path": "/workspace/app/ios/Runner/Bridge.swift",
-                        "start": {"line": 29},
-                    },
-                ],
-                "scan_metadata": {
-                    "scopes": {
-                        "flutter": {
-                            "status": "success",
-                            "configured_rule_ids": [
-                                "flutter.source.sql-injection",
-                                "flutter.source.unsafe-platform-channel",
-                            ],
-                        },
-                        "android": {"status": "failed", "configured_rule_ids": []},
-                        "ios": {
-                            "status": "success",
-                            "configured_rule_ids": [
-                                "ios-weak-crypto-md5",
-                            ],
-                        },
-                    }
-                },
-            },
+@pytest.mark.parametrize("framework", ["flutter", "react_native"])
+def test_reviews_and_observations_do_not_inflate_vulnerability_counts(framework):
+    payload = scoped_payload(
+        **{
+            framework: assessment_payload(
+                rule("example.review", finding_type="review"),
+                rule("example.control", finding_type="control"),
+                category="crypto",
+                results=[{"check_id": "example.review"}, {"check_id": "example.control"}],
+            )
         }
     )
-
-    code = FlutterCodeEvidence(context)
-    network = FlutterNetworkEvidence(context)
-    storage = FlutterDataStorageEvidence(context)
-    resilience = FlutterResilienceEvidence(context)
-    functionality = FlutterFunctionality(context)
-    manual_review = FlutterManualReviewInventory(context)
-
-    assert code.contains_potential_sql_injection.present is True
-    assert code.encodes_data_using_insecure_cryptography.present is None
-    assert code.writes_sensitive_information_to_system_log.present is None
-    assert network.sensitive_information_unencrypted_in_transit.present is None
-    assert storage.sensitive_values_stored_insecurely.present is None
-    assert resilience.biometric_local_authentication_bypass_possible.present is True
-    assert functionality.items["Camera"]["present"] is True
-    assert functionality.items["Microphone"]["present"] is True
-    assert functionality.items["SMS"]["present"] is None
-    assert [finding.rule_id for finding in manual_review.findings] == [
-        "flutter.source.unsafe-platform-channel",
-    ]
-    assert manual_review.assessed_scopes == ["flutter"]
-    assert manual_review.fully_assessed is True
-
-    json.dumps(
-        {
-            "code": asdict(code),
-            "network": asdict(network),
-            "storage": asdict(storage),
-            "resilience": asdict(resilience),
-            "functionality": asdict(functionality),
-            "manual_review": asdict(manual_review),
-        }
-    )
+    report = _build(framework, payload)
+    assert len(report.vulnerability_sections[0].checks) == 2
+    assert report.findings_severity.high == 0
+    assert report.risk_summary[0].risk_level.value == "not_evaluated"
 
 
-def test_raw_and_positive_informational_rules_cannot_enter_vulnerability_models() -> None:
-    flutter_raw_ids = {
-        rule_id
-        for rule_id, mapping in FLUTTER_RULE_REGISTRY.items()
-        if mapping.disposition is FlutterRuleDisposition.RAW_ONLY
-    }
-    results = [
-        {
-            "check_id": rule_id,
-            "phoenix_scope": scope,
-            "path": f"{scope}/{index}.source",
-        }
-        for scope, rule_ids in (("flutter", flutter_raw_ids),)
-        for index, rule_id in enumerate(sorted(rule_ids))
-    ]
-    context = FlutterScanExtractionContext(
-        {
-            "source_metadata": {
-                "platforms": {"ios": True},
-                "ios": {"available": True, "metadata": {}},
-            },
-            "opengrep": {
-                "results": results,
-                "scan_metadata": {
-                    "scopes": {
-                        "flutter": {
-                            "status": "success",
-                            "configured_rule_ids": sorted(flutter_raw_ids),
-                        },
-                        "ios": {
-                            "status": "success",
-                            "configured_rule_ids": sorted(set()),
-                        },
-                    }
-                },
-            },
-        }
-    )
-
-    vulnerability_output = json.dumps(
-        {
-            "code": asdict(FlutterCodeEvidence(context)),
-            "network": asdict(FlutterNetworkEvidence(context)),
-            "storage": asdict(FlutterDataStorageEvidence(context)),
-            "resilience": asdict(FlutterResilienceEvidence(context)),
-        }
-    )
-    manual_review = FlutterManualReviewInventory(context)
-
-    assert not any(rule_id in vulnerability_output for rule_id in flutter_raw_ids)
-    assert {finding.rule_id for finding in manual_review.findings} == flutter_raw_ids
-
-
-def test_step_four_models_are_public_flutter_exports() -> None:
-    expected_exports = {
-        "FlutterCodeEvidence",
-        "FlutterDataStorageEvidence",
-        "FlutterEvidenceEntry",
-        "FlutterFunctionality",
-        "FlutterHardcodedValues",
-        "FlutterManualReviewFinding",
-        "FlutterManualReviewInventory",
-        "FlutterNetworkEvidence",
-        "FlutterResilienceEvidence",
-    }
-
-    assert expected_exports <= set(flutter_models.__all__)
-    assert all(hasattr(flutter_models, name) for name in expected_exports)
+@pytest.mark.parametrize("framework", ["flutter", "react_native"])
+def test_unconfigured_categories_and_legacy_evidence_do_not_create_checks(framework):
+    report = _build(framework, scoped_payload(**{framework: assessment_payload(rule(), category="crypto")}))
+    assert report.vulnerability_sections == ()
+    assert [r.area for r in report.risk_summary] == ["Crypto"]

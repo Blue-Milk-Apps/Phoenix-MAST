@@ -1,6 +1,7 @@
 import pytest
 
 from adapters.output.phoenix_report.builders.flutter import FlutterReportDataBuilder
+from domain.post_scan.rule_assessment import rule_assessments
 from domain.report import (
     AssessmentStatus,
     CheckSeverity,
@@ -12,6 +13,8 @@ from domain.report import (
     ReportTargetType,
     RiskLevel,
 )
+from domain.report.rule_report import with_rule_assessments
+from tests.rule_fixtures import assessment_payload, rule, scoped_payload
 
 
 def _metadata(kind: ReportTargetKind = ReportTargetKind.FLUTTER_SOURCE) -> ReportMetadata:
@@ -26,48 +29,43 @@ def _metadata(kind: ReportTargetKind = ReportTargetKind.FLUTTER_SOURCE) -> Repor
     )
 
 
-def test_builds_all_sections_and_preserves_finding_metadata() -> None:
-    report = FlutterReportDataBuilder().build(
-        {
-            "code_evidence": {
-                "insecure api": {
-                    "present": True,
-                    "severity": "high",
-                    "evidence": "lib/main.dart:4",
-                    "compliance": "MASVS-CODE",
-                    "remediation_link": "https://example.test/fix",
-                    "explanation": "Unsafe API usage detected.",
-                }
-            },
-            "network_evidence": {"cleartext": {"present": False, "severity": "medium"}},
-        },
-        _metadata(),
-    )
+def test_builds_configured_sections_and_preserves_yaml_metadata() -> None:
+    definition = rule("example.api", title="Unsafe API", severity="HIGH")
+    data = {
+        "rule_assessments": rule_assessments(
+            scoped_payload(
+                flutter=assessment_payload(
+                    definition,
+                    category="code",
+                    results=[{"check_id": "example.api", "path": "lib/main.dart", "start": {"line": 4}}],
+                )
+            )
+        )
+    }
+    report = with_rule_assessments(FlutterReportDataBuilder().build(data, _metadata()), data)
 
-    assert [section.name for section in report.vulnerability_sections] == [
-        "Code",
-        "Network",
-        "Data Storage",
-        "Resilience",
-    ]
+    assert [section.name for section in report.vulnerability_sections] == ["Code"]
     check = report.vulnerability_sections[0].checks[0]
     assert check.result == AssessmentStatus.PRESENT
     assert check.severity == CheckSeverity.HIGH
     assert check.evidence == "lib/main.dart:4"
-    assert check.compliance == "MASVS-CODE"
-    assert check.remediation_link == "https://example.test/fix"
+    assert check.compliance == "EXAMPLE STANDARD: A1"
+    assert check.references == ("https://example.test/guide",)
     assert report.findings_severity.high == 1
     assert report.risk_summary[0].risk_level == RiskLevel.HIGH
-    details = report.platform_details
-    assert details.package_name == ""
+    assert report.platform_details.package_name == ""
 
 
 def test_maps_flutter_metadata_and_dependencies() -> None:
     report = FlutterReportDataBuilder().build(
         {
-            "identity": {"package_name": "com.example.app", "version_name": "1.2.3"},
-            "sdk": {"dart_constraint": ">=3.3.0", "flutter_constraint": ">=3.22.0"},
-            "platforms": {"android": True, "ios": True, "web": False},
+            "app_info": {"package_name": "com.example.app", "version_name": "1.2.3"},
+            "platform_inventory": {
+                "sdk": {"dart_constraint": ">=3.3.0", "flutter_constraint": ">=3.22.0"},
+                "android": {"detected": True},
+                "ios": {"detected": True},
+                "web_detected": False,
+            },
             "dependency_inventory": {"declared": [{"name": "http"}], "resolved": [{"name": "path"}]},
         },
         _metadata(),
@@ -104,8 +102,8 @@ def test_maps_flutter_inventories() -> None:
 def test_partial_evidence_produces_empty_sections_and_not_evaluated_risk() -> None:
     report = FlutterReportDataBuilder().build({}, _metadata())
 
-    assert all(not section.checks for section in report.vulnerability_sections)
-    assert all(summary.risk_level == RiskLevel.NOT_EVALUATED for summary in report.risk_summary)
+    assert report.vulnerability_sections == ()
+    assert report.risk_summary == ()
 
 
 def test_rejects_incompatible_target_kind() -> None:

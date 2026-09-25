@@ -139,6 +139,9 @@ class ReactNativeOpenGrepScanner(ScannerPort):
                 "exclude_patterns": (),
             },
         }
+        plist_path = config.output_path / ScanType.PLIST_SOURCE.value / "ios"
+        if scope_specs["ios"]["applicable"] and plist_path.is_dir():
+            scope_specs["ios"]["scan_paths"].append(plist_path)
 
         scopes: dict[str, dict[str, Any]] = {}
         findings: list[dict[str, Any]] = []
@@ -226,8 +229,7 @@ class ReactNativeOpenGrepScanner(ScannerPort):
             "scan_paths": [str(path) for path in scan_paths],
             "configured_rule_ids": [],
         }
-        if scope == "ios":
-            metadata.update({"rule_catalog": [], "rule_execution": {}, "mode": "source"})
+        metadata.update({"rule_catalog": [], "rule_execution": {}, "mode": "source"})
         if not applicable or not scan_paths:
             metadata["reason"] = (
                 "No eligible mobile JavaScript or TypeScript source files were found."
@@ -243,11 +245,7 @@ class ReactNativeOpenGrepScanner(ScannerPort):
             config,
             ignore_patterns=list(dict.fromkeys([*config.ignore_patterns, *exclusions])),
         )
-        scanner = (
-            CategoryOpenGrepScanner(rules_directory=rules_path, scan_paths=scan_paths)
-            if scope == "ios"
-            else OpenGrepScanner(rules_path=rules_path, scan_paths=scan_paths)
-        )
+        scanner = CategoryOpenGrepScanner(rules_directory=rules_path, scan_paths=scan_paths, platform=scope)
         result = scanner.scan(scope_config)[0]
         try:
             payload = json.loads(result.raw_output)
