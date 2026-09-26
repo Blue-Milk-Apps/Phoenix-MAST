@@ -670,7 +670,7 @@ def test_scan_command_passes_syft_output_format(tmp_path: Path, monkeypatch) -> 
 
 
 @pytest.mark.parametrize("stack", ["FLUTTER", "REACT_NATIVE", "NATIVE_ANDROID", "NATIVE_IOS"])
-def test_get_opengrep_scan_paths_for_source_includes_native_ios_plist_artifacts(tmp_path: Path, stack: str) -> None:
+def test_get_opengrep_scan_paths_for_source_includes_only_native_ios_xml_artifacts(tmp_path: Path, stack: str) -> None:
     config = ScanConfig(
         project_path=tmp_path / "project",
         output_path=tmp_path / "scan-results",
@@ -684,7 +684,11 @@ def test_get_opengrep_scan_paths_for_source_includes_native_ios_plist_artifacts(
     assert paths == [config.project_path]
     plist_output = config.output_path / "plist_source"
     plist_output.mkdir(parents=True)
-    expected = [config.project_path, plist_output] if stack == "NATIVE_IOS" else [config.project_path]
+    (plist_output / "Info.json").write_text('{"plist": {}}')
+    assert workflow.MobileScannerFactory()._get_opengrep_scan_paths(config) == [config.project_path]
+    xml_output = plist_output / "xml"
+    xml_output.mkdir()
+    expected = [config.project_path, xml_output] if stack == "NATIVE_IOS" else [config.project_path]
     assert workflow.MobileScannerFactory()._get_opengrep_scan_paths(config) == expected
 
 

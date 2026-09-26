@@ -49,11 +49,15 @@ def test_scans_each_flutter_platform_with_only_its_scoped_rules(tmp_path: Path, 
         FakeOpenGrepScanner,
     )
 
+    config = _config(project, tmp_path)
+    xml_output = config.output_path / "plist_source" / "xml" / "ios"
+    xml_output.mkdir(parents=True)
+    (config.output_path / "plist_source" / "Info.json").write_text('{"plist": {}}')
     result = FlutterOpenGrepScanner(
         rules_root / "flutter",
         android_rules_path=rules_root / "android",
         ios_rules_path=rules_root / "ios",
-    ).scan(_config(project, tmp_path))[0]
+    ).scan(config)[0]
     payload = json.loads(result.raw_output)
 
     assert result.success is True
@@ -61,7 +65,7 @@ def test_scans_each_flutter_platform_with_only_its_scoped_rules(tmp_path: Path, 
     assert calls == [
         ("flutter", [project / "lib"]),
         ("android", [project / "android"]),
-        ("ios", [project / "ios"]),
+        ("ios", [project / "ios", xml_output]),
     ]
     assert payload["scan_metadata"]["status"] == "complete"
     assert payload["scan_metadata"]["configured_rule_ids"] == sorted(rule_ids.values())

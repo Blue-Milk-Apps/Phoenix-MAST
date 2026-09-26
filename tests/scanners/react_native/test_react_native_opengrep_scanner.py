@@ -62,6 +62,9 @@ def test_scopes_mobile_source_and_excludes_web(monkeypatch, tmp_path: Path) -> N
         ios_rules_path=rules / "ios",
     )
     config = ScanConfig(project_path=project, output_path=tmp_path / "output", stack="REACT_NATIVE")
+    xml_output = config.output_path / "plist_source" / "xml" / "ios"
+    xml_output.mkdir(parents=True)
+    (config.output_path / "plist_source" / "Info.json").write_text('{"plist": {}}')
 
     result = scanner.scan(config)[0]
     report = json.loads(result.raw_output)
@@ -72,7 +75,7 @@ def test_scopes_mobile_source_and_excludes_web(monkeypatch, tmp_path: Path) -> N
     assert [paths for _, paths, _ in FakeOpenGrepScanner.calls] == [
         [project.resolve()],
         [(project / "android").resolve()],
-        [(project / "ios").resolve()],
+        [(project / "ios").resolve(), xml_output],
     ]
     react_native_config = FakeOpenGrepScanner.calls[0][2]
     assert "android/**" in react_native_config.ignore_patterns

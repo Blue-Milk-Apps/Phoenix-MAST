@@ -101,6 +101,21 @@ class PlistReportBuilder:
                         description=self.description,
                     )
                 )
+                if self.scan_type == ScanType.PLIST_SOURCE:
+                    with plist_file.open("rb") as handle:
+                        binary_plist = handle.read(8) == b"bplist00"
+                    if binary_plist:
+                        results.append(
+                            ScanResult(
+                                scanner_name=self.scanner_name,
+                                scan_type=self.scan_type,
+                                raw_output=plistlib.dumps(data, fmt=plistlib.FMT_XML).decode("utf-8"),
+                                relative_target_path=(
+                                    Path("xml") / relative_target.parent / plist_file.name
+                                ).as_posix(),
+                                description="XML copy of a binary source plist for generic OpenGrep rules.",
+                            )
+                        )
             except Exception as exc:
                 parse_failures += 1
                 index_entries.append(

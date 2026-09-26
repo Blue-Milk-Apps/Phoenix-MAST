@@ -63,7 +63,7 @@ class FlutterOpenGrepScanner(ScannerPort):
                 "scan_paths": self._platform_scan_paths(project_path, "ios"),
             },
         }
-        plist_path = config.output_path / ScanType.PLIST_SOURCE.value / "ios"
+        plist_path = config.output_path / ScanType.PLIST_SOURCE.value / "xml" / "ios"
         if scope_specs["ios"]["scan_paths"] and plist_path.is_dir():
             scope_specs["ios"]["scan_paths"].append(plist_path)
 

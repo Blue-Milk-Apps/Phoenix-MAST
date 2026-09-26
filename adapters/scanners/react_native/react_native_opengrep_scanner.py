@@ -139,7 +139,7 @@ class ReactNativeOpenGrepScanner(ScannerPort):
                 "exclude_patterns": (),
             },
         }
-        plist_path = config.output_path / ScanType.PLIST_SOURCE.value / "ios"
+        plist_path = config.output_path / ScanType.PLIST_SOURCE.value / "xml" / "ios"
         if scope_specs["ios"]["applicable"] and plist_path.is_dir():
             scope_specs["ios"]["scan_paths"].append(plist_path)
 
