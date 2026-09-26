@@ -27,7 +27,7 @@ def test_native_android_target_information_resolves_native_builder() -> None:
     )
     assert report.metadata.target.target_kind == ReportTargetKind.NATIVE_ANDROID_SOURCE
     assert report.platform_details.package_name == "com.example"
-    assert PdfReportGenerator._merged_presentation_data(report)["url_schemes"] == [
+    assert PdfReportGenerator._presentation_data(report)["url_schemes"] == [
         {"url_name": "com.example.MainActivity", "schemes": ("dontdothis",)}
     ]
     assert PdfPresentation.for_target_kind(report.metadata.target.target_kind).show_url_schemes

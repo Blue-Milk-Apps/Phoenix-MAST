@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import copy
-import json
 import os
 import sys
 from dataclasses import asdict
@@ -40,19 +38,17 @@ class PdfReportGenerator(ReportGeneratorPort):
         self,
         input_data: ReportData,
         output_path: Path | str,
-        *,
-        show_confidence_caveats: bool = False,
     ) -> Path:
         """Render a PDF from format-independent report data."""
 
         self._configure_weasyprint_library_path()
-        from jinja2 import Environment, FileSystemLoader
+        from jinja2 import Environment, FileSystemLoader, StrictUndefined
         from weasyprint import HTML
 
         presentation = PdfPresentation.for_target_kind(input_data.metadata.target.target_kind)
-        data = self._merged_presentation_data(input_data)
+        data = self._presentation_data(input_data)
         base_dir = Path(__file__).parent.parent
-        environment = Environment(loader=FileSystemLoader(str(base_dir / "templates")))
+        environment = Environment(loader=FileSystemLoader(str(base_dir / "templates")), undefined=StrictUndefined)
         environment.globals["risk_badge"] = risk_badge
         environment.globals["result_badge"] = result_badge
         environment.globals["assessment_badge"] = assessment_badge
@@ -63,45 +59,12 @@ class PdfReportGenerator(ReportGeneratorPort):
             charts=build_charts(data),
             app_icon_uri=get_app_icon_data_uri(data),
             phoenix_brand_icon_uri=get_report_brand_icon_data_uri(),
-            show_confidence_caveats=show_confidence_caveats,
         )
         resolved_output_path = Path(output_path)
         resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
         HTML(string=html, base_url=str(base_dir)).write_pdf(str(resolved_output_path))
         print(f"Wrote {resolved_output_path}")
         return resolved_output_path
-
-    @classmethod
-    def _merged_presentation_data(cls, report_data: ReportData) -> dict[str, object]:
-        base_dir = Path(__file__).parent.parent
-        base_template = json.loads((base_dir / "data" / "blank_template.json").read_text(encoding="utf-8"))
-        presentation_data = cls._presentation_data(report_data)
-        merged = cls._merge(base_template, presentation_data)
-        # Typed platform details are authoritative for these collections.  A
-        # recursive merge would retain unrelated placeholder rows from the
-        # shared template (for example Android functionality in an iOS report).
-        for key in (
-            "functionality",
-            "third_party_sdks",
-            "hardcoded_values",
-            "permissions",
-            "endpoints",
-            "url_schemes",
-            "ipa_binary_protections",
-            "risk_summary",
-        ):
-            if key in presentation_data:
-                merged[key] = copy.deepcopy(presentation_data[key])
-        return merged
-
-    @staticmethod
-    def _merge(base: object, override: object) -> object:
-        if isinstance(base, dict) and isinstance(override, dict):
-            result = copy.deepcopy(base)
-            for key, value in override.items():
-                result[key] = PdfReportGenerator._merge(result[key], value) if key in result else copy.deepcopy(value)
-            return result
-        return copy.deepcopy(override)
 
     @staticmethod
     def _presentation_data(report_data: ReportData) -> dict[str, object]:

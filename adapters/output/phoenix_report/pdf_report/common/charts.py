@@ -59,5 +59,4 @@ def make_overall_risk_polar_chart(risk_summary: dict[str, str]) -> str:
 
 
 def build_charts(data: dict[str, object]) -> dict[str, str]:
-    risk_summary = data.get("risk_summary", {})
-    return {"overall_risk_polar": make_overall_risk_polar_chart(risk_summary if isinstance(risk_summary, dict) else {})}
+    return {"overall_risk_polar": make_overall_risk_polar_chart(data["risk_summary"])}

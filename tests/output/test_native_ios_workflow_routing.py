@@ -23,7 +23,7 @@ def test_native_ios_target_information_resolves_native_builder() -> None:
     assert PdfReportGenerator._presentation_data(report)["app_info"]["icon_path"] == "app.png"
     expected = [{"url_name": "Example App", "schemes": ("dontdothis", "example")}]
     assert map_native_ios_details(report.platform_details)["url_schemes"] == expected
-    assert PdfReportGenerator._merged_presentation_data(report)["url_schemes"] == expected
+    assert PdfReportGenerator._presentation_data(report)["url_schemes"] == expected
 
 
 def test_native_ios_maps_expanded_inventories() -> None:

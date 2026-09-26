@@ -69,7 +69,7 @@ def test_app_icon_survives_source_cleanup_through_report_pipeline(tmp_path: Path
         "stack": "native_ios",
     }
     report = ReportGenerationService([NativeIOSReportDataBuilder()]).build_report_data(sections)
-    uri = get_app_icon_data_uri(PdfReportGenerator._merged_presentation_data(report))
+    uri = get_app_icon_data_uri(PdfReportGenerator._presentation_data(report))
     assert uri == sections["app_info"]["icon_data_uri"]
     with Image.open(io.BytesIO(base64.b64decode(uri.split(",")[1]))) as icon:
         assert icon.size == (64, 64)

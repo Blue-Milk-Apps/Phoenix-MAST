@@ -5,7 +5,6 @@
 <style>{{ css }}</style>
 </head>
 <body>
-{% set presentation = presentation | default(data.presentation) %}
 {% set is_ios_report = data.meta.platform == 'iOS' %}
 {% set is_native_ios_source = presentation.target_type == 'source' and data.meta.platform == 'iOS' %}
 
@@ -44,7 +43,7 @@
     {% if android_info.main_activity %}<tr><td class="label">Main Activity</td><td class="value">{{ android_info.main_activity | e }}</td></tr>{% endif %}
     {% if android_info.target_sdk %}<tr><td class="label">Target SDK</td><td class="value">{{ android_info.target_sdk | e }}</td></tr>{% endif %}
     {% if android_info.min_sdk %}<tr><td class="label">Min SDK</td><td class="value">{{ android_info.min_sdk | e }}</td></tr>{% endif %}
-    {% if android_info.max_sdk %}<tr><td class="label">Max SDK</td><td class="value">{{ android_info.max_sdk | e }}</td></tr>{% endif %}
+    {% if presentation.target_type == 'binary' and android_info.max_sdk %}<tr><td class="label">Max SDK</td><td class="value">{{ android_info.max_sdk | e }}</td></tr>{% endif %}
     {% elif is_native_ios_source and data.native_ios_details.minimum_os %}
     <tr><td class="label">Minimum OS</td><td class="value">{{ data.native_ios_details.minimum_os | e }}</td></tr>
     {% endif %}
@@ -57,6 +56,7 @@
     {% endif %}
     <tr><td class="label">Scan Date</td><td class="value">{{ data.meta.scan_date }}</td></tr>
     <tr><td class="label">Platform</td><td class="value">{{ data.meta.platform }}</td></tr>
+    {% if presentation.target_type == 'binary' %}
     {% if data.app_info.app_store_id %}
     <tr><td class="label">{{ 'App Store' if data.meta.platform == 'iOS' else 'Play Store' }}</td><td class="value">{{ data.app_info.app_store_id }}</td></tr>
     {% endif %}
@@ -69,6 +69,7 @@
     {% if data.app_info.trackers_detected %}
     <tr><td class="label">Trackers Detected</td><td class="value">{{ data.app_info.trackers_detected }}</td></tr>
     {% endif %}
+    {% endif %}
   </table>
   </div>
 </div>
@@ -80,7 +81,7 @@
     <div class="severity-bars" aria-label="Finding counts by severity">
       {% set max_count = [data.findings_severity.values() | max, 1] | max %}
       {% for level, color, key in [('Critical','#8e1b1b','critical'), ('High','#c0392b','high'), ('Medium','#e08e0b','medium'), ('Low','#5499c7','low'), ('Info','#2980b9','info'), ('Secure','#27ae60','secure')] %}
-      {% set count = data.findings_severity.get(key, 0) %}
+      {% set count = data.findings_severity[key] %}
       <div class="bar-block">
         <div class="bar-label-row">
           <span class="bar-label">{{ level }}</span>
@@ -117,7 +118,7 @@
 </div>
 
 <!-- ===================== CERTIFICATE / FILE / COMPONENTS ===================== -->
-{% if not is_native_ios_source %}
+{% if presentation.target_type == 'binary' or data.meta.platform == 'Android' %}
 <div class="section">
   {% if presentation.target_type != 'source' and data.meta.platform != 'iOS' %}
   <h2>Certificate Information</h2>
@@ -170,7 +171,7 @@
   </table>
   {% endif %}
 
-  {% if data.meta.platform == 'iOS' and presentation.target_type == 'BINARY' and data.ios_binary_manual_review_available %}
+  {% if presentation.show_ios_binary_analysis and data.ios_binary_manual_review_available %}
   <h2>Requires Manual Review</h2>
   <p class="small">These checks need source-level or runtime validation and are not confirmed findings from binary evidence alone.</p>
   <p class="small">Assessment status: {{ data.ios_binary_manual_review_status }}</p>
@@ -182,14 +183,14 @@
   </table>
   {% endif %}
 
-  {% if data.meta.platform != 'iOS' and (data.meta.platform != 'Flutter' or data.app_components.activities is not none or data.app_components.services is not none or data.app_components.receivers is not none or data.app_components.providers is not none) %}
+  {% if data.meta.platform == 'Android' %}
   <h2>App Components</h2>
   <div class="components-bars">
     {% set component_rows = [
-      ('Activities', data.app_components.activities or 0, data.app_components.exported_activities or 0),
-      ('Services', data.app_components.services or 0, data.app_components.exported_services or 0),
-      ('Receivers', data.app_components.receivers or 0, data.app_components.exported_receivers or 0),
-      ('Providers', data.app_components.providers or 0, data.app_components.exported_providers or 0)
+      ('Activities', data.app_components.activities, data.app_components.exported_activities),
+      ('Services', data.app_components.services, data.app_components.exported_services),
+      ('Receivers', data.app_components.receivers, data.app_components.exported_receivers),
+      ('Providers', data.app_components.providers, data.app_components.exported_providers)
     ] %}
     {% set max_total = (component_rows | map(attribute=1) | list | max) or 1 %}
     {% for label, total, exported in component_rows %}
@@ -571,7 +572,7 @@ SOFTWARE.
     <div class="func-row">
     {% for name, f in row %}
     {% set present = f.present is sameas true or f.status == 'present' %}
-    {% set status = f.status or ('present' if present else 'not_evaluated' if f.present is none else 'not_present') %}
+    {% set status = f.status %}
     <div class="func-item {{ 'func-present' if present else 'func-absent' }}" role="listitem" title="{{ f.explanation | e }}" aria-label="{{ name | e }}: {{ status | replace('_', ' ') | e }}">
       {{ functionality_icon(name, present) }}
       <div class="func-name">{{ name | e }}</div>
@@ -622,7 +623,7 @@ SOFTWARE.
           {% endfor %}
         </div>
         {% endif %}
-        {% if c.remediation_link %}<br><span class="small">Remediation: {{ c.remediation_link | e }}</span>{% endif %}{% if c.confidence_caveat and show_confidence_caveats %}<br><span class="small confidence-caveat">⚠ {{ c.confidence_caveat | e }}</span>{% endif %}
+        {% if c.remediation_link %}<br><span class="small">Remediation: {{ c.remediation_link | e }}</span>{% endif %}
       </td>
       <td class="small finding-compliance">{{ c.compliance | e }}</td>
       <td class="small rule-evidence">{{ c.evidence | e }}</td>
@@ -717,28 +718,25 @@ SOFTWARE.
 </div>
 
 <!-- ===================== ENDPOINTS ===================== -->
+{% if data.endpoints %}
 <div class="section">
   <h2>Endpoint Connections</h2>
   <p class="small">The following network destinations were identified in the available analysis evidence.</p>
-  {% set detailed_endpoints = data.meta.platform == "React Native" %}
   <table class="compact">
     <tr>
       <th>Endpoint</th><th>Tags</th>
-      {% if detailed_endpoints %}<th>Source</th><th>Connection</th><th>Security</th>{% endif %}
       <th>IP Address</th><th>Country</th>
     </tr>
     {% for e in data.endpoints %}
     <tr>
       <td class="mono">{{ e.endpoint }}</td><td>{{ e.tags }}</td>
-      {% if detailed_endpoints %}
-      <td class="mono">{{ e.source }}</td><td>{{ e.connection_type }}</td><td>{{ e.transport_security }}</td>
-      {% endif %}
       <td class="mono">{{ e.ip_address }}</td><td>{{ e.country }}</td>
     </tr>
     {% endfor %}
   </table>
   <p class="small">* If country code is not provided it could not be determined.</p>
 </div>
+{% endif %}
 
 </body>
 </html>

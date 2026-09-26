@@ -15,6 +15,4 @@ class ReportGeneratorPort(Protocol):
         self,
         input_data: ReportData,
         output_path: Path | str,
-        *,
-        show_confidence_caveats: bool = False,
     ) -> Path: ...

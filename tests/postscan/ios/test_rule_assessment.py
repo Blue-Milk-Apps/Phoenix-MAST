@@ -91,7 +91,7 @@ def test_pdf_projection_keeps_metadata_and_dynamic_categories():
         functionality={"Camera": {"present": False, "explanation": "No camera capability recorded."}},
         url_schemes=[{"url_name": "Example App", "schemes": ["dontdothis"]}],
     )
-    data = PdfReportGenerator._merged_presentation_data(report)
+    data = PdfReportGenerator._presentation_data(report)
     check = data["vulnerability_sections"][-1]["checks"][0]
     assert check["finding_type"] == "review"
     assert check["scope"] == "matched_code"
@@ -101,17 +101,24 @@ def test_pdf_projection_keeps_metadata_and_dynamic_categories():
     from dataclasses import asdict
     from pathlib import Path
 
-    from jinja2 import Environment, FileSystemLoader
+    from jinja2 import Environment, FileSystemLoader, StrictUndefined, UndefinedError
 
     from adapters.output.phoenix_report.common import assessment_badge, result_badge, risk_badge
     from adapters.output.phoenix_report.pdf_report.presentation import PdfPresentation
 
     templates = Path(__file__).resolve().parents[3] / "adapters/output/phoenix_report/templates"
-    environment = Environment(loader=FileSystemLoader(str(templates)))
+    environment = Environment(loader=FileSystemLoader(str(templates)), undefined=StrictUndefined)
     environment.globals.update(assessment_badge=assessment_badge, result_badge=result_badge, risk_badge=risk_badge)
-    html = environment.get_template("report.html.jinja").render(
-        data=data, charts={}, presentation=asdict(PdfPresentation.for_target_kind(report.metadata.target.target_kind))
-    )
+    template = environment.get_template("report.html.jinja")
+    context = {
+        "data": data,
+        "charts": {"overall_risk_polar": ""},
+        "presentation": asdict(PdfPresentation.for_target_kind(report.metadata.target.target_kind)),
+        "css": "",
+        "app_icon_uri": "",
+        "phoenix_brand_icon_uri": "",
+    }
+    html = template.render(**context)
     table = html.split('<table class="findings-table">')[1].split("</table>")[0]
     assert all(
         f">{column}</th>" in table
@@ -132,7 +139,12 @@ def test_pdf_projection_keeps_metadata_and_dynamic_categories():
     assert "Secret-scanner results were not included" in html
     assert "Rule Coverage" not in html
     assert 'class="section checks-section"' in html
-    assert "Endpoint Connections" in html
+    assert "Endpoint Connections" not in html
+    assert "app_components" not in data
+    assert "certificate" not in data
+    data["findings_severity"].pop("high")
+    with pytest.raises(UndefinedError, match="high"):
+        template.render(**context)
 
 
 def test_only_hits_are_merged_into_one_table_per_category():
@@ -202,10 +214,10 @@ def source_scan_report(tmp_path, artifacts):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(payload), encoding="utf-8")
     sections = PostScanProcessingService(NativeIOSScanOutputLoader(), NativeIOSScanDetailExtractor()).process(tmp_path)
-    # The workflow persists this snapshot before building the report.
+    # Preserve the scanner JSON representation while exercising aggregation.
     sections = json.loads(json.dumps(sections))
     report = build(None, **sections)
-    return sections, report, PdfReportGenerator._merged_presentation_data(report)
+    return sections, report, PdfReportGenerator._presentation_data(report)
 
 
 @pytest.fixture
