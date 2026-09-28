@@ -112,21 +112,11 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Comma-separated paths or quoted globs to exclude; may be repeated",
     )
     scan_parser.add_argument(
-        "--rules-root",
+        "--opengrep-rules",
         type=Path,
         metavar="PATH",
         default=os.environ.get("PHOENIX_RULES_ROOT") or None,
         help="Root containing <platform>/<source|binary>/ rule directories (Docker default: /app/rules).",
-    )
-    scan_parser.add_argument("--ios-binary-opengrep-rules", type=Path, metavar="PATH")
-    scan_parser.add_argument("--android-binary-opengrep-rules", type=Path, metavar="PATH")
-    scan_parser.add_argument("--flutter-source-opengrep-rules", type=Path, metavar="PATH")
-    scan_parser.add_argument("--react-native-source-opengrep-rules", type=Path, metavar="PATH")
-    scan_parser.add_argument(
-        "--android-source-opengrep-rules", dest="native_android_source_opengrep_rules", type=Path, metavar="PATH"
-    )
-    scan_parser.add_argument(
-        "--ios-source-opengrep-rules", dest="native_ios_source_opengrep_rules", type=Path, metavar="PATH"
     )
     scan_parser.set_defaults(func=_scan_command)
 
@@ -178,10 +168,6 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_slug = "android_binary"
             platform = "ANDROID"
             stack = "ANY"
-            rules_path = _resolve_opengrep_rules_path(
-                args.android_binary_opengrep_rules,
-                "android_binary",
-            )
 
         case argparse.Namespace(ios_binary=Path() as project_path):
             scan_mode = "binary"
@@ -189,10 +175,6 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_slug = "ios_binary"
             platform = "IOS"
             stack = "ANY"
-            rules_path = _resolve_opengrep_rules_path(
-                args.ios_binary_opengrep_rules,
-                "ios_binary",
-            )
 
         case argparse.Namespace(flutter_source=Path() as project_path):
             scan_mode = "source"
@@ -200,10 +182,6 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_slug = "flutter_source"
             platform = "ANY"
             stack = "FLUTTER"
-            rules_path = _resolve_opengrep_rules_path(
-                args.flutter_source_opengrep_rules,
-                "flutter_source",
-            )
 
         case argparse.Namespace(react_native_source=Path() as project_path):
             scan_mode = "source"
@@ -211,10 +189,6 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_slug = "react_native_source"
             platform = "ANY"
             stack = "REACT_NATIVE"
-            rules_path = _resolve_opengrep_rules_path(
-                args.react_native_source_opengrep_rules,
-                "react_native_source",
-            )
 
         case argparse.Namespace(native_android_source=Path() as project_path):
             scan_mode = "source"
@@ -222,10 +196,6 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_slug = "native_android_source"
             platform = "ANDROID"
             stack = "NATIVE_ANDROID"
-            rules_path = _resolve_opengrep_rules_path(
-                args.native_android_source_opengrep_rules,
-                "native_android_source",
-            )
 
         case argparse.Namespace(native_ios_source=Path() as project_path):
             scan_mode = "source"
@@ -233,20 +203,11 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
             scan_slug = "native_ios_source"
             platform = "IOS"
             stack = "NATIVE_IOS"
-            rules_path = _resolve_opengrep_rules_path(
-                args.native_ios_source_opengrep_rules,
-                "native_ios_source",
-            )
 
         case _:
             raise ValueError("No valid scan type provided")
-    rules_root = getattr(args, "rules_root", None)
-    rules_override = getattr(args, f"{scan_slug}_opengrep_rules", None)
-    if rules_override is not None and rules_path == rules_override.resolve() / DEFAULT_OPENGREP_RULES_DIRS[scan_slug]:
-        # A whole-tree override also supplies embedded iOS/Android rules for framework scans.
-        rules_root = rules_override.resolve()
-    elif rules_root is not None and rules_override is None:
-        rules_path = rules_root.resolve() / DEFAULT_OPENGREP_RULES_DIRS[scan_slug]
+    rules_path = _resolve_opengrep_rules_path(args.opengrep_rules, scan_slug)
+    rules_root = rules_path.parent.parent if rules_path is not None else None
     project_path = project_path.resolve()
     run_timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
     output_path = args.output.resolve() / f"SAST_{scan_slug}_{run_timestamp}"
@@ -272,17 +233,10 @@ def _resolve_opengrep_rules_path(
     scan_slug: str,
 ) -> Path | None:
     default_dir = DEFAULT_OPENGREP_RULES_DIRS.get(scan_slug)
-    if override_path is not None:
-        override_path = override_path.resolve()
-        if default_dir and any(
-            (override_path / Path(relative).parts[0]).is_dir() for relative in DEFAULT_OPENGREP_RULES_DIRS.values()
-        ):
-            # Select the requested scope even if it is missing; never substitute another mode.
-            return override_path / default_dir
-        return override_path
-
     if not default_dir:
         return None
+    if override_path is not None:
+        return override_path.resolve() / default_dir
 
     candidates = [
         (Path(__file__).parent.parent / "rules" / default_dir).resolve(),

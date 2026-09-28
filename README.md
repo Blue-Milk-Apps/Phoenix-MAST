@@ -54,6 +54,14 @@ rules/
 
 Add your custom OpenGrep yml rules files accordingly, and the scan target flag will use the required folders mounted under `/app/rules` automatically.
 
+Use `--opengrep-rules PATH` to select a different rules root containing the platform folders:
+
+```bash
+phoenix scan --ios-source /path/to/application --opengrep-rules /path/to/Phoenix-Rules/rules
+```
+
+Phoenix selects `<platform>/<source|binary>` beneath that root from the scan target. Flutter and React Native also use its `ios/source` and `android/source` folders. The explicit flag overrides `PHOENIX_RULES_ROOT`; the container sets that environment variable to `/app/rules`. Pass the shared root, not an individual platform folder or YAML file. This replaces `--rules-root` and all platform-specific `--*-opengrep-rules` flags.
+
 ## Scan target flags
 
 Pass exactly one target flag to choose the scan platform, source/binary mode, and input path.
