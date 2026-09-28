@@ -45,7 +45,6 @@ class Aapt2Scanner(ScannerPort):
     SCHEMA_VERSION = "1.0"
     COMMAND_PROFILE = "AAPT2_ANDROID_EVIDENCE_V1"
     DEFAULT_TIMEOUT_SECONDS = 180
-    MAX_RESOURCE_CANDIDATES = 250
 
     COMMANDS = (
         Aapt2CommandSpec(
@@ -72,7 +71,7 @@ class Aapt2Scanner(ScannerPort):
         ),
         Aapt2CommandSpec(
             key="resources",
-            purpose="resource_table_candidates",
+            purpose="resource_table",
             argv_template=["aapt2", "dump", "resources", "<apk>"],
         ),
     )
@@ -116,32 +115,6 @@ class Aapt2Scanner(ScannerPort):
         "android.permission.WRITE_EXTERNAL_STORAGE",
     }
     COMPONENT_TAGS = {"activity", "activity-alias", "service", "receiver", "provider"}
-    SECURITY_RESOURCE_KEYWORDS = (
-        "auth",
-        "backup",
-        "biometric",
-        "cert",
-        "cleartext",
-        "config",
-        "credential",
-        "crypto",
-        "deeplink",
-        "domain",
-        "fileprovider",
-        "key",
-        "network_security",
-        "oauth",
-        "permission",
-        "pin",
-        "privacy",
-        "provider",
-        "secret",
-        "security",
-        "ssl",
-        "token",
-        "trust",
-        "webview",
-    )
 
     @property
     def scan_type(self) -> ScanType:
@@ -317,10 +290,8 @@ class Aapt2Scanner(ScannerPort):
             "application": manifest["application"],
             "components": manifest["components"],
             "intent_filters": manifest["intent_filters"],
-            "resource_summary": resources["summary"],
-            "resource_candidates": resources["candidates"],
-            "evidence_relationships": relationships + resources["relationships"],
-            "candidate_interpretations": self._candidate_interpretations(permissions, manifest, resources),
+            "resource_summary": resources,
+            "evidence_relationships": relationships,
             "downstream_correlation_requirements": self._correlation_requirements(),
             "raw_evidence": {
                 result.key: {
@@ -504,73 +475,17 @@ class Aapt2Scanner(ScannerPort):
             "security_posture": security_posture,
         }
 
-    def _parse_resources(
-        self,
-        result: Aapt2CommandResult | None,
-    ) -> dict[str, Any]:
-        candidates: list[dict[str, Any]] = []
+    def _parse_resources(self, result: Aapt2CommandResult | None) -> dict[str, Any]:
         type_counts: dict[str, int] = {}
         if result is not None:
             for line in result.stdout.splitlines():
                 parsed = self._resource_line(line)
-                if parsed is None:
-                    continue
-                resource_type = parsed["resource_type"]
-                type_counts[resource_type] = type_counts.get(resource_type, 0) + 1
-                haystack = f"{parsed['name']} {parsed.get('value') or ''}".lower()
-                if not any(keyword in haystack for keyword in self.SECURITY_RESOURCE_KEYWORDS):
-                    continue
-                if len(candidates) >= self.MAX_RESOURCE_CANDIDATES:
-                    continue
-                candidate_id = self._evidence_id("resource", parsed["resource_id"], parsed["name"])
-                candidates.append(
-                    {
-                        "id": candidate_id,
-                        "resource_id": parsed["resource_id"],
-                        "resource_type": resource_type,
-                        "name": parsed["name"],
-                        "value_hint": parsed.get("value"),
-                        "confidence": "medium",
-                        "fact_type": "resource_follow_up_candidate",
-                        "provenance": self._provenance("resources"),
-                        "interpretation_hints": [
-                            "resource name or value suggests security relevance",
-                            "candidate requires decoded resource or code correlation",
-                        ],
-                        "follow_up": [
-                            "correlate resource id with manifest references",
-                            "inspect decoded resource content when available",
-                        ],
-                    }
-                )
-
-        relationships = [
-            {
-                "relationship_type": "application_resource_reference_candidate",
-                "id": self._evidence_id(
-                    "relationship",
-                    "application_resource_reference_candidate",
-                    "app",
-                    candidate["id"],
-                ),
-                "source_id": "app",
-                "target_id": candidate["id"],
-                "confidence": "medium",
-                "provenance": self._provenance("resources"),
-            }
-            for candidate in candidates
-            if candidate["resource_type"] in {"xml", "string", "array", "bool"}
-        ]
+                if parsed is not None:
+                    resource_type = parsed["resource_type"]
+                    type_counts[resource_type] = type_counts.get(resource_type, 0) + 1
         return {
-            "summary": {
-                "resource_type_counts": dict(sorted(type_counts.items())),
-                "candidate_count": len(candidates),
-                "candidate_limit": self.MAX_RESOURCE_CANDIDATES,
-                "exhaustive_normalization": False,
-                "provenance": self._provenance("resources"),
-            },
-            "candidates": candidates,
-            "relationships": relationships,
+            "resource_type_counts": dict(sorted(type_counts.items())),
+            "provenance": self._provenance("resources"),
         }
 
     def _security_posture(
@@ -598,94 +513,12 @@ class Aapt2Scanner(ScannerPort):
             "deep_link_intent_filter_count": sum(
                 1 for component in components for _ in component.get("intent_filter_ids", [])
             ),
-            "posture_kind": "extracted_facts_and_candidates",
+            "posture_kind": "extracted_facts",
             "interpretation_hints": [
                 "manifest attributes are static evidence, not exploitability findings",
                 "exported components and permissions require downstream behavioral correlation",
             ],
         }
-
-    def _candidate_interpretations(
-        self,
-        permissions: list[dict[str, Any]],
-        manifest: dict[str, Any],
-        resources: dict[str, Any],
-    ) -> list[dict[str, Any]]:
-        candidates: list[dict[str, Any]] = []
-        for component in manifest["components"]:
-            if component["exported"] is True:
-                candidates.append(
-                    self._candidate(
-                        "exported_component_review",
-                        component["id"],
-                        "Exported component is externally addressable evidence.",
-                        "high",
-                        ["correlate with intent filters, permissions, and DEX handlers"],
-                    )
-                )
-            if component["component_type"] == "provider" and self._is_file_provider(component):
-                candidates.append(
-                    self._candidate(
-                        "fileprovider_posture_review",
-                        component["id"],
-                        "Provider metadata/name suggests FileProvider posture review.",
-                        "medium",
-                        ["inspect provider authorities and paths XML"],
-                    )
-                )
-        for permission in permissions:
-            if permission["protection_level_hint"] == "dangerous":
-                candidates.append(
-                    self._candidate(
-                        "dangerous_permission_correlation",
-                        permission["id"],
-                        "Dangerous permission is declared.",
-                        "high",
-                        ["correlate with runtime API usage and user-facing feature need"],
-                    )
-                )
-        application = manifest["application"]
-        if application["uses_cleartext_traffic"] is True:
-            candidates.append(
-                self._candidate(
-                    "cleartext_traffic_posture_review",
-                    "app",
-                    "Application allows cleartext traffic by manifest attribute.",
-                    "high",
-                    ["correlate with network security config and endpoint evidence"],
-                )
-            )
-        if application["network_security_config_reference"]:
-            candidates.append(
-                self._candidate(
-                    "network_security_config_follow_up",
-                    "app",
-                    "Application references a network security config resource.",
-                    "high",
-                    ["decode and inspect referenced XML resource"],
-                )
-            )
-        if application["allow_backup"] is True:
-            candidates.append(
-                self._candidate(
-                    "backup_posture_review",
-                    "app",
-                    "Application permits Android backup by manifest attribute.",
-                    "medium",
-                    ["correlate with backup rules and sensitive local storage usage"],
-                )
-            )
-        if resources["candidates"]:
-            candidates.append(
-                self._candidate(
-                    "security_resource_follow_up",
-                    "app",
-                    "Security-relevant resource names were observed.",
-                    "medium",
-                    ["correlate resource ids with manifest and code references"],
-                )
-            )
-        return candidates
 
     def _relationships(
         self,
@@ -727,12 +560,7 @@ class Aapt2Scanner(ScannerPort):
         command_results: list[Aapt2CommandResult],
     ) -> list[ScanResult]:
         execution_status = evidence["extraction_metadata"]["execution_status"]
-        extractor_success = execution_status not in {
-            "TIMEOUT",
-            "TOOL_ERROR",
-            "PARSING_ERROR",
-            "INTERRUPTED",
-        }
+        extractor_success = execution_status == "SUCCESS"
         error_message = "" if extractor_success else "aapt2 evidence extraction failed."
         artifacts = self._section_artifacts(evidence, command_results)
         results = []
@@ -820,9 +648,7 @@ class Aapt2Scanner(ScannerPort):
                 "deep_links": [item for item in evidence["intent_filters"] if item.get("uri_patterns")],
             },
             "resource_summary.json": evidence["resource_summary"],
-            "resource_candidates.json": {"resource_candidates": evidence["resource_candidates"]},
             "evidence_relationships.json": {"relationships": evidence["evidence_relationships"]},
-            "candidate_interpretations.json": {"candidate_interpretations": evidence["candidate_interpretations"]},
             "correlation_requirements.json": {
                 "downstream_correlation_requirements": evidence["downstream_correlation_requirements"]
             },
@@ -852,7 +678,6 @@ class Aapt2Scanner(ScannerPort):
             "components.json": "xmltree_manifest",
             "intent_filters.json": "xmltree_manifest",
             "resource_summary.json": "resources",
-            "resource_candidates.json": "resources",
         }
         return {
             "artifacts": [
@@ -875,12 +700,8 @@ class Aapt2Scanner(ScannerPort):
             return len(value["intent_filters"])
         if name == "permissions.json":
             return len(value["permissions"])
-        if name == "resource_candidates.json":
-            return len(value["resource_candidates"])
         if name == "evidence_relationships.json":
             return len(value["relationships"])
-        if name == "candidate_interpretations.json":
-            return len(value["candidate_interpretations"])
         if isinstance(value, list):
             return len(value)
         return 0
@@ -983,7 +804,6 @@ class Aapt2Scanner(ScannerPort):
             "categories": [],
             "data": [],
             "uri_patterns": [],
-            "auth_related_entrypoint_indicator": False,
             "confidence": "high",
             "fact_type": "manifest_intent_filter",
             "provenance": self._provenance("xmltree_manifest"),
@@ -1059,9 +879,6 @@ class Aapt2Scanner(ScannerPort):
             merged.update({key: value for key, value in entry.items() if value is not None})
         if merged:
             item["uri_patterns"] = [self._uri_pattern(merged)]
-        auth_terms = ("login", "oauth", "sso", "callback", "auth", "token")
-        haystack = " ".join(item["actions"] + item["categories"] + list(merged.values())).lower()
-        item["auth_related_entrypoint_indicator"] = any(term in haystack for term in auth_terms)
         return item
 
     def _uri_pattern(self, data: dict[str, str]) -> dict[str, Any]:
@@ -1165,36 +982,6 @@ class Aapt2Scanner(ScannerPort):
 
     def _android_name(self, name: str) -> str:
         return name.split(":", 1)[-1]
-
-    def _is_file_provider(self, component: dict[str, Any]) -> bool:
-        haystack = " ".join(
-            str(value)
-            for value in (
-                component.get("name"),
-                component.get("authorities"),
-                component.get("permission"),
-            )
-            if value
-        ).lower()
-        return "fileprovider" in haystack or "file.provider" in haystack
-
-    def _candidate(
-        self,
-        candidate_type: str,
-        evidence_id: str,
-        hint: str,
-        confidence: str,
-        follow_up: list[str],
-    ) -> dict[str, Any]:
-        return {
-            "id": self._evidence_id("candidate", candidate_type, evidence_id),
-            "candidate_type": candidate_type,
-            "related_evidence_id": evidence_id,
-            "confidence": confidence,
-            "interpretation_hint": hint,
-            "follow_up": follow_up,
-            "not_a_finding": True,
-        }
 
     def _relationship(
         self,

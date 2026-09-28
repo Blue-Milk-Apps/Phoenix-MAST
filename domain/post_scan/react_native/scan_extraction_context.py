@@ -6,6 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from domain.post_scan.dependencies import syft_assessed, syft_packages
+
 
 class ReactNativeScanExtractionContext:
     def __init__(self, loaded_outputs: dict[str, Any]) -> None:
@@ -39,7 +41,13 @@ class ReactNativeScanExtractionContext:
     @property
     def dependencies(self) -> dict[str, list[dict[str, Any]]]:
         values = self.mapping(self.source_metadata.get("dependencies"))
-        return {key: self.mapping_list(values.get(key)) for key in ("declared", "resolved")}
+        return {
+            "declared": self.mapping_list(values.get("declared")),
+            "resolved": [
+                {"name": p["name"], "version": str(p.get("version") or ""), "scope": "resolved"}
+                for p in syft_packages(self.loaded_outputs, "npm")
+            ],
+        }
 
     @property
     def android(self) -> dict[str, Any]:
@@ -115,27 +123,11 @@ class ReactNativeScanExtractionContext:
 
     @property
     def syft_packages(self) -> list[dict[str, str]]:
-        output = self._known_output("syft_outputs", "sbom.json")
-        if not isinstance(output, dict):
-            return []
-        packages: list[dict[str, str]] = []
-        for key in ("artifacts", "components"):
-            for item in output.get(key, []) if isinstance(output.get(key), list) else []:
-                if isinstance(item, dict) and self.first_non_empty(item.get("name")):
-                    packages.append(
-                        {
-                            "name": self.first_non_empty(item.get("name")),
-                            "version": self.first_non_empty(item.get("version")),
-                        }
-                    )
-        return packages
+        return [{"name": p["name"], "version": str(p.get("version") or "")} for p in syft_packages(self.loaded_outputs)]
 
     @property
     def syft_assessed(self) -> bool:
-        output = self._known_output("syft_outputs", "sbom.json")
-        return isinstance(output, dict) and any(
-            isinstance(output.get(key), list) for key in ("artifacts", "components")
-        )
+        return syft_assessed(self.loaded_outputs)
 
     @property
     def scan_date(self) -> str:

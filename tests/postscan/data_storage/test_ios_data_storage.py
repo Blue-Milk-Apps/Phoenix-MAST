@@ -46,8 +46,8 @@ def test_ios_data_storage_scan_output_loader_loads_expected_artifacts(tmp_path: 
     )
     _write_json(scan_dir / "plist_binary" / "scan_index.json", {"plists": []})
     (scan_dir / "strings" / "main.txt").write_text("hello\n", encoding="utf-8")
-    (scan_dir / "trufflehog" / "report.json").write_text("{}", encoding="utf-8")
-    (scan_dir / "gitleaks" / "report.json").write_text("{}", encoding="utf-8")
+    (scan_dir / "trufflehog" / "trufflehog_results.json").write_text("{}", encoding="utf-8")
+    (scan_dir / "gitleaks" / "gitleaks_report.json").write_text("{}", encoding="utf-8")
     (scan_dir / "syft" / "sbom.json").write_text("{}", encoding="utf-8")
 
     loaded = IOSBinaryScanOutputLoader().load(scan_dir)
@@ -70,9 +70,8 @@ def test_ios_data_storage_scan_output_loader_loads_expected_artifacts(tmp_path: 
         }
     }
     assert loaded["plist_index"] == {"plists": []}
-    assert loaded["strings_outputs"] == {"main.txt": "hello\n"}
-    assert loaded["trufflehog_outputs"] == {"report.json": {}}
-    assert loaded["gitleaks_outputs"] == {"report.json": {}}
+    assert loaded["trufflehog_outputs"] == {"trufflehog_results.json": {}}
+    assert loaded["gitleaks_outputs"] == {"gitleaks_report.json": {}}
     assert loaded["syft_outputs"] == {"sbom.json": {}}
 
 
@@ -89,7 +88,6 @@ def test_ios_data_storage_scan_output_loader_tolerates_missing_optional_artifact
     assert loaded["lief_outputs"] == {}
     assert loaded["plist_outputs"] == {}
     assert loaded["plist_index"] is None
-    assert loaded["strings_outputs"] == {}
     assert loaded["trufflehog_outputs"] == {}
     assert loaded["gitleaks_outputs"] == {}
     assert loaded["syft_outputs"] == {}

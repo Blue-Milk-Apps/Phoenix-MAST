@@ -14,12 +14,12 @@ class AppComponent:
     exported_providers: int = 0
 
     def __init__(self, loaded_outputs: dict[str, Any]):
-        androguard_components = loaded_outputs.get("androguard_components") or {}
+        components = loaded_outputs.get("aapt2_components") or loaded_outputs.get("androguard_components") or {}
 
-        activities = androguard_components.get("activities") or []
-        services = androguard_components.get("services") or []
-        receivers = androguard_components.get("receivers") or []
-        providers = androguard_components.get("providers") or []
+        activities = components.get("activities") or []
+        services = components.get("services") or []
+        receivers = components.get("receivers") or []
+        providers = components.get("providers") or []
         self.activities = len(activities)
         self.services = len(services)
         self.receivers = len(receivers)
@@ -31,9 +31,4 @@ class AppComponent:
 
     @staticmethod
     def count_exported(components: list[dict[str, Any]]) -> int:
-        return sum(
-            1
-            for component in components
-            if component.get("exported") is True
-            or (component.get("exported") is None and bool(component.get("has_intent_filters")))
-        )
+        return sum(1 for component in components if component.get("exported") is True)

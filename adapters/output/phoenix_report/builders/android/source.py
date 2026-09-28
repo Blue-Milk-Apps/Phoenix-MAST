@@ -1,6 +1,5 @@
 from typing import Any, Mapping
 
-from adapters.output.phoenix_report.builders.android.source_check_catalog import ANDROID_SOURCE_SECTION_CHECKS
 from adapters.output.phoenix_report.builders.source import SourceReportDataBuilder
 from domain.report.models import (
     AndroidApplicationDetails,
@@ -13,12 +12,11 @@ from domain.report.models import (
     PermissionDetails,
     ReportPlatform,
     ReportTargetKind,
+    UrlSchemeDetails,
 )
 
 
 class NativeAndroidReportDataBuilder(SourceReportDataBuilder):
-    check_sections = ANDROID_SOURCE_SECTION_CHECKS
-
     @property
     def target_kind(self) -> ReportTargetKind:
         return ReportTargetKind.NATIVE_ANDROID_SOURCE
@@ -29,11 +27,23 @@ class NativeAndroidReportDataBuilder(SourceReportDataBuilder):
         components = data.get("app_components") if isinstance(data.get("app_components"), Mapping) else {}
         hardcoded = data.get("hardcoded_values") if isinstance(data.get("hardcoded_values"), Mapping) else {}
         functionality = data.get("functionality") if isinstance(data.get("functionality"), Mapping) else {}
+        deep_links = data.get("deep_links") if isinstance(data.get("deep_links"), Mapping) else {}
+        schemes: dict[str, list[str]] = {}
+        for link in deep_links.get("deep_links") or ():
+            if not isinstance(link, Mapping):
+                continue
+            scheme = str(link.get("scheme") or "").strip()
+            if scheme and scheme.lower() not in {"http", "https"}:
+                schemes.setdefault(str(link.get("component") or ""), []).append(scheme)
         return NativeAndroidReportDetails(
             package_name=str(app.get("package_name") or ""),
             version_name=str(app.get("version_name") or ""),
             target_sdk=str(app.get("target_sdk") or ""),
             min_sdk=str(app.get("min_sdk") or ""),
+            main_activity=str(app.get("main_activity") or ""),
+            url_schemes=tuple(
+                UrlSchemeDetails(component, tuple(dict.fromkeys(values))) for component, values in schemes.items()
+            ),
             application=AndroidApplicationDetails(
                 debuggable=self._optional_bool(application.get("debuggable")),
                 allow_backup=self._optional_bool(application.get("allow_backup")),

@@ -1,19 +1,17 @@
 # Syft Setup
 
-Phoenix uses Syft to generate CycloneDX SBOM output. The adapter expects a `syft` command on `PATH`.
+Phoenix uses Syft to generate its canonical `syft-json` dependency inventory. The adapter expects a `syft` command on `PATH`.
 
 ## What Phoenix expects
 
 - `syft` installed and available on `PATH`.
 - No extra local database is required.
-- Phoenix writes `sbom.json` and `sbom.xml` under the scan output directory.
+- Phoenix writes `syft/sbom.json` under the scan output directory, independently of the aggregate `--json` flag.
 
 The adapter runs:
 
 ```bash
-syft scan <project> \
-  -o syft-json=<output>/sbom.json \
-  -o cyclonedx-xml=<output>/sbom.xml
+syft scan <project> -o syft-json
 ```
 
 ## Install Syft

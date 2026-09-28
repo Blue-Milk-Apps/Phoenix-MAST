@@ -9,8 +9,6 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from adapters.scanners.android import NativeAndroidSourceMetadataScanner
 from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
@@ -102,8 +100,6 @@ class ReactNativeSourceMetadataScanner(ScannerPort):
         lock_path = next(
             (project_path / name for name in self.LOCK_FILE_NAMES if (project_path / name).is_file()), None
         )
-        resolved, lock_warnings = self._resolved_dependencies(lock_path)
-        warnings.extend(lock_warnings)
 
         android, android_warnings = self._android_metadata(config, project_path)
         warnings.extend(android_warnings)
@@ -155,7 +151,6 @@ class ReactNativeSourceMetadataScanner(ScannerPort):
             "ios": ios,
             "dependencies": {
                 "declared": declared,
-                "resolved": resolved,
             },
         }
 
@@ -235,7 +230,7 @@ class ReactNativeSourceMetadataScanner(ScannerPort):
             "entitlements": self._supporting_plists(
                 ios_path,
                 ".entitlements",
-                lambda data: self._entitlement_metadata(builder, data),
+                builder._entitlement_details,
                 warnings,
             ),
             "privacy_manifests": self._supporting_plists(
@@ -309,23 +304,6 @@ class ReactNativeSourceMetadataScanner(ScannerPort):
         return artifacts
 
     @staticmethod
-    def _entitlement_metadata(builder: PlistReportBuilder, data: dict[str, Any]) -> dict[str, Any]:
-        metadata = builder._entitlement_details(data)
-        risky_keys = {
-            "get-task-allow",
-            "com.apple.security.cs.allow-dyld-environment-variables",
-            "com.apple.security.cs.allow-unsigned-executable-memory",
-            "com.apple.security.cs.disable-executable-page-protection",
-            "com.apple.security.cs.disable-library-validation",
-        }
-        metadata["security_risk_keys"] = sorted(
-            key
-            for key, value in data.items()
-            if (key in risky_keys and value is True) or str(key).startswith("com.apple.private.")
-        )
-        return metadata
-
-    @staticmethod
     def _load_plist(path: Path, ios_path: Path, warnings: list[str]) -> dict[str, Any] | None:
         try:
             with path.open("rb") as handle:
@@ -363,78 +341,6 @@ class ReactNativeSourceMetadataScanner(ScannerPort):
             if isinstance(value, str) and value.strip():
                 return value.strip()
         return ""
-
-    def _resolved_dependencies(self, lock_path: Path | None) -> tuple[list[dict[str, str]], list[str]]:
-        if lock_path is None:
-            return [], ["No supported JavaScript lockfile found; resolved dependencies were not assessed."]
-        if lock_path.name == "yarn.lock":
-            return self._yarn_dependencies(lock_path)
-        if lock_path.name == "package-lock.json":
-            data, warnings = self._json_mapping(lock_path, required=True)
-            if data is None:
-                return [], warnings
-            packages = self._mapping(data.get("packages"))
-            resolved = []
-            for location, value in sorted(packages.items()):
-                record = self._mapping(value)
-                if not location or not record:
-                    continue
-                resolved.append(
-                    {
-                        "name": self._text(record.get("name")) or str(location).rsplit("node_modules/", 1)[-1],
-                        "version": self._text(record.get("version")),
-                        "scope": "development" if record.get("dev") is True else "resolved",
-                    }
-                )
-            return resolved, warnings
-        try:
-            data = yaml.safe_load(lock_path.read_text(encoding="utf-8"))
-        except (OSError, yaml.YAMLError) as exc:
-            return [], [f"Unable to parse {lock_path.name}; resolved dependencies were not assessed: {exc}"]
-        packages = self._mapping(self._mapping(data).get("packages"))
-        resolved = []
-        for key in sorted(packages):
-            name, version = self._pnpm_package_parts(str(key))
-            if name:
-                resolved.append({"name": name, "version": version, "scope": "resolved"})
-        return resolved, []
-
-    def _yarn_dependencies(self, lock_path: Path) -> tuple[list[dict[str, str]], list[str]]:
-        try:
-            lines = lock_path.read_text(encoding="utf-8").splitlines()
-        except OSError as exc:
-            return [], [f"Unable to read {lock_path.name}; resolved dependencies were not assessed: {exc}"]
-
-        resolved: list[dict[str, str]] = []
-        current_name = ""
-        for line in lines:
-            if line and not line[0].isspace() and line.rstrip().endswith(":"):
-                selector = line.rstrip()[:-1].split(",", 1)[0].strip().strip("\"'")
-                current_name = "" if selector.startswith("__") else selector.rsplit("@", 1)[0]
-                continue
-            version_match = re.match(r'^\s+version(?:\s+|:\s*)["\']?([^"\'\s]+)', line)
-            if current_name and version_match:
-                resolved.append(
-                    {
-                        "name": current_name,
-                        "version": version_match.group(1),
-                        "scope": "resolved",
-                    }
-                )
-                current_name = ""
-
-        if not resolved:
-            return [], ["yarn.lock was detected but no resolved dependency entries could be normalized."]
-        unique = {(item["name"], item["version"]): item for item in resolved}
-        return list(unique.values()), []
-
-    @staticmethod
-    def _pnpm_package_parts(value: str) -> tuple[str, str]:
-        normalized = value.lstrip("/").split("(", 1)[0]
-        if "@" not in normalized:
-            return normalized, ""
-        name, version = normalized.rsplit("@", 1)
-        return name, version
 
     @staticmethod
     def _expo_metadata(expo: dict[str, Any], assessed: bool) -> dict[str, Any]:

@@ -26,6 +26,9 @@ def resolve_scan_target(config: ScanConfig) -> ResolvedScanTarget:
     """Return the best available filesystem path for scanners to inspect."""
     project_path = config.project_path
 
+    decoded = config.output_path / "apktool" / "decoded"
+    if config.target_type == "BINARY" and config.platform == "ANDROID" and decoded.is_dir():
+        return ResolvedScanTarget(path=decoded)
     if config.extracted_binary is not None:
         return ResolvedScanTarget(path=config.extracted_binary.scan_root_path)
 

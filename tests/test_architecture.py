@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from application.scanner_service import ScannerService
 from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scan_output_port import ScanOutputPort
@@ -56,9 +58,7 @@ def test_scanner_service_writes_scan_results_to_output(tmp_path: Path) -> None:
         output_path=tmp_path / "scan-results",
     )
 
-    results = ScannerService(scanners=[scanner]).scan_project(config)
-    for result in results:
-        output.write_result(result)
+    results = ScannerService(scanners=[scanner]).scan_project(config, output=output)
 
     assert results == output.results
     assert output.results[0].scanner_name == "Gitleaks"
@@ -66,7 +66,7 @@ def test_scanner_service_writes_scan_results_to_output(tmp_path: Path) -> None:
     assert output.results[0].duration_seconds >= 0
 
 
-def test_scanner_service_writes_unavailable_result_to_output(tmp_path: Path) -> None:
+def test_scanner_service_stops_on_unavailable_scanner(tmp_path: Path) -> None:
     output = RecordingOutput()
     scanner = FakeScanner('{"results": []}')
     scanner.is_available = lambda: False
@@ -75,10 +75,15 @@ def test_scanner_service_writes_unavailable_result_to_output(tmp_path: Path) -> 
         output_path=tmp_path / "scan-results",
     )
 
-    results = ScannerService(scanners=[scanner]).scan_project(config)
-    for result in results:
-        output.write_result(result)
+    def unexpected_scan(config):
+        pytest.fail("An unavailable scanner or a later scanner must never run.")
 
-    assert results == output.results
-    assert output.results[0].skipped is True
-    assert output.results[0].success is False
+    scanner.scan = unexpected_scan
+    later = FakeScanner("later")
+    later.scan = unexpected_scan
+    first = FakeScanner("completed")
+    with pytest.raises(RuntimeError, match="Gitleaks failed: .*not available"):
+        ScannerService(scanners=[first, scanner, later]).scan_project(config, output=output)
+
+    assert len(output.results) == 1
+    assert output.results[0].raw_output == "completed"

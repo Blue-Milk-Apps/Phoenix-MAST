@@ -60,8 +60,8 @@ dev_dependencies:
     assert result.relative_target_path == "project_metadata.json"
     assert payload["schema_version"] == "1.0"
     assert payload["extraction"] == {
-        "status": "partial",
-        "warnings": ["No pubspec.lock file found; resolved dependencies were not assessed."],
+        "status": "complete",
+        "warnings": [],
     }
     assert payload["project"] == {
         "project_path": str(project.resolve()),
@@ -101,93 +101,7 @@ dev_dependencies:
             {"constraint": "^1.2.0", "name": "http", "source": "hosted"},
             {"constraint": "", "name": "local_package", "source": "path"},
         ],
-        "resolved": [],
     }
-
-
-def test_extracts_resolved_dependencies_from_pubspec_lock(tmp_path: Path) -> None:
-    project = tmp_path / "project"
-    _write(project / "pubspec.yaml", "name: example_app\n")
-    _write(
-        project / "pubspec.lock",
-        """
-packages:
-  flutter:
-    dependency: direct main
-    description: flutter
-    source: sdk
-    version: "0.0.0"
-  git_package:
-    dependency: transitive
-    description:
-      path: .
-      ref: main
-      resolved-ref: abc123
-      url: https://example.com/package.git
-    source: git
-    version: "1.0.0"
-  hosted_package:
-    dependency: direct main
-    description:
-      name: hosted_package
-      sha256: abc123
-      url: https://pub.dev
-    source: hosted
-    version: "2.3.4"
-  local_package:
-    dependency: direct dev
-    description:
-      path: ../local_package
-      relative: true
-    source: path
-    version: "0.5.0"
-""",
-    )
-
-    result = FlutterSourceMetadataScanner().scan(_config(project, tmp_path))[0]
-    payload = json.loads(result.raw_output)
-
-    assert result.success is True
-    assert payload["extraction"] == {"status": "complete", "warnings": []}
-    assert payload["project"]["pubspec_lock_path"] == "pubspec.lock"
-    assert payload["dependencies"]["resolved"] == [
-        {
-            "dependency_kind": "direct",
-            "hosted_url": "",
-            "name": "flutter",
-            "path": "",
-            "source": "sdk",
-            "vcs_url": "",
-            "version": "0.0.0",
-        },
-        {
-            "dependency_kind": "transitive",
-            "hosted_url": "",
-            "name": "git_package",
-            "path": "",
-            "source": "git",
-            "vcs_url": "https://example.com/package.git",
-            "version": "1.0.0",
-        },
-        {
-            "dependency_kind": "direct",
-            "hosted_url": "https://pub.dev",
-            "name": "hosted_package",
-            "path": "",
-            "source": "hosted",
-            "vcs_url": "",
-            "version": "2.3.4",
-        },
-        {
-            "dependency_kind": "development",
-            "hosted_url": "",
-            "name": "local_package",
-            "path": "../local_package",
-            "source": "path",
-            "vcs_url": "",
-            "version": "0.5.0",
-        },
-    ]
 
 
 def test_extracts_android_metadata_and_uses_pubspec_version_fallback(tmp_path: Path) -> None:
@@ -375,21 +289,6 @@ def test_invalid_ios_info_plist_returns_partial_flutter_metadata(tmp_path: Path)
     assert payload["extraction"]["status"] == "partial"
     assert payload["ios"] == {"available": True, "metadata": None, "project_path": "ios"}
     assert payload["extraction"]["warnings"][0].startswith("iOS metadata: Unable to parse Runner/Info.plist")
-
-
-@pytest.mark.parametrize("content", ("packages: [\n", "sdks:\n  dart: '>=3.3.0 <4.0.0'\n"))
-def test_invalid_pubspec_lock_returns_partial_metadata(tmp_path: Path, content: str) -> None:
-    project = tmp_path / "project"
-    _write(project / "pubspec.yaml", "name: example_app\n")
-    _write(project / "pubspec.lock", content)
-
-    result = FlutterSourceMetadataScanner().scan(_config(project, tmp_path))[0]
-    payload = json.loads(result.raw_output)
-
-    assert result.success is True
-    assert payload["extraction"]["status"] == "partial"
-    assert "resolved dependencies were not assessed" in payload["extraction"]["warnings"][0]
-    assert payload["dependencies"]["resolved"] == []
 
 
 @pytest.mark.parametrize(

@@ -320,7 +320,7 @@ class ApkidScanner(ScannerPort):
                 "execution_status": execution_status,
                 "duration_seconds": round(command_result.duration_seconds, 6),
                 "apkid_version": tool_version,
-                "rule_signature_metadata": self._rule_metadata(parsed_output),
+                "signature_metadata": self._signature_metadata(parsed_output),
                 "command_profile": self.COMMAND_PROFILE,
                 "tool_exit_code": command_result.exit_code,
                 "timeout_seconds": self.DEFAULT_TIMEOUT_SECONDS,
@@ -413,7 +413,7 @@ class ApkidScanner(ScannerPort):
                             "source_artifact_id": artifact.artifact_id,
                             "source_relationship": artifact.relationship,
                             "family": normalized_family,
-                            "rule_name": value,
+                            "signature_name": value,
                             "signal_tier": tier,
                             "priority": self._priority(tier),
                             "confidence": self._confidence(normalized_family, value),
@@ -435,7 +435,7 @@ class ApkidScanner(ScannerPort):
                 tier_order[item["signal_tier"]],
                 item["family"],
                 item["source_artifact_id"],
-                item["rule_name"],
+                item["signature_name"],
             ),
         )
 
@@ -559,7 +559,7 @@ class ApkidScanner(ScannerPort):
             )
         return hints
 
-    def _rule_metadata(
+    def _signature_metadata(
         self,
         parsed_output: dict[str, Any] | list[Any] | None,
     ) -> dict[str, Any]:
@@ -725,12 +725,7 @@ class ApkidScanner(ScannerPort):
         command_result: ApkidCommandResult,
     ) -> list[ScanResult]:
         execution_status = evidence["extraction_metadata"]["execution_status"]
-        extractor_success = execution_status not in {
-            "TIMEOUT",
-            "TOOL_ERROR",
-            "PARSING_ERROR",
-            "INTERRUPTED",
-        }
+        extractor_success = execution_status == "SUCCESS"
         error_message = (
             ""
             if extractor_success

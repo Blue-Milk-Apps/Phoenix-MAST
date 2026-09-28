@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, fields, is_dataclass, replace
 from enum import StrEnum
-from typing import Iterable
+from types import UnionType
+from typing import Any, Iterable, Mapping, get_args, get_origin, get_type_hints
 
 
 class RiskLevel(StrEnum):
@@ -26,7 +27,6 @@ class CheckSeverity(StrEnum):
     MEDIUM = "medium"
     LOW = "low"
     INFO = "info"
-    SECURE = "secure"
     HOTSPOT = "hotspot"
     VARIABLE = "variable"
     NOT_APPLICABLE = "not_applicable"
@@ -115,6 +115,8 @@ class ReportMetadata:
     version_name: str = ""
     version_code: str = ""
     reviewer_org: str = ""
+    app_icon_path: str = ""
+    app_icon_data_uri: str = ""
 
 
 @dataclass(frozen=True)
@@ -140,6 +142,14 @@ class SecurityCheck:
     remediation_link: str = ""
     platform_assessments: tuple[PlatformAssessment, ...] = ()
     status: AssessmentStatus | None = None
+    rule_id: str = ""
+    finding_type: str = ""
+    scope: str = ""
+    impact: str = ""
+    remediation: str = ""
+    references: tuple[str, ...] = ()
+    execution_status: str = ""
+    rule_file: str = ""
 
 
 @dataclass(frozen=True)
@@ -170,14 +180,22 @@ class RiskSummary:
 
 @dataclass(frozen=True)
 class FindingSeverity:
-    """Counts of checks grouped by severity."""
+    """Counts of matched security checks grouped by severity, regardless of finding type."""
 
     critical: int = 0
     high: int = 0
     medium: int = 0
     low: int = 0
     info: int = 0
-    secure: int = 0
+
+    @classmethod
+    def from_sections(cls, sections: Iterable[VulnerabilitySection]) -> FindingSeverity:
+        counts = dict.fromkeys((item.name for item in fields(cls)), 0)
+        for section in sections:
+            for check in section.checks:
+                if check.result == AssessmentStatus.PRESENT and check.severity.value in counts:
+                    counts[check.severity.value] += 1
+        return cls(**counts)
 
 
 class PlatformReportDetails(ABC):
@@ -371,6 +389,8 @@ class NativeAndroidReportDetails(PlatformReportDetails):
     permissions: tuple[PermissionDetails, ...] = ()
     hardcoded_values: HardcodedValuesDetails = field(default_factory=lambda: HardcodedValuesDetails())
     endpoints: tuple[EndpointDetails, ...] = ()
+    url_schemes: tuple[UrlSchemeDetails, ...] = ()
+    main_activity: str = ""
 
     @property
     def target_kind(self) -> ReportTargetKind:
@@ -382,7 +402,7 @@ class NativeIOSReportDetails(PlatformReportDetails):
     bundle_identifier: str = ""
     version_name: str = ""
     minimum_os: str = ""
-    url_schemes: tuple[str, ...] = ()
+    url_schemes: tuple[UrlSchemeDetails, ...] = ()
     functionality: tuple[FunctionalityDetails, ...] = ()
     permissions: tuple[PermissionDetails, ...] = ()
     hardcoded_values: HardcodedValuesDetails = field(default_factory=lambda: HardcodedValuesDetails())
@@ -401,10 +421,10 @@ class NativeIOSReportDetails(PlatformReportDetails):
 class SignatureVersions:
     """Verified Android application signature schemes."""
 
-    v1: bool = False
-    v2: bool = False
-    v3: bool = False
-    v4: bool = False
+    v1: bool | None = None
+    v2: bool | None = None
+    v3: bool | None = None
+    v4: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -566,8 +586,8 @@ class IOSBinaryEvidenceDetails:
 
 
 @dataclass(frozen=True)
-class IOSUrlSchemeDetails:
-    """A declared iOS URL scheme handler."""
+class UrlSchemeDetails:
+    """A declared custom URL or URI scheme handler."""
 
     url_name: str
     schemes: tuple[str, ...] = ()
@@ -588,7 +608,7 @@ class IOSBinaryReportDetails(PlatformReportDetails):
     file_info: FileDetails
     app_info: AppDetails
     binary_evidence: IOSBinaryEvidenceDetails
-    url_schemes: tuple[IOSUrlSchemeDetails, ...]
+    url_schemes: tuple[UrlSchemeDetails, ...]
     functionality: tuple[FunctionalityDetails, ...]
     third_party_sdks: tuple[IOSSDKCategoryDetails, ...]
     permissions: tuple[PermissionDetails, ...]
@@ -604,8 +624,23 @@ class IOSBinaryReportDetails(PlatformReportDetails):
 
 
 @dataclass(frozen=True)
+class SecretFindingSummary:
+    detector: str
+    location: str
+    verification: str = "Not checked"
+
+
+@dataclass(frozen=True)
+class SecretScanSummary:
+    scanner: str
+    status: str
+    findings: tuple[SecretFindingSummary, ...] = ()
+    reason: str = ""
+
+
+@dataclass(frozen=True)
 class ReportData:
-    """Standard, format-independent output of a report data builder."""
+    """The final scan aggregate shared by JSON output and report renderers."""
 
     metadata: ReportMetadata
     vulnerability_sections: tuple[VulnerabilitySection, ...]
@@ -613,3 +648,72 @@ class ReportData:
     risk_summary: tuple[RiskSummary, ...]
     findings_severity: FindingSeverity
     platform_details: PlatformReportDetails
+    rule_coverage: tuple[dict[str, object], ...] = ()
+    rule_status: str = ""
+    rule_status_reason: str = ""
+    secret_scans: tuple[SecretScanSummary, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return the versioned aggregate for JSON serialization."""
+
+        return {"schema_version": 1, **asdict(self)}
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> ReportData:
+        """Restore a saved aggregate without rebuilding checks or recalculating risk."""
+
+        if not isinstance(data, Mapping) or type(data.get("schema_version")) is not int or data["schema_version"] != 1:
+            raise ValueError("Expected a report aggregate with schema_version=1")
+
+        detail_types = {
+            ReportTargetKind.ANDROID_BINARY: AndroidBinaryReportDetails,
+            ReportTargetKind.IOS_BINARY: IOSBinaryReportDetails,
+            ReportTargetKind.FLUTTER_SOURCE: FlutterReportDetails,
+            ReportTargetKind.REACT_NATIVE_SOURCE: ReactNativeReportDetails,
+            ReportTargetKind.NATIVE_ANDROID_SOURCE: NativeAndroidReportDetails,
+            ReportTargetKind.NATIVE_IOS_SOURCE: NativeIOSReportDetails,
+        }
+
+        def restore(model: Any, value: Any, path: str) -> Any:
+            if model is PlatformReportDetails:
+                model = detail_types[metadata.target.target_kind]
+            if get_origin(model) is UnionType:
+                if value is None:
+                    return None
+                model = next(member for member in get_args(model) if member is not type(None))
+            if is_dataclass(model):
+                names = {item.name for item in fields(model)}
+                if model is FindingSeverity and isinstance(value, Mapping):
+                    # Older aggregates included a non-severity bucket and omitted review findings.
+                    value = {key: item for key, item in value.items() if key != "secure"}
+                if not isinstance(value, Mapping) or set(value) != names:
+                    raise ValueError(f"Invalid aggregate fields at {path}")
+                hints = get_type_hints(model)
+                return model(**{key: restore(hints[key], value[key], f"{path}.{key}") for key in names})
+            if get_origin(model) is tuple:
+                if not isinstance(value, (list, tuple)):
+                    raise ValueError(f"Expected an array at {path}")
+                return tuple(restore(get_args(model)[0], item, f"{path}[{index}]") for index, item in enumerate(value))
+            if get_origin(model) is dict:
+                if not isinstance(value, Mapping):
+                    raise ValueError(f"Expected an object at {path}")
+                key_type, value_type = get_args(model)
+                return {
+                    restore(key_type, key, path): restore(value_type, item, f"{path}.{key}")
+                    for key, item in value.items()
+                }
+            if isinstance(model, type) and issubclass(model, StrEnum):
+                try:
+                    return model(value)
+                except (TypeError, ValueError) as error:
+                    raise ValueError(f"Invalid {model.__name__} at {path}: {value!r}") from error
+            if model is not object and type(value) is not model:
+                raise ValueError(f"Expected {model.__name__} at {path}")
+            return value
+
+        # Resolve the platform detail model from the saved target, never from scan files.
+        metadata = restore(ReportMetadata, data.get("metadata"), "metadata")
+        report = restore(cls, {key: value for key, value in data.items() if key != "schema_version"}, "report")
+        if "secure" in data["findings_severity"]:
+            report = replace(report, findings_severity=FindingSeverity.from_sections(report.vulnerability_sections))
+        return report

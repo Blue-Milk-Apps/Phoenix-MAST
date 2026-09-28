@@ -1,156 +1,103 @@
-# AGENTS.md
+# Phoenix MAST agent guidance
 
-This file gives repo-specific guidance to AI coding agents working on Phoenix MAST. It is not runtime code and is not used by the Python package.
+Phoenix MAST is the public Python engine that coordinates mobile security tools
+for iOS, Android, Flutter, and React Native. Private OpenGrep rules live in
+Phoenix-Rules and are supplied at runtime.
 
-## Project Summary
+## Engine boundaries and terminology
 
-Phoenix MAST is the Python foundation for phoenix, an all-in-one Mobile Application Security Testing (MAST) tool for iOS and Android applications.
-
-The project coordinates security scanning workflows for:
-
-- Static analysis for mobile application security issues
-- Secret detection for accidental credential exposure
-- Dependency vulnerability checks
-- Software Bill of Materials (SBOM) generation
-- IPA/APK binary analysis
-
-Phoenix MAST is intended to make mobile application reviews repeatable by collecting scanner orchestration, configuration, adapter behavior in one Python project.
+- A **rule** means an OpenGrep rule. Call Python transformations and report logic
+  post-processing, normalization, or aggregation.
+- A **scan** is one Phoenix run. An individual tool invocation is a **tool execution**.
+- Keep the engine simple: use included tools for capabilities they already provide.
+  Scrutinize custom Python that duplicates their behavior.
+- OpenGrep owns security findings and functionality detection. Syft owns resolved
+  dependency inventories. Python coordinates tools, normalizes evidence, and reports results.
+- MobSF is not used. See [the tool inventory](docs/ToolInventory.md) before adding
+  tools or changing responsibility for an output.
+- Keep the same `<platform>/source` and `<platform>/binary` rule-directory structure
+  across platforms. Missing binary rules are reported as not evaluated; source rules are required.
 
 ## Architecture
 
-Use the existing port-and-adapter structure.
+Follow the existing ports and adapters:
 
-- `domain/` contains core dataclasses and enums such as `ScanType`, `ScanResult`, and `ScanConfig`.
-- `ports/` contains interfaces for external behavior.
-- `ports/scanner_port.py` defines `ScannerPort`.
-- `ports/storage_port.py` defines `ArtifactStorePort`.
-- `application/` contains orchestration such as `ScannerService`.
-- `adapters/source_code_scanners/` contains source/source code scanner adapters.
-- `adapters/binary_scanners/` contains binary scanner adapters.
-- `adapters/storage/` contains storage adapters.
-- `entrypoints/cli.py` contains the phoenix CLI.
-- `utilities/` contains helper code for APK/IPA extraction and binary target discovery.
-- `setup/` contains local setup notes for external scanner tools.
-- `tests/` contains unit and integration tests.
+| Location | Responsibility |
+| --- | --- |
+| `domain/` | Models, assessment semantics, and report aggregates |
+| `ports/` | Interfaces such as `ScannerPort` and `ArtifactStorePort` |
+| `application/` | Workflow and tool orchestration |
+| `adapters/scanners/` | Tool execution and platform metadata extraction |
+| `adapters/post_scan/` | Artifact loading and evidence normalization |
+| `adapters/output/` | Console, JSON, and PDF presentation |
+| `adapters/storage/` | Artifact persistence |
+| `entrypoints/cli.py` | CLI arguments and entrypoint |
+| `utilities/` | Shared extraction, path, and exclusion helpers |
 
-Scanner implementations should satisfy `ScannerPort`.
+Keep external tool, subprocess, HTTP, and filesystem operations in adapters or
+existing utilities. Keep domain models independent of those operations.
 
-Storage implementations should satisfy `ArtifactStorePort`.
+## Output contracts
 
-Keep domain models free of external tool or filesystem-specific behavior unless explicitly requested.
+- Stdout and tool artifacts are the default output. Aggregate JSON and PDF are
+  independently opt-in through `--json` and `--pdf`.
+- JSON and PDF use the same report aggregate. Severity counts include all matched
+  security checks, including reviews, controls, and observations. Functionality
+  stays separate; category risk assessments use weakness findings.
+- Severity counts use Critical, High, Medium, Low, and Info. Secure is not a severity.
+- `--severity` filters stdout findings and counts at that level or higher; reports
+  and raw artifacts remain complete.
+- Use Rich for static, CI-friendly formatting. Avoid animations and cursor redraws;
+  respect `NO_COLOR` and keep credential values out of stdout.
+- `--exclude` accepts comma-separated paths and glob patterns. Use the shared
+  exclusion handling rather than implementing different behavior per tool.
+- Preserve the distinction between failed, skipped, incomplete, and successful
+  tool executions. Missing evidence must not become a clean assessment.
 
-## Scope Control
+## Working conventions
 
-When the user asks to update a specific file, only edit that file unless the change cannot work without touching another file.
+- Make the smallest complete change within the requested scope. Avoid unrelated refactors.
+- For a request naming one file, edit only that file unless related changes are necessary.
+- Get approval before adding files, tests, package configuration, lockfile changes,
+  exports, or documentation unless the request or earlier authorization already covers them.
+- Ask before expanding scope or choosing a materially broader or riskier approach.
+  Resolve routine implementation details using the existing code and conversation.
+- Ask before network access, elevated permissions, or work outside the workspace
+  unless already authorized; follow the environment's permission controls.
+- Preserve user changes. Do not delete or regenerate unrelated files, and do not
+  commit unless requested.
+- Explain relevant findings during work and summarize changes, validation, and
+  remaining limitations when finished.
 
-Before adding new files, tests, package config changes, lockfile changes, exports, or documentation, ask the user first.
+## Coding and verification
 
-Before broadening the task beyond the requested change, ask a short question and wait for approval.
+- Follow nearby code style and use `pathlib.Path` for filesystem paths.
+- Keep related fields and behavior together. Prefer dataclasses and enums where
+  appropriate; avoid unnecessary wrappers, parallel maps, and one-off abstractions.
+- Implement the existing ports and return `ScanResult` with accurate status,
+  errors, raw output, and descriptions. Create output directories before writing.
+- Keep comments brief and focused on non-obvious behavior.
+- Run relevant existing tests first. Broaden verification when shared behavior changes.
+  Add tests only when requested or approved.
+- Unit tests should mock tool execution and availability, use temporary directories,
+  and avoid requiring installed external binaries or private rules.
+- Isolate integration tests that require tools, Docker, network access, or databases.
+  PDF tests require native rendering dependencies described in [setup](setup/README.md).
+- For console changes, check GitHub Actions color settings and `NO_COLOR`. Compare
+  plain text separately from ANSI styling so environment differences do not break assertions.
 
-Prefer the smallest working change that satisfies the request.
+## Commands and references
 
-Do not make opportunistic refactors while completing a focused request.
-
-Do not modify `uv.lock`, package metadata, generated files, or unrelated modules unless the user asks for that change or approves it.
-
-## Communication
-
-If the task scope is ambiguous, ask a concise clarifying question before proceeding.
-
-If there is a meaningful tradeoff, describe it briefly and ask before choosing the broader or riskier option.
-
-If a command needs network access, escalated permissions, or access outside the workspace, ask before proceeding.
-
-When work is in progress, explain what context is being gathered and why.
-
-When finished, summarize the files changed and the verification performed.
-
-## Commands
-
-Common project commands:
-
-See the [scan target flags](README.md#scan-target-flags) list for valid `<scan-target-flag>` values.
+Use Python 3.12+ and run commands from the repository root:
 
 ```bash
-uv venv
 uv sync
-make test
-python -m pytest
+uv run pytest tests/path/to/test_file.py
 uv run pytest
+uv run ruff check .
 uv run phoenix scan <scan-target-flag> path/to/target
 ```
 
-The CLI entrypoint accepts exactly one scan target flag:
-
-```bash
-phoenix scan --ios-binary-path path/to/app.ipa
-phoenix scan --android-binary-path path/to/app.apk
-phoenix scan --flutter-source-path path/to/project
-phoenix scan --react-native-source-path path/to/project
-phoenix scan --native-android-source-path path/to/project
-phoenix scan --native-ios-source-path path/to/project
-```
-
-For local MobSF binary scans:
-
-```bash
-make services-up
-MOBSF_URL=http://localhost:8000 uv run phoenix scan --ios-binary-path path/to/app.ipa
-make services-down
-```
-
-Use focused tests first when they already exist and are relevant. Run broader tests only when the change affects shared behavior or the user asks for a full test pass.
-
-## Testing Rules
-
-Do not add tests unless the user asks for tests or approves adding them.
-
-It is OK to run existing focused tests when relevant.
-
-External scanner binaries should not be required for unit tests. Mock subprocesses, filesystem inputs, and availability checks where possible.
-
-Keep adapter tests focused and use temporary directories.
-
-Integration tests that require external tools, Docker, MobSF, network access, or local scanner databases should be clearly marked or isolated.
-
-## External Scanner Notes
-
-phoenix may use the following tools from the local `PATH`:
-
-- `trufflehog`
-- `gitleaks`
-- `syft`
-- `strings`
-
-MobSF binary scanning uses a sidecar service configured through `MOBSF_URL` and `MOBSF_API_KEY`.
-
-
-Do not assume these tools are installed when writing unit tests.
-
-## Coding Guidelines
-
-Follow the existing style in nearby modules.
-
-Prefer cohesive, readable domain and adapter structures over fragmented internal helpers and opaque constant maps. Use frozen dataclasses for related structured data and enums for closed sets of values. Keep a model's fields and behavior together when that makes the contract easier to understand. Avoid introducing small factory functions, parallel metadata dictionaries, or repeated normalization expressions when direct class construction, named fields, or a focused method makes the intent clearer. Keep catalog entries self-contained where practical so a reviewer can understand a definition without tracing several internal constants.
-
-Use `pathlib.Path` for filesystem paths.
-
-Keep adapters responsible for external tool, subprocess, HTTP, or filesystem behavior.
-
-Return `ScanResult` objects from scanners with clear `success`, `skipped`, `error_message`, `raw_output`, and `description` values.
-
-Create output directories before writing scanner reports.
-
-Avoid adding abstractions unless they remove real duplication or match an existing project pattern.
-
-Keep comments brief and only where they clarify non-obvious behavior.
-
-## Git And Generated Files
-
-The worktree may contain user changes. Do not revert changes you did not make.
-
-Do not delete or regenerate files unless the user asks.
-
-Ignore unrelated dirty files.
-
-Do not commit unless the user asks for a commit.
+Pass exactly one [scan target flag](README.md#scan-target-flags).
+See [README.md](README.md) for CLI and container workflows, and
+[the report guide](adapters/output/phoenix_report/README.md) for rendering contracts.

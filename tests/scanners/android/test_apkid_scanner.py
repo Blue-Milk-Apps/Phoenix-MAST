@@ -100,7 +100,7 @@ def test_apkid_extracts_normalized_operational_intelligence(
     assert results[0].relative_target_path == "apkid_intelligence.json"
     assert evidence["schema_version"] == "1.0"
     assert evidence["extraction_metadata"]["apkid_version"] == "APKiD 2.1.5"
-    assert evidence["extraction_metadata"]["rule_signature_metadata"]["rules_sha256"] == "abc123"
+    assert evidence["extraction_metadata"]["signature_metadata"]["rules_sha256"] == "abc123"
     assert evidence["downstream_findings"] == []
     assert evidence["raw_evidence"]["stdout"] == "raw/apkid_stdout.json"
     assert {result.relative_target_path for result in results} == {

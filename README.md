@@ -1,283 +1,139 @@
-<h1>
-  <img alt="Phoenix MAST logo" src="./assets/PhoenixShield1280x640.png" width="100" valign="middle">
-  &nbsp;Phoenix MAST
-</h1>
+# Phoenix MAST
 
-Phoenix MAST is an open source mobile application security testing toolkit for iOS and Android. It packages a practical set of OSS security and analysis tools into a Docker-first workflow, then adds lightweight Python orchestration so teams can run repeatable checks against source projects and mobile binaries. The project is intentionally modular. Scanner adapters live behind stable ports, so phoenix can be extended, slimmed down, or customized for a specific review process without rewriting the whole pipeline.|
+Phoenix MAST coordinates mobile security scanners for iOS, Android, Flutter, and React Native. It collects scanner artifacts, assembles evidence, and optionally generates JSON and PDF reports. Docker provides the scanner tools; the Python application controls their execution and reporting.
 
-## Features
+The engine is public. Detection rules are maintained privately in Phoenix-Rules and supplied at runtime. The public image contains the engine and scanner tools.
 
-- Static analysis orchestration for iOS, Android, Flutter, and React Native projects
-- Secret detection with OSS scanners such as Gitleaks and TruffleHog
-- OpenGrep support for custom source and binary pattern matching
-- SBOM generation with Syft
-- IPA and APK binary analysis with tools such as Strings, LIEF, ipsw, Androguard, Apktool, Apksigner, and APKiD
-- Optional MobSF integration for deeper binary scanning
-- Docker and Docker Compose workflows for repeatable local and CI usage
-- Python port-and-adapter architecture for adding, removing, or swapping scanner implementations
+## Interactive Docker workflow
 
-## Quick Start
-
-The most convenient way to run phoenix is the released Docker image from GitHub Container Registry.
+The image starts **Bash** and targets `linux/amd64`. Put your private YAML rules in the matching folders under `rules/`, then mount the application, rules, and output directory. Replace `<tag>` with a published image tag.
 
 ```bash
 mkdir -p scan-results
 
-docker run --rm \
-  -v "$PWD:/workspace:ro" \
+docker run --rm -it --platform linux/amd64 \
+  -v "/path/to/application:/workspace:ro" \
+  -v "$PWD/rules:/app/rules:ro" \
   -v "$PWD/scan-results:/app/results" \
-  ghcr.io/blue-milk-apps/phoenix:<version> \
-  scan --native-ios-source-path /workspace --output /app/results
+  "ghcr.io/blue-milk-apps/phoenix-mast:<tag>"
+
+# Inside the container:
+phoenix scan --ios-source /workspace \
+  --output /app/results
 ```
 
-Replace `<version>` with the release tag you want to run, and replace the scan flag with the target type that matches your app.
-
-## Scan Targets
-
-`phoenix scan` requires exactly one scan target flag.
+For an automated run, override the entrypoint explicitly:
 
 ```bash
-phoenix scan --ios-binary-path path/to/app.ipa
-phoenix scan --android-binary-path path/to/app.apk
-phoenix scan --flutter-source-path path/to/project
-phoenix scan --react-native-source-path path/to/project
-phoenix scan --native-android-source-path path/to/project
-phoenix scan --native-ios-source-path path/to/project
-```
-
-Source scans run Gitleaks, TruffleHog, and Syft, with plist extraction included for Flutter, React Native, and native iOS source scans.
-
-Binary scans run Strings, with LIEF, ipsw, and plist extraction for iOS binaries and Androguard, Apktool, Apksigner, and APKiD for Android binaries. MobSF runs for binary scans only when `MOBSF_URL` is configured.
-
-OpenGrep runs only when a rules path is available. Native source targets scan the project directory directly. Flutter source scans are scoped: Flutter rules scan production Dart paths, Android rules scan only `android/`, and iOS rules scan only `ios/`. Missing embedded-platform directories are recorded as skipped scopes. For binary targets, phoenix first generates `strings` output from the IPA or APK contents and then runs OpenGrep once over that generated `strings` artifact directory.
-
-By default, phoenix looks for OpenGrep rules in these folders:
-
-- `rules/ios` for `--ios-binary-path` and `--native-ios-source-path`
-- `rules/android` for `--android-binary-path` and `--native-android-source-path`
-- `rules/flutter` for `--flutter-source-path`
-- `rules/react_native` for `--react-native-source-path`
-
-The bundled Flutter rules cover cleartext HTTP, certificate-validation bypasses, sensitive logging, sensitive SharedPreferences and Hive writes, weak hashes and ciphers, dynamic raw SQL, WebView SSL bypasses, and sensitive platform-channel handlers. The OpenGrep report records configured rule IDs and execution status per scope so a missing finding is not treated as a clean assessment unless the relevant rules completed successfully.
-
-### Flutter source analysis
-
-Flutter source scans statically extract project identity, version, Dart and Flutter SDK constraints, declared and resolved dependencies, and generated-platform availability from `pubspec.yaml`, `pubspec.lock`, and the project layout. When present, the Android project is inspected for manifest and Gradle metadata, and the iOS project is inspected for plist, Xcode, entitlement, privacy-manifest, permission, App Transport Security, and URL-scheme metadata. Project code is not executed during metadata extraction.
-
-The Flutter post-scan pipeline combines these metadata artifacts with scoped OpenGrep, Gitleaks, TruffleHog, plist, and Syft output. It writes `post_scan_processing.json` and generates a Flutter-aware PDF report containing:
-
-- Flutter project, SDK, platform, and dependency inventories
-- Android and iOS application identifiers and platform requirements
-- Permissions, Android deep links, iOS URL schemes, and queried schemes
-- Code, network, data-storage, and resilience evidence from Dart and embedded native source
-- Redacted hardcoded-value findings and raw-only findings that require manual review
-- Extraction warnings and assessment status for partial scans
-
-Assessment status is evidence-aware. A positive finding is retained even when a scanner or embedded-platform scope only partially completed. A missing finding is reported as `Not Present` only when the relevant configured rules completed successfully; otherwise it remains `Not Evaluated`. Missing external scanner binaries are recorded as skipped scanner results rather than being treated as clean assessments.
-
-You can override the default rules location per scan target with these flags:
-
-- `--ios-binary-opengrep-rules-path`
-- `--android-binary-opengrep-rules-path`
-- `--flutter-source-opengrep-rules-path`
-- `--react-native-source-opengrep-rules-path`
-- `--native-android-source-opengrep-rules-path`
-- `--native-ios-source-opengrep-rules-path`
-
-These override flags can point to rule directories outside this repository when you run `phoenix scan` directly. For container runs, the rules directory must be mounted into the container and passed as a container path. The current `make compose-run` wrapper does not provide a dedicated variable for passing extra OpenGrep override flags, so direct `phoenix scan` or `docker run` is the better path when you want an external rules directory.
-
-Binary scans require the binary to be unsigned. If you have access to source code, you can build an unsigned .ipa easily [using these instructions](docs/UnsignediOSBinaries.md).
-
-## Running phoenix
-
-### 1. Released Docker Image
-
-Use the pre-built, versioned container when you want the fastest path with the scanner tooling already bundled.
-
-For source projects:
-
-```bash
-mkdir -p scan-results
-
-docker run --rm \
-  -v "/path/to/project:/workspace:ro" \
+docker run --rm --platform linux/amd64 --entrypoint phoenix \
+  -v "/path/to/application:/workspace:ro" \
+  -v "$PWD/rules:/app/rules:ro" \
   -v "$PWD/scan-results:/app/results" \
-  ghcr.io/blue-milk-apps/phoenix:<version> \
-  scan --react-native-source-path /workspace --output /app/results
+  "ghcr.io/blue-milk-apps/phoenix-mast:<tag>" \
+  scan --ios-source /workspace \
+  --output /app/results
 ```
 
-For mobile binaries, mount the directory that contains the binary and scan the file path inside the container:
-
-```bash
-mkdir -p scan-results
-
-docker run --rm \
-  -v "/path/to/binaries:/workspace:ro" \
-  -v "$PWD/scan-results:/app/results" \
-  ghcr.io/blue-milk-apps/phoenix:<version> \
-  scan --ios-binary-path /workspace/app.ipa --output /app/results
-```
-
-Use `--android-binary-path /workspace/app.apk` for APK scans.
-
-### 2. Local Docker Compose
-
-Use `make compose-run` when you are working from a clone of this repository and want phoenix to build locally, start its Compose services, mount the target, and write results to `./scan-results`.
-
-```bash
-git clone https://github.com/Blue-Milk-Apps/phoenix.git
-cd phoenix
-
-make compose-run PROJECT_PATH=path/to/project SCAN_FLAG=--native-ios-source-path
-```
-
-For binary files, pass the matching binary scan flag. When `PROJECT_PATH` is a file, the Makefile mounts its parent directory and scans the file under `/workspace`.
-
-```bash
-make compose-run PROJECT_PATH=path/to/app.ipa SCAN_FLAG=--ios-binary-path
-make compose-run PROJECT_PATH=path/to/app.apk SCAN_FLAG=--android-binary-path
-```
-
-If the binary path contains spaces, quote the entire `PROJECT_PATH` value:
-
-```bash
-make compose-run PROJECT_PATH="/Users/name/Desktop/ipas/My Lawn.ipa" SCAN_FLAG=--ios-binary-path
-```
-
-When `PROJECT_PATH` is a directory that contains a binary, set `PHOENIX_SCAN_PATH` to the file path inside the container:
-
-```bash
-make compose-run PROJECT_PATH=path/to/files SCAN_FLAG=--ios-binary-path PHOENIX_SCAN_PATH=/workspace/app.ipa
-```
-
-To include MobSF in a Compose scan, point phoenix at the MobSF sidecar:
-
-```bash
-MOBSF_URL=http://mobsf-scanner:8000 \
-make compose-run PROJECT_PATH=path/to/app.ipa SCAN_FLAG=--ios-binary-path
-```
-
-### 3. Local Developer Install
-
-Use a local install when you are developing phoenix itself, debugging scanner adapters, or intentionally running against tools installed on your host.
-
-Install `uv`:
-
-```bash
-brew install uv
-```
-
-Or use the official installer:
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-Clone and install the project:
-
-```bash
-git clone https://github.com/Blue-Milk-Apps/phoenix.git
-cd phoenix
-uv venv
-source .venv/bin/activate
-uv sync
-make hooks-install
-```
-
-`make hooks-install` installs the repository's pre-commit hook. It runs the test suite, Ruff lint, formatting, and secret detection before each commit.
-
-`uv sync` installs the Python package dependencies for phoenix, but that alone is not enough for local OpenGrep scans. The Python `opengrep` package is only a launcher and still requires a real `opengrep-core` binary on your host.
-
-Run the CLI locally:
-
-```bash
-uv run phoenix scan --native-ios-source-path path/to/project
-```
-
-To use a non-default OpenGrep rules directory locally:
-
-```bash
-uv run phoenix scan \
-  --native-ios-source-path path/to/project \
-  --native-ios-source-opengrep-rules-path path/to/rules
-```
-
-If you want OpenGrep locally, install the standalone OpenGrep binary so that both `opengrep` and `opengrep-core` are available on your `PATH`, or run phoenix through Docker or Docker Compose instead.
-
-Local scans use scanner binaries from your host `PATH`. Install the tools you plan to run before using this mode.
-
-At minimum, local development scans may require:
-
-- the standalone `opengrep` and `opengrep-core` binaries for local OpenGrep scans
-- `trufflehog`
-- `gitleaks`
-- `syft`
-- `strings`
-- `ipsw` for IPA signing, entitlement, and Mach-O load-command analysis
-- `apktool` for APK semantic reconstruction and evidence extraction
-- `apksigner` for APK signing integrity and signer identity evidence
-- The Python packages used by binary scanners, including `lief`, `androguard`, and `apkid`
-
-Detailed setup notes are available in [setup/README.md](setup/README.md), including tool-specific instructions for [MobSF](setup/mobsf-scanner/README.md), [Syft](setup/syft/README.md), [TruffleHog](setup/trufflehog/README.md), [Gitleaks](setup/gitleaks/README.md), [Strings](setup/strings/README.md), [LIEF](setup/lief/README.md), [ipsw](setup/ipsw/README.md), [Apktool](setup/apktool/README.md), and [Apksigner](setup/apksigner/README.md).
-
-## MobSF Sidecar
-
-MobSF is optional and only applies to IPA/APK binary scans.
-
-For local CLI scans with MobSF:
-
-```bash
-make services-up
-MOBSF_URL=http://localhost:8000 uv run phoenix scan --ios-binary-path "path/to/app.ipa"
-make services-down
-```
-
-For Compose scans with MobSF:
-
-```bash
-MOBSF_URL=http://mobsf-scanner:8000 \
-make compose-run PROJECT_PATH=path/to/app.ipa SCAN_FLAG=--ios-binary-path
-```
-
-## Results
-
-Scan output is written to the configured output directory. Docker and Compose examples in this README write reports to `./scan-results` on the host and `/app/results` inside the container. When OpenGrep is enabled, it writes `opengrep_results.json` alongside the other scan artifacts.
-
-## Development
-
-Run the test suite:
-
-```bash
-make test
-```
-
-Run the CLI from the local environment:
-
-```bash
-uv run phoenix scan <scan-target-flag> path/to/target
-```
-
-The codebase follows a port-and-adapter layout:
-
-- `domain/` contains core dataclasses and enums.
-- `ports/` defines scanner and storage interfaces.
-- `application/` contains orchestration such as `ScannerService`.
-- `adapters/` contains scanner, storage, and output implementations.
-- `entrypoints/cli.py` contains the command-line interface.
-- `utilities/` contains helper code for binary extraction and target discovery.
-
-## Getting Help
-
-Use GitHub issues for bugs, setup problems, and feature requests:
+The empty rule folders are included in the checkout:
 
 ```text
-https://github.com/Blue-Milk-Apps/phoenix/issues
+rules/
+  android/
+    source/
+    binary/
+  ios/
+    source/
+    binary/
+  flutter/
+    source/
+    binary/
+  react_native/
+    source/
+    binary/
 ```
 
-## Maintainers And Contributors
+Add your custom OpenGrep yml rules files accordingly, and the scan target flag will use the required folders mounted under `/app/rules` automatically.
 
-Phoenix MAST is maintained by Blue Milk Apps. Contributions should be made through pull requests against this repository.
+## Scan target flags
 
-## License
+Pass exactly one target flag to choose the scan platform, source/binary mode, and input path.
 
-Phoenix MAST is released under the [Apache License 2.0](LICENSE).
+| Target flag | Input | Rule directories under `/app/rules` |
+| --- | --- | --- |
+| `--ios-source` | iOS source directory | `ios/source` |
+| `--android-source` | Android source directory | `android/source` |
+| `--flutter-source` | Flutter source directory | `flutter/source`, `ios/source`, `android/source` |
+| `--react-native-source` | React Native source directory | `react_native/source`, `ios/source`, `android/source` |
+| `--ios-binary` | IPA file | `ios/binary` |
+| `--android-binary` | APK file | `android/binary` |
+
+Flutter and React Native scans apply framework rules to production framework sources, iOS rules to `ios/`, and Android rules to `android/`. Mount the relevant platform directories together under `/app/rules`. Missing embedded-platform source directories are recorded as skipped scopes.
+
+Binary OpenGrep tool executions inspect extracted strings, decoded Apktool files and normalized platform-tool evidence. Missing binary rules are reported as `not_evaluated`; source rules are required. No binary rules are bundled.
+
+## Scanners and artifacts
+
+Source workflows include Gitleaks, TruffleHog, Syft, OpenGrep, and platform metadata extraction. Binary workflows use Strings plus platform tools such as LIEF, ipsw, Androguard, Apktool, Apksigner, and APKiD. A failed or unavailable required tool fails the scan, preserving artifacts already written. See the [complete tool inventory](docs/ToolInventory.md) for each tool, its outputs and why it is retained.
+
+The output directory always contains tool artifacts and scan metadata. `--json` adds `post_scan_processing.json`; `--pdf` adds the PDF report. Both flags default to off. Raw tool JSON remains available independently of the aggregate JSON flag.
+
+`post_scan_processing.json` is the final report aggregate (`schema_version: 1`). JSON and PDF use the same findings, severity counts, risk summaries, coverage, secret-detector results, and platform details. The aggregate replaces the previous intermediate JSON structure:
+
+| Content | Aggregate field |
+| --- | --- |
+| App identity and scan target | `metadata`, `metadata.target` |
+| Matched checks, evidence, and remediation | `vulnerability_sections[].checks[]` |
+| Matched security checks by severity, including reviews, controls and observations | `findings_severity` |
+| Category risks and explanations | `risk_summary`, `overall_evaluation` |
+| OpenGrep execution coverage | `rule_status`, `rule_status_reason`, `rule_coverage` |
+| Functionality, URL schemes, and other platform details | `platform_details` |
+| Secret-scanner outcomes | `secret_scans` |
+
+Tool artifacts retain OpenGrep rule definitions and original tool evidence. Render a saved aggregate without running tools or reassessing findings:
+
+```bash
+phoenix report scan-results/RUN/post_scan_processing.json --pdf -o report.pdf
+```
+
+The loader requires schema version 1 and complete model fields; it does not convert older intermediate JSON or fill missing findings with defaults.
+
+## Output and exclusions
+
+```bash
+# Stdout summary and tool artifacts:
+phoenix scan --android-source /workspace --exclude 'vendor,**/build,**/*.generated.*'
+
+# Add either or both aggregate reports:
+phoenix scan --ios-source /workspace --json --pdf
+```
+
+`--exclude` accepts comma-separated paths or quoted globs and can be repeated. Paths are relative to the source root or extracted binary root; absolute paths within a source root also work. `*` matches within one path component and `**` matches across directories. Matching a directory excludes its descendants. Source output directories within the target are automatically excluded. Tools use one filtered source tree, and saved evidence uses the original source paths.
+
+For binary inputs, exclusions apply to extracted files and Apktool's decoded tree. Tools that inspect the original APK, including signature verification, aapt2 and Androguard, still inspect the original archive. Exclusions do not rewrite that archive.
+
+Stdout uses Rich for static scan headers, tool status lines and tables showing finding counts, matched findings and secret-detector summaries. No animations or cursor redraws are used. `--severity MEDIUM` shows medium, high and critical findings and counts on stdout; JSON/PDF reports and raw artifacts remain complete. Colors are enabled for supported terminals and GitHub Actions; set `NO_COLOR=1` to disable styling. Elapsed time, artifact locations and OpenGrep coverage are also displayed. Secret output summarizes detector counts without printing credential values. Tool failures return exit code 1; findings alone do not change the exit code.
+
+A **rule** always means an OpenGrep rule. A **scan** is one Phoenix run; individual adapters perform **tool executions**. Python post-processing normalizes evidence and builds reports; OpenGrep owns security findings and functionality detection, and Syft owns resolved dependency inventories.
+
+## Local development
+
+With Python 3.12+ and `uv` installed, run from this checkout:
+
+```bash
+uv sync
+uv run pytest
+```
+
+Unit tests use synthetic rules. PDF tests also require [Pango and its native dependencies](setup/README.md#phoenix-pdf-report-setup).
+
+## Local containers
+
+Build an image from this checkout:
+
+```bash
+docker build --platform linux/amd64 -t phoenix:local .
+```
+
+Follow the [Docker examples above](#interactive-docker-workflow), using `phoenix:local` as the image name.
+
+Phoenix MAST is maintained by Blue Milk Apps and released under the [Apache License 2.0](LICENSE).
