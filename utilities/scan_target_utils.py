@@ -40,3 +40,15 @@ def resolve_scan_target(config: ScanConfig) -> ResolvedScanTarget:
         return ResolvedScanTarget(path=extracted.app_bundle, owned_extraction=extracted)
 
     return ResolvedScanTarget(path=project_path)
+
+
+def secret_scan_paths(config: ScanConfig, target: ResolvedScanTarget) -> tuple[Path, ...]:
+    """Include extracted text without rescanning reports or other tool artifacts."""
+    strings = config.output_path / "strings"
+    if (
+        config.target_type == "BINARY"
+        and strings.is_dir()
+        and not strings.resolve().is_relative_to(target.path.resolve())
+    ):
+        return target.path, strings
+    return (target.path,)

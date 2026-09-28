@@ -83,6 +83,21 @@ Binary OpenGrep tool executions inspect extracted strings, decoded Apktool files
 
 Source workflows include Gitleaks, TruffleHog, Syft, OpenGrep, and platform metadata extraction. Binary workflows use Strings plus platform tools such as LIEF, ipsw, Androguard, Apktool, Apksigner, and APKiD. A failed or unavailable required tool fails the scan, preserving artifacts already written. See the [complete tool inventory](docs/ToolInventory.md) for each tool, its outputs and why it is retained.
 
+Binary secret detection inspects both extracted resources and the `strings/` artifacts.
+Strings retains printable sequences of at least four characters. TruffleHog binary
+executions use local detection without credential verification; Gitleaks merges
+its per-input findings and preserves failures. Raw secret-tool artifacts can contain
+credential values; aggregate reports include detector and location summaries.
+
+JSON and PDF include rule-defined observation inventories (such as external
+libraries, Apple system frameworks, and hardcoded strings) when the supplied
+OpenGrep rules identify them. The aggregate `inventories` field contains distinct
+captured values and evidence locations. Source and binary reports also include
+`sbom` package details from Syft, with completion status, versions, ecosystems,
+package URLs, and locations. These inventories do not imply vulnerability or
+complete dependency coverage.
+
+
 The output directory always contains tool artifacts and scan metadata. `--json` adds `post_scan_processing.json`; `--pdf` adds the PDF report. Both flags default to off. Raw tool JSON remains available independently of the aggregate JSON flag.
 
 `post_scan_processing.json` is the final report aggregate (`schema_version: 1`). JSON and PDF use the same findings, severity counts, risk summaries, coverage, secret-detector results, and platform details. The aggregate replaces the previous intermediate JSON structure:

@@ -16,7 +16,7 @@ from utilities.path_utils import relative_result_path
 class StringsScanner(ScannerPort):
     """Scanner for extracting strings from binary files."""
 
-    DEFAULT_MIN_LENGTH = 10
+    DEFAULT_MIN_LENGTH = 4
     DEFAULT_PROCESS_TIMEOUT_SECONDS = 300
 
     @property

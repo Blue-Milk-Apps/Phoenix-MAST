@@ -89,6 +89,7 @@ class PdfReportGenerator(ReportGeneratorPort):
                 f"{report_data.metadata.target.target_kind.value} report details"
             )
 
+        inventory_ids = {item.rule_id for item in report_data.inventories}
         metadata = report_data.metadata
         return {
             "meta": {
@@ -114,6 +115,11 @@ class PdfReportGenerator(ReportGeneratorPort):
             "rule_coverage": list(report_data.rule_coverage),
             "rule_status": report_data.rule_status,
             "rule_status_reason": report_data.rule_status_reason,
+            "inventories": [
+                {**asdict(item), "platform": PdfReportGenerator._platform_label(ReportPlatform(item.platform))}
+                for item in report_data.inventories
+            ],
+            "sbom": asdict(report_data.sbom),
             "secret_scans": [asdict(summary) for summary in report_data.secret_scans],
             "vulnerability_sections": [
                 {
@@ -149,9 +155,11 @@ class PdfReportGenerator(ReportGeneratorPort):
                             "remediation_link": check.remediation_link,
                         }
                         for check in section.checks
+                        if check.rule_id not in inventory_ids
                     ],
                 }
                 for section in report_data.vulnerability_sections
+                if any(check.rule_id not in inventory_ids for check in section.checks)
             ],
             "overall_evaluation": [
                 {

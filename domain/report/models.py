@@ -639,6 +639,40 @@ class SecretScanSummary:
 
 
 @dataclass(frozen=True)
+class InventoryValue:
+    value: str
+    locations: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class RuleObservation:
+    category: str
+    title: str
+    rule_id: str
+    platform: str
+    severity: str
+    description: str
+    execution_status: str
+    values: tuple[InventoryValue, ...] = ()
+
+
+@dataclass(frozen=True)
+class SbomPackage:
+    name: str
+    version: str = ""
+    ecosystem: str = ""
+    purl: str = ""
+    locations: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class SbomSummary:
+    status: str = "Unavailable"
+    reason: str = "No readable Syft inventory was recorded."
+    packages: tuple[SbomPackage, ...] = ()
+
+
+@dataclass(frozen=True)
 class ReportData:
     """The final scan aggregate shared by JSON output and report renderers."""
 
@@ -652,6 +686,8 @@ class ReportData:
     rule_status: str = ""
     rule_status_reason: str = ""
     secret_scans: tuple[SecretScanSummary, ...] = ()
+    inventories: tuple[RuleObservation, ...] = ()
+    sbom: SbomSummary = SbomSummary()
 
     def to_dict(self) -> dict[str, Any]:
         """Return the versioned aggregate for JSON serialization."""
@@ -713,7 +749,11 @@ class ReportData:
 
         # Resolve the platform detail model from the saved target, never from scan files.
         metadata = restore(ReportMetadata, data.get("metadata"), "metadata")
-        report = restore(cls, {key: value for key, value in data.items() if key != "schema_version"}, "report")
+        saved = {key: value for key, value in data.items() if key != "schema_version"}
+        # These inventories were not present in earlier schema-version-1 aggregates.
+        saved.setdefault("inventories", [])
+        saved.setdefault("sbom", asdict(SbomSummary()))
+        report = restore(cls, saved, "report")
         if "secure" in data["findings_severity"]:
             report = replace(report, findings_severity=FindingSeverity.from_sections(report.vulnerability_sections))
         return report

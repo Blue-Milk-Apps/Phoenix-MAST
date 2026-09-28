@@ -6,7 +6,7 @@ that model. Rendering does not load a blank data template or merge sample data.
 
 ## Usage
 
-The scan workflow generates the PDF automatically. To regenerate one from a
+The scan workflow generates a PDF when `--pdf` is supplied. Aggregate JSON is independently enabled with `--json`. To regenerate one from a
 saved `post_scan_processing.json` (schema version 1):
 
 ```python
@@ -71,3 +71,18 @@ WeasyPrint can find Homebrew libraries under `/opt/homebrew/lib` or
 If WeasyPrint fails with errors such as `cannot load library 'libgobject-2.0-0'`
 or `cannot load library 'libpango-1.0-0'`, first verify that the Homebrew
 packages are installed and then rerun the scan inside the project virtualenv.
+
+## Observation and package inventories
+
+`ReportData.inventories` stores INFO observations populated from named OpenGrep
+captures. Each group retains its category, title, rule ID, platform, description,
+execution status, and distinct values with evidence locations. These checks still
+contribute once per matched rule to severity counts and remain in aggregate JSON.
+The PDF shows captured observations in inventory tables instead of duplicating
+them in check tables. Inventory-only categories do not receive risk ratings.
+
+`ReportData.sbom` carries the Syft completion status and package name, version,
+ecosystem, package URL, and locations for every scan target. Missing or failed
+inventories remain distinguishable from completed inventories with no packages.
+These two additive fields default to unavailable/empty when loading older
+schema-version-1 reports. PDF regeneration requires no original tool artifacts.

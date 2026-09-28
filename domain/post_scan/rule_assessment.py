@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, dataclass
 from enum import StrEnum
 from typing import Any, Mapping
@@ -56,6 +57,12 @@ class RuleDefinition:
         severity = str(rule.get("severity", "")).lower()
         if severity not in {"critical", "high", "medium", "low", "info", "error", "warning", "inventory", "experiment"}:
             raise ValueError(f"{rule_id}: unsupported severity {severity!r}.")
+        if "inventory" in metadata:
+            capture = metadata["inventory"]
+            if not isinstance(capture, str) or not re.fullmatch(r"\$[A-Z][A-Z0-9_]*", capture):
+                raise ValueError(f"{rule_id}: metadata.inventory must name a capture such as $VALUE.")
+            if metadata["finding_type"] != "observation" or severity != "info":
+                raise ValueError(f"{rule_id}: inventory rules must be INFO observations.")
         return cls(rule_id.strip(), category, rule_file, fingerprint, severity, str(rule.get("message", "")), metadata)
 
     def snapshot(self) -> dict[str, Any]:

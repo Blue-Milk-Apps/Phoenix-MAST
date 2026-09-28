@@ -86,9 +86,9 @@ class MobileScannerFactory:
                     IpswScanner(),
                     SyftScanner(),
                     LIEFScanner(),
+                    StringsScanner(),
                     TrufflehogScanner(),
                     GitleaksScanner(),
-                    StringsScanner(),
                     PlistBinaryScanner(),
                 ]
             case ("SOURCE", _, "FLUTTER"):

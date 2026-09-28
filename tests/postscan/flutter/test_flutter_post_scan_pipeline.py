@@ -82,6 +82,7 @@ def test_persisted_flutter_artifacts_produce_the_complete_section_contract(tmp_p
     assert set(sections) == {
         "rule_assessments",
         "secret_scans",
+        "sbom",
         "meta",
         "file_info",
         "app_info",
