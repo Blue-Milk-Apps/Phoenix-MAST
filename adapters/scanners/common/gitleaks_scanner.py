@@ -33,7 +33,7 @@ class GitleaksScanner(ScannerPort):
     def description(self) -> str:
         return (
             "Detected secrets, API keys, tokens, passwords, and other sensitive values in "
-            "the target project using Gitleaks rules."
+            "the target project using Gitleaks detectors."
         )
 
     def _gitleaks_executable(self) -> str | None:
@@ -92,7 +92,7 @@ class GitleaksScanner(ScannerPort):
                     ]
 
             resolved_target = resolve_scan_target(config)
-            print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}Resolved scan target: {resolved_target.path}")
+            print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}Tool input: {resolved_target.path}")
             executable = self._gitleaks_executable()
             if not executable:
                 error_message = "Gitleaks executable was not found on this system."
@@ -113,7 +113,9 @@ class GitleaksScanner(ScannerPort):
                 "--no-banner",
                 "--no-color",
                 "--log-level",
-                "fatal",
+                "error",
+                "--exit-code",
+                "0",  # Findings belong in the report; nonzero exits indicate execution errors.
                 "--report-format",
                 "json",
                 "--report-path",
@@ -140,8 +142,8 @@ class GitleaksScanner(ScannerPort):
                     if clean_line:
                         print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}{clean_line}")
 
-            if process.returncode not in (0, 1):
-                error_message = f"Gitleaks error with return code {process.returncode}"
+            if process.returncode != 0:
+                error_message = f"Gitleaks error with return code {process.returncode}: {stderr_data.strip()}"
                 return [
                     ScanResult(
                         scanner_name=self.name,

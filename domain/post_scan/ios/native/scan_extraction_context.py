@@ -72,25 +72,6 @@ class NativeIOSScanExtractionContext:
         return [result for result in results if isinstance(result, dict)]
 
     @property
-    def syft_packages(self) -> list[tuple[str, str, str]]:
-        packages: list[tuple[str, str, str]] = []
-        outputs = self.loaded_outputs.get("syft_outputs") or {}
-        if not isinstance(outputs, dict):
-            return packages
-        for path, content in outputs.items():
-            if not isinstance(content, dict):
-                continue
-            for collection_name in ("components", "artifacts"):
-                for package in content.get(collection_name) or []:
-                    if not isinstance(package, dict):
-                        continue
-                    name = str(package.get("name", "")).strip()
-                    version = str(package.get("version", "")).strip()
-                    if name:
-                        packages.append((str(path), name, version))
-        return packages
-
-    @property
     def scan_date(self) -> str:
         explicit = str(self.scan_metadata.get("scan_date", "")).strip()
         if explicit:

@@ -70,7 +70,7 @@ docker compose run --rm --entrypoint apksigner phoenix version
 Apksigner runs automatically during APK binary scans:
 
 ```bash
-uv run phoenix scan --android-binary-path path/to/app.apk
+uv run phoenix scan --android-binary path/to/app.apk
 ```
 
 The scanner skips non-APK inputs. It emits one primary document-style artifact under:

@@ -13,7 +13,7 @@ class AppCertificate:
     validity: str = ""
     issuer: str = ""
     serial_number: str = ""
-    signature_versions: dict[str, bool] = field(default_factory=dict)
+    signature_versions: dict[str, bool | None] = field(default_factory=dict)
     hash_algorithms: str = ""
     fingerprint: str = ""
     unique_certs: str = ""
@@ -70,10 +70,9 @@ class AppCertificate:
         self.unique_certs = str(len(androguard_certificates.get("all") or []))
 
     @staticmethod
-    def signature_scheme_verified(signature_scheme: dict[str, Any] | None) -> bool:
-        if not signature_scheme:
-            return False
-        return str(signature_scheme.get("state", "")).upper() == "VERIFIED"
+    def signature_scheme_verified(signature_scheme: dict[str, Any] | None) -> bool | None:
+        state = str((signature_scheme or {}).get("state", "")).upper()
+        return True if state == "VERIFIED" else False if state == "MISSING" else None
 
     @staticmethod
     def _primary_certificate(

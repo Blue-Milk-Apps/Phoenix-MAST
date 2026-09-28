@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 import shutil
 import subprocess
 import tempfile
@@ -16,6 +15,7 @@ from xml.etree import ElementTree
 from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
 from utilities.apk_utils import find_apk_in_directory, is_apk_file
+from utilities.exclusions import prune_excluded
 
 ANDROID_NS = "{http://schemas.android.com/apk/res/android}"
 
@@ -33,39 +33,6 @@ class ApktoolScanner(ScannerPort):
     """Scanner for normalized Android evidence reconstructed by apktool."""
 
     DEFAULT_TIMEOUT_SECONDS = 300
-    MAX_TEXT_FILE_BYTES = 512_000
-    MAX_SMALI_FILES = 5000
-    MAX_MATCHES_PER_CATEGORY = 250
-    SECRET_CONTEXT_CHARS = 80
-
-    CODE_PATTERNS = {
-        "webview": re.compile(
-            r"(Landroid/webkit/WebView;|Landroid/webkit/WebSettings;|"
-            r"setJavaScriptEnabled|addJavascriptInterface|setAllowFileAccess)"
-        ),
-        "dynamic_loading": re.compile(r"(DexClassLoader|PathClassLoader|loadClass|loadLibrary|System;->load)"),
-        "reflection": re.compile(
-            r"(Ljava/lang/reflect/|Ljava/lang/Class;->forName|->getMethod|"
-            r"->getDeclaredMethod)"
-        ),
-        "crypto": re.compile(
-            r"(Ljavax/crypto/|Ljava/security/MessageDigest;|"
-            r"Ljava/security/SecureRandom;|Cipher;->getInstance)"
-        ),
-        "trust_manager": re.compile(r"(Ljavax/net/ssl/|X509TrustManager|HostnameVerifier|TrustManager)"),
-        "runtime_exec": re.compile(r"(Ljava/lang/Runtime;->exec|ProcessBuilder)"),
-    }
-    ENDPOINT_PATTERNS = {
-        "url": re.compile(r"https?://[^\s\"'<>]+", re.IGNORECASE),
-        "domain": re.compile(
-            r"\b[a-z0-9][a-z0-9.-]*\."
-            r"(?:com|net|org|io|dev|app|co|gov|edu|cloud|info|biz)\b",
-            re.IGNORECASE,
-        ),
-        "ip_address": re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"),
-        "jwt": re.compile(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b"),
-        "secret_keyword": re.compile(r"(?i)(api[_-]?key|client[_-]?secret|secret[_-]?key|access[_-]?token)"),
-    }
     SECURITY_RELEVANT_ASSET_SUFFIXES = {
         ".cer",
         ".crt",
@@ -125,10 +92,15 @@ class ApktoolScanner(ScannerPort):
         errors: list[dict[str, Any]] = []
         try:
             decode_result = self._decode_apk(apktool_executable, apk_path, temp_dir)
+            prune_excluded(decode_result.decoded_root, config.exclude_patterns)
             artifacts = self._extract_artifacts(decode_result, errors)
             artifacts["decode_metadata.json"] = self._decode_metadata(apk_path, decode_result, artifacts, errors)
             artifacts["extraction_errors.json"] = {"errors": errors}
             artifacts["evidence_index.json"] = self._evidence_index(artifacts)
+            if decode_result.decoded_root.is_dir():
+                decoded_output = config.output_path / self.scan_type.value / "decoded"
+                decoded_output.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(decode_result.decoded_root), str(decoded_output))
             return self._scan_results(artifacts, decode_result, errors)
         except Exception as exc:
             return [
@@ -201,8 +173,6 @@ class ApktoolScanner(ScannerPort):
             ("deep_links.json", self._extract_deep_links),
             ("network_security_config.json", self._extract_network_security_config),
             ("trust_boundaries.json", self._extract_trust_boundaries),
-            ("code_indicators.json", self._extract_code_indicators),
-            ("secrets_endpoints.json", self._extract_secrets_endpoints),
             ("native_libraries.json", self._extract_native_libraries),
             ("assets_inventory.json", self._extract_assets_inventory),
         ]
@@ -389,19 +359,6 @@ class ApktoolScanner(ScannerPort):
                 )
         return {"items": sorted(boundaries, key=lambda item: item["value"])}
 
-    def _extract_code_indicators(self, decoded_root: Path) -> dict[str, Any]:
-        return {"items": self._scan_text_patterns(decoded_root, self.CODE_PATTERNS, "code_indicator")}
-
-    def _extract_secrets_endpoints(self, decoded_root: Path) -> dict[str, Any]:
-        return {
-            "items": self._scan_text_patterns(
-                decoded_root,
-                self.ENDPOINT_PATTERNS,
-                "secret_or_endpoint",
-                include_context=True,
-            )
-        }
-
     def _extract_native_libraries(self, decoded_root: Path) -> dict[str, Any]:
         libraries = []
         lib_root = decoded_root / "lib"
@@ -444,60 +401,6 @@ class ApktoolScanner(ScannerPort):
                     }
                 )
         return {"assets": assets}
-
-    def _scan_text_patterns(
-        self,
-        decoded_root: Path,
-        patterns: dict[str, re.Pattern[str]],
-        evidence_type: str,
-        *,
-        include_context: bool = False,
-    ) -> list[dict[str, Any]]:
-        counts = {category: 0 for category in patterns}
-        items = []
-        for path in self._iter_text_files(decoded_root):
-            text = path.read_text(encoding="utf-8", errors="ignore")
-            for line_number, line in enumerate(text.splitlines(), start=1):
-                for category, pattern in patterns.items():
-                    if counts[category] >= self.MAX_MATCHES_PER_CATEGORY:
-                        continue
-                    for match in pattern.finditer(line):
-                        counts[category] += 1
-                        context = {"category": category}
-                        if include_context:
-                            context["line_context"] = self._short_context(line, match)
-                        items.append(
-                            self._evidence(
-                                evidence_type,
-                                match.group(0),
-                                decoded_root,
-                                path,
-                                context,
-                                line_number=line_number,
-                            )
-                        )
-                        if counts[category] >= self.MAX_MATCHES_PER_CATEGORY:
-                            break
-        return sorted(items, key=lambda item: json.dumps(item, sort_keys=True))
-
-    def _iter_text_files(self, decoded_root: Path) -> list[Path]:
-        candidates = []
-        for path in sorted(decoded_root.rglob("*")):
-            if len(candidates) >= self.MAX_SMALI_FILES:
-                break
-            if path.is_symlink() or not path.is_file():
-                continue
-            if path.stat().st_size > self.MAX_TEXT_FILE_BYTES:
-                continue
-            if path.suffix.lower() in {
-                ".smali",
-                ".xml",
-                ".json",
-                ".txt",
-                ".properties",
-            }:
-                candidates.append(path)
-        return candidates
 
     def _load_manifest(self, decoded_root: Path) -> ElementTree.ElementTree:
         return ElementTree.parse(decoded_root / "AndroidManifest.xml")
@@ -676,11 +579,7 @@ class ApktoolScanner(ScannerPort):
         decode_result: ApktoolDecodeResult,
         errors: list[dict[str, Any]],
     ) -> list[ScanResult]:
-        extracted_any = any(
-            name not in {"decode_metadata.json", "extraction_errors.json"} and self._count_items(value) > 0
-            for name, value in artifacts.items()
-        )
-        overall_success = decode_result.exit_code == 0 or extracted_any
+        overall_success = decode_result.exit_code == 0 and not errors
         return [
             ScanResult(
                 scanner_name=self.name,
@@ -740,11 +639,6 @@ class ApktoolScanner(ScannerPort):
             "apktool_artifact": "decoded_apk",
             "extraction_method": "apktool_normalized_evidence",
         }
-
-    def _short_context(self, line: str, match: re.Match[str]) -> str:
-        start = max(0, match.start() - self.SECRET_CONTEXT_CHARS)
-        end = min(len(line), match.end() + self.SECRET_CONTEXT_CHARS)
-        return line[start:end].strip()
 
     def _summarize_lines(self, text: str) -> list[str]:
         return [line.strip() for line in text.splitlines() if line.strip()][:20]

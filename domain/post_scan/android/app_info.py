@@ -28,26 +28,26 @@ class AndroidAppInfo:
         manifest_application = apktool_manifest_summary.get("application") or {}
         self.icon_path = ""
         self.name = first_non_empty(
-            androguard_metadata.get("app_name"),
             aapt2_identity.get("application_label"),
+            androguard_metadata.get("app_name"),
         )
         self.package_name = first_non_empty(
-            androguard_metadata.get("package"),
             aapt2_identity.get("package_name"),
+            androguard_metadata.get("package"),
         )
         self.main_activity = first_non_empty(aapt2_identity.get("launchable_activity"))
         self.target_sdk = first_non_empty(
-            androguard_metadata.get("target_sdk"),
             aapt2_identity.get("target_sdk_version"),
+            androguard_metadata.get("target_sdk"),
         )
         self.min_sdk = first_non_empty(
-            androguard_metadata.get("min_sdk"),
             aapt2_identity.get("min_sdk_version"),
+            androguard_metadata.get("min_sdk"),
         )
         self.max_sdk = ""
         self.version_name = first_non_empty(
-            androguard_metadata.get("version_name"),
             aapt2_identity.get("version_name"),
+            androguard_metadata.get("version_name"),
         )
         self.debuggable = first_non_empty(
             manifest_application.get("debuggable"),

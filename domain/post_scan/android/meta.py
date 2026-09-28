@@ -30,26 +30,26 @@ class AndroidMeta:
         scan_output_path = Path(str(loaded_outputs.get("scan_output_path", "")))
 
         self.app_display_name = first_non_empty(
-            androguard_metadata.get("app_name"),
             aapt2_identity.get("application_label"),
+            androguard_metadata.get("app_name"),
         )
         self.file_name = first_non_empty(
             androguard_metadata.get("file_name"),
             Path(scan_metadata.get("project_path", "")).name,
         )
         self.package_name = first_non_empty(
-            androguard_metadata.get("package"),
             aapt2_identity.get("package_name"),
+            androguard_metadata.get("package"),
         )
         self.scan_date = self._derive_scan_date(scan_metadata, scan_output_path)
         self.platform = self._normalize_platform(scan_metadata.get("platform"))
         self.version_name = first_non_empty(
-            androguard_metadata.get("version_name"),
             aapt2_identity.get("version_name"),
+            androguard_metadata.get("version_name"),
         )
         self.version_code = first_non_empty(
-            androguard_metadata.get("version_code"),
             aapt2_identity.get("version_code"),
+            androguard_metadata.get("version_code"),
         )
         self.reviewer_org = self.DEFAULT_REVIEWER_ORG
 

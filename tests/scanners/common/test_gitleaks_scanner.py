@@ -53,6 +53,7 @@ def test_gitleaks_scan_success_returns_raw_output(monkeypatch, tmp_path: Path, s
     assert results[0].raw_output == "[]"
     assert results[0].relative_target_path == "gitleaks_report.json"
     assert captured_cmd[captured_cmd.index("--report-path") + 1] == "-"
+    assert captured_cmd[captured_cmd.index("--exit-code") + 1] == "0"
 
 
 def test_gitleaks_scan_reports_findings(monkeypatch, tmp_path: Path, scan_config) -> None:
@@ -64,7 +65,7 @@ def test_gitleaks_scan_reports_findings(monkeypatch, tmp_path: Path, scan_config
     class FakeProcess:
         def __init__(self, cmd: list[str]) -> None:
             self.cmd = cmd
-            self.returncode = 1
+            self.returncode = int(cmd[cmd.index("--exit-code") + 1])
 
         def communicate(self, timeout: int | None = None) -> tuple[str, str]:
             return (

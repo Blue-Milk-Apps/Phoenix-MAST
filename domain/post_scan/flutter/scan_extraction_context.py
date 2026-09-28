@@ -6,6 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from domain.post_scan.dependencies import syft_assessed, syft_packages
+
 
 class FlutterScanExtractionContext:
     """Provide defensive typed views over persisted Flutter scan artifacts."""
@@ -47,14 +49,28 @@ class FlutterScanExtractionContext:
     @property
     def dependencies(self) -> dict[str, list[dict[str, Any]]]:
         values = self._mapping(self.source_metadata.get("dependencies"))
-        return {key: self._mapping_list(values.get(key)) for key in ("direct", "development", "resolved")}
+        declared = {key: self._mapping_list(values.get(key)) for key in ("direct", "development")}
+        scopes = {item.get("name"): scope for scope, items in declared.items() for item in items}
+        resolved = []
+        for package in syft_packages(self.loaded_outputs, "dart-pub"):
+            metadata = self._mapping(package.get("metadata"))
+            resolved.append(
+                {
+                    "name": package["name"],
+                    "version": package.get("version", ""),
+                    "dependency_kind": scopes.get(package["name"], "unknown"),
+                    "source": "hosted" if metadata.get("hosted_url") else "unknown",
+                    "hosted_url": metadata.get("hosted_url", ""),
+                    "vcs_url": metadata.get("vcs_url", ""),
+                    "path": metadata.get("path", ""),
+                }
+            )
+        return {**declared, "resolved": resolved}
 
     @property
     def dependencies_assessed(self) -> bool:
         values = self.source_metadata.get("dependencies")
-        return isinstance(values, dict) and all(
-            isinstance(values.get(key), list) for key in ("direct", "development", "resolved")
-        )
+        return isinstance(values, dict) and all(isinstance(values.get(key), list) for key in ("direct", "development"))
 
     @property
     def project_path(self) -> Path:
@@ -229,28 +245,15 @@ class FlutterScanExtractionContext:
 
     @property
     def syft_packages(self) -> list[tuple[str, str, str]]:
-        packages: list[tuple[str, str, str]] = []
-        for output_path, content in self._scanner_outputs("syft_outputs").items():
-            if not isinstance(content, dict):
-                continue
-            for collection_name in ("components", "artifacts"):
-                for package in content.get(collection_name) or []:
-                    if not isinstance(package, dict):
-                        continue
-                    name = self.first_non_empty(package.get("name"))
-                    version = self.first_non_empty(package.get("version"))
-                    if name:
-                        packages.append((output_path, name, version))
-        return list(dict.fromkeys(packages))
+        return list(
+            dict.fromkeys(
+                ("sbom.json", p["name"], str(p.get("version") or "")) for p in syft_packages(self.loaded_outputs)
+            )
+        )
 
     @property
     def syft_assessed(self) -> bool:
-        for content in self._scanner_outputs("syft_outputs").values():
-            if not isinstance(content, dict) or content.get("success") is False:
-                continue
-            if isinstance(content.get("components"), list) or isinstance(content.get("artifacts"), list):
-                return True
-        return False
+        return syft_assessed(self.loaded_outputs)
 
     @property
     def scan_date(self) -> str:

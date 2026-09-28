@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from rich.text import Text
+
 from adapters.output import ConsoleScanOutput, FileScanOutput, MultiScanOutput
 from adapters.storage import StoreToFile
 from domain.models import ScanConfig, ScanResult, ScanType
@@ -62,25 +64,25 @@ def test_console_scan_output_prints_skipped_status(capsys) -> None:
 
     ConsoleScanOutput().write_result(result)
 
-    output = capsys.readouterr().out
+    output = Text.from_ansi(capsys.readouterr().out).plain
     assert "Gitleaks: Skipped" in output
     assert "Gitleaks is not available." in output
 
 
 def test_console_scan_output_prints_skipped_binary_status(capsys) -> None:
     result = ScanResult(
-        scanner_name="MobSF Scanner",
-        scan_type=ScanType.MOBSF_SCANNER,
+        scanner_name="Example tool",
+        scan_type=ScanType.SYFT,
         success=False,
         skipped=True,
-        error_message="MobSF Scanner is not available on this system.",
+        error_message="Example tool is not available on this system.",
     )
 
     ConsoleScanOutput().write_result(result)
 
-    output = capsys.readouterr().out
-    assert "MobSF Scanner: Skipped" in output
-    assert "MobSF Scanner is not available on this system." in output
+    output = Text.from_ansi(capsys.readouterr().out).plain
+    assert "Example tool: Skipped" in output
+    assert "Example tool is not available on this system." in output
 
 
 def test_file_scan_output_delegates_to_artifact_store(tmp_path: Path) -> None:
@@ -182,13 +184,36 @@ def test_store_to_file_adds_txt_for_extensionless_relative_target(
         tmp_path / "scan-results",
     )
 
-    assert (
-        stored_path
-        == tmp_path
-        / "scan-results"
-        / "strings"
-        / "Frameworks"
-        / "Foo.framework"
-        / "Foo.txt"
-    )
+    assert stored_path == tmp_path / "scan-results" / "strings" / "Frameworks" / "Foo.framework" / "Foo.txt"
     assert stored_path.read_text(encoding="utf-8") == "HELLO"
+
+
+def test_console_ci_output_is_static_and_treats_markup_as_text(monkeypatch, capsys):
+    import re
+
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("CI", "true")
+    monkeypatch.setenv("TTY_INTERACTIVE", "1")
+    monkeypatch.setenv("TERM", "xterm-256color")
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    output = ConsoleScanOutput()
+    output.tool_status("[red]literal tool[/red]", "OK", "1.23s | 2 artifacts")
+    text = capsys.readouterr().out
+    assert not output.console.is_interactive
+    assert "[red]literal tool[/red]" in text
+    assert "[OK]" in text
+    assert "\x1b[" in text
+    assert "\r" not in text
+    assert all(sequence.endswith("m") for sequence in re.findall(r"\x1b\[[0-9;?]*[A-Za-z]", text))
+
+
+def test_console_no_color_overrides_forced_ci_color(monkeypatch, capsys):
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    monkeypatch.setenv("NO_COLOR", "1")
+    output = ConsoleScanOutput()
+    output.tool_status("OpenGrep", "FAILED", "Required rules unavailable")
+    text = capsys.readouterr().out
+    assert "[FAILED] OpenGrep" in text
+    assert "\x1b" not in text
+    assert not output.console.is_interactive

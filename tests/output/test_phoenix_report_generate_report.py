@@ -1,7 +1,12 @@
+import json
+
 from adapters.output.phoenix_report.builders.android import NativeAndroidReportDataBuilder
 from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
 from adapters.output.phoenix_report.pdf_report.common import build_charts
 from application.report_generation_service import ReportGenerationService
+from domain.post_scan.rule_assessment import rule_assessments
+from domain.report import ReportData
+from tests.rule_fixtures import assessment_payload, rule
 
 
 def _android_source_report(data: dict) -> object:
@@ -23,23 +28,32 @@ def test_modular_report_data_contains_canonical_android_sections() -> None:
             "app_info": {"package_name": "com.example", "target_sdk": "35"},
             "application": {"allow_backup": True},
             "app_components": {"activities": 1, "exported_activities": 1},
-            "code_evidence": {
-                "activities_accessible_to_other_apps": {
-                    "present": True,
-                    "evidence": "exported_activities=1",
-                }
-            },
+            "rule_assessments": rule_assessments(
+                assessment_payload(
+                    rule("example.exported", title="Exported component", finding_type="review"),
+                    platform="android",
+                    category="code",
+                    results=[{"check_id": "example.exported", "path": "AndroidManifest.xml"}],
+                )
+            ),
             "functionality": {"Camera": {"present": None}},
         }
     )
 
     code = next(section for section in report.vulnerability_sections if section.name == "Code")
-    activities = next(check for check in code.checks if check.name == "Activities Accessible to Other Apps")
+    activities = next(check for check in code.checks if check.name == "Exported component")
     assert activities.result.value == "present"
     assert activities.severity.value == "high"
     assert activities.compliance
-    assert len(report.vulnerability_sections) == 4
+    assert activities.finding_type == "review"
+    assert report.findings_severity.high == 1
+    assert [section.name for section in report.vulnerability_sections] == ["Code"]
     assert report.platform_details.app_components.exported_activities == 1
+    saved = json.loads(json.dumps(report.to_dict()))
+    assert ReportData.from_dict(saved) == report
+    assert set(saved["findings_severity"]) == {"critical", "high", "medium", "low", "info"}
+    saved["findings_severity"].update(high=0, secure=1)
+    assert ReportData.from_dict(saved) == report
 
 
 def test_pdf_presentation_maps_android_details_and_charts() -> None:
@@ -53,7 +67,9 @@ def test_pdf_presentation_maps_android_details_and_charts() -> None:
         }
     )
 
-    presentation = PdfReportGenerator._presentation_data(report)
+    restored = ReportData.from_dict(json.loads(json.dumps(report.to_dict())))
+    presentation = PdfReportGenerator._presentation_data(restored)
+    assert presentation == PdfReportGenerator._presentation_data(report)
     assert presentation["application"]["debuggable"] is False
     assert presentation["app_components"]["activities"] == 2
     assert presentation["functionality"]["Camera"]["present"] is True

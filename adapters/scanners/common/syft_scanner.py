@@ -1,8 +1,10 @@
 """Platform-neutral Syft scanner adapter for SBOM generation."""
 
 import json
+import os
 import shutil
 import subprocess
+from pathlib import Path
 
 from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
@@ -14,6 +16,7 @@ class SyftScanner(ScannerPort):
     """Scanner for generating Software Bill of Materials using Syft."""
 
     DEFAULT_OUTPUT_FORMAT = "syft-json"
+    DEFAULT_PROCESS_TIMEOUT_SECONDS = 300
 
     def __init__(self, output_format: str = DEFAULT_OUTPUT_FORMAT) -> None:
         self.output_format = output_format
@@ -43,24 +46,31 @@ class SyftScanner(ScannerPort):
                 config.extracted_binary.scan_root_path if config.extracted_binary is not None else config.project_path
             )
             output_format = self._stdout_output_format()
+            source_name = os.environ.get("SYFT_SOURCE_NAME") or (
+                Path(config.display_project_path or config.project_path).resolve().name or "filesystem"
+            )
             cmd = [
                 "syft",
                 "scan",
                 str(scan_target),
+                "--source-name",
+                source_name,
                 "-o",
                 output_format,
             ]
 
-            print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}Scanning filesystem...")
+            print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}Inventorying dependencies...")
 
-            process = subprocess.Popen(
+            process = subprocess.run(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                check=False,
+                timeout=self.DEFAULT_PROCESS_TIMEOUT_SECONDS,
             )
 
-            stdout_data, stderr_data = process.communicate()
+            stdout_data, stderr_data = process.stdout, process.stderr
 
             for line in stderr_data.splitlines():
                 clean_line = line.replace("\r", "").strip()
@@ -69,7 +79,7 @@ class SyftScanner(ScannerPort):
                 print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}{clean_line}")
 
             if process.returncode != 0:
-                error_message = f"Syft error: {process.returncode}"
+                error_message = f"Syft error with code {process.returncode}: {stderr_data.strip()}"
                 return [
                     ScanResult(
                         scanner_name=self.name,
@@ -81,7 +91,7 @@ class SyftScanner(ScannerPort):
                     )
                 ]
 
-            print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}Scan complete.")
+            print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}Tool execution output received.")
 
             return [
                 ScanResult(
@@ -106,26 +116,16 @@ class SyftScanner(ScannerPort):
             ]
 
     def _stdout_output_format(self) -> str:
-        output_format = self.output_format.strip()
-        if not output_format:
-            return self.DEFAULT_OUTPUT_FORMAT
-        if "=" in output_format:
-            raise ValueError(
-                "Syft output format must not include a file path. "
-                "Use a format such as 'syft-json', 'spdx-json', or 'syft-json'."
-            )
-        if not output_format.endswith("-json"):
-            raise ValueError(
-                "Syft output format must be JSON so phoenix can persist a .json report. "
-                "Use a format such as 'syft-json', 'spdx-json', or 'syft-json'."
-            )
-        return output_format
+        if self.output_format != self.DEFAULT_OUTPUT_FORMAT:
+            raise ValueError("Phoenix requires syft-json for its internal dependency inventory.")
+        return self.DEFAULT_OUTPUT_FORMAT
 
     @staticmethod
     def _json_report(raw_output: str) -> str:
-        if not raw_output.strip():
-            return "{}"
-        return json.dumps(json.loads(raw_output), sort_keys=True)
+        report = json.loads(raw_output)
+        if not isinstance(report, dict) or not isinstance(report.get("artifacts"), list):
+            raise ValueError("Syft did not return a syft-json artifact inventory.")
+        return json.dumps(report, sort_keys=True)
 
     def _error_report(self, error_message: str, raw_output: str = "") -> str:
         report: dict[str, object] = {

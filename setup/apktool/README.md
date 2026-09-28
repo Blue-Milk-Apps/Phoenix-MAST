@@ -1,6 +1,6 @@
 # Apktool Evidence Extractor Setup
 
-phoenix uses apktool during APK binary scans to reconstruct Android semantics into a temporary workspace. phoenix keeps normalized JSON evidence and removes the decoded project after extraction.
+Phoenix uses Apktool during APK binary scans to decode XML, smali and resources. It keeps the decoded tree under `apktool/decoded/`, alongside normalized configuration evidence, for subsequent tool executions.
 
 ## Local Install
 
@@ -35,7 +35,7 @@ docker compose run --rm phoenix --help
 Apktool runs automatically during APK binary scans:
 
 ```bash
-uv run phoenix scan --android-binary-path path/to/app.apk
+uv run phoenix scan --android-binary path/to/app.apk
 ```
 
 The scanner skips non-APK inputs. It emits deterministic JSON artifacts under:
@@ -46,7 +46,7 @@ scan-results/.../apktool/
 
 ## Generated Outputs
 
-The scanner writes compact evidence artifacts rather than persisting the full decoded APK project:
+The adapter writes these artifacts and retains the decoded project:
 
 | File | Purpose |
 | --- | --- |
@@ -57,15 +57,13 @@ The scanner writes compact evidence artifacts rather than persisting the full de
 | `deep_links.json` | Deep-link schemes, hosts, paths, actions, categories, and owning activities. |
 | `network_security_config.json` | Network security config references, domains, cleartext policy, trust anchors, pins, and debug overrides. |
 | `trust_boundaries.json` | Evidence records that describe app boundary crossings such as exported components. |
-| `code_indicators.json` | Bounded smali/XML indicators for WebView, reflection, dynamic loading, crypto, trust management, and runtime execution. |
-| `secrets_endpoints.json` | Bounded endpoint and secret-marker evidence with short line context. |
 | `native_libraries.json` | Native library inventory with ABI, path, size, and SHA-256. |
 | `assets_inventory.json` | Security-relevant asset inventory with path, size, suffix, and SHA-256. |
 | `extraction_errors.json` | Extraction-stage errors captured during partial failures. |
 | `evidence_index.json` | Artifact index and item counts. |
 
-## Extraction Philosophy
+## Tool ownership
 
-phoenix treats apktool as Android semantic reconstruction infrastructure, not as a long-term APK dump. The scanner prioritizes high-signal, provenance-rich AppSec evidence that downstream systems can enrich into findings later.
+Apktool supplies decoded inputs and configuration inventories. OpenGrep owns vulnerability detection; Gitleaks and TruffleHog own credential detection. Phoenix no longer applies Python smali or secret-marker regex classifiers to the decoded tree.
 
-The decoded apktool workspace is temporary. phoenix preserves contextual relationships in JSON artifacts and avoids storing full smali trees, giant string dumps, or UI-focused decoded resources.
+`--exclude` patterns remove matching files from the disposable decoded tree before its inventories and downstream tools execute. A decode or extraction error fails the tool execution while preserving available artifacts.

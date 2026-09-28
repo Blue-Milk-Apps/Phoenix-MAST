@@ -24,7 +24,8 @@ def test_scans_each_flutter_platform_with_only_its_scoped_rules(tmp_path: Path, 
     }
 
     class FakeOpenGrepScanner:
-        def __init__(self, rules_path=None, scan_paths=None):
+        def __init__(self, rules_directory=None, scan_paths=None, **kwargs):
+            rules_path = rules_directory
             self.rules_path = Path(rules_path)
             self.scan_paths = list(scan_paths)
 
@@ -44,42 +45,19 @@ def test_scans_each_flutter_platform_with_only_its_scoped_rules(tmp_path: Path, 
             return [_result(payload)]
 
     monkeypatch.setattr(
-        "adapters.scanners.flutter.flutter_opengrep_scanner.OpenGrepScanner",
+        "adapters.scanners.flutter.flutter_opengrep_scanner.CategoryOpenGrepScanner",
         FakeOpenGrepScanner,
     )
 
-    class FakeIOSSectionOpenGrepScanner:
-        def __init__(self, rules_directory=None, scan_paths=None):
-            _ = rules_directory
-            calls.append(("ios", list(scan_paths)))
-
-        def scan(self, config):
-            _ = config
-            return [
-                _result(
-                    {
-                        "success": True,
-                        "results": [{"check_id": rule_ids["ios"]}],
-                        "errors": [],
-                        "scan_metadata": {
-                            "status": "complete",
-                            "tool_version": "test-version",
-                            "configured_rule_ids": [rule_ids["ios"]],
-                        },
-                    }
-                )
-            ]
-
-    monkeypatch.setattr(
-        "adapters.scanners.flutter.flutter_opengrep_scanner.IOSSectionOpenGrepScanner",
-        FakeIOSSectionOpenGrepScanner,
-    )
-
+    config = _config(project, tmp_path)
+    xml_output = config.output_path / "plist_source" / "xml" / "ios"
+    xml_output.mkdir(parents=True)
+    (config.output_path / "plist_source" / "Info.json").write_text('{"plist": {}}')
     result = FlutterOpenGrepScanner(
         rules_root / "flutter",
         android_rules_path=rules_root / "android",
         ios_rules_path=rules_root / "ios",
-    ).scan(_config(project, tmp_path))[0]
+    ).scan(config)[0]
     payload = json.loads(result.raw_output)
 
     assert result.success is True
@@ -87,7 +65,7 @@ def test_scans_each_flutter_platform_with_only_its_scoped_rules(tmp_path: Path, 
     assert calls == [
         ("flutter", [project / "lib"]),
         ("android", [project / "android"]),
-        ("ios", [project / "ios"]),
+        ("ios", [project / "ios", xml_output]),
     ]
     assert payload["scan_metadata"]["status"] == "complete"
     assert payload["scan_metadata"]["configured_rule_ids"] == sorted(rule_ids.values())
@@ -103,7 +81,8 @@ def test_missing_native_platforms_are_recorded_as_skipped(tmp_path: Path, monkey
     calls: list[list[Path]] = []
 
     class FakeOpenGrepScanner:
-        def __init__(self, rules_path=None, scan_paths=None):
+        def __init__(self, rules_directory=None, scan_paths=None, **kwargs):
+            rules_path = rules_directory
             _ = rules_path
             calls.append(list(scan_paths))
 
@@ -124,7 +103,7 @@ def test_missing_native_platforms_are_recorded_as_skipped(tmp_path: Path, monkey
             ]
 
     monkeypatch.setattr(
-        "adapters.scanners.flutter.flutter_opengrep_scanner.OpenGrepScanner",
+        "adapters.scanners.flutter.flutter_opengrep_scanner.CategoryOpenGrepScanner",
         FakeOpenGrepScanner,
     )
 
@@ -146,7 +125,8 @@ def test_failed_required_flutter_scope_does_not_record_its_rule_ids(tmp_path: Pa
     rules_path.mkdir(parents=True)
 
     class FakeOpenGrepScanner:
-        def __init__(self, rules_path=None, scan_paths=None):
+        def __init__(self, rules_directory=None, scan_paths=None, **kwargs):
+            rules_path = rules_directory
             _ = (rules_path, scan_paths)
 
         def scan(self, config):
@@ -162,7 +142,7 @@ def test_failed_required_flutter_scope_does_not_record_its_rule_ids(tmp_path: Pa
             ]
 
     monkeypatch.setattr(
-        "adapters.scanners.flutter.flutter_opengrep_scanner.OpenGrepScanner",
+        "adapters.scanners.flutter.flutter_opengrep_scanner.CategoryOpenGrepScanner",
         FakeOpenGrepScanner,
     )
 
@@ -177,24 +157,29 @@ def test_failed_required_flutter_scope_does_not_record_its_rule_ids(tmp_path: Pa
     assert payload["errors"] == [{"error": "scanner failed", "scope": "flutter"}]
 
 
-def test_failed_native_scope_makes_report_partial_without_discarding_flutter_results(
+def test_failed_native_scope_stops_before_ios_and_preserves_failure_details(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
     project = tmp_path / "project"
     (project / "lib").mkdir(parents=True)
     (project / "android").mkdir()
+    (project / "ios").mkdir()
     rules_root = tmp_path / "rules"
     (rules_root / "flutter").mkdir(parents=True)
     (rules_root / "android").mkdir()
+    (rules_root / "ios").mkdir()
+    calls = []
 
     class FakeOpenGrepScanner:
-        def __init__(self, rules_path=None, scan_paths=None):
+        def __init__(self, rules_directory=None, scan_paths=None, **kwargs):
+            rules_path = rules_directory
             self.scope = Path(rules_path).name
             _ = scan_paths
 
         def scan(self, config):
             _ = config
+            calls.append(self.scope)
             if self.scope == "android":
                 return [
                     ScanResult(
@@ -219,17 +204,20 @@ def test_failed_native_scope_makes_report_partial_without_discarding_flutter_res
             ]
 
     monkeypatch.setattr(
-        "adapters.scanners.flutter.flutter_opengrep_scanner.OpenGrepScanner",
+        "adapters.scanners.flutter.flutter_opengrep_scanner.CategoryOpenGrepScanner",
         FakeOpenGrepScanner,
     )
 
     result = FlutterOpenGrepScanner(
         rules_root / "flutter",
         android_rules_path=rules_root / "android",
+        ios_rules_path=rules_root / "ios",
     ).scan(_config(project, tmp_path))[0]
     payload = json.loads(result.raw_output)
 
-    assert result.success is True
+    assert calls == ["flutter", "android"]
+    assert "Android rules failed" in result.error_message
+    assert result.success is False
     assert payload["scan_metadata"]["status"] == "partial"
     assert payload["scan_metadata"]["configured_rule_ids"] == ["flutter.source.cleartext-http"]
     assert payload["scan_metadata"]["scopes"]["android"]["status"] == "failed"
@@ -246,8 +234,13 @@ def test_workflow_selects_scoped_opengrep_for_flutter(tmp_path: Path, monkeypatc
     captured: list[Path] = []
 
     class FakeFlutterOpenGrepScanner:
-        def __init__(self, flutter_rules_path):
+        name = "Flutter Scoped OpenGrep Scanner"
+
+        def __init__(self, flutter_rules_path, **kwargs):
             captured.append(Path(flutter_rules_path))
+
+        def is_available(self):
+            return True
 
         def scan(self, scan_config):
             assert scan_config is config
