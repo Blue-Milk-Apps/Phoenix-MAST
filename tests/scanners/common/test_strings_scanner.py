@@ -142,7 +142,6 @@ def test_strings_scan_for_ipa_paths_are_relative_to_app_bundle(monkeypatch, tmp_
 
     outputs = {
         "TestApp": "APP_STRING\n",
-        "Frameworks/Foo.framework/Foo": "FRAMEWORK_STRING\n",
     }
 
     def fake_run(cmd, capture_output, text, check, timeout):
@@ -167,5 +166,4 @@ def test_strings_scan_for_ipa_paths_are_relative_to_app_bundle(monkeypatch, tmp_
 
     assert {result.relative_target_path: result.raw_output for result in results} == {
         "TestApp.txt": "APP_STRING",
-        "Frameworks/Foo.framework/Foo.txt": "FRAMEWORK_STRING",
     }

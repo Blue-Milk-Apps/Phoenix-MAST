@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from domain.models import ExtractedBinary, ScanConfig
-from utilities.ipa_utils import extract_ipa, is_ipa_file
+from utilities.ipa_utils import ExtractedIPA, extract_ipa, is_ipa_file
 
 
 @dataclass
@@ -29,6 +29,8 @@ def resolve_scan_target(config: ScanConfig) -> ResolvedScanTarget:
     decoded = config.output_path / "apktool" / "decoded"
     if config.target_type == "BINARY" and config.platform == "ANDROID" and decoded.is_dir():
         return ResolvedScanTarget(path=decoded)
+    if isinstance(config.extracted_binary, ExtractedIPA):
+        return ResolvedScanTarget(path=config.extracted_binary.binary_path)
     if config.extracted_binary is not None:
         return ResolvedScanTarget(path=config.extracted_binary.scan_root_path)
 
@@ -37,7 +39,7 @@ def resolve_scan_target(config: ScanConfig) -> ResolvedScanTarget:
 
     if project_path.is_file() and is_ipa_file(project_path):
         extracted = extract_ipa(project_path)
-        return ResolvedScanTarget(path=extracted.app_bundle, owned_extraction=extracted)
+        return ResolvedScanTarget(path=extracted.binary_path, owned_extraction=extracted)
 
     return ResolvedScanTarget(path=project_path)
 
@@ -45,6 +47,8 @@ def resolve_scan_target(config: ScanConfig) -> ResolvedScanTarget:
 def secret_scan_paths(config: ScanConfig, target: ResolvedScanTarget) -> tuple[Path, ...]:
     """Include extracted text without rescanning reports or other tool artifacts."""
     strings = config.output_path / "strings"
+    if config.target_type == "BINARY" and config.platform == "IOS" and strings.is_dir():
+        return (strings,)
     if (
         config.target_type == "BINARY"
         and strings.is_dir()

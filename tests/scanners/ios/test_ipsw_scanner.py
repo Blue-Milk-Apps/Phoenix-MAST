@@ -85,6 +85,7 @@ def test_ipsw_scan_returns_raw_command_outputs(monkeypatch, tmp_path: Path) -> N
             return subprocess.CompletedProcess(argv, 0, "ipsw version 3.1.687\n", "")
 
         binary_name = Path(argv[3]).name
+        assert binary_name == "TestApp"
         if argv[-1] == "--json":
             stdout = json.dumps({"header": {"type": "EXECUTE"}, "binary": binary_name})
         elif argv[-1] == "--sig":
@@ -114,28 +115,21 @@ def test_ipsw_scan_returns_raw_command_outputs(monkeypatch, tmp_path: Path) -> N
 
     results = IpswScanner().scan(config)
 
-    assert len(results) == 2
+    assert len(results) == 1
     assert all(result.success for result in results)
     assert not (config.output_path / "ipsw").exists()
     assert [result.relative_target_path for result in results] == [
         "TestApp.json",
-        "Frameworks/Foo.framework/Foo.json",
     ]
 
     outputs = {result.relative_target_path: json.loads(result.raw_output) for result in results}
     app_output = outputs["TestApp.json"]
-    framework_output = outputs["Frameworks/Foo.framework/Foo.json"]
 
     assert app_output["app_info"]["bundle_id"] == "com.example.test"
     assert app_output["binary"] == {
         "kind": "main",
         "name": "TestApp",
         "path": "TestApp",
-    }
-    assert framework_output["binary"] == {
-        "kind": "framework",
-        "name": "Foo",
-        "path": "Frameworks/Foo.framework/Foo",
     }
     assert app_output["scan_metadata"]["ipsw_version"] == "ipsw version 3.1.687"
     assert app_output["scan_metadata"]["execution_status"] == "SUCCESS"
@@ -171,4 +165,4 @@ def test_ipsw_scan_returns_raw_command_outputs(monkeypatch, tmp_path: Path) -> N
         "application-identifier": "TestApp",
         "com.apple.developer.team-identifier": "ABCDE12345",  # pragma: allowlist secret
     }
-    assert len(calls) == 7
+    assert len(calls) == 4

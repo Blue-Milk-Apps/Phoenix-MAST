@@ -239,7 +239,7 @@ class MobileAnalysisWorkflowService:
             reason = "Binary OpenGrep rules have not been provided; security findings were not evaluated."
             result = ScanResult(
                 scanner_name="OpenGrep",
-                scan_type=ScanType.OPENGREP_SOURCE,
+                scan_type=ScanType.OPENGREP_BINARY,
                 skipped=True,
                 error_message=reason,
                 relative_target_path="opengrep_results.json",

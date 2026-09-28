@@ -817,7 +817,7 @@ def test_opengrep_rule_loading_failure_is_visible_in_terminal(tmp_path, capsys, 
 
     assert exit_code == 1
     error = Text.from_ansi(capsys.readouterr().err).plain
-    assert "Phoenix scan failed: iOS Category OpenGrep Scanner failed:" in error
+    assert "Phoenix scan failed: iOS OpenGrep Scanner failed:" in error
     assert f"No YAML rule files found in: {rules}" in error
     assert not list(config.output_path.rglob("post_scan_processing.json"))
     assert not list(config.output_path.rglob("*.pdf"))

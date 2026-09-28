@@ -273,7 +273,7 @@ def test_missing_binary_rules_record_unassessed_coverage(tmp_path, empty_directo
         (config.opengrep_rules_path / ".gitkeep").touch()
     output = FileScanOutput(config.output_path)
     result = MobileAnalysisWorkflowService()._perform_opengrep_scan(config, output)[0]
-    payload = json.loads((config.output_path / "opengrep_source/opengrep_results.json").read_text())
+    payload = json.loads((config.output_path / "opengrep_binary/opengrep_results.json").read_text())
     assert result.skipped
     assert payload["scan_metadata"]["status"] == "not_evaluated"
     coverage = rule_assessments(payload)["coverage"]

@@ -32,27 +32,13 @@ class ExtractedIPA:
 
     @property
     def analysis_targets(self) -> list[Path]:
-        """Return the Mach-O binaries relevant to binary analysis."""
+        """Return only the primary app executable for binary analysis."""
         return get_scanable_binary_paths(self)
 
 
 def get_scanable_binary_paths(extracted: ExtractedIPA) -> list[Path]:
-    """Return the IPA binary targets that should be scanned by analysis tools."""
-    targets = [extracted.binary_path] if extracted.binary_path.is_file() else []
-    frameworks_dir = extracted.app_bundle / "Frameworks"
-    if not frameworks_dir.exists():
-        return targets
-
-    for framework_dir in sorted(frameworks_dir.glob("*.framework")):
-        binary = framework_dir / framework_dir.stem
-        if binary.is_file():
-            targets.append(binary)
-
-        for dylib in sorted(framework_dir.glob("*.dylib")):
-            if dylib.is_file():
-                targets.append(dylib)
-
-    return targets
+    """Return only the primary app executable, excluding embedded executables."""
+    return [extracted.binary_path] if extracted.binary_path.is_file() else []
 
 
 def relative_ipa_binary_path(extracted: ExtractedIPA, binary_path: Path) -> Path:

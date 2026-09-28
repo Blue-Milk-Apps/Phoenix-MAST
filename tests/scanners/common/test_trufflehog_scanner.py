@@ -51,7 +51,7 @@ def test_trufflehog_scan_success_returns_raw_output(monkeypatch, tmp_path, scan_
     assert "--fail-on-scan-errors" in captured_cmd
 
 
-def test_trufflehog_ios_binary_scan_uses_extracted_app_bundle_and_skips_verified_only(
+def test_trufflehog_ios_binary_scan_uses_primary_executable_and_skips_verified_only(
     monkeypatch, tmp_path: Path
 ) -> None:
     ipa_path = _build_test_ipa(tmp_path / "Demo.ipa")
@@ -68,8 +68,8 @@ def test_trufflehog_ios_binary_scan_uses_extracted_app_bundle_and_skips_verified
 
         def __init__(self, cmd: list[str]) -> None:
             captured_cmd.extend(cmd)
-            assert Path(cmd[2]).is_dir()
-            assert Path(cmd[2]).name == "Demo.app"
+            assert Path(cmd[2]).is_file()
+            assert Path(cmd[2]).name == "Demo"
 
         stdout = '{"SourceMetadata": {}}\n'
         stderr = ""

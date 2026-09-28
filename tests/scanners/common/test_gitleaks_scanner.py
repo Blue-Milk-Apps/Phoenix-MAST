@@ -90,7 +90,7 @@ def test_gitleaks_scan_reports_findings(monkeypatch, tmp_path: Path, scan_config
     assert results[0].relative_target_path == "gitleaks_report.json"
 
 
-def test_gitleaks_ios_binary_scan_uses_extracted_app_bundle(monkeypatch, tmp_path: Path) -> None:
+def test_gitleaks_ios_binary_scan_uses_primary_executable(monkeypatch, tmp_path: Path) -> None:
     ipa_path = _build_test_ipa(tmp_path / "Demo.ipa")
     config = ScanConfig(
         project_path=ipa_path,
@@ -106,8 +106,8 @@ def test_gitleaks_ios_binary_scan_uses_extracted_app_bundle(monkeypatch, tmp_pat
         def __init__(self, cmd: list[str]) -> None:
             captured_cmd.extend(cmd)
             self.returncode = 0
-            assert Path(cmd[-1]).is_dir()
-            assert Path(cmd[-1]).name == "Demo.app"
+            assert Path(cmd[-1]).is_file()
+            assert Path(cmd[-1]).name == "Demo"
 
         def communicate(self, timeout: int | None = None) -> tuple[str, str]:
             return "[]", ""
