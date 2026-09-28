@@ -111,7 +111,7 @@ phoenix scan --ios-source /workspace --json --pdf
 
 For binary inputs, exclusions apply to extracted files and Apktool's decoded tree. Tools that inspect the original APK, including signature verification, aapt2 and Androguard, still inspect the original archive. Exclusions do not rewrite that archive.
 
-Stdout includes tool progress, elapsed time, artifact locations, OpenGrep coverage, finding counts and matched finding titles. Secret output summarizes detector counts without printing credential values. Tool failures return exit code 1; findings alone do not change the exit code.
+Stdout uses Rich for static scan headers, tool status lines and tables showing finding counts, matched findings and secret-detector summaries. No animations or cursor redraws are used. `--severity MEDIUM` shows medium, high and critical findings and counts on stdout; JSON/PDF reports and raw artifacts remain complete. Colors are enabled for supported terminals and GitHub Actions; set `NO_COLOR=1` to disable styling. Elapsed time, artifact locations and OpenGrep coverage are also displayed. Secret output summarizes detector counts without printing credential values. Tool failures return exit code 1; findings alone do not change the exit code.
 
 A **rule** always means an OpenGrep rule. A **scan** is one Phoenix run; individual adapters perform **tool executions**. Python post-processing normalizes evidence and builds reports; OpenGrep owns security findings and functionality detection, and Syft owns resolved dependency inventories.
 

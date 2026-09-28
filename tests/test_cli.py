@@ -528,9 +528,8 @@ def test_scan_command_prints_selected_scan_details(tmp_path: Path, capsys, monke
     output = capsys.readouterr().out
     assert exit_code == 1
     assert "Phoenix scan" in output
-    assert f"Project: {tmp_path.resolve()}" in output
-    assert "Scan type: Android binary" in output
-    assert "Proceeding with Android binary scan" in output
+    assert str(tmp_path.resolve()) in "".join(output.split())
+    assert "Scan type Android binary" in " ".join(output.split())
 
 
 def test_scan_command_writes_scan_metadata(tmp_path: Path, monkeypatch) -> None:

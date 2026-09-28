@@ -26,16 +26,20 @@ from utilities.exclusions import PathExclusions, prune_excluded, source_scan_wor
 from utilities.ipa_utils import ExtractedIPA
 
 
+@pytest.mark.parametrize("severity", [None, "info", "LOW", "Medium", "HIGH", "CRITICAL"])
 @pytest.mark.parametrize("json_flag,pdf_flag", [(False, False), (True, False), (False, True), (True, True)])
-def test_reports_are_independently_opt_in(tmp_path, monkeypatch, capsys, json_flag, pdf_flag):
+def test_reports_are_independently_opt_in(tmp_path, monkeypatch, capsys, json_flag, pdf_flag, severity):
     from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
 
+    monkeypatch.setenv("NO_COLOR", "1")
     project = tmp_path / "project"
     project.mkdir()
     args = ["scan", "--ios-source", str(project), "--output", str(tmp_path / "out")]
     args += ["--json"] if json_flag else []
     args += ["--pdf"] if pdf_flag else []
+    args += ["--severity", severity] if severity else []
     config = _create_scan_config(_build_parser().parse_args(args))
+    assert config.stdout_severity == (severity.lower() if severity else None)
     assert (config.json_report, config.pdf_report) == (json_flag, pdf_flag)
     monkeypatch.setattr(MobileScannerFactory, "build_scanner_list", lambda self, config: [])
 
@@ -43,7 +47,15 @@ def test_reports_are_independently_opt_in(tmp_path, monkeypatch, capsys, json_fl
         result = ScanResult(
             "OpenGrep",
             ScanType.OPENGREP_SOURCE,
-            raw_output=json.dumps(assessment_payload(rule("test.finding"), results=[{"check_id": "test.finding"}])),
+            raw_output=json.dumps(
+                assessment_payload(
+                    *(
+                        rule(f"test.{level}", severity=level.upper())
+                        for level in ("info", "low", "medium", "high", "critical")
+                    ),
+                    results=[{"check_id": f"test.{level}"} for level in ("info", "low", "medium", "high", "critical")],
+                )
+            ),
             relative_target_path="opengrep_results.json",
         )
         output.write_result(result)
@@ -64,10 +76,18 @@ def test_reports_are_independently_opt_in(tmp_path, monkeypatch, capsys, json_fl
     assert bool(rendered) == pdf_flag
     assert (config.output_path / "opengrep_source/opengrep_results.json").is_file()
     stdout = capsys.readouterr().out
-    assert "Finding: HIGH | test.finding" in stdout
+    levels = ["info", "low", "medium", "high", "critical"]
+    expected = levels[levels.index(severity.lower()) :] if severity else levels
+    counts = stdout.split("Weakness counts", 1)[1].split("Findings", 1)[0]
+    for level in levels:
+        assert (f"test.{level}" in stdout) == (level in expected)
+        assert (level.upper() in counts) == (level in expected)
+    if rendered:
+        assert sum(len(section.checks) for section in rendered[0].vulnerability_sections) == 5
     assert "OpenGrep coverage: success" in stdout
     if json_flag:
         original = json.loads((config.output_path / "post_scan_processing.json").read_text())
+        assert sum(len(section["checks"]) for section in original["vulnerability_sections"]) == 5
         monkeypatch.setattr(
             MobileAnalysisWorkflowService, "run", lambda *_: pytest.fail("Saved reports must not run tools")
         )

@@ -31,6 +31,7 @@ All independently installed analysis tools above have an execution path. Raw evi
 | APKiD adapter | Normalize upstream signature families, evidence locations and follow-up hints. These are tool evidence, not additional Phoenix rules or report vulnerabilities. |
 | Rule assessment/report builders | Join persisted OpenGrep catalog entries to matches, group findings, count severity and format output. No keyword or version-based vulnerability inference. |
 | Exclusion workspace | Apply one root-relative path contract across tools with different exclusion interfaces. A filtered source tree is prepared once when needed, using hard links where possible and copies otherwise. Original source paths are restored before persistence. |
+| Rich | Static stdout/stderr formatting, status labels, severity colors and summary tables. No animations; severity filtering affects stdout only. |
 | Jinja2, MarkupSafe, WeasyPrint | Optional PDF rendering; template autoescaping is enabled and badge labels are escaped. Loaded on demand for PDF output. |
 | Matplotlib, NumPy, Pillow | PDF charts and images; Pillow is also used for application icon extraction. |
 | PyYAML | OpenGrep catalog metadata and Flutter manifest declarations. |

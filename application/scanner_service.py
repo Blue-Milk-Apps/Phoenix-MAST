@@ -4,6 +4,7 @@ import json
 import time
 from dataclasses import replace
 
+from adapters.output.console_output import ConsoleScanOutput
 from domain.models import ScanConfig, ScanResult
 from ports.scan_output_port import ScanOutputPort
 from ports.scanner_port import ScannerPort
@@ -17,6 +18,7 @@ class ScannerService:
         scanners: list[ScannerPort] | None = None,
     ) -> None:
         self.scanners = scanners or []
+        self.console = ConsoleScanOutput()
 
     def scan_project(
         self, config: ScanConfig, output: ScanOutputPort | None = None, *, retain_output: bool = True
@@ -32,7 +34,7 @@ class ScannerService:
         """
         results: list[ScanResult] = []
         for scanner in self.scanners:
-            print(f"Tool execution started: {scanner.name}", flush=True)
+            self.console.tool_status(scanner.name, "START")
 
             start = time.perf_counter()
             try:
@@ -40,6 +42,7 @@ class ScannerService:
                     raise RuntimeError("Required scanner is not available on this system.")
                 scan_results = scanner.scan(config)
             except Exception as exc:
+                self.console.tool_status(scanner.name, "FAILED", f"{time.perf_counter() - start:.2f}s | {exc}")
                 raise RuntimeError(f"{scanner.name} failed: {exc}") from exc
             duration = time.perf_counter() - start
             for result in scan_results:
@@ -57,17 +60,13 @@ class ScannerService:
                 if output is not None:
                     output.write_result(result)
             if not scan_results:
+                self.console.tool_status(scanner.name, "FAILED", "No execution results returned")
                 raise RuntimeError(f"{scanner.name} returned no execution results.")
             for result in scan_results:
                 if not result.success or result.skipped:
-                    print(
-                        f"Tool execution failed: {scanner.name} | {duration:.2f}s | partial artifacts saved", flush=True
-                    )
+                    self.console.tool_status(scanner.name, "FAILED", f"{duration:.2f}s | partial artifacts saved")
                     raise RuntimeError(f"{scanner.name} failed: {result.error_message or 'Execution was incomplete.'}")
-            print(
-                f"Tool execution completed: {scanner.name} | {duration:.2f}s | {len(scan_results)} artifacts",
-                flush=True,
-            )
+            self.console.tool_status(scanner.name, "OK", f"{duration:.2f}s | {len(scan_results)} artifacts")
             results.extend(
                 scan_results
                 if retain_output or output is None

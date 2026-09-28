@@ -72,6 +72,7 @@ class ScanConfig:
     exclude_patterns: list[str] = field(default_factory=list)
     json_report: bool = False
     pdf_report: bool = False
+    stdout_severity: str | None = None
     display_project_path: str = ""
     platform: str = "ANY"
     stack: str = "ANY"

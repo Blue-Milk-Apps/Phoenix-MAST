@@ -184,3 +184,34 @@ def test_store_to_file_adds_txt_for_extensionless_relative_target(
 
     assert stored_path == tmp_path / "scan-results" / "strings" / "Frameworks" / "Foo.framework" / "Foo.txt"
     assert stored_path.read_text(encoding="utf-8") == "HELLO"
+
+
+def test_console_ci_output_is_static_and_treats_markup_as_text(monkeypatch, capsys):
+    import re
+
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("CI", "true")
+    monkeypatch.setenv("TTY_INTERACTIVE", "1")
+    monkeypatch.setenv("TERM", "xterm-256color")
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    output = ConsoleScanOutput()
+    output.tool_status("[red]literal tool[/red]", "OK", "1.23s | 2 artifacts")
+    text = capsys.readouterr().out
+    assert not output.console.is_interactive
+    assert "[red]literal tool[/red]" in text
+    assert "[OK]" in text
+    assert "\x1b[" in text
+    assert "\r" not in text
+    assert all(sequence.endswith("m") for sequence in re.findall(r"\x1b\[[0-9;?]*[A-Za-z]", text))
+
+
+def test_console_no_color_overrides_forced_ci_color(monkeypatch, capsys):
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    monkeypatch.setenv("NO_COLOR", "1")
+    output = ConsoleScanOutput()
+    output.tool_status("OpenGrep", "FAILED", "Required rules unavailable")
+    text = capsys.readouterr().out
+    assert "[FAILED] OpenGrep" in text
+    assert "\x1b" not in text
+    assert not output.console.is_interactive

@@ -3,6 +3,7 @@ import time
 from dataclasses import asdict
 from pathlib import Path
 
+from adapters.output.console_output import ConsoleScanOutput
 from adapters.output.file_output import FileScanOutput
 from adapters.output.phoenix_report.builders.android import (
     AndroidBinaryReportDataBuilder,
@@ -156,16 +157,15 @@ class MobileAnalysisWorkflowService:
     POST_SCAN_OUTPUT_FILE_NAME = "post_scan_processing.json"
     GENERATED_REPORT_FILE_NAME = "phoenix_Report.pdf"
 
+    def __init__(self) -> None:
+        self.console = ConsoleScanOutput()
+
     def run(self, scan_config: ScanConfig) -> None:
         with source_scan_workspace(scan_config) as execution_config:
             self._run(execution_config)
 
     def _run(self, scan_config: ScanConfig) -> None:
-        print("Phoenix scan")
-        print(f"Project: {scan_config.display_project_path or scan_config.project_path}")
-        print(f"Output: {scan_config.output_path}")
-        print(f"Scan type: {scan_config.scan_label}")
-        print(f"Proceeding with {scan_config.scan_label} scan")
+        self.console.scan_started(scan_config)
 
         scan_config.output_path.mkdir(parents=True, exist_ok=True)
         scan_output_method = FileScanOutput(scan_config.output_path)
@@ -202,27 +202,15 @@ class MobileAnalysisWorkflowService:
             if scan_config.json_report:
                 target = scan_config.output_path / self.POST_SCAN_OUTPUT_FILE_NAME
                 target.write_text(json.dumps(report_data.to_dict(), indent=2, sort_keys=True), encoding="utf-8")
-                print(f"JSON report: {target}")
+                self.console.report_written("JSON", target)
             if scan_config.pdf_report:
                 from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
 
                 report_path = self._report_output_path(scan_config.output_path, report_data.metadata)
                 PdfReportGenerator().generate(report_data, report_path)
-                print(f"PDF report: {report_path}")
+                self.console.report_written("PDF", report_path)
             executions = len({result.scanner_name for result in scan_results if not result.skipped})
-            print(f"Tool executions completed: {executions}")
-            print(f"OpenGrep coverage: {report_data.rule_status} {report_data.rule_status_reason}")
-            counts = asdict(report_data.findings_severity)
-            print("Finding counts: " + ", ".join(f"{name}={count}" for name, count in counts.items()))
-            for section in report_data.vulnerability_sections:
-                for check in section.checks:
-                    if check.result.value == "present":
-                        title = " ".join(check.name.splitlines())
-                        print(f"Finding: {check.severity.value.upper()} | {check.rule_id} | {title}")
-            for summary in report_data.secret_scans:
-                print(f"{summary.scanner}: {summary.status} | {len(summary.findings)} secret detections")
-            print(f"Artifacts: {scan_config.output_path}")
-            print(f"Phoenix scan completed in {time.perf_counter() - wall_start:.2f}s", flush=True)
+            self.console.scan_summary(report_data, scan_config, executions, time.perf_counter() - wall_start)
         finally:
             if extracted_binary is not None:
                 extracted_binary.cleanup()
@@ -241,8 +229,8 @@ class MobileAnalysisWorkflowService:
     def _perform_opengrep_scan(self, scan_config: ScanConfig, scan_output_method: FileScanOutput):
         open_grep_rules_path = self._get_opengrep_rules_path(scan_config)
         opengrep_scan_paths = self._get_opengrep_scan_paths(scan_config)
-        print(f"OpenGrep rules path: {open_grep_rules_path}")
-        print(f"OpenGrep scan paths: {opengrep_scan_paths}")
+        self.console.message("OpenGrep rules", open_grep_rules_path)
+        self.console.message("OpenGrep inputs", ", ".join(str(path) for path in opengrep_scan_paths))
         if (
             scan_config.target_type == "BINARY"
             and open_grep_rules_path
@@ -271,7 +259,7 @@ class MobileAnalysisWorkflowService:
             )
             if scan_output_method is not None:
                 scan_output_method.write_result(result)
-            print(f"Tool execution skipped: OpenGrep | {reason}")
+            self.console.tool_status("OpenGrep", "SKIPPED", reason)
             return [result]
         if open_grep_rules_path and opengrep_scan_paths:
             if scan_config.stack == "FLUTTER":

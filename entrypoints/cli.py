@@ -5,12 +5,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Sequence
 
+from adapters.output.console_output import ConsoleScanOutput
 from application.mobile_analysis_workflow_service import MobileAnalysisWorkflowService
 from domain.models import ScanConfig
 
@@ -99,6 +99,12 @@ def _build_parser() -> argparse.ArgumentParser:
     scan_parser.add_argument("--json", action="store_true", help="Write the aggregate JSON report (default: disabled)")
     scan_parser.add_argument("--pdf", action="store_true", help="Write a PDF report (default: disabled)")
     scan_parser.add_argument(
+        "--severity",
+        type=str.upper,
+        choices=("INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"),
+        help="Minimum severity for stdout findings and counts; reports and tool artifacts remain complete",
+    )
+    scan_parser.add_argument(
         "--exclude",
         action="append",
         default=[],
@@ -138,7 +144,7 @@ def _scan_command(args: argparse.Namespace) -> int:
         scan_config: ScanConfig = _create_scan_config(args)
         MobileAnalysisWorkflowService().run(scan_config)
     except Exception as exc:
-        print(f"Phoenix scan failed: {exc}", file=sys.stderr)
+        ConsoleScanOutput(stderr=True).message("Phoenix scan failed", exc, style="bold red")
         return 1
     return 0
 
@@ -152,7 +158,7 @@ def _report_command(args: argparse.Namespace) -> int:
         output = args.output or args.input.with_suffix(".pdf")
         PdfReportGenerator().generate(report, output)
     except Exception as exc:
-        print(f"Phoenix report failed: {exc}", file=sys.stderr)
+        ConsoleScanOutput(stderr=True).message("Phoenix report failed", exc, style="bold red")
         return 1
     return 0
 
@@ -255,6 +261,7 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
         opengrep_rules_root=rules_root.resolve() if rules_root else None,
         json_report=args.json,
         pdf_report=args.pdf,
+        stdout_severity=args.severity.lower() if args.severity else None,
         exclude_patterns=[item.strip() for group in args.exclude for item in group.split(",") if item.strip()],
     )
     return scan_config
