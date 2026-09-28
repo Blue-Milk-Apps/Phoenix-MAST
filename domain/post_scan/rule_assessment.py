@@ -73,6 +73,10 @@ def rule_assessments(opengrep: object) -> dict[str, Any]:
     sources = scopes.items() if isinstance(scopes, Mapping) else ((scan.get("platform", "ios"), scan),)
     results = opengrep.get("results")
     results = results if isinstance(results, list) else []
+    matches_by_rule: dict[tuple[str, object], list[dict[str, Any]]] = {}
+    for result in results:
+        if isinstance(result, dict) and isinstance(result.get("check_id"), str):
+            matches_by_rule.setdefault((result["check_id"], result.get("phoenix_scope")), []).append(result)
     assessments: list[dict[str, Any]] = []
     coverage: list[dict[str, Any]] = []
     for platform, source in sources:
@@ -93,13 +97,7 @@ def rule_assessments(opengrep: object) -> dict[str, Any]:
         )
         for definition in catalog:
             rule_id = definition["rule_id"]
-            matches = [
-                result
-                for result in results
-                if isinstance(result, dict)
-                and result.get("check_id") == rule_id
-                and result.get("phoenix_scope", platform) == platform
-            ]
+            matches = [*matches_by_rule.get((rule_id, platform), []), *matches_by_rule.get((rule_id, None), [])]
             execution = outcomes.get(rule_id, {}) if isinstance(outcomes, Mapping) else {}
             execution_status = execution.get("status", "not_evaluated")
             status = "present" if matches else "not_present" if execution_status == "success" else "not_evaluated"
@@ -122,12 +120,17 @@ def rule_assessments(opengrep: object) -> dict[str, Any]:
     }
 
 
+def assessments_from_outputs(loaded_outputs: dict[str, Any]) -> dict[str, Any]:
+    cached = loaded_outputs.get("rule_assessments")
+    return cached if isinstance(cached, dict) else rule_assessments(loaded_outputs.get("opengrep"))
+
+
 class RuleFunctionality:
     """Group declared YAML functionality labels, preserving each scanner scope."""
 
-    def __init__(self, opengrep: object) -> None:
+    def __init__(self, opengrep: object, *, assessments: dict[str, Any] | None = None) -> None:
         groups: dict[str, dict[str, list[dict[str, Any]]]] = {}
-        for rule in rule_assessments(opengrep)["rules"]:
+        for rule in (assessments if assessments is not None else rule_assessments(opengrep))["rules"]:
             label = rule["metadata"].get("functionality")
             if rule["category"] == "functionality" and isinstance(label, str) and label.strip():
                 groups.setdefault(label, {}).setdefault(rule["platform"], []).append(rule)

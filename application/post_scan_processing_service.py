@@ -6,7 +6,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from domain.post_scan.rule_assessment import rule_assessments
+from domain.post_scan.rule_assessment import assessments_from_outputs
 from domain.post_scan.utilities import summarize_secret_scans
 from ports.post_scan.scan_detail_extractor_port import ScanDetailExtractorPort
 from ports.post_scan.scan_output_loader_port import ScanOutputLoaderPort
@@ -29,7 +29,8 @@ class PostScanProcessingService:
         """Build report-ready output from persisted scan outputs."""
 
         scanner_outputs = self._scan_output_loader.load(scan_output_path)
+        scanner_outputs["rule_assessments"] = assessments_from_outputs(scanner_outputs)
         sections = self._scan_detail_extractor.extract_sections(scanner_outputs)
-        sections["rule_assessments"] = rule_assessments(scanner_outputs.get("opengrep"))
+        sections["rule_assessments"] = assessments_from_outputs(scanner_outputs)
         sections["secret_scans"] = [asdict(summary) for summary in summarize_secret_scans(scanner_outputs)]
         return sections

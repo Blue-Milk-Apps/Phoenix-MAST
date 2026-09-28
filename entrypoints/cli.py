@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from datetime import datetime, timezone
@@ -13,7 +14,6 @@ from typing import Sequence
 from application.mobile_analysis_workflow_service import MobileAnalysisWorkflowService
 from domain.models import ScanConfig
 
-DEFAULT_SYFT_OUTPUT_FORMAT = "syft-json"
 DEFAULT_OPENGREP_RULES_DIRS = {
     "ios_binary": "ios/binary",
     "android_binary": "android/binary",
@@ -55,13 +55,13 @@ def _build_parser() -> argparse.ArgumentParser:
         "--ios-binary",
         type=Path,
         metavar="PATH",
-        help="Path to compiled iOS .ipa or .app",
+        help="Path to compiled iOS .ipa",
     )
     scan_paths.add_argument(
         "--android-binary",
         type=Path,
         metavar="PATH",
-        help="Path to compiled Android .apk or .aab",
+        help="Path to compiled Android .apk",
     )
     scan_paths.add_argument(
         "--flutter-source",
@@ -96,10 +96,14 @@ def _build_parser() -> argparse.ArgumentParser:
         default=Path("./scan-results"),
         help="Output directory for scan results",
     )
+    scan_parser.add_argument("--json", action="store_true", help="Write the aggregate JSON report (default: disabled)")
+    scan_parser.add_argument("--pdf", action="store_true", help="Write a PDF report (default: disabled)")
     scan_parser.add_argument(
-        "--syft-output-format",
-        default=DEFAULT_SYFT_OUTPUT_FORMAT,
-        help=(f"Syft SBOM output format to capture from stdout (default: {DEFAULT_SYFT_OUTPUT_FORMAT})"),
+        "--exclude",
+        action="append",
+        default=[],
+        metavar="PATHS",
+        help="Comma-separated paths or quoted globs to exclude; may be repeated",
     )
     scan_parser.add_argument(
         "--rules-root",
@@ -120,6 +124,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     scan_parser.set_defaults(func=_scan_command)
 
+    report_parser = subparsers.add_parser("report", help="Render a saved Phoenix JSON aggregate without running tools")
+    report_parser.add_argument("input", type=Path, help="Saved post_scan_processing.json")
+    report_parser.add_argument("--pdf", action="store_true", required=True, help="Render PDF output")
+    report_parser.add_argument("--output", "-o", type=Path, help="PDF path (default: beside the input JSON)")
+    report_parser.set_defaults(func=_report_command)
+
     return parser
 
 
@@ -129,6 +139,20 @@ def _scan_command(args: argparse.Namespace) -> int:
         MobileAnalysisWorkflowService().run(scan_config)
     except Exception as exc:
         print(f"Phoenix scan failed: {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _report_command(args: argparse.Namespace) -> int:
+    try:
+        from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
+        from domain.report import ReportData
+
+        report = ReportData.from_dict(json.loads(args.input.read_text(encoding="utf-8")))
+        output = args.output or args.input.with_suffix(".pdf")
+        PdfReportGenerator().generate(report, output)
+    except Exception as exc:
+        print(f"Phoenix report failed: {exc}", file=sys.stderr)
         return 1
     return 0
 
@@ -229,7 +253,9 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
         stack=stack,
         opengrep_rules_path=rules_path,
         opengrep_rules_root=rules_root.resolve() if rules_root else None,
-        syft_output_format=args.syft_output_format,
+        json_report=args.json,
+        pdf_report=args.pdf,
+        exclude_patterns=[item.strip() for group in args.exclude for item in group.split(",") if item.strip()],
     )
     return scan_config
 

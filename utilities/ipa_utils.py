@@ -38,7 +38,7 @@ class ExtractedIPA:
 
 def get_scanable_binary_paths(extracted: ExtractedIPA) -> list[Path]:
     """Return the IPA binary targets that should be scanned by analysis tools."""
-    targets = [extracted.binary_path]
+    targets = [extracted.binary_path] if extracted.binary_path.is_file() else []
     frameworks_dir = extracted.app_bundle / "Frameworks"
     if not frameworks_dir.exists():
         return targets

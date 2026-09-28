@@ -23,7 +23,6 @@ class ExtractedBinary(Protocol):
 class ScanType(str, Enum):
     """Available scan types."""
 
-    MOBSF_SCANNER = "mobsf_scanner"
     LIEF = "lief"
     ANDROGUARD = "androguard"
     AAPT2 = "aapt2"
@@ -70,11 +69,12 @@ class ScanConfig:
     opengrep_rules_path: Path | None = None
     opengrep_rules_root: Path | None = None
     ignore_patterns: list[str] = field(default_factory=list)
-    ignore_file: Path | None = None
+    exclude_patterns: list[str] = field(default_factory=list)
+    json_report: bool = False
+    pdf_report: bool = False
     display_project_path: str = ""
     platform: str = "ANY"
     stack: str = "ANY"
-    syft_output_format: str = "syft-json"
     extracted_binary: ExtractedBinary | None = None
 
     @property

@@ -30,7 +30,7 @@ def test_syft_scan_success_loads_raw_output(monkeypatch, tmp_path: Path, scan_co
             self.cmd = cmd
             self.returncode = 0
 
-        stdout = '{"components": []}'
+        stdout = '{"artifacts": []}'
         stderr = ""
 
     monkeypatch.setattr(syft_scanner.subprocess, "run", lambda cmd, *args, **kwargs: FakeProcess(cmd))
@@ -39,7 +39,7 @@ def test_syft_scan_success_loads_raw_output(monkeypatch, tmp_path: Path, scan_co
 
     assert len(results) == 1
     assert results[0].success
-    assert results[0].raw_output == '{"components": []}'
+    assert results[0].raw_output == '{"artifacts": []}'
     assert results[0].relative_target_path == "sbom.json"
     assert captured_cmd[captured_cmd.index("-o") + 1] == "syft-json"
 
@@ -60,10 +60,9 @@ def test_syft_scan_uses_configured_stdout_format(monkeypatch, tmp_path, scan_con
 
     results = SyftScanner(output_format="spdx-json").scan(config)
 
-    assert results[0].success
-    assert results[0].raw_output == '{"spdxVersion": "SPDX-2.3"}'
-    assert results[0].relative_target_path == "sbom.json"
-    assert captured_cmd[captured_cmd.index("-o") + 1] == "spdx-json"
+    assert not results[0].success
+    assert "requires syft-json" in results[0].error_message
+    assert captured_cmd == []
 
 
 def test_syft_scans_shared_extracted_binary_root(monkeypatch, tmp_path: Path, scan_config) -> None:
@@ -76,7 +75,7 @@ def test_syft_scans_shared_extracted_binary_root(monkeypatch, tmp_path: Path, sc
     class FakeProcess:
         returncode = 0
 
-        stdout = '{"components": []}'
+        stdout = '{"artifacts": []}'
         stderr = ""
 
     def fake_run(cmd: list[str], *args, **kwargs):
@@ -97,4 +96,4 @@ def test_syft_scan_rejects_file_output_format(tmp_path, scan_config) -> None:
     results = SyftScanner(output_format="syft-json=sbom.json").scan(config)
 
     assert not results[0].success
-    assert "must not include a file path" in results[0].error_message
+    assert "requires syft-json" in results[0].error_message

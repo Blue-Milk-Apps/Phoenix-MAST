@@ -69,18 +69,18 @@ def test_console_scan_output_prints_skipped_status(capsys) -> None:
 
 def test_console_scan_output_prints_skipped_binary_status(capsys) -> None:
     result = ScanResult(
-        scanner_name="MobSF Scanner",
-        scan_type=ScanType.MOBSF_SCANNER,
+        scanner_name="Example tool",
+        scan_type=ScanType.SYFT,
         success=False,
         skipped=True,
-        error_message="MobSF Scanner is not available on this system.",
+        error_message="Example tool is not available on this system.",
     )
 
     ConsoleScanOutput().write_result(result)
 
     output = capsys.readouterr().out
-    assert "MobSF Scanner: Skipped" in output
-    assert "MobSF Scanner is not available on this system." in output
+    assert "Example tool: Skipped" in output
+    assert "Example tool is not available on this system." in output
 
 
 def test_file_scan_output_delegates_to_artifact_store(tmp_path: Path) -> None:
@@ -182,13 +182,5 @@ def test_store_to_file_adds_txt_for_extensionless_relative_target(
         tmp_path / "scan-results",
     )
 
-    assert (
-        stored_path
-        == tmp_path
-        / "scan-results"
-        / "strings"
-        / "Frameworks"
-        / "Foo.framework"
-        / "Foo.txt"
-    )
+    assert stored_path == tmp_path / "scan-results" / "strings" / "Frameworks" / "Foo.framework" / "Foo.txt"
     assert stored_path.read_text(encoding="utf-8") == "HELLO"

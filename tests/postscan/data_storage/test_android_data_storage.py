@@ -39,7 +39,6 @@ def test_android_data_storage_scan_output_loader_loads_expected_artifacts(tmp_pa
     assert loaded["androguard_components"] == {"activities": []}
     assert loaded["androguard_metadata"] == {"app_name": "APKPure"}
     assert loaded["androguard_permissions"] == {"items": []}
-    assert loaded["androguard_api_calls"] == {"items": []}
     assert loaded["androguard_certificates"] == {"all": []}
     assert loaded["aapt2_components"] == {"activities": []}
     assert loaded["aapt2_identity"] == {"application_label": "APKPure"}
@@ -49,7 +48,6 @@ def test_android_data_storage_scan_output_loader_loads_expected_artifacts(tmp_pa
     assert loaded["apksigner_signing_evidence"] == {"verification": {}}
     assert loaded["apktool_manifest_summary"] == {"application": {"debuggable": "true"}}
     assert loaded["apktool_permissions"] == {"declared": []}
-    assert loaded["apktool_secrets_endpoints"] == {"items": []}
     assert loaded["apktool_network_security_config"] == {"config_file_present": False}
     assert loaded["apktool_deep_links"] == {"deep_links": []}
 

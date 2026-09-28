@@ -1,6 +1,8 @@
 """Scanner service - orchestrates security scanning operations."""
 
+import json
 import time
+from dataclasses import replace
 
 from domain.models import ScanConfig, ScanResult
 from ports.scan_output_port import ScanOutputPort
@@ -16,7 +18,9 @@ class ScannerService:
     ) -> None:
         self.scanners = scanners or []
 
-    def scan_project(self, config: ScanConfig, output: ScanOutputPort | None = None) -> list[ScanResult]:
+    def scan_project(
+        self, config: ScanConfig, output: ScanOutputPort | None = None, *, retain_output: bool = True
+    ) -> list[ScanResult]:
         """Execute all enabled scanners and return aggregated report.
 
         Args:
@@ -28,7 +32,7 @@ class ScannerService:
         """
         results: list[ScanResult] = []
         for scanner in self.scanners:
-            print(f"Running {scanner.name}...")
+            print(f"Tool execution started: {scanner.name}", flush=True)
 
             start = time.perf_counter()
             try:
@@ -40,13 +44,34 @@ class ScannerService:
             duration = time.perf_counter() - start
             for result in scan_results:
                 result.duration_seconds = duration
+                if config.display_project_path and config.display_project_path != str(config.project_path):
+                    old = str(config.project_path)
+                    new = config.display_project_path
+                    result.raw_output = result.raw_output.replace(json.dumps(old)[1:-1], json.dumps(new)[1:-1]).replace(
+                        old, new
+                    )
+                    result.artifact_files = {
+                        name: content.replace(json.dumps(old)[1:-1], json.dumps(new)[1:-1]).replace(old, new)
+                        for name, content in result.artifact_files.items()
+                    }
                 if output is not None:
                     output.write_result(result)
             if not scan_results:
                 raise RuntimeError(f"{scanner.name} returned no execution results.")
             for result in scan_results:
                 if not result.success or result.skipped:
+                    print(
+                        f"Tool execution failed: {scanner.name} | {duration:.2f}s | partial artifacts saved", flush=True
+                    )
                     raise RuntimeError(f"{scanner.name} failed: {result.error_message or 'Execution was incomplete.'}")
-            results.extend(scan_results)
+            print(
+                f"Tool execution completed: {scanner.name} | {duration:.2f}s | {len(scan_results)} artifacts",
+                flush=True,
+            )
+            results.extend(
+                scan_results
+                if retain_output or output is None
+                else [replace(result, raw_output="", artifact_files={}) for result in scan_results]
+            )
 
         return results

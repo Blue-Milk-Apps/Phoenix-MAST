@@ -16,8 +16,6 @@ from domain.report.models import (
 
 
 class NativeIOSReportDataBuilder(SourceReportDataBuilder):
-    _excluded_functionalities = frozenset({"fingerprint", "google cloud messaging", "infrared led"})
-
     @property
     def target_kind(self) -> ReportTargetKind:
         return ReportTargetKind.NATIVE_IOS_SOURCE
@@ -52,7 +50,6 @@ class NativeIOSReportDataBuilder(SourceReportDataBuilder):
                 )
                 for name, item in functionality.items()
                 if isinstance(item, Mapping)
-                and str(name).strip().casefold() not in NativeIOSReportDataBuilder._excluded_functionalities
             ),
             permissions=tuple(
                 NativeIOSReportDataBuilder._permission_details(item)
@@ -77,11 +74,7 @@ class NativeIOSReportDataBuilder(SourceReportDataBuilder):
                 for item in data.get("endpoints", ())
                 if isinstance(item, Mapping)
             ),
-            third_party_sdks=tuple(
-                str(name)
-                for name in data.get("third_party_sdks", {})
-                if isinstance(data.get("third_party_sdks"), Mapping)
-            ),
+            third_party_sdks=tuple(str(name) for name in data.get("third_party_sdks", []) if isinstance(name, str)),
             manual_review_available=isinstance(data.get("manual_review"), Mapping),
             manual_review_status=self._manual_review_status(data),
             manual_review_findings=self._manual_review_findings(data),

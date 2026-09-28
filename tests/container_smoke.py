@@ -42,6 +42,8 @@ def main():
         "ipsw",
         "apktool",
         "apksigner",
+        "aapt2",
+        "apkid",
     ):
         assert shutil.which(tool), f"Missing scanner executable: {tool}"
 
@@ -80,7 +82,7 @@ def main():
         )
         output = root / "results"
         subprocess.run(
-            ["phoenix", "scan", "--ios-source", str(source), "--output", str(output)],
+            ["phoenix", "scan", "--ios-source", str(source), "--output", str(output), "--json", "--pdf"],
             check=True,
             timeout=180,
         )

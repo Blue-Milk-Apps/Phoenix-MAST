@@ -188,8 +188,6 @@ class OpenGrepScanner(ScannerPort):
                 "--disable-version-check",
             ]
 
-            if config.ignore_file and config.ignore_file.exists():
-                command.extend(["--exclude-rules", str(config.ignore_file)])
             for pattern in config.ignore_patterns:
                 command.extend(["--exclude", pattern])
 

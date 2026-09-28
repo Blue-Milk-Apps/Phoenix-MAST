@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<style>{{ css }}</style>
+<style>{{ css | safe }}</style>
 </head>
 <body>
 {% set is_ios_report = data.meta.platform == 'iOS' %}
@@ -131,10 +131,10 @@
     <tr><td class="k">Issuer</td><td class="v">{{ data.certificate.issuer }}</td></tr>
     <tr><td class="k">Serial Number</td><td class="v mono">{{ data.certificate.serial_number }}</td></tr>
     <tr><td class="k">Signature Versions</td><td class="v">
-      v1: {{ "Yes" if data.certificate.signature_versions.v1 else "No" }} &nbsp;|&nbsp;
-      v2: {{ "Yes" if data.certificate.signature_versions.v2 else "No" }} &nbsp;|&nbsp;
-      v3: {{ "Yes" if data.certificate.signature_versions.v3 else "No" }} &nbsp;|&nbsp;
-      v4: {{ "Yes" if data.certificate.signature_versions.v4 else "No" }}
+      v1: {{ "Unknown" if data.certificate.signature_versions.v1 is none else "Yes" if data.certificate.signature_versions.v1 else "No" }} &nbsp;|&nbsp;
+      v2: {{ "Unknown" if data.certificate.signature_versions.v2 is none else "Yes" if data.certificate.signature_versions.v2 else "No" }} &nbsp;|&nbsp;
+      v3: {{ "Unknown" if data.certificate.signature_versions.v3 is none else "Yes" if data.certificate.signature_versions.v3 else "No" }} &nbsp;|&nbsp;
+      v4: {{ "Unknown" if data.certificate.signature_versions.v4 is none else "Yes" if data.certificate.signature_versions.v4 else "No" }}
     </td></tr>
     <tr><td class="k">Hash Algorithms</td><td class="v">{{ data.certificate.hash_algorithms }}</td></tr>
     <tr><td class="k">Fingerprint</td><td class="v mono">{{ data.certificate.fingerprint }}</td></tr>

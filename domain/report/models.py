@@ -414,10 +414,10 @@ class NativeIOSReportDetails(PlatformReportDetails):
 class SignatureVersions:
     """Verified Android application signature schemes."""
 
-    v1: bool = False
-    v2: bool = False
-    v3: bool = False
-    v4: bool = False
+    v1: bool | None = None
+    v2: bool | None = None
+    v3: bool | None = None
+    v4: bool | None = None
 
 
 @dataclass(frozen=True)

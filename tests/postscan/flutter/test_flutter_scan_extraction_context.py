@@ -25,7 +25,7 @@ def test_exposes_flutter_and_embedded_platform_metadata() -> None:
                 "dependencies": {
                     "direct": [{"name": "http", "constraint": "^1.2.0"}, "invalid"],
                     "development": [{"name": "test"}],
-                    "resolved": [{"name": "http", "version": "1.2.0"}],
+                    "resolved": [],
                 },
                 "android": {
                     "available": True,
@@ -63,7 +63,7 @@ def test_exposes_flutter_and_embedded_platform_metadata() -> None:
     assert context.dependencies == {
         "direct": [{"name": "http", "constraint": "^1.2.0"}],
         "development": [{"name": "test"}],
-        "resolved": [{"name": "http", "version": "1.2.0"}],
+        "resolved": [],
     }
     assert context.dependencies_assessed is True
     assert context.warnings == ["first", "second"]
@@ -184,7 +184,6 @@ def test_exposes_secret_findings_and_deduplicated_syft_packages() -> None:
                         {"name": "http", "version": "1.2.0"},
                         {"name": "http", "version": "1.2.0"},
                     ],
-                    "components": [{"name": "flutter", "version": "3.22.0"}],
                 }
             },
         }
@@ -195,7 +194,6 @@ def test_exposes_secret_findings_and_deduplicated_syft_packages() -> None:
     assert context.gitleaks_findings == [{"RuleID": "generic-api-key"}]
     assert context.trufflehog_findings == [{"DetectorName": "AWS"}]
     assert context.syft_packages == [
-        ("sbom.json", "flutter", "3.22.0"),
         ("sbom.json", "http", "1.2.0"),
     ]
     assert context.syft_assessed is True

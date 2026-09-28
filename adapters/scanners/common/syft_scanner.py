@@ -52,7 +52,7 @@ class SyftScanner(ScannerPort):
                 output_format,
             ]
 
-            print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}Scanning filesystem...")
+            print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}Inventorying dependencies...")
 
             process = subprocess.run(
                 cmd,
@@ -84,7 +84,7 @@ class SyftScanner(ScannerPort):
                     )
                 ]
 
-            print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}Scan complete.")
+            print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}Tool execution output received.")
 
             return [
                 ScanResult(
@@ -109,26 +109,16 @@ class SyftScanner(ScannerPort):
             ]
 
     def _stdout_output_format(self) -> str:
-        output_format = self.output_format.strip()
-        if not output_format:
-            return self.DEFAULT_OUTPUT_FORMAT
-        if "=" in output_format:
-            raise ValueError(
-                "Syft output format must not include a file path. "
-                "Use a format such as 'syft-json', 'spdx-json', or 'syft-json'."
-            )
-        if not output_format.endswith("-json"):
-            raise ValueError(
-                "Syft output format must be JSON so phoenix can persist a .json report. "
-                "Use a format such as 'syft-json', 'spdx-json', or 'syft-json'."
-            )
-        return output_format
+        if self.output_format != self.DEFAULT_OUTPUT_FORMAT:
+            raise ValueError("Phoenix requires syft-json for its internal dependency inventory.")
+        return self.DEFAULT_OUTPUT_FORMAT
 
     @staticmethod
     def _json_report(raw_output: str) -> str:
-        if not raw_output.strip():
-            return "{}"
-        return json.dumps(json.loads(raw_output), sort_keys=True)
+        report = json.loads(raw_output)
+        if not isinstance(report, dict) or not isinstance(report.get("artifacts"), list):
+            raise ValueError("Syft did not return a syft-json artifact inventory.")
+        return json.dumps(report, sort_keys=True)
 
     def _error_report(self, error_message: str, raw_output: str = "") -> str:
         report: dict[str, object] = {

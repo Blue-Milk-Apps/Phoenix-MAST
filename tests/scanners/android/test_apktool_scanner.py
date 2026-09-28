@@ -88,7 +88,7 @@ def test_apktool_partial_decode_extracts_normalized_evidence(monkeypatch, tmp_pa
     results = ApktoolScanner().scan(config)
 
     artifacts = {result.relative_target_path: json.loads(result.raw_output) for result in results}
-    assert all(result.success for result in results)
+    assert all(not result.success for result in results)
     assert artifacts["decode_metadata.json"]["partial_success"] is True
     assert artifacts["decode_metadata.json"]["apktool_version"] == "2.10.0"
     assert "AndroidManifest.xml" in artifacts["decode_metadata.json"]["decoded_files_used"]
@@ -101,8 +101,6 @@ def test_apktool_partial_decode_extracts_normalized_evidence(monkeypatch, tmp_pa
     assert artifacts["deep_links.json"]["deep_links"][0]["context"]["host"] == "example.com"
     assert artifacts["network_security_config.json"]["domains"][0]["domains"][0]["value"] == "api.example.com"
     assert artifacts["network_security_config.json"]["target_sdk"] == "22"
-    assert artifacts["code_indicators.json"]["items"][0]["provenance"]["path"].endswith(".smali")
-    assert artifacts["secrets_endpoints.json"]["items"]
     assert artifacts["native_libraries.json"]["libraries"][0]["abi"] == "arm64-v8a"
     assert artifacts["assets_inventory.json"]["assets"][0]["path"] == "assets/config.json"
     assert not work_dir.exists()

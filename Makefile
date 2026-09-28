@@ -1,9 +1,8 @@
-.PHONY: help build run test hooks-install services-up services-down compose-run compose-down
+.PHONY: help build run test hooks-install compose-run compose-down
 
 # Image Variables
 IMAGE_NAME ?= phoenix
 TAG ?= latest
-MOBSF_API_KEY ?= phoenix-local-mobsf-api-key
 
 # Local Paths
 PROJECT_PATH ?= $(shell pwd)
@@ -17,8 +16,6 @@ help:
 	@echo "Targets:"
 	@echo "  make build         Build the phoenix image"
 	@echo "  make run           Run a standalone docker run scan"
-	@echo "  make services-up   Start the MobSF sidecar"
-	@echo "  make services-down Stop the MobSF sidecar"
 	@echo "  make compose-run   Build and run a scan with docker compose"
 	@echo "  make test          Run local pytest"
 	@echo "  make hooks-install Install the repository pre-commit hook"
@@ -59,25 +56,6 @@ run:
 		-v "$(RESULTS_DIR):/app/results" \
 		-v "$(RULES_PATH):/app/rules:ro" \
 		$(IMAGE_NAME):$(TAG) scan "$(SCAN_FLAG)" "$$SCAN_PATH" --output /app/results
-
-services-up:
-	PROJECT_PATH="$(PROJECT_PATH)" OUTPUT_PATH="$(RESULTS_DIR)" MOBSF_API_KEY="$(MOBSF_API_KEY)" docker compose up -d mobsf-scanner
-	@echo "Waiting for MobSF scanner to become healthy..."
-	@container_id=$$(docker compose ps -q mobsf-scanner); \
-	for i in $$(seq 1 60); do \
-		status=$$(docker inspect -f '{{.State.Health.Status}}' "$$container_id" 2>/dev/null || echo starting); \
-		if [ "$$status" = "healthy" ]; then \
-			echo "MobSF scanner is ready at http://localhost:8000"; \
-			echo 'Run: MOBSF_URL=http://localhost:8000 uv run phoenix scan --ios-binary "path/to/app.ipa"'; \
-			exit 0; \
-		fi; \
-		sleep 2; \
-	done; \
-	echo "MobSF did not become healthy in time"; \
-	exit 1
-
-services-down:
-	docker compose stop mobsf-scanner
 
 compose-run:
 	@mkdir -p "$(RESULTS_DIR)"

@@ -95,7 +95,11 @@ class LIEFScanner(ScannerPort):
                     ScanResult(
                         scanner_name=self.name,
                         scan_type=self.scan_type,
-                        success=True,
+                        success=bool(binary_record.get("slices")) and not binary_record.get("error"),
+                        error_message=str(
+                            binary_record.get("error")
+                            or ("" if binary_record.get("slices") else "LIEF returned no Mach-O slices.")
+                        ),
                         raw_output=raw_output,
                         description=self.description,
                         relative_target_path=Path(relative_result_path(extracted.app_bundle, binary_path))

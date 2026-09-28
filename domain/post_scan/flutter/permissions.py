@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass
 from domain.post_scan.android.native.permissions import NativeAndroidPermissions
 from domain.post_scan.flutter.scan_extraction_context import FlutterScanExtractionContext
 from domain.post_scan.ios.common.permissions import PERMISSION_DETAILS as IOS_PERMISSION_DETAILS
-from domain.post_scan.rule_assessment import rule_assessments
+from domain.post_scan.rule_assessment import assessments_from_outputs
 
 
 @dataclass(frozen=True)
@@ -39,7 +39,7 @@ class FlutterPermissions:
         permissions = NativeAndroidPermissions(context).items
         if not any(
             rule["platform"] == "android" and rule["category"] == "functionality"
-            for rule in rule_assessments(context.loaded_outputs.get("opengrep"))["rules"]
+            for rule in assessments_from_outputs(context.loaded_outputs)["rules"]
         ):
             return
         self.assessed_platforms.append("android")

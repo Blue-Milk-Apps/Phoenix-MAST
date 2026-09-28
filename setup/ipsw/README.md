@@ -78,7 +78,7 @@ Each JSON artifact contains:
 - compact entitlement summary extracted from `ipsw macho info <binary> --ent`
 - command execution metadata, with raw output omitted for successful commands
 
-Raw command output is intentionally omitted on successful runs because it can be very large and often duplicates information that LIEF, plist extraction, MobSF, or Strings already capture more directly.
+Raw command output is intentionally omitted on successful runs because it can be very large and often duplicates information that LIEF, plist extraction or Strings already capture more directly.
 
 ## Final Analysis Role
 
@@ -100,8 +100,8 @@ Recommended fields to parse for final analysis:
 Avoid treating ipsw as the primary source for:
 
 - library and framework inventory: prefer LIEF's `binary.slices[].libraries`, using ipsw only for weak-link and rpath context
-- URLs, IP addresses, emails, or generic identifiers: prefer Strings and MobSF
-- hardcoded secrets: prefer Strings, MobSF, and source secret scanners
+- URLs, IP addresses, emails, or generic identifiers: use OpenGrep over extracted evidence
+- hardcoded secrets: use Gitleaks and TruffleHog
 - tracker classification: use dependency/framework names from LIEF or SBOM sources plus a tracker knowledge base
 - Android `.so` analysis: ipsw is iOS/Mach-O only
 

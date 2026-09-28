@@ -20,7 +20,7 @@ RUN apt-get update \
     && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends \
     bash git curl ca-certificates \
-    apksigner \
+    aapt apksigner \
     binutils libmagic1t64 \
     libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-dejavu-core \
     openjdk-21-jre-headless \
@@ -44,6 +44,7 @@ RUN curl -sSfL "https://raw.githubusercontent.com/anchore/syft/${SYFT_VERSION}/i
     "https://github.com/iBotPeaches/Apktool/releases/download/v${APKTOOL_VERSION}/apktool_${APKTOOL_VERSION}.jar" \
     && chmod +x /usr/local/bin/gitleaks /usr/local/bin/ipsw /usr/local/bin/apktool /usr/local/bin/apktool.jar \
     && apktool --version \
+    && aapt2 version \
     && apksigner version \
     && gitleaks version \
     && ipsw version \
@@ -91,7 +92,9 @@ COPY --chown=phoenix:phoenix domain ./domain
 COPY --chown=phoenix:phoenix entrypoints ./entrypoints
 COPY --chown=phoenix:phoenix ports ./ports
 
-RUN /opt/phoenix-venv/bin/pip install --no-cache-dir .
+RUN /opt/phoenix-venv/bin/pip install --no-cache-dir . \
+    && apt-get purge -y curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # 6. Working Directory
 USER phoenix

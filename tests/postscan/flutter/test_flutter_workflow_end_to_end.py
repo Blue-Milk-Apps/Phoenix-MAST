@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
 from application import mobile_analysis_workflow_service as workflow
 from domain.models import ScanConfig, ScanResult, ScanType
 from domain.report import ReportData
@@ -42,6 +43,8 @@ def test_flutter_workflow_persists_post_scan_output_and_requests_report(
         scan_label="Flutter source",
         platform="ANY",
         stack="FLUTTER",
+        json_report=True,
+        pdf_report=True,
     )
     scanner_results = [
         ScanResult(
@@ -127,9 +130,7 @@ def test_flutter_workflow_persists_post_scan_output_and_requests_report(
         report_path.write_bytes(b"%PDF-fake")
         return report_path
 
-    monkeypatch.setattr(
-        workflow.PdfReportGenerator, "generate", lambda self, data, path: fake_pdf_generation(data, path)
-    )
+    monkeypatch.setattr(PdfReportGenerator, "generate", lambda self, data, path: fake_pdf_generation(data, path))
 
     workflow.MobileAnalysisWorkflowService().run(config)
 

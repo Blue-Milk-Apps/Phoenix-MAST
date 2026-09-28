@@ -35,11 +35,6 @@ def _fake_scanner(scan_type: ScanType, name: str):
 def _patch_core_scanners(monkeypatch) -> None:
     monkeypatch.setattr(
         workflow,
-        "MobSFScanner",
-        _fake_scanner(ScanType.MOBSF_SCANNER, "MobSF Scanner"),
-    )
-    monkeypatch.setattr(
-        workflow,
         "OpenGrepScanner",
         _fake_scanner(ScanType.OPENGREP_SOURCE, "OpenGrep"),
     )
@@ -136,7 +131,6 @@ def _assert_scanner_types(config: ScanConfig, expected_scan_types: set[ScanType]
 def test_create_scan_config_for_android_binary(tmp_path: Path, monkeypatch) -> None:
     rules_path = tmp_path / "rules" / "android"
     rules_path.mkdir(parents=True)
-    monkeypatch.delenv("MOBSF_URL", raising=False)
     monkeypatch.setattr(cli, "_resolve_opengrep_rules_path", lambda override, slug: rules_path)
     args = _scan_args(tmp_path, "--android-binary")
 
@@ -158,6 +152,9 @@ def test_create_scan_config_for_android_binary(tmp_path: Path, monkeypatch) -> N
             ScanType.APKTOOL,
             ScanType.APKSIGNER,
             ScanType.APKID,
+            ScanType.SYFT,
+            ScanType.GITLEAKS,
+            ScanType.TRUFFLEHOG,
             ScanType.STRINGS,
         },
     )
@@ -166,7 +163,6 @@ def test_create_scan_config_for_android_binary(tmp_path: Path, monkeypatch) -> N
 def test_create_scan_config_for_android_binary_includes_opengrep_when_rules_path_is_configured(
     tmp_path: Path, monkeypatch
 ) -> None:
-    monkeypatch.delenv("MOBSF_URL", raising=False)
     rules_path = tmp_path / "android-opengrep-rules"
     rules_path.mkdir()
     args = _scan_args(
@@ -184,34 +180,14 @@ def test_create_scan_config_for_android_binary_includes_opengrep_when_rules_path
         ScanType.APKTOOL,
         ScanType.APKSIGNER,
         ScanType.APKID,
+        ScanType.SYFT,
+        ScanType.GITLEAKS,
+        ScanType.TRUFFLEHOG,
         ScanType.STRINGS,
     }
 
 
-def test_create_scan_config_for_android_binary_includes_mobsf_when_url_is_configured(
-    tmp_path: Path, monkeypatch
-) -> None:
-    monkeypatch.setenv("MOBSF_URL", "http://localhost:8000")
-    args = _scan_args(tmp_path, "--android-binary")
-
-    config = cli._create_scan_config(args)
-
-    _assert_scanner_types(
-        config,
-        {
-            ScanType.MOBSF_SCANNER,
-            ScanType.ANDROGUARD,
-            ScanType.AAPT2,
-            ScanType.APKTOOL,
-            ScanType.APKSIGNER,
-            ScanType.APKID,
-            ScanType.STRINGS,
-        },
-    )
-
-
 def test_create_scan_config_for_ios_binary(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.delenv("MOBSF_URL", raising=False)
     monkeypatch.setattr(cli, "_resolve_opengrep_rules_path", lambda override, slug: None)
     args = _scan_args(tmp_path, "--ios-binary")
 
@@ -240,7 +216,6 @@ def test_create_scan_config_for_ios_binary(tmp_path: Path, monkeypatch) -> None:
 def test_create_scan_config_for_ios_binary_includes_opengrep_when_rules_path_is_configured(
     tmp_path: Path, monkeypatch
 ) -> None:
-    monkeypatch.delenv("MOBSF_URL", raising=False)
     rules_path = tmp_path / "ios-opengrep-rules"
     rules_path.mkdir()
     args = _scan_args(
@@ -284,7 +259,7 @@ def test_ios_workflow_shares_and_cleans_extracted_binary(tmp_path: Path, monkeyp
         def __init__(self, scanners):
             _ = scanners
 
-        def scan_project(self, scan_config, output=None):
+        def scan_project(self, scan_config, output=None, **kwargs):
             captured.append(scan_config.extracted_binary)
             assert scan_config.project_path == ipa_path
             assert scan_config.extracted_binary is not None
@@ -303,7 +278,6 @@ def test_ios_workflow_shares_and_cleans_extracted_binary(tmp_path: Path, monkeyp
         "_run_post_scan_processing",
         lambda self, output_path, scan_config: {},
     )
-    monkeypatch.setattr(workflow.PdfReportGenerator, "generate", lambda self, data, path: path)
 
     workflow.MobileAnalysisWorkflowService().run(config)
 
@@ -320,33 +294,10 @@ def test_create_scan_config_for_ios_binary_uses_default_opengrep_rules_path_when
     rules_path.mkdir()
 
     monkeypatch.setattr(cli, "_resolve_opengrep_rules_path", lambda override, slug: rules_path)
-    monkeypatch.delenv("MOBSF_URL", raising=False)
 
     config = cli._create_scan_config(_scan_args(tmp_path, "--ios-binary"))
 
     assert config.opengrep_rules_path == rules_path
-
-
-def test_create_scan_config_for_ios_binary_includes_mobsf_when_url_is_configured(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setenv("MOBSF_URL", "http://localhost:8000")
-    monkeypatch.setattr(cli, "_resolve_opengrep_rules_path", lambda override, slug: None)
-    args = _scan_args(tmp_path, "--ios-binary")
-
-    config = cli._create_scan_config(args)
-
-    _assert_scanner_types(
-        config,
-        {
-            ScanType.MOBSF_SCANNER,
-            ScanType.IPSW,
-            ScanType.LIEF,
-            ScanType.TRUFFLEHOG,
-            ScanType.GITLEAKS,
-            ScanType.STRINGS,
-            ScanType.PLIST_BINARY,
-            ScanType.SYFT,
-        },
-    )
 
 
 def test_create_scan_config_for_flutter_source(tmp_path: Path) -> None:
@@ -359,7 +310,6 @@ def test_create_scan_config_for_flutter_source(tmp_path: Path) -> None:
     assert config.platform == "ANY"
     assert config.stack == "FLUTTER"
     assert config.opengrep_rules_path == (Path(__file__).parent.parent / "rules" / "flutter" / "source").resolve()
-    assert config.syft_output_format == "syft-json"
     assert config.output_path.name.startswith("SAST_flutter_source_")
     _assert_scanner_types(
         config,
@@ -519,7 +469,6 @@ def test_create_scan_config_for_native_android_source_includes_opengrep_when_rul
 
 def test_create_scan_config_for_native_ios_source(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(cli, "_resolve_opengrep_rules_path", lambda override, slug: None)
-    monkeypatch.setenv("MOBSF_URL", "http://localhost:8000")
     args = _scan_args(tmp_path, "--ios-source")
 
     config = cli._create_scan_config(args)
@@ -614,7 +563,6 @@ def test_scan_command_passes_scan_config_to_mobile_analysis_workflow_service(
 ) -> None:
     rules_path = tmp_path / "rules" / "android"
     rules_path.mkdir(parents=True)
-    monkeypatch.delenv("MOBSF_URL", raising=False)
     monkeypatch.setattr(cli, "_resolve_opengrep_rules_path", lambda override, slug: rules_path)
     captured = {}
 
@@ -645,28 +593,6 @@ def test_scan_command_passes_scan_config_to_mobile_analysis_workflow_service(
     assert captured["config"].opengrep_rules_path == rules_path
     assert not hasattr(captured["config"], "scanners")
     assert not hasattr(captured["config"], "enabled_scans")
-
-
-def test_scan_command_passes_syft_output_format(tmp_path: Path, monkeypatch) -> None:
-    captured = {}
-
-    def recording_syft_scanner(*args, **kwargs):
-        captured["output_format"] = kwargs.get("output_format")
-        return FakeScanner(ScanType.SYFT, "Syft")
-
-    monkeypatch.setattr(workflow, "SyftScanner", recording_syft_scanner)
-
-    config = cli._create_scan_config(
-        _scan_args(
-            tmp_path,
-            "--flutter-source",
-            ["--syft-output-format", "spdx-json"],
-        )
-    )
-    scanners = _build_scanners(config)
-
-    assert scanners
-    assert captured["output_format"] == "spdx-json"
 
 
 @pytest.mark.parametrize("stack", ["FLUTTER", "REACT_NATIVE", "NATIVE_ANDROID", "NATIVE_IOS"])
@@ -750,7 +676,10 @@ def test_cli_help_mentions_scan_target_flags(capsys) -> None:
     assert "--ios-source-opengrep-rules" in output
     assert "-path" not in output
     assert "--native-" not in output
-    assert "--syft-output-format" in output
+    assert "--json" in output
+    assert "--pdf" in output
+    assert "--exclude" in output
+    assert "--no-json" not in output
 
 
 @pytest.mark.parametrize("option", ["--ios-source", "--ios-source-opengrep-rules"])

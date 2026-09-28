@@ -48,7 +48,9 @@ class PdfReportGenerator(ReportGeneratorPort):
         presentation = PdfPresentation.for_target_kind(input_data.metadata.target.target_kind)
         data = self._presentation_data(input_data)
         base_dir = Path(__file__).parent.parent
-        environment = Environment(loader=FileSystemLoader(str(base_dir / "templates")), undefined=StrictUndefined)
+        environment = Environment(
+            loader=FileSystemLoader(str(base_dir / "templates")), undefined=StrictUndefined, autoescape=True
+        )
         environment.globals["risk_badge"] = risk_badge
         environment.globals["result_badge"] = result_badge
         environment.globals["assessment_badge"] = assessment_badge

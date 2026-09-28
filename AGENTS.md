@@ -10,7 +10,7 @@ The project coordinates security scanning workflows for:
 
 - Static analysis for mobile application security issues
 - Secret detection for accidental credential exposure
-- Dependency vulnerability checks
+- Dependency inventories
 - Software Bill of Materials (SBOM) generation
 - IPA/APK binary analysis
 
@@ -25,8 +25,7 @@ Use the existing port-and-adapter structure.
 - `ports/scanner_port.py` defines `ScannerPort`.
 - `ports/storage_port.py` defines `ArtifactStorePort`.
 - `application/` contains orchestration such as `ScannerService`.
-- `adapters/source_code_scanners/` contains source/source code scanner adapters.
-- `adapters/binary_scanners/` contains binary scanner adapters.
+- `adapters/scanners/` contains source and binary tool adapters.
 - `adapters/storage/` contains storage adapters.
 - `entrypoints/cli.py` contains the phoenix CLI.
 - `utilities/` contains helper code for APK/IPA extraction and binary target discovery.
@@ -91,14 +90,6 @@ phoenix scan --android-source path/to/project
 phoenix scan --ios-source path/to/project
 ```
 
-For local MobSF binary scans:
-
-```bash
-make services-up
-MOBSF_URL=http://localhost:8000 uv run phoenix scan --ios-binary path/to/app.ipa
-make services-down
-```
-
 Use focused tests first when they already exist and are relevant. Run broader tests only when the change affects shared behavior or the user asks for a full test pass.
 
 ## Testing Rules
@@ -111,19 +102,11 @@ External scanner binaries should not be required for unit tests. Mock subprocess
 
 Keep adapter tests focused and use temporary directories.
 
-Integration tests that require external tools, Docker, MobSF, network access, or local scanner databases should be clearly marked or isolated.
+Integration tests that require external tools, Docker, network access, or local scanner databases should be clearly marked or isolated.
 
 ## External Scanner Notes
 
-phoenix may use the following tools from the local `PATH`:
-
-- `trufflehog`
-- `gitleaks`
-- `syft`
-- `strings`
-
-MobSF binary scanning uses a sidecar service configured through `MOBSF_URL` and `MOBSF_API_KEY`.
-
+See [the tool inventory](docs/ToolInventory.md) for external commands, Python APIs and output ownership.
 
 Do not assume these tools are installed when writing unit tests.
 

@@ -4,18 +4,12 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from adapters.output.phoenix_report.builders.android.binary_check_catalog import (
-    EVIDENCE_KEY_BY_CHECK,
-    SECTION_CHECKS,
-    AndroidBinaryCheckDefinition,
-)
 from adapters.output.phoenix_report.builders.binary import BinaryReportDataBuilder
 from domain.report import (
     AndroidApplicationDetails,
     AndroidBinaryReportDetails,
     AppComponentSummary,
     AppDetails,
-    AssessmentStatus,
     CertificateDetails,
     EndpointDetails,
     FileDetails,
@@ -29,9 +23,7 @@ from domain.report import (
     ReportMetadata,
     ReportPlatform,
     ReportTargetKind,
-    SecurityCheck,
     SignatureVersions,
-    VulnerabilitySection,
 )
 
 
@@ -56,14 +48,9 @@ class AndroidBinaryReportDataBuilder(BinaryReportDataBuilder):
                 f"got {metadata.target.target_kind.value}"
             )
 
-        sections = tuple(
-            self._section(name, evidence_key, checks, post_scan_data)
-            for name, _area, evidence_key, checks in SECTION_CHECKS
-        )
-        sections = self._attach_single_platform_assessments(sections, ReportPlatform.ANDROID)
         return ReportData(
             metadata=metadata,
-            vulnerability_sections=sections,
+            vulnerability_sections=(),
             overall_evaluation=(),
             risk_summary=(),
             findings_severity=FindingSeverity(),
@@ -79,117 +66,6 @@ class AndroidBinaryReportDataBuilder(BinaryReportDataBuilder):
                 endpoints=self._endpoint_details(post_scan_data),
             ),
         )
-
-    def _section(
-        self,
-        section_name: str,
-        evidence_key: str,
-        definitions: tuple[AndroidBinaryCheckDefinition, ...],
-        post_scan_data: Mapping[str, Any],
-    ) -> VulnerabilitySection:
-        evidence = self._mapping(post_scan_data, evidence_key)
-        checks = tuple(
-            self._check(definition, evidence, post_scan_data, self._compliance_for_section(section_name))
-            for definition in definitions
-        )
-        return VulnerabilitySection(
-            name=section_name,
-            findings_text="",
-            checks=checks,
-        )
-
-    @classmethod
-    def _check(
-        cls,
-        definition: AndroidBinaryCheckDefinition,
-        section_evidence: Mapping[str, Any],
-        post_scan_data: Mapping[str, Any],
-        compliance: str,
-    ) -> SecurityCheck:
-        entry = section_evidence.get(EVIDENCE_KEY_BY_CHECK[cls._normalized(definition.name)])
-        entry = entry if isinstance(entry, Mapping) else {}
-        present = cls._optional_bool(entry.get("present"))
-        evidence = cls._text(entry, "evidence")
-        if present is None:
-            present, evidence = cls._derived_result(definition.name, post_scan_data, evidence)
-        result = cls._check_result(present)
-        return SecurityCheck(
-            name=definition.name,
-            severity=definition.severity,
-            result=result,
-            explanation=cls._text(entry, "explanation") or cls._explanation(definition.name, result, entry),
-            evidence=evidence,
-            compliance=cls._text(entry, "compliance") or compliance,
-            remediation_link=cls._text(entry, "remediation_link"),
-        )
-
-    @classmethod
-    def _derived_result(
-        cls,
-        check_name: str,
-        data: Mapping[str, Any],
-        evidence: str,
-    ) -> tuple[bool | None, str]:
-        component_key = {
-            "Activities Accessible to Other Apps": "exported_activities",
-            "Receivers Accessible to Other Apps": "exported_receivers",
-            "Services Accessible to Other Apps": "exported_services",
-        }.get(check_name)
-        if component_key:
-            components = cls._mapping(data, "app_components")
-            if component_key in components:
-                count = cls._integer(components[component_key])
-                return count > 0, f"{component_key}={count}"
-        if check_name == "App is Debuggable":
-            return cls._derived_boolean(data, "debuggable", evidence)
-        if check_name == "Allows Cleartext Traffic for All Domains":
-            return cls._derived_boolean(data, "uses_cleartext_traffic", evidence)
-        return None, evidence
-
-    @classmethod
-    def _derived_boolean(
-        cls,
-        data: Mapping[str, Any],
-        key: str,
-        evidence: str,
-    ) -> tuple[bool | None, str]:
-        for section_name in ("application", "app_info", "manifest"):
-            section = cls._mapping(data, section_name)
-            if key in section:
-                value = cls._optional_bool(section.get(key))
-                if value is not None:
-                    return value, evidence or f"{key}={str(value).lower()}"
-        return None, evidence
-
-    @staticmethod
-    def _compliance_for_section(section_name: str) -> str:
-        return {
-            "code": "MASVS-CODE",
-            "network": "MASVS-NETWORK",
-            "data storage": "MASVS-STORAGE",
-            "resilience": "MASVS-RESILIENCE",
-        }.get(section_name.strip().lower(), "MASVS")
-
-    @staticmethod
-    def _check_result(value: bool | None) -> AssessmentStatus:
-        if value is True:
-            return AssessmentStatus.PRESENT
-        if value is False:
-            return AssessmentStatus.NOT_PRESENT
-        return AssessmentStatus.NOT_EVALUATED
-
-    @staticmethod
-    def _explanation(check_name: str, result: AssessmentStatus, entry: Mapping[str, Any]) -> str:
-        if result == AssessmentStatus.NOT_EVALUATED:
-            detail = str(entry.get("not_evaluated_detail") or entry.get("not_evaluated_reason") or "").strip()
-            if detail:
-                return f"Not evaluated because {detail.rstrip('.')}."
-            if not entry:
-                return "Not evaluated because post-scan analysis did not produce evidence for this check."
-            return "Not evaluated because the scanner did not return a conclusive result."
-        if result == AssessmentStatus.PRESENT:
-            return f"Evidence indicates that {check_name.lower()}."
-        return f"No evidence indicates that {check_name.lower()}."
 
     @staticmethod
     def _mapping(data: Mapping[str, Any], key: str) -> Mapping[str, Any]:
@@ -219,10 +95,10 @@ class AndroidBinaryReportDataBuilder(BinaryReportDataBuilder):
             issuer=cls._text(certificate, "issuer"),
             serial_number=cls._text(certificate, "serial_number"),
             signature_versions=SignatureVersions(
-                v1=cls._bool(versions.get("v1")),
-                v2=cls._bool(versions.get("v2")),
-                v3=cls._bool(versions.get("v3")),
-                v4=cls._bool(versions.get("v4")),
+                v1=cls._optional_bool(versions.get("v1")),
+                v2=cls._optional_bool(versions.get("v2")),
+                v3=cls._optional_bool(versions.get("v3")),
+                v4=cls._optional_bool(versions.get("v4")),
             ),
             hash_algorithms=cls._text(certificate, "hash_algorithms"),
             fingerprint=cls._text(certificate, "fingerprint"),

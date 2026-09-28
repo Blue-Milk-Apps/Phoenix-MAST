@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from domain.post_scan.android.native.scan_extraction_context import NativeAndroidScanExtractionContext
-from domain.post_scan.rule_assessment import rule_assessments
+from domain.post_scan.rule_assessment import assessments_from_outputs
 
 
 @dataclass
@@ -15,7 +15,7 @@ class NativeAndroidFunctionality:
     assessed: bool
 
     def __init__(self, context: NativeAndroidScanExtractionContext) -> None:
-        rules = rule_assessments(context.loaded_outputs.get("opengrep"))["rules"]
+        rules = assessments_from_outputs(context.loaded_outputs)["rules"]
         capabilities: dict[str, list[dict[str, Any]]] = {}
         for rule in rules:
             capability = rule["metadata"].get("functionality")

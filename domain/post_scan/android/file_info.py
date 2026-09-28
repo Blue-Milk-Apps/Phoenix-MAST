@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -24,14 +23,8 @@ class FileInfo:
         signing_evidence = loaded_outputs.get("apksigner_signing_evidence") or {}
         apk_details = signing_evidence.get("apk") or {}
 
-        file_path = self._existing_file_path(
-            scan_metadata.get("project_path"),
-            androguard_metadata.get("apk_path"),
-        )
-        file_hashes = self._hash_file(file_path) if file_path else {}
-        size_bytes = apk_details.get("size_bytes")
-        if size_bytes in (None, "") and file_path is not None:
-            size_bytes = file_path.stat().st_size
+        file_hashes = scan_metadata.get("file_info") or {}
+        size_bytes = file_hashes.get("size", apk_details.get("size_bytes"))
 
         self.filename = first_non_empty(
             apk_details.get("file_name"),
@@ -42,25 +35,3 @@ class FileInfo:
         self.md5 = first_non_empty(file_hashes.get("md5"))
         self.sha1 = first_non_empty(file_hashes.get("sha1"))
         self.sha256 = first_non_empty(file_hashes.get("sha256"), apk_details.get("sha256"))
-
-    @staticmethod
-    def _existing_file_path(*candidates: object) -> Path | None:
-        for candidate in candidates:
-            path = Path(str(candidate or "").strip())
-            if path.is_file():
-                return path
-        return None
-
-    @staticmethod
-    def _hash_file(path: Path) -> dict[str, str]:
-        md5 = hashlib.md5()  # noqa: S324 - report metadata only
-        sha1 = hashlib.sha1()  # noqa: S324 - report metadata only
-        sha256 = hashlib.sha256()
-
-        with path.open("rb") as handle:
-            for chunk in iter(lambda: handle.read(8192), b""):
-                md5.update(chunk)
-                sha1.update(chunk)
-                sha256.update(chunk)
-
-        return {"md5": md5.hexdigest(), "sha1": sha1.hexdigest(), "sha256": sha256.hexdigest()}

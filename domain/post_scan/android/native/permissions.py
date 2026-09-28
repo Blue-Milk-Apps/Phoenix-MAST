@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from domain.post_scan.android.native.scan_extraction_context import NativeAndroidScanExtractionContext
-from domain.post_scan.rule_assessment import rule_assessments
+from domain.post_scan.rule_assessment import assessments_from_outputs
 
 
 @dataclass
@@ -15,7 +15,7 @@ class NativeAndroidPermissions:
     def __init__(self, context: NativeAndroidScanExtractionContext) -> None:
         self.items = []
         seen: set[str] = set()
-        for rule in rule_assessments(context.loaded_outputs.get("opengrep"))["rules"]:
+        for rule in assessments_from_outputs(context.loaded_outputs)["rules"]:
             if rule["category"] != "functionality" or rule["metadata"]["scope"] != "app_declaration":
                 continue
             for match in rule["matches"]:

@@ -1,6 +1,6 @@
 """Template badge rendering shared by report output adapters."""
 
-from markupsafe import Markup
+from markupsafe import Markup, escape
 
 
 def risk_badge(rating: str, label: str | None = None) -> Markup:
@@ -24,7 +24,7 @@ def risk_badge(rating: str, label: str | None = None) -> Markup:
         "dangerous": "badge-high",
         "normal": "badge-info",
     }.get(key, "badge-info")
-    return Markup(f'<span class="badge {css_class}">{label or rating}</span>')
+    return Markup(f'<span class="badge {css_class}">{escape(label or rating)}</span>')
 
 
 def result_badge(result: str) -> Markup:
@@ -47,7 +47,7 @@ def result_badge(result: str) -> Markup:
         "not evaluated": "Not Evaluated",
         "not applicable": "Not Applicable",
     }
-    return Markup(f'<span class="badge {css_class}">{labels.get(key, result)}</span>')
+    return Markup(f'<span class="badge {css_class}">{escape(labels.get(key, result))}</span>')
 
 
 def assessment_badge(status: str) -> Markup:

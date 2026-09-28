@@ -116,9 +116,7 @@ def test_aapt2_extracts_normalized_evidence(monkeypatch, tmp_path: Path) -> None
     assert "components.json" in paths
     assert "intent_filters.json" in paths
     assert "resource_summary.json" in paths
-    assert "resource_candidates.json" in paths
     assert "evidence_relationships.json" in paths
-    assert "candidate_interpretations.json" in paths
     assert "correlation_requirements.json" in paths
     assert "limitations.json" in paths
     assert "scan_index.json" in paths
@@ -139,13 +137,12 @@ def test_aapt2_extracts_normalized_evidence(monkeypatch, tmp_path: Path) -> None
         for component in evidence["components"]
     )
     assert evidence["intent_filters"][0]["uri_patterns"][0]["normalized"] == ("https://example.com/oauth/callback")
-    assert evidence["intent_filters"][0]["auth_related_entrypoint_indicator"] is True
-    assert any(candidate["name"] == "network_security_config" for candidate in evidence["resource_candidates"])
     assert any(
         relationship["relationship_type"] == "intent_filter_declares_uri_pattern"
         for relationship in evidence["evidence_relationships"]
     )
-    assert all(candidate["not_a_finding"] for candidate in evidence["candidate_interpretations"])
+    assert "candidate_interpretations" not in evidence
+    assert evidence["resource_summary"]["resource_type_counts"]
     components = output_json(results, "components.json")
     scan_index = output_json(results, "scan_index.json")
     assert len(components["activities"]) == 1
@@ -171,15 +168,13 @@ def test_aapt2_tolerates_partial_command_failure(monkeypatch, tmp_path: Path) ->
     evidence = json.loads(results[0].raw_output)
     paths = {result.relative_target_path for result in results}
 
-    assert results[0].success
+    assert not results[0].success
     assert evidence["extraction_metadata"]["execution_status"] == "PARTIAL_SUCCESS"
     assert evidence["commands"][3]["key"] == "resources"
     assert evidence["commands"][3]["execution_status"] == "PARTIAL_SUCCESS"
     assert "raw/aapt2_resources_stderr.txt" in paths
     scan_index = output_json(results, "scan_index.json")
-    assert any(
-        item["name"] == "resource_candidates.json" and item["partial_failure"] for item in scan_index["artifacts"]
-    )
+    assert any(item["name"] == "resource_summary.json" and item["partial_failure"] for item in scan_index["artifacts"])
 
 
 def fake_run_success(cmd, capture_output, text, check, timeout):

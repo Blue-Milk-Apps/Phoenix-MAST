@@ -1,5 +1,4 @@
 import json
-import os
 import time
 from dataclasses import asdict
 from pathlib import Path
@@ -12,7 +11,6 @@ from adapters.output.phoenix_report.builders.android import (
 from adapters.output.phoenix_report.builders.flutter import FlutterReportDataBuilder
 from adapters.output.phoenix_report.builders.ios import IOSBinaryReportDataBuilder, NativeIOSReportDataBuilder
 from adapters.output.phoenix_report.builders.react_native import ReactNativeReportDataBuilder
-from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
 from adapters.post_scan import (
     AndroidBinaryScanDetailExtractor,
     AndroidBinaryScanOutputLoader,
@@ -37,7 +35,6 @@ from adapters.scanners.android import (
 )
 from adapters.scanners.common import (
     GitleaksScanner,
-    MobSFScanner,
     OpenGrepScanner,
     StringsScanner,
     SyftScanner,
@@ -55,10 +52,11 @@ from adapters.scanners.react_native import ReactNativeOpenGrepScanner, ReactNati
 from application.post_scan_processing_service import PostScanProcessingService
 from application.report_generation_service import ReportGenerationService
 from application.scanner_service import ScannerService
-from domain.models import ExtractedBinary, ScanConfig, ScanType
+from domain.models import ExtractedBinary, ScanConfig, ScanResult, ScanType
 from domain.report import ReportMetadata, ReportTargetFactory
 from ports.scanner_port import ScannerPort
 from utilities.apk_utils import extract_apk, is_apk_file
+from utilities.exclusions import prune_excluded, source_scan_workspace
 from utilities.ipa_utils import extract_ipa, is_ipa_file
 
 
@@ -66,12 +64,7 @@ class MobileScannerFactory:
     """Build the scanner list for a mobile analysis workflow."""
 
     def build_scanner_list(self, config: ScanConfig) -> list[ScannerPort]:
-        scanners = self._base_scanners(config)
-
-        if config.target_type == "BINARY" and self._mobsf_url_configured():
-            scanners.append(MobSFScanner())
-
-        return scanners
+        return self._base_scanners(config)
 
     def _base_scanners(self, config: ScanConfig) -> list[ScannerPort]:
         match (config.target_type, config.platform, config.stack):
@@ -83,11 +76,14 @@ class MobileScannerFactory:
                     ApksignerScanner(),
                     ApkidScanner(),
                     StringsScanner(),
+                    SyftScanner(),
+                    TrufflehogScanner(),
+                    GitleaksScanner(),
                 ]
             case ("BINARY", "IOS", _):
                 return [
                     IpswScanner(),
-                    SyftScanner(output_format=config.syft_output_format),
+                    SyftScanner(),
                     LIEFScanner(),
                     TrufflehogScanner(),
                     GitleaksScanner(),
@@ -100,7 +96,7 @@ class MobileScannerFactory:
                     TrufflehogScanner(),
                     GitleaksScanner(),
                     *([PlistSourceScanner()] if (config.project_path / "ios").is_dir() else []),
-                    SyftScanner(output_format=config.syft_output_format),
+                    SyftScanner(),
                 ]
             case ("SOURCE", _, "REACT_NATIVE"):
                 return [
@@ -108,31 +104,27 @@ class MobileScannerFactory:
                     TrufflehogScanner(),
                     GitleaksScanner(),
                     *([PlistSourceScanner()] if (config.project_path / "ios").is_dir() else []),
-                    SyftScanner(output_format=config.syft_output_format),
+                    SyftScanner(),
                 ]
             case ("SOURCE", "ANDROID", "NATIVE_ANDROID"):
                 return [
                     NativeAndroidSourceMetadataScanner(),
                     TrufflehogScanner(),
                     GitleaksScanner(),
-                    SyftScanner(output_format=config.syft_output_format),
+                    SyftScanner(),
                 ]
             case ("SOURCE", "IOS", "NATIVE_IOS"):
                 return [
                     TrufflehogScanner(),
                     GitleaksScanner(),
                     PlistSourceScanner(),
-                    SyftScanner(output_format=config.syft_output_format),
+                    SyftScanner(),
                 ]
             case _:
                 raise ValueError(
                     "Unsupported scan configuration: "
                     f"target_type={config.target_type}, platform={config.platform}, stack={config.stack}"
                 )
-
-    @staticmethod
-    def _mobsf_url_configured() -> bool:
-        return bool(os.environ.get("MOBSF_URL", "").strip())
 
     @staticmethod
     def _get_opengrep_scan_paths(config: ScanConfig) -> list[Path]:
@@ -143,10 +135,20 @@ class MobileScannerFactory:
                 paths.append(plist_output)
             return paths
         if config.target_type == "BINARY":
-            strings_output_path = config.output_path / ScanType.STRINGS.value
-            if not strings_output_path.is_dir():
-                return []
-            return [strings_output_path]
+            evidence_types = (
+                ScanType.STRINGS,
+                ScanType.APKTOOL,
+                ScanType.AAPT2,
+                ScanType.APKSIGNER,
+                ScanType.ANDROGUARD,
+                ScanType.APKID,
+                ScanType.LIEF,
+                ScanType.IPSW,
+                ScanType.PLIST_BINARY,
+            )
+            return [
+                config.output_path / kind.value for kind in evidence_types if (config.output_path / kind.value).is_dir()
+            ]
         raise ValueError(f"Unsupported target type for OpenGrep scan paths: {config.target_type}")
 
 
@@ -155,8 +157,12 @@ class MobileAnalysisWorkflowService:
     GENERATED_REPORT_FILE_NAME = "phoenix_Report.pdf"
 
     def run(self, scan_config: ScanConfig) -> None:
+        with source_scan_workspace(scan_config) as execution_config:
+            self._run(execution_config)
+
+    def _run(self, scan_config: ScanConfig) -> None:
         print("Phoenix scan")
-        print(f"Project: {scan_config.project_path}")
+        print(f"Project: {scan_config.display_project_path or scan_config.project_path}")
         print(f"Output: {scan_config.output_path}")
         print(f"Scan type: {scan_config.scan_label}")
         print(f"Proceeding with {scan_config.scan_label} scan")
@@ -167,11 +173,16 @@ class MobileAnalysisWorkflowService:
         extracted_binary = self._extract_binary(scan_config)
         scan_config.extracted_binary = extracted_binary
         try:
+            if extracted_binary is not None and scan_config.exclude_patterns:
+                prune_excluded(extracted_binary.scan_root_path, scan_config.exclude_patterns)
+                if hasattr(extracted_binary, "native_libs"):
+                    extracted_binary.native_libs = [p for p in extracted_binary.native_libs if p.is_file()]
+                    extracted_binary.analysis_targets = [p for p in extracted_binary.analysis_targets if p.is_file()]
             scanners = MobileScannerFactory().build_scanner_list(scan_config)
             scanner_service = ScannerService(scanners)
 
             wall_start = time.perf_counter()
-            scan_results = scanner_service.scan_project(scan_config, output=scan_output_method)
+            scan_results = scanner_service.scan_project(scan_config, output=scan_output_method, retain_output=False)
 
             opengrep_results = self._perform_opengrep_scan(scan_config, scan_output_method)
             scan_results.extend(opengrep_results)
@@ -188,15 +199,30 @@ class MobileAnalysisWorkflowService:
                     NativeIOSReportDataBuilder(),
                 ]
             ).build_report_data(post_scan_output)
-            target = scan_config.output_path / self.POST_SCAN_OUTPUT_FILE_NAME
-            target.write_text(
-                json.dumps(report_data.to_dict(), indent=2, sort_keys=True),
-                encoding="utf-8",
-            )
-            report_path = self._report_output_path(scan_config.output_path, report_data.metadata)
-            PdfReportGenerator().generate(report_data, report_path)
-            print(f"Results: {len(scan_results)}")
-            print(f"Duration: {time.perf_counter() - wall_start:.2f} seconds")
+            if scan_config.json_report:
+                target = scan_config.output_path / self.POST_SCAN_OUTPUT_FILE_NAME
+                target.write_text(json.dumps(report_data.to_dict(), indent=2, sort_keys=True), encoding="utf-8")
+                print(f"JSON report: {target}")
+            if scan_config.pdf_report:
+                from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
+
+                report_path = self._report_output_path(scan_config.output_path, report_data.metadata)
+                PdfReportGenerator().generate(report_data, report_path)
+                print(f"PDF report: {report_path}")
+            executions = len({result.scanner_name for result in scan_results if not result.skipped})
+            print(f"Tool executions completed: {executions}")
+            print(f"OpenGrep coverage: {report_data.rule_status} {report_data.rule_status_reason}")
+            counts = asdict(report_data.findings_severity)
+            print("Finding counts: " + ", ".join(f"{name}={count}" for name, count in counts.items()))
+            for section in report_data.vulnerability_sections:
+                for check in section.checks:
+                    if check.result.value == "present":
+                        title = " ".join(check.name.splitlines())
+                        print(f"Finding: {check.severity.value.upper()} | {check.rule_id} | {title}")
+            for summary in report_data.secret_scans:
+                print(f"{summary.scanner}: {summary.status} | {len(summary.findings)} secret detections")
+            print(f"Artifacts: {scan_config.output_path}")
+            print(f"Phoenix scan completed in {time.perf_counter() - wall_start:.2f}s", flush=True)
         finally:
             if extracted_binary is not None:
                 extracted_binary.cleanup()
@@ -217,6 +243,36 @@ class MobileAnalysisWorkflowService:
         opengrep_scan_paths = self._get_opengrep_scan_paths(scan_config)
         print(f"OpenGrep rules path: {open_grep_rules_path}")
         print(f"OpenGrep scan paths: {opengrep_scan_paths}")
+        if (
+            scan_config.target_type == "BINARY"
+            and open_grep_rules_path
+            and not OpenGrepScanner()._has_rule_files(Path(open_grep_rules_path))
+        ):
+            reason = "Binary OpenGrep rules have not been provided; security findings were not evaluated."
+            result = ScanResult(
+                scanner_name="OpenGrep",
+                scan_type=ScanType.OPENGREP_SOURCE,
+                skipped=True,
+                error_message=reason,
+                relative_target_path="opengrep_results.json",
+                raw_output=json.dumps(
+                    {
+                        "results": [],
+                        "scan_metadata": {
+                            "platform": scan_config.platform.lower(),
+                            "mode": "binary",
+                            "rule_catalog": [],
+                            "rule_execution": {},
+                            "status": "not_evaluated",
+                            "reason": reason,
+                        },
+                    }
+                ),
+            )
+            if scan_output_method is not None:
+                scan_output_method.write_result(result)
+            print(f"Tool execution skipped: OpenGrep | {reason}")
+            return [result]
         if open_grep_rules_path and opengrep_scan_paths:
             if scan_config.stack == "FLUTTER":
                 opengrep_scanner = FlutterOpenGrepScanner(
@@ -249,7 +305,9 @@ class MobileAnalysisWorkflowService:
                     rules_path=Path(open_grep_rules_path),
                     scan_paths=opengrep_scan_paths,
                 )
-            return ScannerService([opengrep_scanner]).scan_project(scan_config, output=scan_output_method)
+            return ScannerService([opengrep_scanner]).scan_project(
+                scan_config, output=scan_output_method, retain_output=False
+            )
         raise RuntimeError("OpenGrep cannot run without a rules path and scan inputs.")
 
     def _get_opengrep_rules_path(self, config: ScanConfig) -> str | None:
