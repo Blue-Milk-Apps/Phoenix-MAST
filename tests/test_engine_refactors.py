@@ -50,7 +50,11 @@ def test_reports_are_independently_opt_in(tmp_path, monkeypatch, capsys, json_fl
             raw_output=json.dumps(
                 assessment_payload(
                     *(
-                        rule(f"test.{level}", severity=level.upper())
+                        rule(
+                            f"test.{level}",
+                            severity=level.upper(),
+                            finding_type="review" if level == "low" else "weakness",
+                        )
                         for level in ("info", "low", "medium", "high", "critical")
                     ),
                     results=[{"check_id": f"test.{level}"} for level in ("info", "low", "medium", "high", "critical")],
@@ -78,7 +82,9 @@ def test_reports_are_independently_opt_in(tmp_path, monkeypatch, capsys, json_fl
     stdout = capsys.readouterr().out
     levels = ["info", "low", "medium", "high", "critical"]
     expected = levels[levels.index(severity.lower()) :] if severity else levels
-    counts = stdout.split("Weakness counts", 1)[1].split("Findings", 1)[0]
+    counts = stdout.split("Finding counts", 1)[1].split("Findings", 1)[0]
+    assert "SECURE" not in counts
+    assert counts.split().count("1") == len(expected)
     for level in levels:
         assert (f"test.{level}" in stdout) == (level in expected)
         assert (level.upper() in counts) == (level in expected)
@@ -88,6 +94,7 @@ def test_reports_are_independently_opt_in(tmp_path, monkeypatch, capsys, json_fl
     if json_flag:
         original = json.loads((config.output_path / "post_scan_processing.json").read_text())
         assert sum(len(section["checks"]) for section in original["vulnerability_sections"]) == 5
+        assert original["findings_severity"] == dict.fromkeys(levels, 1)
         monkeypatch.setattr(
             MobileAnalysisWorkflowService, "run", lambda *_: pytest.fail("Saved reports must not run tools")
         )

@@ -55,7 +55,7 @@
 
     "severity": {
       "type": "string",
-      "enum": ["Critical", "High", "Medium", "Low", "Info", "Secure", "Hotspot", "Variable", "N/A"],
+      "enum": ["Critical", "High", "Medium", "Low", "Info", "Hotspot", "Variable", "N/A"],
       "description": "Matches capabilities.csv's Default Severity column. 'Variable' is used in the CSV itself for a few checks (e.g. 'Components with known vulnerabilities') where actual severity depends on the specific CVE found. 'N/A' is used for pure inventory/artifact checks that don't carry a risk rating of their own."
     },
 

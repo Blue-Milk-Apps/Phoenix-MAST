@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import asdict, dataclass, field, fields, is_dataclass
+from dataclasses import asdict, dataclass, field, fields, is_dataclass, replace
 from enum import StrEnum
 from types import UnionType
 from typing import Any, Iterable, Mapping, get_args, get_origin, get_type_hints
@@ -27,7 +27,6 @@ class CheckSeverity(StrEnum):
     MEDIUM = "medium"
     LOW = "low"
     INFO = "info"
-    SECURE = "secure"
     HOTSPOT = "hotspot"
     VARIABLE = "variable"
     NOT_APPLICABLE = "not_applicable"
@@ -181,14 +180,22 @@ class RiskSummary:
 
 @dataclass(frozen=True)
 class FindingSeverity:
-    """Counts of checks grouped by severity."""
+    """Counts of matched security checks grouped by severity, regardless of finding type."""
 
     critical: int = 0
     high: int = 0
     medium: int = 0
     low: int = 0
     info: int = 0
-    secure: int = 0
+
+    @classmethod
+    def from_sections(cls, sections: Iterable[VulnerabilitySection]) -> FindingSeverity:
+        counts = dict.fromkeys((item.name for item in fields(cls)), 0)
+        for section in sections:
+            for check in section.checks:
+                if check.result == AssessmentStatus.PRESENT and check.severity.value in counts:
+                    counts[check.severity.value] += 1
+        return cls(**counts)
 
 
 class PlatformReportDetails(ABC):
@@ -676,6 +683,9 @@ class ReportData:
                 model = next(member for member in get_args(model) if member is not type(None))
             if is_dataclass(model):
                 names = {item.name for item in fields(model)}
+                if model is FindingSeverity and isinstance(value, Mapping):
+                    # Older aggregates included a non-severity bucket and omitted review findings.
+                    value = {key: item for key, item in value.items() if key != "secure"}
                 if not isinstance(value, Mapping) or set(value) != names:
                     raise ValueError(f"Invalid aggregate fields at {path}")
                 hints = get_type_hints(model)
@@ -703,4 +713,7 @@ class ReportData:
 
         # Resolve the platform detail model from the saved target, never from scan files.
         metadata = restore(ReportMetadata, data.get("metadata"), "metadata")
-        return restore(cls, {key: value for key, value in data.items() if key != "schema_version"}, "report")
+        report = restore(cls, {key: value for key, value in data.items() if key != "schema_version"}, "report")
+        if "secure" in data["findings_severity"]:
+            report = replace(report, findings_severity=FindingSeverity.from_sections(report.vulnerability_sections))
+        return report

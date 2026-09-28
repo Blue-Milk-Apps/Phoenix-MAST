@@ -83,7 +83,7 @@ The output directory always contains tool artifacts and scan metadata. `--json` 
 | --- | --- |
 | App identity and scan target | `metadata`, `metadata.target` |
 | Matched checks, evidence, and remediation | `vulnerability_sections[].checks[]` |
-| Weakness counts by severity | `findings_severity` |
+| Matched security checks by severity, including reviews, controls and observations | `findings_severity` |
 | Category risks and explanations | `risk_summary`, `overall_evaluation` |
 | OpenGrep execution coverage | `rule_status`, `rule_status_reason`, `rule_coverage` |
 | Functionality, URL schemes, and other platform details | `platform_details` |

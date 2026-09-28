@@ -25,7 +25,6 @@ class ConsoleScanOutput(ScanOutputPort):
         "medium": "yellow",
         "low": "cyan",
         "info": "blue",
-        "secure": "green",
     }
 
     def __init__(self, console: Console | None = None, *, stderr: bool = False) -> None:
@@ -82,7 +81,7 @@ class ConsoleScanOutput(ScanOutputPort):
         if config.stdout_severity is not None:
             ordered = tuple(self.SEVERITY_STYLES)
             visible_severities = ordered[: ordered.index(config.stdout_severity) + 1]
-        counts = Table(title="Weakness counts", box=box.SIMPLE_HEAD, title_justify="left", min_width=20)
+        counts = Table(title="Finding counts", box=box.SIMPLE_HEAD, title_justify="left", min_width=20)
         values = []
         for severity, count in asdict(report.findings_severity).items():
             if visible_severities is None or severity in visible_severities:

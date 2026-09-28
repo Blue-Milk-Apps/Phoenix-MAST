@@ -37,8 +37,9 @@ sample files in `data/` are not inputs to this API.
 - `assets/` contains branding and the placeholder used when an app icon is
   unavailable. An absent icon does not change assessment results.
 
-Source categories come from the loaded YAML rules. Functionality observations
-remain separate from weakness counts. Flutter and React Native findings retain
+Source categories come from the loaded YAML rules. Severity counts include all
+matched security checks, including reviews, controls, and observations; functionality
+observations remain separate. Category risks use weakness findings. Flutter and React Native findings retain
 their framework or embedded Android/iOS origin. Android component counts appear
 only for Android targets; certificate and file-hash sections are binary-only.
 Empty endpoint collections do not produce a table or an extra report section.

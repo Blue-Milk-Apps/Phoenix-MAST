@@ -49,10 +49,13 @@ def test_new_id_and_custom_category_need_no_python_registration():
 
 
 @pytest.mark.parametrize("finding_type", ["review", "control", "observation"])
-def test_nonweakness_matches_never_increase_vulnerability_counts(finding_type):
-    report = build(assessment_payload(rule(finding_type=finding_type), results=[{"check_id": "example.check"}]))
+def test_nonweakness_matches_count_by_severity_without_increasing_risk(finding_type):
+    report = build(
+        assessment_payload(rule(finding_type=finding_type, severity="LOW"), results=[{"check_id": "example.check"}])
+    )
     assert report.vulnerability_sections[-1].checks[0].finding_type == finding_type
     assert report.findings_severity.high == 0
+    assert report.findings_severity.low == 1
     assert report.overall_evaluation[-1].risk_level.value == "not_evaluated"
 
 
@@ -87,7 +90,7 @@ def test_scoped_catalog_preserves_ios_platform_and_outcomes():
 
 def test_pdf_projection_keeps_metadata_and_dynamic_categories():
     report = build(
-        assessment_payload(rule(finding_type="review"), results=[{"check_id": "example.check"}]),
+        assessment_payload(rule(finding_type="review", severity="LOW"), results=[{"check_id": "example.check"}]),
         functionality={"Camera": {"present": False, "explanation": "No camera capability recorded."}},
         url_schemes=[{"url_name": "Example App", "schemes": ["dontdothis"]}],
     )
@@ -119,6 +122,13 @@ def test_pdf_projection_keeps_metadata_and_dynamic_categories():
         "phoenix_brand_icon_uri": "",
     }
     html = template.render(**context)
+    bars = html.split('<div class="severity-bars"')[1].split('<div class="risk-graph-wrap">')[0]
+    assert data["findings_severity"] == {"critical": 0, "high": 0, "medium": 0, "low": 1, "info": 0}
+    assert '<span class="bar-label">Low</span>' in bars
+    assert '<span class="bar-count-chip" style="background:#5499c7;">1</span>' in bars
+    assert 'width:100.0%; background:#5499c7;' in bars
+    assert bars.count('class="bar-label"') == 5
+    assert "Secure" not in bars
     table = html.split('<table class="findings-table">')[1].split("</table>")[0]
     assert all(
         f">{column}</th>" in table
@@ -338,7 +348,8 @@ def test_partial_source_scans_retain_positive_findings(tmp_path, completed_sourc
     assert len(checks) == 1
     assert all(check.result == AssessmentStatus.PRESENT and check.execution_status == "partial" for check in checks)
     assert all("incomplete scan" in check.explanation for check in checks)
-    assert report.findings_severity.high == report.findings_severity.medium == 0
+    assert report.findings_severity.high == 1
+    assert report.findings_severity.medium == 0
     assert presentation["risk_summary"]["Code"] == "not_evaluated"
     assert report.rule_status == "partial"
     secret_scan = next(scan for scan in report.secret_scans if scan.scanner == "Gitleaks")
@@ -418,7 +429,8 @@ def test_completed_source_scans_retain_positive_findings(tmp_path, completed_sou
     assert checks[0].rule_id == "example.entitlement"
     assert checks[0].execution_status == "success"
     assert "incomplete" not in checks[0].explanation
-    assert report.findings_severity.high == report.findings_severity.medium == 0
+    assert report.findings_severity.high == 1
+    assert report.findings_severity.medium == 0
     assert presentation["risk_summary"]["Code"] == "not_evaluated"
     secret_scan = next(scan for scan in report.secret_scans if scan.scanner == "Gitleaks")
     assert secret_scan.status == "Completed"

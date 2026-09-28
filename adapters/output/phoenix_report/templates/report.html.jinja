@@ -80,7 +80,7 @@
   <div class="security-overview no-break">
     <div class="severity-bars" aria-label="Finding counts by severity">
       {% set max_count = [data.findings_severity.values() | max, 1] | max %}
-      {% for level, color, key in [('Critical','#8e1b1b','critical'), ('High','#c0392b','high'), ('Medium','#e08e0b','medium'), ('Low','#5499c7','low'), ('Info','#2980b9','info'), ('Secure','#27ae60','secure')] %}
+      {% for level, color, key in [('Critical','#8e1b1b','critical'), ('High','#c0392b','high'), ('Medium','#e08e0b','medium'), ('Low','#5499c7','low'), ('Info','#2980b9','info')] %}
       {% set count = data.findings_severity[key] %}
       <div class="bar-block">
         <div class="bar-label-row">
@@ -613,7 +613,7 @@ SOFTWARE.
     <tr>
       <td>{{ c.check | e }}</td>
       <td>{{ risk_badge(c.severity) }}</td>
-      <td>{{ (c.finding_type or ('control' if c.severity == 'Secure' else 'review' if c.severity == 'Hotspot' else 'weakness')) | title | e }}</td>
+      <td>{{ (c.finding_type or ('review' if c.severity == 'Hotspot' else 'weakness')) | title | e }}</td>
       <td>
         {{ c.explanation | e }}
         {% if c.platform_assessments | length > 1 %}

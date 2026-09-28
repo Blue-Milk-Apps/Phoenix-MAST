@@ -71,7 +71,7 @@ def test_scoped_snapshots_preserve_positives_and_unknowns(framework):
 
 
 @pytest.mark.parametrize("framework", ["flutter", "react_native"])
-def test_reviews_and_observations_do_not_inflate_vulnerability_counts(framework):
+def test_reviews_and_controls_count_as_findings_without_increasing_risk(framework):
     payload = scoped_payload(
         **{
             framework: assessment_payload(
@@ -84,7 +84,7 @@ def test_reviews_and_observations_do_not_inflate_vulnerability_counts(framework)
     )
     report = _build(framework, payload)
     assert len(report.vulnerability_sections[0].checks) == 2
-    assert report.findings_severity.high == 0
+    assert report.findings_severity.high == 2
     assert report.risk_summary[0].risk_level.value == "not_evaluated"
 
 

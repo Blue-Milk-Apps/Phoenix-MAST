@@ -46,10 +46,13 @@ def test_modular_report_data_contains_canonical_android_sections() -> None:
     assert activities.severity.value == "high"
     assert activities.compliance
     assert activities.finding_type == "review"
-    assert report.findings_severity.high == 0
+    assert report.findings_severity.high == 1
     assert [section.name for section in report.vulnerability_sections] == ["Code"]
     assert report.platform_details.app_components.exported_activities == 1
     saved = json.loads(json.dumps(report.to_dict()))
+    assert ReportData.from_dict(saved) == report
+    assert set(saved["findings_severity"]) == {"critical", "high", "medium", "low", "info"}
+    saved["findings_severity"].update(high=0, secure=1)
     assert ReportData.from_dict(saved) == report
 
 

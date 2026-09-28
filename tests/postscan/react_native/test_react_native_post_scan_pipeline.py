@@ -19,7 +19,7 @@ def test_react_native_extractor_builds_mobile_only_report_and_pdf(tmp_path):
     payload = scoped_payload(
         react_native=assessment_payload(
             rule("customer.transport"),
-            rule("customer.bridge", finding_type="review"),
+            rule("customer.bridge", finding_type="review", severity="LOW"),
             category="networking",
             results=[{"check_id": "customer.transport"}, {"check_id": "customer.bridge"}],
         )
@@ -37,6 +37,7 @@ def test_react_native_extractor_builds_mobile_only_report_and_pdf(tmp_path):
     assert [s.name for s in report.vulnerability_sections] == ["Networking"]
     assert len(report.vulnerability_sections[0].checks) == 2
     assert report.findings_severity.high == 1
+    assert report.findings_severity.low == 1
     pdf = PdfReportGenerator().generate(report, tmp_path / "react-native-report.pdf")
     assert pdf.is_file() and pdf.stat().st_size > 0
 
