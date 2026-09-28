@@ -43,7 +43,7 @@ class PdfPresentation:
             assessment_title=(
                 f"{source_label} Vulnerability Assessment"
                 if target_type == ReportTargetType.SOURCE
-                else "Application Vulnerability Assessment"
+                else "Mobile App Security Assessment"
             ),
             target_label="Project Name" if target_type == ReportTargetType.SOURCE else "File Name",
             target_information_heading=source_heading if target_type == ReportTargetType.SOURCE else "File Information",
