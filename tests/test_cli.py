@@ -5,6 +5,7 @@ import zipfile
 from pathlib import Path
 
 import pytest
+from rich.text import Text
 
 from application import mobile_analysis_workflow_service as workflow
 from domain.models import ScanConfig, ScanResult, ScanType
@@ -525,7 +526,7 @@ def test_scan_command_prints_selected_scan_details(tmp_path: Path, capsys, monke
         ]
     )
 
-    output = capsys.readouterr().out
+    output = Text.from_ansi(capsys.readouterr().out).plain
     assert exit_code == 1
     assert "Phoenix scan" in output
     assert str(tmp_path.resolve()) in "".join(output.split())
@@ -810,7 +811,7 @@ def test_opengrep_rule_loading_failure_is_visible_in_terminal(tmp_path, capsys, 
     )
 
     assert exit_code == 1
-    error = capsys.readouterr().err
+    error = Text.from_ansi(capsys.readouterr().err).plain
     assert "Phoenix scan failed: iOS Category OpenGrep Scanner failed:" in error
     assert f"No YAML rule files found in: {rules}" in error
     assert not list(config.output_path.rglob("post_scan_processing.json"))

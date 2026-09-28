@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from rich.text import Text
+
 from adapters.output import ConsoleScanOutput, FileScanOutput, MultiScanOutput
 from adapters.storage import StoreToFile
 from domain.models import ScanConfig, ScanResult, ScanType
@@ -62,7 +64,7 @@ def test_console_scan_output_prints_skipped_status(capsys) -> None:
 
     ConsoleScanOutput().write_result(result)
 
-    output = capsys.readouterr().out
+    output = Text.from_ansi(capsys.readouterr().out).plain
     assert "Gitleaks: Skipped" in output
     assert "Gitleaks is not available." in output
 
@@ -78,7 +80,7 @@ def test_console_scan_output_prints_skipped_binary_status(capsys) -> None:
 
     ConsoleScanOutput().write_result(result)
 
-    output = capsys.readouterr().out
+    output = Text.from_ansi(capsys.readouterr().out).plain
     assert "Example tool: Skipped" in output
     assert "Example tool is not available on this system." in output
 
