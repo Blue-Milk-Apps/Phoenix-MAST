@@ -35,7 +35,7 @@ class FlutterOpenGrepScanner(ScannerPort):
 
     @property
     def name(self) -> str:
-        return "Flutter Scoped OpenGrep Scanner"
+        return "Flutter OpenGrep Scanner"
 
     @property
     def description(self) -> str:

@@ -452,7 +452,7 @@ class CategoryOpenGrepScanner(ScannerPort):
     @property
     def name(self) -> str:
         platform = "iOS" if self._platform == "ios" else self._platform.replace("_", " ").title()
-        return f"{platform} Category OpenGrep Scanner"
+        return f"{platform} OpenGrep Scanner"
 
     @property
     def description(self) -> str:

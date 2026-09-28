@@ -105,7 +105,7 @@ class ReactNativeOpenGrepScanner(ScannerPort):
 
     @property
     def name(self) -> str:
-        return "React Native Scoped OpenGrep Scanner"
+        return "React Native OpenGrep Scanner"
 
     @property
     def description(self) -> str:
