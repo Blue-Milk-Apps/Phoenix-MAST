@@ -24,7 +24,7 @@ REPORT_PATH = "opengrep_results.json"
 
 
 class OpenGrepScanner(ScannerPort):
-    """Scanner for extracting source-code findings with OpenGrep."""
+    """Scanner for extracting findings from source code and binary artifacts with OpenGrep."""
 
     DEFAULT_PROCESS_TIMEOUT_SECONDS = 300
 
@@ -203,7 +203,7 @@ class OpenGrepScanner(ScannerPort):
             for line in stderr_data.splitlines():
                 clean_line = line.replace("\r", "").rstrip()
                 if clean_line:
-                    print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}{clean_line}")
+                    print(f"OpenGrep {config.target_type.title()} -> {clean_line}")
 
             if process.returncode != 0:
                 return [
