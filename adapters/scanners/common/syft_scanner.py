@@ -1,8 +1,10 @@
 """Platform-neutral Syft scanner adapter for SBOM generation."""
 
 import json
+import os
 import shutil
 import subprocess
+from pathlib import Path
 
 from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
@@ -44,10 +46,15 @@ class SyftScanner(ScannerPort):
                 config.extracted_binary.scan_root_path if config.extracted_binary is not None else config.project_path
             )
             output_format = self._stdout_output_format()
+            source_name = os.environ.get("SYFT_SOURCE_NAME") or (
+                Path(config.display_project_path or config.project_path).resolve().name or "filesystem"
+            )
             cmd = [
                 "syft",
                 "scan",
                 str(scan_target),
+                "--source-name",
+                source_name,
                 "-o",
                 output_format,
             ]
