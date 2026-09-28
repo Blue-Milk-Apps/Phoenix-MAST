@@ -24,7 +24,7 @@ REPORT_PATH = "opengrep_results.json"
 
 
 class OpenGrepScanner(ScannerPort):
-    """Scanner for extracting findings from source code and binary artifacts with OpenGrep."""
+    """Shared CLI runner; platform adapters add the rule metadata required by reports."""
 
     DEFAULT_PROCESS_TIMEOUT_SECONDS = 300
 
@@ -443,6 +443,8 @@ def validate_rule_inventory(rules_directory: Path) -> RuleInventory:
 
 
 class CategoryOpenGrepScanner(ScannerPort):
+    """Validate the rule catalog and attach reporting metadata to OpenGrep results."""
+
     REPORT_PATH = "opengrep_results.json"
 
     def __init__(self, rules_directory: Path, scan_paths: list[Path] | None = None, *, platform: str = "ios") -> None:

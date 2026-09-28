@@ -166,7 +166,7 @@ class RuleFunctionality:
                     "status": status,
                     "explanation": " ".join(descriptions)
                     or (
-                        f"No evaluated source rule indicated {label.lower()} functionality."
+                        f"No evaluated rule indicated {label.lower()} functionality."
                         if status == "not_present"
                         else "Required rule evidence was unavailable."
                     ),

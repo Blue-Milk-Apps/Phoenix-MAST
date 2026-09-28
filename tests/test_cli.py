@@ -161,9 +161,12 @@ def test_create_scan_config_for_android_binary(tmp_path: Path, monkeypatch) -> N
     )
 
 
-def test_create_scan_config_for_android_binary_includes_opengrep_when_rules_path_is_configured(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_android_binary_opengrep_preserves_rule_catalog_and_functionality(tmp_path: Path, monkeypatch) -> None:
+    from adapters.output.file_output import FileScanOutput
+    from adapters.scanners.common.opengrep_scanner import OpenGrepScanner
+    from domain.post_scan.rule_assessment import RuleFunctionality, rule_assessments
+    from tests.rule_fixtures import rule, write_rules
+
     rules_path = tmp_path / "android-opengrep-rules"
     rules_path.mkdir()
     args = _scan_args(
@@ -186,6 +189,39 @@ def test_create_scan_config_for_android_binary_includes_opengrep_when_rules_path
         ScanType.TRUFFLEHOG,
         ScanType.STRINGS,
     }
+    definition = rule("example.location", finding_type="observation", severity="INFO")
+    definition["metadata"]["functionality"] = "Location"
+    write_rules(config.opengrep_rules_path / "functionality.yml", definition)
+    strings = config.output_path / "strings"
+    strings.mkdir(parents=True)
+    target = strings / "classes.txt"
+    target.write_text("EXAMPLE_MARKER")
+
+    def fake_scan(self, scan_config):
+        assert self._scan_paths == [strings.resolve()]
+        return [
+            ScanResult(
+                self.name,
+                ScanType.OPENGREP_BINARY,
+                raw_output=json.dumps(
+                    {
+                        "results": [{"check_id": "example.location", "path": str(target), "start": {"line": 1}}],
+                        "paths": {"scanned": [str(target)]},
+                    }
+                ),
+                relative_target_path="opengrep_results.json",
+            )
+        ]
+
+    monkeypatch.setattr(OpenGrepScanner, "is_available", lambda self: True)
+    monkeypatch.setattr(OpenGrepScanner, "scan", fake_scan)
+    workflow.MobileAnalysisWorkflowService()._perform_opengrep_scan(config, FileScanOutput(config.output_path))
+    payload = json.loads((config.output_path / "opengrep_binary/opengrep_results.json").read_text())
+    assert payload["scan_metadata"]["status"] == "success"
+    assert payload["scan_metadata"]["platform"] == "android"
+    assert payload["scan_metadata"]["mode"] == "binary"
+    assert rule_assessments(payload)["rules"][0]["status"] == "present"
+    assert RuleFunctionality(payload).items["Location"]["present"] is True
 
 
 def test_create_scan_config_for_ios_binary(tmp_path: Path, monkeypatch) -> None:
@@ -628,6 +664,10 @@ def test_get_opengrep_scan_paths_for_binary_returns_strings_artifact_directory_o
     )
     strings_path = config.output_path / ScanType.STRINGS.value
     strings_path.mkdir(parents=True)
+    for name in ("opengrep_binary", "opengrep_source", "gitleaks", "trufflehog", "syft", "previous-scan"):
+        (config.output_path / name).mkdir()
+        (config.output_path / name / "report.json").write_text("{}")
+    (config.output_path / "post_scan_processing.json").write_text("{}")
     paths = workflow.MobileScannerFactory()._get_opengrep_scan_paths(config)
 
     assert paths == [strings_path]

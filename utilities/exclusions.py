@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import fnmatch
+import json
 import os
 import shutil
 import tempfile
 from contextlib import contextmanager
 from dataclasses import replace
+from glob import escape
 from pathlib import Path
 from typing import Iterator
 
@@ -59,6 +61,15 @@ def prune_excluded(root: Path, patterns: list[str]) -> None:
                     path.unlink()
 
 
+def _is_scan_output(path: Path) -> bool:
+    """Identify Phoenix results by their metadata, regardless of directory name."""
+    try:
+        metadata = json.loads((path / "scan_metadata.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return isinstance(metadata, dict) and {"scan_label", "target_type", "project_path", "output_path"}.issubset(metadata)
+
+
 @contextmanager
 def source_scan_workspace(config: ScanConfig) -> Iterator[ScanConfig]:
     """Use a shared filtered tree only when exclusions are needed.
@@ -74,9 +85,22 @@ def source_scan_workspace(config: ScanConfig) -> Iterator[ScanConfig]:
     # Exclude this and previous runs when the output directory is inside the target.
     output_parent = config.output_path.resolve().parent
     if output_parent != root and output_parent.is_relative_to(root):
-        patterns.append(output_parent.relative_to(root).as_posix())
+        patterns.append(escape(output_parent.relative_to(root).as_posix()))
     elif config.output_path.resolve().is_relative_to(root):
-        patterns.append(config.output_path.resolve().relative_to(root).as_posix())
+        patterns.append(escape(config.output_path.resolve().relative_to(root).as_posix()))
+    if _is_scan_output(root):
+        raise ValueError("Source target is a Phoenix scan results directory; select the original source project.")
+    matcher = PathExclusions(root, patterns)
+    for directory, dirs, _ in os.walk(root):
+        for name in dirs[:]:
+            path = Path(directory) / name
+            if matcher.matches(path):
+                dirs.remove(name)
+            elif _is_scan_output(path):
+                relative = path.relative_to(root).as_posix()
+                patterns.append(escape(relative))
+                dirs.remove(name)
+                print(f"Input skipped: {relative} (previous Phoenix scan results)")
     if not patterns:
         yield config
         return

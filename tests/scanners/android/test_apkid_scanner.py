@@ -5,6 +5,8 @@ import subprocess
 import zipfile
 from pathlib import Path
 
+import pytest
+
 from adapters.scanners.android import apkid_scanner
 from adapters.scanners.android.apkid_scanner import ApkidScanner
 from domain.models import ScanConfig, ScanType
@@ -46,12 +48,15 @@ def test_apkid_scan_skips_when_command_missing(monkeypatch, tmp_path: Path) -> N
     assert "apkid" in results[0].error_message.lower()
 
 
+@pytest.mark.parametrize("output_format", ["document", "stream", "pretty_stream", "list", "truncated", "scalar_tail"])
 def test_apkid_extracts_normalized_operational_intelligence(
     monkeypatch,
     tmp_path: Path,
+    output_format: str,
 ) -> None:
     apk_path = make_apk(tmp_path / "sample.apk")
     monkeypatch.setattr(apkid_scanner.shutil, "which", lambda _: "/usr/bin/apkid")
+    commands = []
 
     def fake_run(cmd, capture_output, text, check, timeout):
         class FakeResult:
@@ -60,16 +65,13 @@ def test_apkid_extracts_normalized_operational_intelligence(
                 self.stdout = stdout
                 self.stderr = stderr
 
-        if cmd == ["/usr/bin/apkid", "--version"]:
-            return FakeResult(0, "APKiD 2.1.5\n", "")
-        if cmd == ["/usr/bin/apkid", "-v"]:
-            return FakeResult(0, "", "")
-
+        commands.append(cmd)
         assert cmd[0:2] == ["/usr/bin/apkid", "-j"]
         targets = cmd[2:]
         dex_target = next(target for target in targets if target.endswith("classes.dex"))
         stdout = json.dumps(
             {
+                "apkid_version": "3.1.0",
                 "rules_sha256": "abc123",
                 "files": [
                     {
@@ -89,6 +91,19 @@ def test_apkid_extracts_normalized_operational_intelligence(
                 ],
             }
         )
+        payload = json.loads(stdout)
+        if output_format == "list":
+            stdout = json.dumps(payload["files"])
+        elif output_format != "document":
+            stdout = "\n\n".join(
+                json.dumps({**payload, "files": [record]}, indent=2 if output_format == "pretty_stream" else None)
+                for record in payload["files"]
+            )
+            if output_format == "truncated":
+                stdout += '\n{"files": ['
+            elif output_format == "scalar_tail":
+                stdout += "\n42"
+        stdout = " \n" + stdout + "\n\t"
         return FakeResult(0, stdout, "")
 
     monkeypatch.setattr(apkid_scanner.subprocess, "run", fake_run)
@@ -96,11 +111,19 @@ def test_apkid_extracts_normalized_operational_intelligence(
     results = ApkidScanner().scan(scan_config(apk_path))
     evidence = json.loads(results[0].raw_output)
 
-    assert results[0].success
+    malformed = output_format in {"truncated", "scalar_tail"}
+    assert results[0].success is not malformed
+    assert len(commands) == 1
+    assert evidence["extraction_metadata"]["execution_status"] == ("PARSING_ERROR" if malformed else "SUCCESS")
+    assert bool(evidence["extraction_metadata"]["parser_errors"]) is malformed
+    if malformed:
+        assert "APKiD JSON" in results[0].error_message
     assert results[0].relative_target_path == "apkid_intelligence.json"
     assert evidence["schema_version"] == "1.0"
-    assert evidence["extraction_metadata"]["apkid_version"] == "APKiD 2.1.5"
-    assert evidence["extraction_metadata"]["signature_metadata"]["rules_sha256"] == "abc123"
+    assert evidence["extraction_metadata"]["apkid_version"] == ("" if output_format == "list" else "3.1.0")
+    assert evidence["extraction_metadata"]["signature_metadata"]["rules_sha256"] == (
+        None if output_format == "list" else "abc123"
+    )
     assert evidence["downstream_findings"] == []
     assert evidence["raw_evidence"]["stdout"] == "raw/apkid_stdout.json"
     assert {result.relative_target_path for result in results} == {
@@ -109,6 +132,7 @@ def test_apkid_extracts_normalized_operational_intelligence(
     }
 
     detections = evidence["normalized_detections"]
+    assert len(detections) == 4
     by_family = {item["family"]: item for item in detections}
     assert by_family["packer"]["signal_tier"] == "routing-critical"
     assert by_family["packer"]["priority"] == "high"
@@ -122,20 +146,13 @@ def test_apkid_extracts_normalized_operational_intelligence(
     )
 
 
-def test_apkid_timeout_is_tool_failure(monkeypatch, tmp_path: Path) -> None:
+@pytest.mark.parametrize("output", [None, b'{"files": []}\n{"files": [', '{"files": []}'])
+def test_apkid_timeout_is_tool_failure(monkeypatch, tmp_path: Path, output: str | bytes | None) -> None:
     apk_path = make_apk(tmp_path / "sample.apk")
     monkeypatch.setattr(apkid_scanner.shutil, "which", lambda _: "/usr/bin/apkid")
 
     def fake_run(cmd, capture_output, text, check, timeout):
-        if cmd == ["/usr/bin/apkid", "--version"]:
-
-            class VersionResult:
-                returncode = 0
-                stdout = "APKiD 2.1.5\n"
-                stderr = ""
-
-            return VersionResult()
-        raise subprocess.TimeoutExpired(cmd, timeout)
+        raise subprocess.TimeoutExpired(cmd, timeout, output=output, stderr=b"tool interrupted")
 
     monkeypatch.setattr(apkid_scanner.subprocess, "run", fake_run)
 
@@ -145,6 +162,7 @@ def test_apkid_timeout_is_tool_failure(monkeypatch, tmp_path: Path) -> None:
     assert not results[0].success
     assert evidence["extraction_metadata"]["execution_status"] == "TIMEOUT"
     assert evidence["normalized_detections"] == []
+    assert results[-1].raw_output == "tool interrupted"
 
 
 def make_apk(path: Path) -> Path:

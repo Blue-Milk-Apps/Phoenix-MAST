@@ -101,13 +101,17 @@ def test_gitleaks_ios_binary_scan_uses_primary_executable(monkeypatch, tmp_path:
 
     monkeypatch.setattr(gitleaks_scanner.shutil, "which", lambda _: "/usr/local/bin/gitleaks")
     captured_cmd: list[str] = []
+    strings = config.output_path / "strings"
 
     class FakeProcess:
         def __init__(self, cmd: list[str]) -> None:
             captured_cmd.extend(cmd)
             self.returncode = 0
-            assert Path(cmd[-1]).is_file()
-            assert Path(cmd[-1]).name == "Demo"
+            if strings.exists():
+                assert Path(cmd[-1]) == strings
+            else:
+                assert Path(cmd[-1]).is_file()
+                assert Path(cmd[-1]).name == "Demo"
 
         def communicate(self, timeout: int | None = None) -> tuple[str, str]:
             return "[]", ""
@@ -126,6 +130,16 @@ def test_gitleaks_ios_binary_scan_uses_primary_executable(monkeypatch, tmp_path:
     assert len(results) == 1
     assert results[0].success
     assert captured_cmd[-1] != str(ipa_path)
+    strings.mkdir(parents=True)
+    (strings / "Demo.txt").write_text("app strings")
+    (config.output_path / "post_scan_processing.json").write_text("{}")
+    (config.output_path / "trufflehog").mkdir()
+    (config.output_path / "trufflehog/report.json").write_text("{}")
+    captured_cmd.clear()
+    results = GitleaksScanner().scan(config)
+    assert results[0].success
+    assert captured_cmd.count("dir") == 1
+    assert captured_cmd[-1] == str(strings)
 
 
 def _build_test_ipa(ipa_path: Path) -> Path:

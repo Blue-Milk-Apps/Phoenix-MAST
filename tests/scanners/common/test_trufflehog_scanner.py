@@ -62,14 +62,18 @@ def test_trufflehog_ios_binary_scan_uses_primary_executable_and_skips_verified_o
         platform="IOS",
     )
     captured_cmd: list[str] = []
+    strings = config.output_path / "strings"
 
     class FakeProcess:
         returncode = 0
 
         def __init__(self, cmd: list[str]) -> None:
             captured_cmd.extend(cmd)
-            assert Path(cmd[2]).is_file()
-            assert Path(cmd[2]).name == "Demo"
+            if strings.exists():
+                assert cmd[2:4] == [str(strings), "--log-level=-1"]
+            else:
+                assert Path(cmd[2]).is_file()
+                assert Path(cmd[2]).name == "Demo"
 
         stdout = '{"SourceMetadata": {}}\n'
         stderr = ""
@@ -87,6 +91,15 @@ def test_trufflehog_ios_binary_scan_uses_primary_executable_and_skips_verified_o
     assert results[0].success
     assert captured_cmd[2] != str(ipa_path)
     assert "--only-verified" not in captured_cmd
+    strings.mkdir(parents=True)
+    (strings / "Demo.txt").write_text("app strings")
+    (config.output_path / "post_scan_processing.json").write_text("{}")
+    (config.output_path / "gitleaks").mkdir()
+    (config.output_path / "gitleaks/report.json").write_text("{}")
+    captured_cmd.clear()
+    results = TrufflehogScanner().scan(config)
+    assert results[0].success
+    assert captured_cmd[2:4] == [str(strings), "--log-level=-1"]
 
 
 def _build_test_ipa(ipa_path: Path) -> Path:

@@ -152,12 +152,10 @@ class ApkidScanner(ScannerPort):
         try:
             artifacts = self._analysis_artifacts(apk_path, extracted)
             command_result = self._run_apkid(apkid_executable, artifacts)
-            tool_version = self._apkid_version(apkid_executable)
             evidence = self._build_evidence(
                 apk_path=apk_path,
                 artifacts=artifacts,
                 command_result=command_result,
-                tool_version=tool_version,
                 extraction_errors=extraction_errors,
             )
             return self._scan_results(evidence, command_result)
@@ -239,8 +237,12 @@ class ApkidScanner(ScannerPort):
         except subprocess.TimeoutExpired as exc:
             return ApkidCommandResult(
                 exit_code=None,
-                stdout=exc.stdout or "",
-                stderr=exc.stderr or "",
+                stdout=exc.stdout.decode("utf-8", errors="replace")
+                if isinstance(exc.stdout, bytes)
+                else exc.stdout or "",
+                stderr=exc.stderr.decode("utf-8", errors="replace")
+                if isinstance(exc.stderr, bytes)
+                else exc.stderr or "",
                 execution_status="TIMEOUT",
                 duration_seconds=time.perf_counter() - started,
                 error_message="APKiD timed out.",
@@ -275,29 +277,11 @@ class ApkidScanner(ScannerPort):
             duration_seconds=time.perf_counter() - started,
         )
 
-    def _apkid_version(self, apkid_executable: str) -> str:
-        for command in ([apkid_executable, "--version"], [apkid_executable, "-v"]):
-            try:
-                result = subprocess.run(
-                    command,
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                    timeout=10,
-                )
-            except Exception:
-                continue
-            output = result.stdout.strip() or result.stderr.strip()
-            if output:
-                return output
-        return ""
-
     def _build_evidence(
         self,
         apk_path: Path,
         artifacts: list[ApkidArtifact],
         command_result: ApkidCommandResult,
-        tool_version: str,
         extraction_errors: list[str],
     ) -> dict[str, Any]:
         parser_errors: list[str] = []
@@ -305,7 +289,7 @@ class ApkidScanner(ScannerPort):
         normalized_detections = self._normalized_detections(parsed_output, artifacts)
         operational_interpretations = self._operational_interpretations(normalized_detections)
         execution_status = command_result.execution_status
-        if execution_status == "SUCCESS" and command_result.stdout.strip() and parsed_output is None:
+        if execution_status == "SUCCESS" and parser_errors:
             execution_status = "PARSING_ERROR"
 
         return {
@@ -319,7 +303,7 @@ class ApkidScanner(ScannerPort):
             "extraction_metadata": {
                 "execution_status": execution_status,
                 "duration_seconds": round(command_result.duration_seconds, 6),
-                "apkid_version": tool_version,
+                "apkid_version": parsed_output.get("apkid_version", "") if isinstance(parsed_output, dict) else "",
                 "signature_metadata": self._signature_metadata(parsed_output),
                 "command_profile": self.COMMAND_PROFILE,
                 "tool_exit_code": command_result.exit_code,
@@ -371,15 +355,31 @@ class ApkidScanner(ScannerPort):
     ) -> dict[str, Any] | list[Any] | None:
         if not stdout.strip():
             return None
-        try:
-            parsed = json.loads(stdout)
-        except json.JSONDecodeError as exc:
-            parser_errors.append(f"APKiD JSON parsing failed: {exc}")
+        # APKiD writes one JSON document per target that produces results.
+        decoder = json.JSONDecoder()
+        documents: list[dict[str, Any] | list[Any]] = []
+        offset = 0
+        while offset < len(stdout):
+            if stdout[offset].isspace():
+                offset += 1
+                continue
+            try:
+                parsed, offset = decoder.raw_decode(stdout, offset)
+            except json.JSONDecodeError as exc:
+                parser_errors.append(f"APKiD JSON parsing failed: {exc}")
+                break
+            if not isinstance(parsed, (dict, list)):
+                parser_errors.append("APKiD JSON root was not an object or list.")
+                break
+            documents.append(parsed)
+
+        if not documents:
             return None
-        if isinstance(parsed, (dict, list)):
-            return parsed
-        parser_errors.append("APKiD JSON root was not an object or list.")
-        return None
+        if len(documents) == 1:
+            return documents[0]
+        merged = next((document.copy() for document in documents if isinstance(document, dict)), {})
+        merged["files"] = [record for document in documents for record in self._file_records(document)]
+        return merged
 
     def _normalized_detections(
         self,
@@ -729,7 +729,12 @@ class ApkidScanner(ScannerPort):
         error_message = (
             ""
             if extractor_success
-            else (command_result.error_message or command_result.stderr.strip() or "APKiD evidence extraction failed.")
+            else (
+                command_result.error_message
+                or command_result.stderr.strip()
+                or "; ".join(evidence["extraction_metadata"]["parser_errors"])
+                or "APKiD evidence extraction failed."
+            )
         )
         results = [
             ScanResult(

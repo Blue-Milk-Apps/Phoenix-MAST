@@ -282,17 +282,14 @@ class MobileAnalysisWorkflowService:
                     if scan_config.opengrep_rules_root
                     else None,
                 )
-            elif scan_config.platform == "IOS" or scan_config.stack == "NATIVE_ANDROID":
+            elif scan_config.platform in {"IOS", "ANDROID"}:
                 opengrep_scanner = CategoryOpenGrepScanner(
                     platform=scan_config.platform.lower(),
                     rules_directory=Path(open_grep_rules_path),
                     scan_paths=opengrep_scan_paths,
                 )
             else:
-                opengrep_scanner = OpenGrepScanner(
-                    rules_path=Path(open_grep_rules_path),
-                    scan_paths=opengrep_scan_paths,
-                )
+                raise ValueError(f"Unsupported OpenGrep platform: {scan_config.platform}")
             return ScannerService([opengrep_scanner]).scan_project(
                 scan_config, output=scan_output_method, retain_output=False
             )
