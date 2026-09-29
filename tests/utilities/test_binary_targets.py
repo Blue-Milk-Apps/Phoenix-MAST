@@ -5,7 +5,7 @@ from utilities.apk_utils import ExtractedAPK, iter_apk_analysis_targets
 from utilities.ipa_utils import ExtractedIPA, get_scanable_binary_paths
 
 
-def test_iter_ipa_analysis_targets_returns_runner_and_framework_binary(
+def test_iter_ipa_analysis_targets_returns_only_primary_app_executable(
     tmp_path: Path,
 ) -> None:
     temp_dir = tmp_path / "ipa"
@@ -30,7 +30,7 @@ def test_iter_ipa_analysis_targets_returns_runner_and_framework_binary(
 
     targets = get_scanable_binary_paths(extracted)
 
-    assert targets == [runner_binary, framework_binary]
+    assert targets == [runner_binary]
     assert extracted.scan_root_path == app_bundle
     assert extracted.analysis_targets == targets
 

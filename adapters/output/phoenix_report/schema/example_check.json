@@ -33,7 +33,7 @@
 
   "evidence": [
     { "file_path": "l4/d.java", "tool": "strings", "output_location": "strings/Runner.txt:rg -n -i \"MD5|SHA1|SHA-1|DES|RC4|ECB|Cipher\\.getInstance|MessageDigest\"" },
-    { "file_path": "u6/l.java", "tool": "mobsf", "output_location": "mobsf_scanner/mobsf_report.json:binary_analysis.findings" }
+    { "file_path": "u6/l.java", "tool": "opengrep", "output_location": "opengrep_source/opengrep_results.json:results" }
   ],
 
   "report_section": "Code"

@@ -55,7 +55,7 @@
 
     "severity": {
       "type": "string",
-      "enum": ["Critical", "High", "Medium", "Low", "Info", "Secure", "Hotspot", "Variable", "N/A"],
+      "enum": ["Critical", "High", "Medium", "Low", "Info", "Hotspot", "Variable", "N/A"],
       "description": "Matches capabilities.csv's Default Severity column. 'Variable' is used in the CSV itself for a few checks (e.g. 'Components with known vulnerabilities') where actual severity depends on the specific CVE found. 'N/A' is used for pure inventory/artifact checks that don't carry a risk rating of their own."
     },
 
@@ -150,11 +150,11 @@
           },
           "tool": {
             "type": ["string", "null"],
-            "description": "Which scanning tool produced this evidence, per capabilities.csv's Phoenix Output Location column, e.g. 'mobsf', 'androguard', 'apktool', 'lief', 'strings', 'gitleaks', 'trufflehog', 'opengrep', 'syft', 'apksigner', or 'dynamic' for runtime-only checks."
+            "description": "Which tool produced this evidence, per capabilities.csv's Phoenix Output Location column, e.g. 'androguard', 'apktool', 'lief', 'strings', 'gitleaks', 'trufflehog', 'opengrep', 'syft', 'apksigner', or 'dynamic' for runtime-only checks."
           },
           "output_location": {
             "type": ["string", "null"],
-            "description": "Path/key within that tool's raw output, e.g. 'mobsf_scanner/mobsf_report.json:binary_analysis.findings'. Kept close to the raw capabilities.csv string for traceability rather than over-parsed."
+            "description": "Path/key within that tool's raw output, e.g. 'opengrep_source/opengrep_results.json:results'. Kept close to the raw capabilities.csv string for traceability rather than over-parsed."
           }
         }
       }

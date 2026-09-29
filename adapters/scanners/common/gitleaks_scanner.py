@@ -11,7 +11,7 @@ from pathlib import Path
 
 from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
-from utilities.scan_target_utils import ResolvedScanTarget, resolve_scan_target
+from utilities.scan_target_utils import ResolvedScanTarget, resolve_scan_target, secret_scan_paths
 
 REPORT_PATH = "gitleaks_report.json"
 
@@ -33,7 +33,7 @@ class GitleaksScanner(ScannerPort):
     def description(self) -> str:
         return (
             "Detected secrets, API keys, tokens, passwords, and other sensitive values in "
-            "the target project using Gitleaks rules."
+            "the target project using Gitleaks detectors."
         )
 
     def _gitleaks_executable(self) -> str | None:
@@ -92,94 +92,30 @@ class GitleaksScanner(ScannerPort):
                     ]
 
             resolved_target = resolve_scan_target(config)
-            print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}Resolved scan target: {resolved_target.path}")
-            executable = self._gitleaks_executable()
-            if not executable:
-                error_message = "Gitleaks executable was not found on this system."
-                return [
-                    ScanResult(
-                        scanner_name=self.name,
-                        scan_type=self.scan_type,
-                        success=False,
-                        error_message=error_message,
-                        raw_output=self._error_report(error_message),
-                        relative_target_path=REPORT_PATH,
-                    )
-                ]
-
-            cmd = [
-                executable,
-                "dir",
-                "--no-banner",
-                "--no-color",
-                "--log-level",
-                "fatal",
-                "--report-format",
-                "json",
-                "--report-path",
-                "-",
-            ]
-
-            config_path = self._resolve_config_path(config)
-            if config_path:
-                cmd.extend(["--config", str(config_path)])
-
-            cmd.append(str(resolved_target.path))
-
-            process = subprocess.Popen(
-                cmd,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-            stdout_data, stderr_data = process.communicate(timeout=self._timeout_seconds())
-
-            if stderr_data:
-                for line in stderr_data.splitlines():
-                    clean_line = line.replace("\r", "").strip()
-                    if clean_line:
-                        print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}{clean_line}")
-
-            if process.returncode not in (0, 1):
-                error_message = f"Gitleaks error with return code {process.returncode}"
-                return [
-                    ScanResult(
-                        scanner_name=self.name,
-                        scan_type=self.scan_type,
-                        success=False,
-                        error_message=error_message,
-                        raw_output=self._error_report(error_message, stdout_data),
-                        relative_target_path=REPORT_PATH,
-                    )
-                ]
-
+            results = [self._scan_path(config, path) for path in secret_scan_paths(config, resolved_target)]
+            if len(results) == 1:
+                return results
+            findings = []
+            errors = []
+            for result in results:
+                report = json.loads(result.raw_output)
+                if result.success:
+                    findings.extend(report)
+                else:
+                    errors.append(result.error_message)
+                    partial = report.get("raw_output", [])
+                    if isinstance(partial, list):
+                        findings.extend(partial)
+            error = "; ".join(errors)
             return [
                 ScanResult(
                     scanner_name=self.name,
                     scan_type=self.scan_type,
-                    success=True,
-                    raw_output=self._json_report(stdout_data, []),
+                    success=not errors,
+                    error_message=error or None,
+                    raw_output=self._error_report(error, json.dumps(findings)) if errors else json.dumps(findings),
                     relative_target_path=REPORT_PATH,
                     description=self.description,
-                )
-            ]
-        except subprocess.TimeoutExpired:
-            process.kill()
-            stdout_data, stderr_data = process.communicate()
-            if stderr_data:
-                for line in stderr_data.splitlines():
-                    clean_line = line.replace("\r", "").strip()
-                    if clean_line:
-                        print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}{clean_line}")
-            error_message = f"Gitleaks timed out after {self._timeout_seconds()} seconds"
-            return [
-                ScanResult(
-                    scanner_name=self.name,
-                    scan_type=self.scan_type,
-                    success=False,
-                    error_message=error_message,
-                    raw_output=self._error_report(error_message, stdout_data),
-                    relative_target_path=REPORT_PATH,
                 )
             ]
         except Exception as exc:
@@ -197,11 +133,110 @@ class GitleaksScanner(ScannerPort):
             if resolved_target is not None:
                 resolved_target.cleanup()
 
+    def _scan_path(self, config: ScanConfig, path: Path) -> ScanResult:
+        try:
+            print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}Tool input: {path}")
+            executable = self._gitleaks_executable()
+            if not executable:
+                error_message = "Gitleaks executable was not found on this system."
+                return ScanResult(
+                    scanner_name=self.name,
+                    scan_type=self.scan_type,
+                    success=False,
+                    error_message=error_message,
+                    raw_output=self._error_report(error_message),
+                    relative_target_path=REPORT_PATH,
+                )
+
+            cmd = [
+                executable,
+                "dir",
+                "--no-banner",
+                "--no-color",
+                "--log-level",
+                "error",
+                "--exit-code",
+                "0",  # Findings belong in the report; nonzero exits indicate execution errors.
+                "--report-format",
+                "json",
+                "--report-path",
+                "-",
+            ]
+
+            config_path = self._resolve_config_path(config)
+            if config_path:
+                cmd.extend(["--config", str(config_path)])
+
+            cmd.append(str(path))
+
+            process = subprocess.Popen(
+                cmd,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            stdout_data, stderr_data = process.communicate(timeout=self._timeout_seconds())
+
+            if stderr_data:
+                for line in stderr_data.splitlines():
+                    clean_line = line.replace("\r", "").strip()
+                    if clean_line:
+                        print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}{clean_line}")
+
+            if process.returncode != 0:
+                error_message = f"Gitleaks error with return code {process.returncode}: {stderr_data.strip()}"
+                return ScanResult(
+                    scanner_name=self.name,
+                    scan_type=self.scan_type,
+                    success=False,
+                    error_message=error_message,
+                    raw_output=self._error_report(error_message, stdout_data),
+                    relative_target_path=REPORT_PATH,
+                )
+
+            return ScanResult(
+                scanner_name=self.name,
+                scan_type=self.scan_type,
+                success=True,
+                raw_output=self._json_report(stdout_data, []),
+                relative_target_path=REPORT_PATH,
+                description=self.description,
+            )
+        except subprocess.TimeoutExpired:
+            process.kill()
+            stdout_data, stderr_data = process.communicate()
+            if stderr_data:
+                for line in stderr_data.splitlines():
+                    clean_line = line.replace("\r", "").strip()
+                    if clean_line:
+                        print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}{clean_line}")
+            error_message = f"Gitleaks timed out after {self._timeout_seconds()} seconds"
+            return ScanResult(
+                scanner_name=self.name,
+                scan_type=self.scan_type,
+                success=False,
+                error_message=error_message,
+                raw_output=self._error_report(error_message, stdout_data),
+                relative_target_path=REPORT_PATH,
+            )
+        except Exception as exc:
+            return ScanResult(
+                scanner_name=self.name,
+                scan_type=self.scan_type,
+                success=False,
+                error_message=str(exc),
+                raw_output=self._error_report(str(exc)),
+                relative_target_path=REPORT_PATH,
+            )
+
     @staticmethod
     def _json_report(raw_output: str, default: object) -> str:
         if not raw_output.strip():
             return json.dumps(default, indent=2, sort_keys=True)
-        return json.dumps(json.loads(raw_output), indent=2, sort_keys=True)
+        report = json.loads(raw_output)
+        if not isinstance(report, list):
+            raise ValueError("Gitleaks did not return a findings array.")
+        return json.dumps(report, indent=2, sort_keys=True)
 
     def _error_report(self, error_message: str, raw_output: str = "") -> str:
         report: dict[str, object] = {

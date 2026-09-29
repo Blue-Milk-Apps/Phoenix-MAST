@@ -6,13 +6,15 @@ import subprocess
 
 from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
-from utilities.scan_target_utils import ResolvedScanTarget, resolve_scan_target
+from utilities.scan_target_utils import ResolvedScanTarget, resolve_scan_target, secret_scan_paths
 
 REPORT_PATH = "trufflehog_results.json"
 
 
 class TrufflehogScanner(ScannerPort):
     """Scanner for detecting leaked secrets using Trufflehog."""
+
+    DEFAULT_PROCESS_TIMEOUT_SECONDS = 300
 
     @property
     def scan_type(self) -> ScanType:
@@ -36,24 +38,32 @@ class TrufflehogScanner(ScannerPort):
         resolved_target: ResolvedScanTarget | None = None
         try:
             resolved_target = resolve_scan_target(config)
-            print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}Resolved scan target: {resolved_target.path}")
+            paths = secret_scan_paths(config, resolved_target)
+            for path in paths:
+                print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}Tool input: {path}")
             cmd = [
                 "trufflehog",
                 "filesystem",
-                str(resolved_target.path),
+                *(str(path) for path in paths),
                 "--log-level=-1",  # Any level above -1 is too verbose for our purposes
                 "--json",
                 "--no-update",
+                "--fail-on-scan-errors",
             ]
 
-            process = subprocess.Popen(
+            if config.target_type == "BINARY":
+                cmd.append("--no-verification")
+
+            process = subprocess.run(
                 cmd,
                 stdout=subprocess.PIPE,  # JSON output (newline-delimited)
                 stderr=subprocess.PIPE,  # Status messages
                 text=True,
+                check=False,
+                timeout=self.DEFAULT_PROCESS_TIMEOUT_SECONDS,
             )
 
-            stdout_data, stderr_data = process.communicate()
+            stdout_data, stderr_data = process.stdout, process.stderr
 
             for line in stderr_data.splitlines():
                 clean_line = line.replace("\r", "").strip()
@@ -61,8 +71,8 @@ class TrufflehogScanner(ScannerPort):
                     continue
                 print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}{clean_line}")
 
-            if process.returncode not in (0, 1):
-                error_message = f"Trufflehog error with code {process.returncode}"
+            if process.returncode != 0:
+                error_message = f"Trufflehog error with code {process.returncode}: {stderr_data.strip()}"
                 return [
                     ScanResult(
                         scanner_name=self.name,

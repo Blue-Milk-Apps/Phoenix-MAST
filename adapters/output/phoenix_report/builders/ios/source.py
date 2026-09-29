@@ -1,23 +1,21 @@
 from typing import Any, Mapping
 
-from adapters.output.phoenix_report.builders.ios.source_check_catalog import IOS_SOURCE_SECTION_CHECKS
 from adapters.output.phoenix_report.builders.source import SourceReportDataBuilder
 from domain.report.models import (
     EndpointDetails,
     HardcodedSecretDetails,
     HardcodedUrlDetails,
     HardcodedValuesDetails,
+    ManualReviewFinding,
     NativeIOSReportDetails,
     PermissionDetails,
     ReportPlatform,
     ReportTargetKind,
+    UrlSchemeDetails,
 )
 
 
 class NativeIOSReportDataBuilder(SourceReportDataBuilder):
-    check_sections = IOS_SOURCE_SECTION_CHECKS
-    _excluded_functionalities = frozenset({"fingerprint", "google cloud messaging", "infrared led"})
-
     @property
     def target_kind(self) -> ReportTargetKind:
         return ReportTargetKind.NATIVE_IOS_SOURCE
@@ -31,7 +29,11 @@ class NativeIOSReportDataBuilder(SourceReportDataBuilder):
             bundle_identifier=str(app.get("bundle_identifier") or app.get("package_name") or ""),
             version_name=str(app.get("version_name") or ""),
             minimum_os=str(app.get("minimum_os") or app.get("min_sdk") or ""),
-            url_schemes=tuple(str(item.get("url_name") if isinstance(item, Mapping) else item) for item in schemes),
+            url_schemes=tuple(
+                UrlSchemeDetails(str(item.get("url_name") or ""), tuple(item.get("schemes") or ()))
+                for item in schemes
+                if isinstance(item, Mapping) and item.get("schemes")
+            ),
             functionality=tuple(
                 self._single_platform_functionality(
                     name,
@@ -48,7 +50,6 @@ class NativeIOSReportDataBuilder(SourceReportDataBuilder):
                 )
                 for name, item in functionality.items()
                 if isinstance(item, Mapping)
-                and str(name).strip().casefold() not in NativeIOSReportDataBuilder._excluded_functionalities
             ),
             permissions=tuple(
                 NativeIOSReportDataBuilder._permission_details(item)
@@ -73,11 +74,36 @@ class NativeIOSReportDataBuilder(SourceReportDataBuilder):
                 for item in data.get("endpoints", ())
                 if isinstance(item, Mapping)
             ),
-            third_party_sdks=tuple(
-                str(name)
-                for name in data.get("third_party_sdks", {})
-                if isinstance(data.get("third_party_sdks"), Mapping)
-            ),
+            third_party_sdks=tuple(str(name) for name in data.get("third_party_sdks", []) if isinstance(name, str)),
+            manual_review_available=isinstance(data.get("manual_review"), Mapping),
+            manual_review_status=self._manual_review_status(data),
+            manual_review_findings=self._manual_review_findings(data),
+        )
+
+    @staticmethod
+    def _manual_review_status(data: Mapping[str, Any]) -> str:
+        review = data.get("manual_review") if isinstance(data.get("manual_review"), Mapping) else {}
+        if review.get("fully_assessed") is True:
+            return "Complete"
+        if review.get("assessed") is True:
+            return "Partial"
+        return "Not Assessed"
+
+    @staticmethod
+    def _manual_review_findings(data: Mapping[str, Any]) -> tuple[ManualReviewFinding, ...]:
+        review = data.get("manual_review") if isinstance(data.get("manual_review"), Mapping) else {}
+        findings = review.get("findings") if isinstance(review.get("findings"), list) else []
+        return tuple(
+            ManualReviewFinding(
+                rule_id=str(item.get("rule_id") or ""),
+                scope=str(item.get("scope") or ""),
+                severity=str(item.get("severity") or ""),
+                location=str(item.get("location") or ""),
+                reason=str(item.get("reason") or ""),
+                message=str(item.get("message") or ""),
+            )
+            for item in findings
+            if isinstance(item, Mapping)
         )
 
     @staticmethod

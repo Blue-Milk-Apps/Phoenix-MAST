@@ -1,3 +1,5 @@
+import json
+
 from adapters.output.phoenix_report.builders.ios import IOSBinaryReportDataBuilder
 from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
 from adapters.output.phoenix_report.pdf_report.ios import map_ios_binary_details
@@ -11,8 +13,9 @@ from domain.report import (
     IOSBinaryEvidenceDetails,
     IOSBinaryReportDetails,
     IOSSDKCategoryDetails,
-    IOSUrlSchemeDetails,
     PermissionDetails,
+    ReportData,
+    UrlSchemeDetails,
 )
 
 
@@ -21,7 +24,7 @@ def test_ios_binary_mapper_preserves_typed_inventory() -> None:
         file_info=FileDetails(filename="Example.ipa"),
         app_info=AppDetails(name="Example"),
         binary_evidence=IOSBinaryEvidenceDetails(nx=True),
-        url_schemes=(IOSUrlSchemeDetails("example", ("example",)),),
+        url_schemes=(UrlSchemeDetails("example", ("example",)),),
         functionality=(FunctionalityDetails("Camera", True, "detected"),),
         third_party_sdks=(IOSSDKCategoryDetails("Analytics", ("SDK",)),),
         permissions=(PermissionDetails("camera"),),
@@ -45,6 +48,10 @@ def test_ios_binary_report_data_renders_pdf(tmp_path) -> None:
             "code_evidence": {"uses_uiwebview": {"present": True, "evidence": "symbol"}},
         }
     )
+    saved = tmp_path / "post_scan_processing.json"
+    saved.write_text(json.dumps(report.to_dict()), encoding="utf-8")
+    restored = ReportData.from_dict(json.loads(saved.read_text(encoding="utf-8")))
+    assert restored == report
     output = tmp_path / "ios-report.pdf"
-    PdfReportGenerator().generate(report, output)
+    PdfReportGenerator().generate(restored, output)
     assert output.is_file() and output.stat().st_size > 0

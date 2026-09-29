@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import tempfile
 from pathlib import Path
@@ -55,7 +56,9 @@ class StoreToFile(ArtifactStorePort):
                     "platform": config.platform,
                     "target_type": config.target_type,
                     "stack": config.stack,
-                    "project_path": str(config.project_path),
+                    "project_path": config.display_project_path or str(config.project_path),
+                    "exclude_patterns": config.exclude_patterns,
+                    "file_info": self._input_file_info(config.project_path),
                     "output_path": str(config.output_path),
                 },
                 indent=2,
@@ -64,6 +67,21 @@ class StoreToFile(ArtifactStorePort):
             encoding="utf-8",
         )
         return target
+
+    @staticmethod
+    def _input_file_info(path: Path) -> dict[str, object]:
+        if not path.is_file():
+            return {}
+        hashes = {name: hashlib.new(name) for name in ("md5", "sha1", "sha256")}
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                for digest in hashes.values():
+                    digest.update(chunk)
+        return {
+            "filename": path.name,
+            "size": str(path.stat().st_size),
+            **{name: digest.hexdigest() for name, digest in hashes.items()},
+        }
 
     @staticmethod
     def _target_path(output_dir: Path, result: ScanResult) -> Path:

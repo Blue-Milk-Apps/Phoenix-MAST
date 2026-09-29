@@ -4,7 +4,7 @@ Phoenix scanner adapters call external tools from the local `PATH`. The current 
 
 | Scanner | Required local command | Extra local data |
 | --- | --- | --- |
-| MobSF Scanner | MobSF service | `MOBSF_URL` pointing to MobSF |
+| OpenGrep | `opengrep` | Phoenix-Rules YAML files |
 | LIEF | Python `lief` package | IPA files only |
 | ipsw | `ipsw` | IPA files only |
 | Androguard | Python `androguard` package | APK files only |
@@ -38,12 +38,11 @@ The Phoenix Docker image pins scanner tool versions with build arguments so CI i
 Override a pin only when intentionally refreshing the scanner image:
 
 ```bash
-docker compose build Phoenix --build-arg GITLEAKS_VERSION=8.30.1
+docker compose build phoenix --build-arg GITLEAKS_VERSION=8.30.1
 ```
 
 ## Readmes
 
-- [MobSF Scanner and MobSF](mobsf-scanner/README.md)
 - [LIEF](lief/README.md)
 - [ipsw](ipsw/README.md)
 - [Androguard](androguard/README.md)
@@ -55,10 +54,6 @@ docker compose build Phoenix --build-arg GITLEAKS_VERSION=8.30.1
 - [TruffleHog](trufflehog/README.md)
 - [Gitleaks](gitleaks/README.md)
 - [Strings](strings/README.md)
-
-## phoenix paths
-
-Phoenix uses `MOBSF_URL` to find the MobSF service for binary scans. If `MOBSF_URL` is not set, Phoenix skips MobSF and continues with the other configured scanners. When using `make services-up`, MobSF is available at `http://localhost:8000`.
 
 ## phoenix PDF report setup
 
@@ -79,15 +74,17 @@ libraries from `/opt/homebrew/lib` or `/usr/local/lib`.
 `phoenix scan` requires exactly one scan target flag. Any of these flags is valid:
 
 ```bash
-phoenix scan --ios-binary-path path/to/app.ipa
-phoenix scan --android-binary-path path/to/app.apk
-phoenix scan --flutter-source-path path/to/project
-phoenix scan --react-native-source-path path/to/project
-phoenix scan --native-android-source-path path/to/project
-phoenix scan --native-ios-source-path path/to/project
+phoenix scan --ios-binary path/to/app.ipa
+phoenix scan --android-binary path/to/app.apk
+phoenix scan --flutter-source path/to/project
+phoenix scan --react-native-source path/to/project
+phoenix scan --android-source path/to/project
+phoenix scan --ios-source path/to/project
 ```
 
-Source scans run Gitleaks as part of the Phoenix pipeline, while binary scans run LIEF, ipsw, and plist extraction for iOS binaries, Androguard, Apktool, Apksigner, and APKiD for Android binaries, and Strings against app binaries plus embedded frameworks/native libraries. MobSF runs for binary scans only when `MOBSF_URL` is configured. ipsw writes compact signing, entitlement, and Mach-O summary evidence under `scan-results/.../ipsw/`. Apktool writes compact Android evidence JSON under `scan-results/.../apktool/` and removes the decoded project after extraction. Apksigner writes APK signing evidence under `scan-results/.../apksigner/`. APKiD writes compact environmental intelligence under `scan-results/.../apkid/`.
+All targets run Gitleaks, TruffleHog and Syft. Source targets use OpenGrep and platform metadata extraction. APK targets add aapt2, Androguard, Apktool, Apksigner, APKiD and Strings; IPA targets add LIEF, ipsw, plist extraction and Strings. See the [complete tool inventory](../docs/ToolInventory.md) for ownership, outputs and retained dependencies.
+
+Apktool retains decoded XML, smali and resources under `apktool/decoded/` for the secret detectors and binary OpenGrep rules. Both aggregate report formats are optional: pass `--json`, `--pdf`, or both. Stdout summaries and tool artifacts are always produced.
 
 For local APK signing evidence, Phoenix resolves `apksigner` from `PATH`. For Docker scans, the Phoenix image installs `apksigner` inside the container during image build, so host Android SDK paths are not needed. APKiD follows the same runtime availability model: local scans need `apkid` on `PATH`, while Docker scans use the APKiD command installed in the Phoenix image.
 
@@ -102,7 +99,7 @@ strings --help
 apktool --version
 aapt2 version
 apksigner version
-apkid --version
+apkid --help
 ipsw version
 syft version
 ```
@@ -112,25 +109,11 @@ Run Phoenix locally with:
 See the [scan target flags](#scan-target-flags) list for valid `<scan-target-flag>` values.
 
 ```bash
-uv run Phoenix scan <scan-target-flag> path/to/target
-```
-
-Run Phoenix locally against an IPA or APK while using the MobSF sidecar:
-
-```bash
-make services-up
-MOBSF_URL=http://localhost:8000 uv run phoenix scan --ios-binary-path "path/to/app.ipa"
-```
-
-Run a Compose scan with MobSF by pointing Phoenix at the Compose sidecar:
-
-```bash
-MOBSF_URL=http://mobsf-scanner:8000 make compose-run PROJECT_PATH="path/to/app.ipa" SCAN_FLAG=--ios-binary-path
+uv run phoenix scan <scan-target-flag> path/to/target
 ```
 
 ## Online references
 
-- MobSF Docker setup: https://mobsf.github.io/Mobile-Security-Framework-MobSF/
 - Syft installation: https://oss.anchore.com/docs/installation/syft
 - TruffleHog installation and usage: https://github.com/trufflesecurity/trufflehog
 - ipsw installation: https://blacktop.github.io/ipsw/docs/getting-started/installation/

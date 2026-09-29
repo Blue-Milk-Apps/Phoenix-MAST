@@ -10,18 +10,9 @@ from adapters.scanners.android.androguard_scanner import AndroguardScanner
 from domain.models import ScanConfig
 
 EXPECTED_ARTIFACTS = [
-    "metadata.json",
-    "manifest.json",
-    "permissions.json",
-    "components.json",
     "strings.json",
     "api_calls.json",
-    "xrefs.json",
-    "native_libs.json",
-    "assets.json",
     "certificates.json",
-    "files.json",
-    "findings.json",
     "report_summary.json",
     "scan_index.json",
     "errors.json",
@@ -257,12 +248,6 @@ def test_androguard_scan_emits_expected_json_outputs(monkeypatch, tmp_path: Path
     assert set(outputs) == set(EXPECTED_ARTIFACTS)
     assert outputs["errors.json"] == {"errors": []}
 
-    component = outputs["components.json"]["receivers"][0]
-    assert component["name"] == "com.example.SyncReceiver"
-    assert component["exported"] is None
-    assert component["has_intent_filters"] is True
-    assert component["intent_filters"] == {"action": ["com.example.SYNC"]}
-
     certificate = outputs["certificates.json"]["all"][0]
     assert certificate["subject"] == {"common_name": "Phoenix Test"}
     assert certificate["issuer"] == {"common_name": "Phoenix CA"}
@@ -270,29 +255,14 @@ def test_androguard_scan_emits_expected_json_outputs(monkeypatch, tmp_path: Path
     assert certificate["sha256"] == hashlib.sha256(b"certificate-bytes").hexdigest()
 
     string_items = outputs["strings.json"]["items"]
-    assert [item["value"] for item in string_items] == ["https://api.example.com/auth?token=abc"]
-    assert {"url", "domain", "token", "auth"} <= set(string_items[0]["categories"])
-
+    assert [item["value"] for item in string_items] == ["https://api.example.com/auth?token=abc", "ordinary text"]
+    assert "categories" not in string_items[0]
+    assert string_items[0]["xrefs"]
     api_items = outputs["api_calls.json"]["items"]
-    assert len(api_items) == 1
-    assert api_items[0]["categories"] == ["runtime_exec"]
     assert api_items[0]["caller"]["method_name"] == "runCommand"
-
-    relationships = {item["relationship"] for item in outputs["xrefs.json"]["items"]}
-    assert "STRING_TO_METHOD" in relationships
-    assert "METHOD_TO_SENSITIVE_API" in relationships
-
-    finding_ids = {item["id"] for item in outputs["findings.json"]["items"]}
-    assert "android-sensitive-permissions" in finding_ids
-    assert "android-component-attack-surface" in finding_ids
-    assert "android-api-runtime_exec" in finding_ids
-    assert "android-string-token" in finding_ids
-
-    summary = outputs["report_summary.json"]
-    assert summary["package"] == "com.example.app"
-    assert summary["finding_count"] == len(outputs["findings.json"]["items"])
-    assert summary["api_category_counts"]["runtime_exec"] == 1
-    assert summary["string_category_counts"]["token"] == 1
+    assert "categories" not in api_items[0]
+    assert "findings.json" not in outputs
+    assert outputs["report_summary.json"]["api_call_count"] == len(api_items)
 
     scan_index_names = {item["name"] for item in outputs["scan_index.json"]["artifacts"]}
     assert "report_summary.json" in scan_index_names
@@ -308,13 +278,13 @@ def test_androguard_scan_records_extractor_failure_and_continues(monkeypatch, tm
         lambda _: (FakeApk(), [], FakeAnalysis()),
     )
 
-    def fail_metadata(_androguard_context):
-        raise ValueError("metadata broke")
+    def fail_strings(_androguard_context):
+        raise ValueError("strings broke")
 
-    monkeypatch.setattr(scanner, "_extract_metadata", fail_metadata)
+    monkeypatch.setattr(scanner, "_extract_strings", fail_strings)
 
     outputs = results_by_path(scanner.scan(scan_config(apk_path)))
 
-    assert outputs["metadata.json"] == {"items": [], "partial_failure": True}
-    assert outputs["errors.json"] == {"errors": [{"artifact": "metadata.json", "error": "metadata broke"}]}
-    assert outputs["components.json"]["activities"][0]["name"] == ("com.example.LoginActivity")
+    assert outputs["strings.json"] == {"items": [], "partial_failure": True}
+    assert outputs["errors.json"] == {"errors": [{"artifact": "strings.json", "error": "strings broke"}]}
+    assert outputs["api_calls.json"]["items"]

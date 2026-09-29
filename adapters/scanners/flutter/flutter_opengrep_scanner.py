@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from adapters.scanners.common import OpenGrepScanner
-from adapters.scanners.ios import IOSSectionOpenGrepScanner
+from adapters.scanners.common.opengrep_scanner import CategoryOpenGrepScanner
 from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
 
@@ -35,7 +35,7 @@ class FlutterOpenGrepScanner(ScannerPort):
 
     @property
     def name(self) -> str:
-        return "Flutter Scoped OpenGrep Scanner"
+        return "Flutter OpenGrep Scanner"
 
     @property
     def description(self) -> str:
@@ -63,6 +63,9 @@ class FlutterOpenGrepScanner(ScannerPort):
                 "scan_paths": self._platform_scan_paths(project_path, "ios"),
             },
         }
+        plist_path = config.output_path / ScanType.PLIST_SOURCE.value / "xml" / "ios"
+        if scope_specs["ios"]["scan_paths"] and plist_path.is_dir():
+            scope_specs["ios"]["scan_paths"].append(plist_path)
 
         scopes: dict[str, dict[str, Any]] = {}
         findings: list[dict[str, Any]] = []
@@ -85,10 +88,16 @@ class FlutterOpenGrepScanner(ScannerPort):
                 configured_rule_ids.update(scope_metadata["configured_rule_ids"])
             if tool_version:
                 tool_versions.add(tool_version)
+            if (scope_metadata["required"] or scope_metadata["applicable"]) and scope_metadata["status"] != "success":
+                break
 
         status = self._aggregate_status(scopes)
-        success = status != "failed"
-        error_message = "No required Flutter OpenGrep scope completed successfully." if not success else ""
+        success = status == "complete"
+        error_message = "; ".join(
+            f"{scope}: {metadata.get('reason', 'OpenGrep scope did not complete.')}"
+            for scope, metadata in scopes.items()
+            if (metadata["required"] or metadata["applicable"]) and metadata["status"] != "success"
+        )
         payload = {
             "results": findings,
             "errors": errors,
@@ -135,6 +144,7 @@ class FlutterOpenGrepScanner(ScannerPort):
             "scan_paths": [str(path) for path in scan_paths],
             "configured_rule_ids": [],
         }
+        base_metadata.update({"rule_catalog": [], "rule_execution": {}, "mode": "source"})
         if not scan_paths:
             base_metadata["reason"] = (
                 "No production Dart source paths were found."
@@ -146,11 +156,7 @@ class FlutterOpenGrepScanner(ScannerPort):
             base_metadata["reason"] = f"No {scope} OpenGrep rules directory was found."
             return base_metadata, [], [], ""
 
-        scanner = (
-            IOSSectionOpenGrepScanner(rules_directory=rules_path, scan_paths=scan_paths)
-            if scope == "ios"
-            else OpenGrepScanner(rules_path=rules_path, scan_paths=scan_paths)
-        )
+        scanner = CategoryOpenGrepScanner(rules_directory=rules_path, scan_paths=scan_paths, platform=scope)
         result = scanner.scan(config)[0]
         try:
             payload = json.loads(result.raw_output)
@@ -161,6 +167,14 @@ class FlutterOpenGrepScanner(ScannerPort):
         report_metadata = report_metadata if isinstance(report_metadata, dict) else {}
         tool_version = str(report_metadata.get("tool_version", "")).strip()
 
+        for key in ("rule_catalog", "rule_execution", "ruleset_fingerprint", "sections", "mode"):
+            if key in report_metadata:
+                base_metadata[key] = report_metadata[key]
+
+        findings = [
+            {**finding, "phoenix_scope": scope} for finding in report.get("results", []) if isinstance(finding, dict)
+        ]
+
         if not result.success:
             error = result.error_message or str(report.get("error", "")).strip() or "OpenGrep scope failed."
             base_metadata.update({"status": "failed", "reason": error})
@@ -170,7 +184,7 @@ class FlutterOpenGrepScanner(ScannerPort):
                     error_details[key] = report[key]
             if "raw_output" in report:
                 error_details["stdout"] = report["raw_output"]
-            return base_metadata, [], [error_details], tool_version
+            return base_metadata, findings, [error_details], tool_version
 
         rule_ids = report_metadata.get("configured_rule_ids")
         configured = sorted(
@@ -182,9 +196,6 @@ class FlutterOpenGrepScanner(ScannerPort):
         if scope_status == "complete":
             scope_status = "success"
         base_metadata.update({"status": scope_status, "configured_rule_ids": configured})
-        findings = [
-            {**finding, "phoenix_scope": scope} for finding in report.get("results", []) if isinstance(finding, dict)
-        ]
         errors = [{**error, "scope": scope} for error in report.get("errors", []) if isinstance(error, dict)]
         return base_metadata, findings, errors, tool_version
 
@@ -203,12 +214,7 @@ class FlutterOpenGrepScanner(ScannerPort):
     def _resolve_platform_rules_path(self, scope: str, explicit_path: Path | None) -> Path | None:
         if explicit_path is not None:
             return explicit_path.resolve()
-        candidates = [
-            self._flutter_rules_path.parent / scope,
-            Path(__file__).resolve().parents[3] / "rules" / scope,
-            Path("/app/rules") / scope,
-        ]
-        return next((path.resolve() for path in candidates if path.is_dir()), None)
+        return (self._flutter_rules_path.parent.parent / scope / "source").resolve()
 
     @classmethod
     def _flutter_scan_paths(cls, project_path: Path) -> list[Path]:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import plistlib
 from pathlib import Path
@@ -33,6 +34,7 @@ class PlistReportBuilder:
         base_path: Path,
         output_format: str,
         plist_transform: Callable[[object], object] | None = None,
+        app_icon_name: str = "AppIcon",
     ) -> None:
         self.scanner_name = scanner_name
         self.scan_type = scan_type
@@ -40,6 +42,7 @@ class PlistReportBuilder:
         self.base_path = base_path
         self.output_format = output_format
         self.plist_transform = plist_transform
+        self.app_icon_name = app_icon_name
 
     def build(self, plist_files: list[Path]) -> list[ScanResult]:
         if self.output_format == "xml":
@@ -98,6 +101,21 @@ class PlistReportBuilder:
                         description=self.description,
                     )
                 )
+                if self.scan_type == ScanType.PLIST_SOURCE:
+                    with plist_file.open("rb") as handle:
+                        binary_plist = handle.read(8) == b"bplist00"
+                    if binary_plist:
+                        results.append(
+                            ScanResult(
+                                scanner_name=self.scanner_name,
+                                scan_type=self.scan_type,
+                                raw_output=plistlib.dumps(data, fmt=plistlib.FMT_XML).decode("utf-8"),
+                                relative_target_path=(
+                                    Path("xml") / relative_target.parent / plist_file.name
+                                ).as_posix(),
+                                description="XML copy of a binary source plist for generic OpenGrep rules.",
+                            )
+                        )
             except Exception as exc:
                 parse_failures += 1
                 index_entries.append(
@@ -218,7 +236,7 @@ class PlistReportBuilder:
         role = self._artifact_role(plist_type, plist_file, data)
         if role == "app":
             payload = {
-                "app_meta": self._app_meta(data),
+                "app_meta": {**self._app_meta(data), "icon_data_uri": self._app_icon_data_uri(plist_file, data)},
                 "ats": self._transport_security_details(data),
                 "background_modes": self._background_modes(data),
                 "entitlements": self._entitlement_details(data),
@@ -280,7 +298,7 @@ class PlistReportBuilder:
         if plist_type in {"credentials_or_preferences_plist", "entitlements_plist", "privacy_manifest"}:
             return True
         if plist_type == "ios_info_plist":
-            return self._bundle_role(plist_file, data) in {"app", "framework"}
+            return self._bundle_role(plist_file, data) in {"app", "framework", "resource_bundle"}
         if self._has_sensitive_key(data):
             return True
         return False
@@ -304,6 +322,8 @@ class PlistReportBuilder:
 
         package_type = str(data.get("CFBundlePackageType", "")).upper()
         source_path = self._source_path(plist_file).lower()
+        if plist_file.parent.suffix.lower() == ".bundle":
+            return "resource_bundle"
         if package_type == "APPL" or data.get("LSRequiresIPhoneOS") is True:
             return "app"
         if package_type == "FMWK" or ".framework/" in source_path or source_path.endswith(".framework/info.plist"):
@@ -331,6 +351,98 @@ class PlistReportBuilder:
                 "supported_platforms": data.get("CFBundleSupportedPlatforms", []),
                 "version": data.get("CFBundleShortVersionString", ""),
             }
+        )
+
+    def _app_icon_data_uri(self, plist_file: Path, data: object) -> str:
+        """Keep the app icon with scan evidence, independent of source mounts or IPA cleanup."""
+        if not isinstance(data, dict):
+            return ""
+
+        candidates: list[Path] = []
+        icon_name = self.app_icon_name
+        for key in ("CFBundleIcons", "CFBundleIcons~ipad"):
+            icons = data.get(key)
+            primary = icons.get("CFBundlePrimaryIcon") if isinstance(icons, dict) else None
+            if not isinstance(primary, dict):
+                continue
+            icon_name = str(primary.get("CFBundleIconName") or icon_name)
+            names = primary.get("CFBundleIconFiles")
+            if isinstance(names, list):
+                candidates.extend(self._bundle_icon_files(plist_file.parent, names))
+        legacy_names = data.get("CFBundleIconFiles", [])
+        if isinstance(legacy_names, list):
+            candidates.extend(self._bundle_icon_files(plist_file.parent, legacy_names))
+        if data.get("CFBundleIconFile"):
+            candidates.extend(self._bundle_icon_files(plist_file.parent, [data["CFBundleIconFile"]]))
+
+        if self.scan_type == ScanType.PLIST_SOURCE:
+            ignored = {".git", ".build", "build", "deriveddata", "pods", "carthage", "node_modules", "vendor"}
+            for root in dict.fromkeys((plist_file.parent, self.base_path)):
+                images: list[tuple[bool, float, Path]] = []
+                for catalog in sorted(root.rglob("*.appiconset")):
+                    if catalog.stem != icon_name or any(
+                        part.lower() in ignored or part.lower().endswith((".framework", ".appex"))
+                        for part in catalog.relative_to(root).parts
+                    ):
+                        continue
+                    try:
+                        contents = json.loads((catalog / "Contents.json").read_text(encoding="utf-8"))
+                        entries = contents.get("images", []) if isinstance(contents, dict) else []
+                    except (OSError, ValueError):
+                        continue
+                    if not isinstance(entries, list):
+                        continue
+                    for entry in entries:
+                        if not isinstance(entry, dict) or not isinstance(entry.get("filename"), str):
+                            continue
+                        if entry.get("platform") not in (None, "ios"):
+                            continue
+                        if entry.get("idiom") not in (None, "universal", "iphone", "ipad", "ios-marketing"):
+                            continue
+                        try:
+                            size = float(str(entry.get("size", "0x0")).split("x")[0])
+                            scale = float(str(entry.get("scale", "1x")).removesuffix("x"))
+                        except ValueError:
+                            size, scale = 0, 1
+                        images.append((bool(entry.get("appearances")), -size * scale, catalog / entry["filename"]))
+                candidates.extend(path for _, _, path in sorted(images))
+                if images:
+                    break
+
+        for path in candidates:
+            try:
+                if not path.resolve().is_relative_to(self.base_path.resolve()):
+                    continue
+                if path.suffix.lower() not in {".png", ".jpg", ".jpeg"} or path.stat().st_size > 5_000_000:
+                    continue
+                image = path.read_bytes()
+                if image.startswith(b"\x89PNG\r\n\x1a\n"):
+                    mime = "png"
+                elif image.startswith(b"\xff\xd8\xff"):
+                    mime = "jpeg"
+                else:
+                    continue
+                return f"data:image/{mime};base64,{base64.b64encode(image).decode('ascii')}"
+            except OSError:
+                continue
+        return ""
+
+    @staticmethod
+    def _bundle_icon_files(bundle: Path, names: list[object]) -> list[Path]:
+        """Resolve declared PNG icons, including @2x/@3x and iPad variants."""
+        stems = {Path(name).stem for name in names if isinstance(name, str) and Path(name).name == name}
+        return (
+            sorted(
+                (
+                    path
+                    for path in bundle.iterdir()
+                    if path.suffix.lower() == ".png"
+                    and any(path.stem == stem or path.stem.startswith((stem + "@", stem + "~")) for stem in stems)
+                ),
+                key=lambda path: ("@3x" not in path.stem, "@2x" not in path.stem, path.name),
+            )
+            if stems
+            else []
         )
 
     def _framework_meta(self, data: object) -> dict[str, object]:

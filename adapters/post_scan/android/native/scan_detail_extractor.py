@@ -9,17 +9,13 @@ from domain.post_scan.android.native import (
     NativeAndroidAppComponents,
     NativeAndroidAppInfo,
     NativeAndroidApplication,
-    NativeAndroidCodeEvidence,
-    NativeAndroidDataStorageEvidence,
     NativeAndroidDeepLinks,
     NativeAndroidEndpoints,
     NativeAndroidFileInfo,
     NativeAndroidFunctionality,
     NativeAndroidHardcodedValues,
     NativeAndroidMeta,
-    NativeAndroidNetworkEvidence,
     NativeAndroidPermissions,
-    NativeAndroidResilienceEvidence,
     NativeAndroidScanExtractionContext,
 )
 from ports.post_scan.scan_detail_extractor_port import ScanDetailExtractorPort
@@ -40,9 +36,7 @@ class NativeAndroidScanDetailExtractor(ScanDetailExtractorPort):
             "deep_links": asdict(NativeAndroidDeepLinks(context)),
         }
         functionality = NativeAndroidFunctionality(context)
-        # Keep every functionality row in the persisted post-scan shape.  An
-        # unavailable source scan is represented by ``present=None`` so later
-        # report generation can show an explicit not-evaluated result.
+        # The persisted rule catalog defines the available functionality rows.
         sections["functionality"] = functionality.items
 
         hardcoded_values = NativeAndroidHardcodedValues(context)
@@ -54,16 +48,4 @@ class NativeAndroidScanDetailExtractor(ScanDetailExtractorPort):
             }
             sections["endpoints"] = NativeAndroidEndpoints(hardcoded_values).items
 
-        evidence_models = (
-            ("code_evidence", NativeAndroidCodeEvidence(context)),
-            ("network_evidence", NativeAndroidNetworkEvidence(context)),
-            ("data_storage_evidence", NativeAndroidDataStorageEvidence(context)),
-            ("resilience_evidence", NativeAndroidResilienceEvidence(context)),
-        )
-        for section_name, model in evidence_models:
-            if not model.assessed:
-                continue
-            evidence = asdict(model)
-            evidence.pop("assessed", None)
-            sections[section_name] = evidence
         return sections

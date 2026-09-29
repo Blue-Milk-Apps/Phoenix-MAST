@@ -6,7 +6,7 @@ APKiD output is not treated as a vulnerability report. It is evidence about the 
 
 ## Availability Model
 
-Phoenix resolves APKiD from the process `PATH` with the `apkid` command. The scanner checks availability before execution and skips with an explicit unavailable-tool result when `apkid` cannot be found.
+Phoenix resolves APKiD from the process `PATH` with the `apkid` command. Phoenix checks availability before execution and fails the scan when the required `apkid` command cannot be found.
 
 The Phoenix Docker image installs APKiD into the Phoenix virtual environment and verifies it during image build. Because `/opt/phoenix-venv/bin` is on the container `PATH`, Docker-based Phoenix scans can resolve `apkid` without a host APKiD install. The Docker build pins APKiD through the `APKID_VERSION` build argument so upgrades are explicit.
 
@@ -14,7 +14,7 @@ Local scans depend on the uv-managed project environment. APKiD is declared in `
 
 ```bash
 uv sync
-uv run apkid --version
+uv run apkid --help
 ```
 
 After that, `uv run phoenix ...` resolves `apkid` from the same project environment used by Phoenix.
@@ -23,10 +23,10 @@ When intentionally changing the APKiD version, update the project metadata and l
 
 ```bash
 uv add "apkid==<version>"
-uv run apkid --version
+uv run apkid --help
 ```
 
-If APKiD is not available locally, Android binary scans continue and the APKiD stage is recorded as skipped. This is intentional: APKiD enriches analysis context, but the rest of the evidence pipeline can still run.
+Unavailable or incomplete APKiD execution fails the Phoenix scan. Available evidence is retained for investigation.
 
 ## Docker Verification
 
@@ -34,7 +34,7 @@ Build the Phoenix image and verify that APKiD resolves inside the container:
 
 ```bash
 docker compose build phoenix
-docker compose run --rm --entrypoint apkid phoenix --version
+docker compose run --rm --entrypoint apkid phoenix --help
 ```
 
 ## Operational Purpose
@@ -106,11 +106,11 @@ Phoenix separates APKiD evidence into five lifecycle stages.
 
 1. Raw output
 
-   Raw APKiD stdout and stderr are preserved as separate raw artifacts when present. They are audit references, not the primary evidence model.
+   Raw APKiD stdout and stderr are preserved as separate raw artifacts when present. APKiD emits one JSON document per target that produces results; Phoenix combines their file records and reads the tool version from that output. Malformed or truncated output remains a failure, with earlier evidence preserved. Raw artifacts are audit references, not the primary evidence model.
 
 2. Normalized detections
 
-   APKiD matches are converted into stable detection records with a family, rule name, source artifact relationship, signal tier, priority, confidence, confidence modifier, analysis impacts, recommended followup, and uncertainty notes.
+   APKiD matches are converted into stable detection records with a family, signature name, source artifact relationship, signal tier, priority, confidence, confidence modifier, analysis impacts, recommended followup, and uncertainty notes.
 
 3. Operational interpretations
 
@@ -183,7 +183,7 @@ Representative structure:
   "extraction_metadata": {
     "execution_status": "SUCCESS",
     "apkid_version": "APKiD ...",
-    "rule_signature_metadata": {
+    "signature_metadata": {
       "version": null,
       "rules_sha256": null,
       "source": "not_reported_by_tool"
@@ -257,7 +257,7 @@ When APKiD times out:
 - normalized detections are emitted only if valid output can be parsed
 - downstream systems should treat the APKiD stage as incomplete, not negative
 
-This behavior supports partial-failure recovery in CI/CD and asynchronous analysis pipelines.
+Partial evidence remains available for investigation; an incomplete tool execution fails the Phoenix scan.
 
 ## Determinism And Scalability
 

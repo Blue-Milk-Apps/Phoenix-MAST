@@ -12,12 +12,32 @@ from domain.post_scan.flutter import (
     FlutterScanExtractionContext,
     FlutterURLSchemes,
 )
+from tests.rule_fixtures import assessment_payload, rule, scoped_payload
+
+
+def _permission_payload(*permissions):
+    definition = rule("example.permission", finding_type="observation")
+    definition["metadata"]["scope"] = "app_declaration"
+    definition["metadata"]["functionality"] = "Camera"
+    return scoped_payload(
+        android=assessment_payload(
+            definition,
+            category="functionality",
+            results=[
+                {"check_id": definition["id"], "extra": {"metavars": {"$PERMISSION": {"abstract_content": permission}}}}
+                for permission in permissions
+            ],
+        )
+    )
 
 
 def test_builds_android_and_ios_report_projections() -> None:
     context = FlutterScanExtractionContext(
         {
             "scan_metadata": {"project_path": "/workspace/example_app"},
+            "opengrep": _permission_payload(
+                "android.permission.CAMERA", "android.permission.CAMERA", "com.example.permission.CUSTOM"
+            ),
             "source_metadata": {
                 "identity": {"package_name": "example_app"},
                 "android": {
@@ -82,7 +102,7 @@ def test_builds_android_and_ios_report_projections() -> None:
     assert permissions.assessed_platforms == ["android", "ios"]
     assert [item["platform"] for item in permissions.items] == ["Android", "Android", "iOS"]
     assert permissions.items[0]["permission"] == "android.permission.CAMERA"
-    assert permissions.items[0]["general_description"] == "Allows the app to access the device camera."
+    assert permissions.items[0]["general_description"] == "The app declares the android.permission.CAMERA permission."
     assert permissions.items[1]["permission"] == "com.example.permission.CUSTOM"
     assert permissions.items[2] == {
         "platform": "iOS",
@@ -102,6 +122,7 @@ def test_builds_android_and_ios_report_projections() -> None:
 def test_empty_platform_collections_are_assessed_as_empty() -> None:
     context = FlutterScanExtractionContext(
         {
+            "opengrep": _permission_payload(),
             "source_metadata": {
                 "android": {
                     "available": True,
@@ -120,7 +141,7 @@ def test_empty_platform_collections_are_assessed_as_empty() -> None:
                     "available": True,
                     "metadata": {"permissions": [], "url_schemes": {}},
                 },
-            }
+            },
         }
     )
 

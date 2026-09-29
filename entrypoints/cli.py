@@ -3,22 +3,24 @@
 from __future__ import annotations
 
 import argparse
+import json
+import os
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Sequence
 
+from adapters.output.console_output import ConsoleScanOutput
 from application.mobile_analysis_workflow_service import MobileAnalysisWorkflowService
 from domain.models import ScanConfig
 
-DEFAULT_SYFT_OUTPUT_FORMAT = "syft-json"
 DEFAULT_OPENGREP_RULES_DIRS = {
-    "ios_binary": "ios",
-    "android_binary": "android",
-    "flutter_source": "flutter",
-    "react_native_source": "react_native",
-    "native_android_source": "android",
-    "native_ios_source": "ios",
+    "ios_binary": "ios/binary",
+    "android_binary": "android/binary",
+    "flutter_source": "flutter/source",
+    "react_native_source": "react_native/source",
+    "native_android_source": "android/source",
+    "native_ios_source": "ios/source",
 }
 
 
@@ -50,40 +52,42 @@ def _build_parser() -> argparse.ArgumentParser:
     scan_parser = subparsers.add_parser("scan", help="Run a Phoenix scan")
     scan_paths = scan_parser.add_mutually_exclusive_group(required=True)
     scan_paths.add_argument(
-        "--ios-binary-path",
+        "--ios-binary",
         type=Path,
         metavar="PATH",
-        help="Path to compiled iOS .ipa or .app",
+        help="Path to compiled iOS .ipa",
     )
     scan_paths.add_argument(
-        "--android-binary-path",
+        "--android-binary",
         type=Path,
         metavar="PATH",
-        help="Path to compiled Android .apk or .aab",
+        help="Path to compiled Android .apk",
     )
     scan_paths.add_argument(
-        "--flutter-source-path",
+        "--flutter-source",
         type=Path,
         metavar="PATH",
         help="Path to Flutter project root directory",
     )
     scan_paths.add_argument(
-        "--react-native-source-path",
+        "--react-native-source",
         type=Path,
         metavar="PATH",
         help="Path to React Native project root directory",
     )
     scan_paths.add_argument(
-        "--native-android-source-path",
+        "--android-source",
+        dest="native_android_source",
         type=Path,
         metavar="PATH",
-        help="Path to Native Android project root directory",
+        help="Path to Android project root directory",
     )
     scan_paths.add_argument(
-        "--native-ios-source-path",
+        "--ios-source",
+        dest="native_ios_source",
         type=Path,
         metavar="PATH",
-        help="Path to Native iOS project root directory",
+        help="Path to iOS project root directory",
     )
     scan_parser.add_argument(
         "--output",
@@ -92,26 +96,60 @@ def _build_parser() -> argparse.ArgumentParser:
         default=Path("./scan-results"),
         help="Output directory for scan results",
     )
+    scan_parser.add_argument("--json", action="store_true", help="Write the aggregate JSON report (default: disabled)")
+    scan_parser.add_argument("--pdf", action="store_true", help="Write a PDF report (default: disabled)")
     scan_parser.add_argument(
-        "--syft-output-format",
-        default=DEFAULT_SYFT_OUTPUT_FORMAT,
-        help=(f"Syft SBOM output format to capture from stdout (default: {DEFAULT_SYFT_OUTPUT_FORMAT})"),
+        "--severity",
+        type=str.upper,
+        choices=("INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"),
+        help="Minimum severity for stdout findings and counts; reports and tool artifacts remain complete",
     )
-    scan_parser.add_argument("--ios-binary-opengrep-rules-path", type=Path, metavar="PATH")
-    scan_parser.add_argument("--android-binary-opengrep-rules-path", type=Path, metavar="PATH")
-    scan_parser.add_argument("--flutter-source-opengrep-rules-path", type=Path, metavar="PATH")
-    scan_parser.add_argument("--react-native-source-opengrep-rules-path", type=Path, metavar="PATH")
-    scan_parser.add_argument("--native-android-source-opengrep-rules-path", type=Path, metavar="PATH")
-    scan_parser.add_argument("--native-ios-source-opengrep-rules-path", type=Path, metavar="PATH")
+    scan_parser.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        metavar="PATHS",
+        help="Comma-separated paths or quoted globs to exclude; may be repeated",
+    )
+    scan_parser.add_argument(
+        "--opengrep-rules",
+        type=Path,
+        metavar="PATH",
+        default=os.environ.get("PHOENIX_RULES_ROOT") or None,
+        help="Root containing <platform>/<source|binary>/ rule directories (Docker default: /app/rules).",
+    )
     scan_parser.set_defaults(func=_scan_command)
+
+    report_parser = subparsers.add_parser("report", help="Render a saved Phoenix JSON aggregate without running tools")
+    report_parser.add_argument("input", type=Path, help="Saved post_scan_processing.json")
+    report_parser.add_argument("--pdf", action="store_true", required=True, help="Render PDF output")
+    report_parser.add_argument("--output", "-o", type=Path, help="PDF path (default: beside the input JSON)")
+    report_parser.set_defaults(func=_report_command)
 
     return parser
 
 
 def _scan_command(args: argparse.Namespace) -> int:
-    scan_config: ScanConfig = _create_scan_config(args)
+    try:
+        scan_config: ScanConfig = _create_scan_config(args)
+        MobileAnalysisWorkflowService().run(scan_config)
+    except Exception as exc:
+        ConsoleScanOutput(stderr=True).message("Phoenix scan failed", exc, style="bold red")
+        return 1
+    return 0
 
-    MobileAnalysisWorkflowService().run(scan_config)
+
+def _report_command(args: argparse.Namespace) -> int:
+    try:
+        from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
+        from domain.report import ReportData
+
+        report = ReportData.from_dict(json.loads(args.input.read_text(encoding="utf-8")))
+        output = args.output or args.input.with_suffix(".pdf")
+        PdfReportGenerator().generate(report, output)
+    except Exception as exc:
+        ConsoleScanOutput(stderr=True).message("Phoenix report failed", exc, style="bold red")
+        return 1
     return 0
 
 
@@ -124,74 +162,52 @@ def _package_version() -> str:
 
 def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
     match args:
-        case argparse.Namespace(android_binary_path=Path() as project_path):
+        case argparse.Namespace(android_binary=Path() as project_path):
             scan_mode = "binary"
             scan_label = "Android binary"
             scan_slug = "android_binary"
             platform = "ANDROID"
             stack = "ANY"
-            rules_path = _resolve_opengrep_rules_path(
-                args.android_binary_opengrep_rules_path,
-                "android_binary",
-            )
 
-        case argparse.Namespace(ios_binary_path=Path() as project_path):
+        case argparse.Namespace(ios_binary=Path() as project_path):
             scan_mode = "binary"
             scan_label = "iOS binary"
             scan_slug = "ios_binary"
             platform = "IOS"
             stack = "ANY"
-            rules_path = _resolve_opengrep_rules_path(
-                args.ios_binary_opengrep_rules_path,
-                "ios_binary",
-            )
 
-        case argparse.Namespace(flutter_source_path=Path() as project_path):
+        case argparse.Namespace(flutter_source=Path() as project_path):
             scan_mode = "source"
             scan_label = "Flutter source"
             scan_slug = "flutter_source"
             platform = "ANY"
             stack = "FLUTTER"
-            rules_path = _resolve_opengrep_rules_path(
-                args.flutter_source_opengrep_rules_path,
-                "flutter_source",
-            )
 
-        case argparse.Namespace(react_native_source_path=Path() as project_path):
+        case argparse.Namespace(react_native_source=Path() as project_path):
             scan_mode = "source"
             scan_label = "React Native source"
             scan_slug = "react_native_source"
             platform = "ANY"
             stack = "REACT_NATIVE"
-            rules_path = _resolve_opengrep_rules_path(
-                args.react_native_source_opengrep_rules_path,
-                "react_native_source",
-            )
 
-        case argparse.Namespace(native_android_source_path=Path() as project_path):
+        case argparse.Namespace(native_android_source=Path() as project_path):
             scan_mode = "source"
             scan_label = "Native Android source"
             scan_slug = "native_android_source"
             platform = "ANDROID"
             stack = "NATIVE_ANDROID"
-            rules_path = _resolve_opengrep_rules_path(
-                args.native_android_source_opengrep_rules_path,
-                "native_android_source",
-            )
 
-        case argparse.Namespace(native_ios_source_path=Path() as project_path):
+        case argparse.Namespace(native_ios_source=Path() as project_path):
             scan_mode = "source"
             scan_label = "Native iOS source"
             scan_slug = "native_ios_source"
             platform = "IOS"
             stack = "NATIVE_IOS"
-            rules_path = _resolve_opengrep_rules_path(
-                args.native_ios_source_opengrep_rules_path,
-                "native_ios_source",
-            )
 
         case _:
             raise ValueError("No valid scan type provided")
+    rules_path = _resolve_opengrep_rules_path(args.opengrep_rules, scan_slug)
+    rules_root = rules_path.parent.parent if rules_path is not None else None
     project_path = project_path.resolve()
     run_timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
     output_path = args.output.resolve() / f"SAST_{scan_slug}_{run_timestamp}"
@@ -203,7 +219,11 @@ def _create_scan_config(args: argparse.Namespace) -> ScanConfig:
         platform=platform,
         stack=stack,
         opengrep_rules_path=rules_path,
-        syft_output_format=args.syft_output_format,
+        opengrep_rules_root=rules_root.resolve() if rules_root else None,
+        json_report=args.json,
+        pdf_report=args.pdf,
+        stdout_severity=args.severity.lower() if args.severity else None,
+        exclude_patterns=[item.strip() for group in args.exclude for item in group.split(",") if item.strip()],
     )
     return scan_config
 
@@ -212,12 +232,11 @@ def _resolve_opengrep_rules_path(
     override_path: Path | None,
     scan_slug: str,
 ) -> Path | None:
-    if override_path is not None:
-        return override_path.resolve()
-
     default_dir = DEFAULT_OPENGREP_RULES_DIRS.get(scan_slug)
     if not default_dir:
         return None
+    if override_path is not None:
+        return override_path.resolve() / default_dir
 
     candidates = [
         (Path(__file__).parent.parent / "rules" / default_dir).resolve(),
@@ -226,7 +245,7 @@ def _resolve_opengrep_rules_path(
     for candidate in candidates:
         if candidate.exists():
             return candidate
-    return None
+    return candidates[0]
 
 
 if __name__ == "__main__":

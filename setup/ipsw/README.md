@@ -1,6 +1,6 @@
 # ipsw Scanner Setup
 
-Phoenix uses `ipsw` during IPA binary scans to collect focused Apple-specific Mach-O, code-signature, and entitlement evidence from app and framework binaries. The scanner writes compact analyst-facing summaries into Phoenix scan artifacts and does not generate findings by itself.
+Phoenix uses `ipsw` during IPA binary scans to collect focused Apple-specific Mach-O, code-signature, and entitlement evidence and Swift type metadata from the primary app executable. The scanner writes compact analyst-facing summaries into Phoenix scan artifacts and does not generate findings by itself.
 
 ## Local Install
 
@@ -48,7 +48,7 @@ docker compose run --rm --entrypoint ipsw phoenix version
 ipsw runs automatically during iOS binary scans:
 
 ```bash
-uv run phoenix scan --ios-binary-path path/to/app.ipa
+uv run phoenix scan --ios-binary path/to/app.ipa
 ```
 
 The scanner skips non-IPA inputs, including APK files and source directories. It emits one JSON artifact per scanned Mach-O binary under:
@@ -57,11 +57,10 @@ The scanner skips non-IPA inputs, including APK files and source directories. It
 scan-results/.../ipsw/
 ```
 
-For a typical IPA, outputs include the main app binary and embedded framework binaries:
+The primary app executable is the only binary analyzed:
 
 ```text
 scan-results/.../ipsw/AppName.json
-scan-results/.../ipsw/Frameworks/Example.framework/Example.json
 ```
 
 ## Output
@@ -78,7 +77,7 @@ Each JSON artifact contains:
 - compact entitlement summary extracted from `ipsw macho info <binary> --ent`
 - command execution metadata, with raw output omitted for successful commands
 
-Raw command output is intentionally omitted on successful runs because it can be very large and often duplicates information that LIEF, plist extraction, MobSF, or Strings already capture more directly.
+Raw command output is intentionally omitted on successful runs because it can be very large and often duplicates information that LIEF, plist extraction or Strings already capture more directly.
 
 ## Final Analysis Role
 
@@ -100,8 +99,8 @@ Recommended fields to parse for final analysis:
 Avoid treating ipsw as the primary source for:
 
 - library and framework inventory: prefer LIEF's `binary.slices[].libraries`, using ipsw only for weak-link and rpath context
-- URLs, IP addresses, emails, or generic identifiers: prefer Strings and MobSF
-- hardcoded secrets: prefer Strings, MobSF, and source secret scanners
+- URLs, IP addresses, emails, or generic identifiers: use OpenGrep over extracted evidence
+- hardcoded secrets: use Gitleaks and TruffleHog
 - tracker classification: use dependency/framework names from LIEF or SBOM sources plus a tracker knowledge base
 - Android `.so` analysis: ipsw is iOS/Mach-O only
 

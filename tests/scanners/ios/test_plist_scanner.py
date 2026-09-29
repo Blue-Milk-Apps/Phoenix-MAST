@@ -42,8 +42,11 @@ def test_plist_scan_writes_app_plist_and_index(tmp_path: Path) -> None:
 
     results = PlistSourceScanner().scan(config)
 
-    assert len(results) == 2
+    assert len(results) == 3
     plist_result = next(result for result in results if result.relative_target_path == "ios/Info.json")
+    xml_result = next(result for result in results if result.relative_target_path == "xml/ios/Info.plist")
+    assert xml_result.success
+    assert plistlib.loads(xml_result.raw_output.encode()) == plistlib.loads(source_plist.read_bytes())
     index_result = next(result for result in results if result.relative_target_path == "scan_index.json")
     assert plist_result.success
     plist_report = json.loads(plist_result.raw_output)
@@ -72,6 +75,7 @@ def test_plist_scan_writes_app_plist_and_index(tmp_path: Path) -> None:
     assert output_file.exists()
     index_file = config.output_path / "plist_source" / "scan_index.json"
     assert index_file.exists()
+    assert (config.output_path / "plist_source" / "xml" / "ios" / "Info.plist").read_text() == xml_result.raw_output
 
 
 def test_plist_scan_groups_app_and_framework_bundles(tmp_path: Path) -> None:
@@ -133,7 +137,15 @@ def test_plist_scan_groups_app_and_framework_bundles(tmp_path: Path) -> None:
 
     results = PlistSourceScanner().scan(config)
 
-    outputs = {result.relative_target_path: json.loads(result.raw_output) for result in results}
+    outputs = {
+        result.relative_target_path: json.loads(result.raw_output)
+        for result in results
+        if result.relative_target_path.endswith(".json")
+    }
+    assert {result.relative_target_path for result in results if not result.relative_target_path.endswith(".json")} == {
+        "xml/App/Info.plist",
+        "xml/Frameworks/Foo.framework/Info.plist",
+    }
     assert set(outputs) == {
         "App/Info.json",
         "Frameworks/Foo.framework/Info.json",
@@ -209,7 +221,16 @@ def test_plist_scan_skips_xcode_project_plists(tmp_path: Path) -> None:
 
     results = PlistSourceScanner().scan(config)
 
-    outputs = {result.relative_target_path: json.loads(result.raw_output) for result in results}
+    outputs = {
+        result.relative_target_path: json.loads(result.raw_output)
+        for result in results
+        if result.relative_target_path.endswith(".json")
+    }
+    assert {result.relative_target_path for result in results} == {
+        "App/Info.json",
+        "xml/App/Info.plist",
+        "scan_index.json",
+    }
     assert set(outputs) == {"App/Info.json", "scan_index.json"}
     assert outputs["scan_index.json"]["plist_count"] == 2
     assert outputs["scan_index.json"]["skipped_plist_count"] == 1
@@ -241,7 +262,7 @@ def test_plist_scan_can_write_xml(tmp_path: Path) -> None:
     assert output_file.exists()
 
 
-def test_plist_scan_reports_sensitive_keys_without_copying_plist(
+def test_plist_scan_reports_sensitive_keys_and_preserves_binary_values_in_xml(
     tmp_path: Path,
 ) -> None:
     project_path = tmp_path / "project"
@@ -258,8 +279,10 @@ def test_plist_scan_reports_sensitive_keys_without_copying_plist(
 
     results = PlistSourceScanner().scan(config)
 
-    assert len(results) == 2
+    assert len(results) == 3
     plist_result = next(result for result in results if result.relative_target_path == "Info.json")
+    xml_result = next(result for result in results if result.relative_target_path == "xml/Info.plist")
+    assert plistlib.loads(xml_result.raw_output.encode())["APIToken"] == b"\x01\x02"
     report = json.loads(plist_result.raw_output)
     assert report["important_items"]["ats"] == {}
     assert report["plist"]["APIToken"] == "0102"
@@ -293,7 +316,7 @@ def test_plist_scan_works_with_temporary_project_fixture(tmp_path: Path) -> None
                 "CFBundlePackageType": "APPL",
             },
             handle,
-            fmt=plistlib.FMT_BINARY,
+            fmt=plistlib.FMT_XML,
         )
 
     config = ScanConfig(

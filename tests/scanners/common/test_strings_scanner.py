@@ -31,7 +31,9 @@ def test_strings_scan_returns_raw_output(monkeypatch, tmp_path: Path) -> None:
 
     monkeypatch.setattr(strings_scanner.shutil, "which", lambda _: "/usr/bin/strings")
 
-    def fake_run(cmd, capture_output, text, check):
+    def fake_run(cmd, capture_output, text, check, timeout):
+        assert timeout == 300
+
         class FakeResult:
             returncode = 0
             stdout = "HELLO_WORLD\nSECRET_TOKEN\n"
@@ -80,7 +82,9 @@ def test_strings_scan_for_apk_returns_raw_output_for_multiple_targets(monkeypatc
         "lib/arm64-v8a/libfoo.so": "LIB_STRING\n",
     }
 
-    def fake_run(cmd, capture_output, text, check):
+    def fake_run(cmd, capture_output, text, check, timeout):
+        assert timeout == 300
+
         class FakeResult:
             returncode = 0
             stderr = ""
@@ -138,10 +142,11 @@ def test_strings_scan_for_ipa_paths_are_relative_to_app_bundle(monkeypatch, tmp_
 
     outputs = {
         "TestApp": "APP_STRING\n",
-        "Frameworks/Foo.framework/Foo": "FRAMEWORK_STRING\n",
     }
 
-    def fake_run(cmd, capture_output, text, check):
+    def fake_run(cmd, capture_output, text, check, timeout):
+        assert timeout == 300
+
         class FakeResult:
             returncode = 0
             stderr = ""
@@ -161,5 +166,4 @@ def test_strings_scan_for_ipa_paths_are_relative_to_app_bundle(monkeypatch, tmp_
 
     assert {result.relative_target_path: result.raw_output for result in results} == {
         "TestApp.txt": "APP_STRING",
-        "Frameworks/Foo.framework/Foo.txt": "FRAMEWORK_STRING",
     }

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from adapters.scanners.common import OpenGrepScanner
-from adapters.scanners.ios import IOSSectionOpenGrepScanner
+from adapters.scanners.common.opengrep_scanner import CategoryOpenGrepScanner
 from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
 
@@ -105,7 +105,7 @@ class ReactNativeOpenGrepScanner(ScannerPort):
 
     @property
     def name(self) -> str:
-        return "React Native Scoped OpenGrep Scanner"
+        return "React Native OpenGrep Scanner"
 
     @property
     def description(self) -> str:
@@ -139,6 +139,9 @@ class ReactNativeOpenGrepScanner(ScannerPort):
                 "exclude_patterns": (),
             },
         }
+        plist_path = config.output_path / ScanType.PLIST_SOURCE.value / "xml" / "ios"
+        if scope_specs["ios"]["applicable"] and plist_path.is_dir():
+            scope_specs["ios"]["scan_paths"].append(plist_path)
 
         scopes: dict[str, dict[str, Any]] = {}
         findings: list[dict[str, Any]] = []
@@ -163,10 +166,16 @@ class ReactNativeOpenGrepScanner(ScannerPort):
                 configured_rule_ids.update(metadata["configured_rule_ids"])
             if tool_version:
                 tool_versions.add(tool_version)
+            if (metadata["required"] or metadata["applicable"]) and metadata["status"] != "success":
+                break
 
         status = self._aggregate_status(scopes)
-        success = status != "failed"
-        error_message = "No required React Native OpenGrep scope completed successfully." if not success else ""
+        success = status == "complete"
+        error_message = "; ".join(
+            f"{scope}: {metadata.get('reason', 'OpenGrep scope did not complete.')}"
+            for scope, metadata in scopes.items()
+            if (metadata["required"] or metadata["applicable"]) and metadata["status"] != "success"
+        )
         payload = {
             "results": findings,
             "errors": errors,
@@ -220,6 +229,7 @@ class ReactNativeOpenGrepScanner(ScannerPort):
             "scan_paths": [str(path) for path in scan_paths],
             "configured_rule_ids": [],
         }
+        metadata.update({"rule_catalog": [], "rule_execution": {}, "mode": "source"})
         if not applicable or not scan_paths:
             metadata["reason"] = (
                 "No eligible mobile JavaScript or TypeScript source files were found."
@@ -235,11 +245,7 @@ class ReactNativeOpenGrepScanner(ScannerPort):
             config,
             ignore_patterns=list(dict.fromkeys([*config.ignore_patterns, *exclusions])),
         )
-        scanner = (
-            IOSSectionOpenGrepScanner(rules_directory=rules_path, scan_paths=scan_paths)
-            if scope == "ios"
-            else OpenGrepScanner(rules_path=rules_path, scan_paths=scan_paths)
-        )
+        scanner = CategoryOpenGrepScanner(rules_directory=rules_path, scan_paths=scan_paths, platform=scope)
         result = scanner.scan(scope_config)[0]
         try:
             payload = json.loads(result.raw_output)
@@ -250,10 +256,18 @@ class ReactNativeOpenGrepScanner(ScannerPort):
         report_metadata = report_metadata if isinstance(report_metadata, dict) else {}
         tool_version = str(report_metadata.get("tool_version", "")).strip()
 
+        for key in ("rule_catalog", "rule_execution", "ruleset_fingerprint", "sections", "mode"):
+            if key in report_metadata:
+                metadata[key] = report_metadata[key]
+
+        findings = [
+            {**finding, "phoenix_scope": scope} for finding in report.get("results", []) if isinstance(finding, dict)
+        ]
+
         if not result.success:
             error = result.error_message or str(report.get("error", "")).strip() or "OpenGrep scope failed."
             metadata.update({"status": "failed", "reason": error})
-            return metadata, [], [{"scope": scope, "error": error}], tool_version
+            return metadata, findings, [{"scope": scope, "error": error}], tool_version
 
         rule_ids = report_metadata.get("configured_rule_ids")
         configured = sorted(
@@ -265,9 +279,6 @@ class ReactNativeOpenGrepScanner(ScannerPort):
         if scope_status == "complete":
             scope_status = "success"
         metadata.update({"status": scope_status, "configured_rule_ids": configured})
-        findings = [
-            {**finding, "phoenix_scope": scope} for finding in report.get("results", []) if isinstance(finding, dict)
-        ]
         errors = [{**error, "scope": scope} for error in report.get("errors", []) if isinstance(error, dict)]
         return metadata, findings, errors, tool_version
 
@@ -286,12 +297,7 @@ class ReactNativeOpenGrepScanner(ScannerPort):
     def _resolve_platform_rules_path(self, scope: str, explicit_path: Path | None) -> Path | None:
         if explicit_path is not None:
             return explicit_path.resolve()
-        candidates = [
-            self._react_native_rules_path.parent / scope,
-            Path(__file__).resolve().parents[3] / "rules" / scope,
-            Path("/app/rules") / scope,
-        ]
-        return next((path.resolve() for path in candidates if path.is_dir()), None)
+        return (self._react_native_rules_path.parent.parent / scope / "source").resolve()
 
     @classmethod
     def _mobile_source_files(cls, project_path: Path) -> list[Path]:

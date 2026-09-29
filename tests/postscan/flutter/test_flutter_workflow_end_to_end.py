@@ -5,8 +5,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from adapters.output.phoenix_report.pdf_report import PdfReportGenerator
 from application import mobile_analysis_workflow_service as workflow
 from domain.models import ScanConfig, ScanResult, ScanType
+from domain.report import ReportData
+from tests.rule_fixtures import assessment_payload, rule, scoped_payload
 
 
 class _ArtifactScanner:
@@ -40,6 +43,8 @@ def test_flutter_workflow_persists_post_scan_output_and_requests_report(
         scan_label="Flutter source",
         platform="ANY",
         stack="FLUTTER",
+        json_report=True,
+        pdf_report=True,
     )
     scanner_results = [
         ScanResult(
@@ -86,38 +91,38 @@ def test_flutter_workflow_persists_post_scan_output_and_requests_report(
         scanner_name="Flutter Scoped OpenGrep Scanner",
         scan_type=ScanType.OPENGREP_SOURCE,
         raw_output=json.dumps(
-            {
-                "results": [
-                    {
-                        "check_id": "flutter.source.sql-injection",
-                        "phoenix_scope": "flutter",
-                        "path": str(project_path / "lib" / "database.dart"),
-                        "start": {"line": 12},
-                    }
-                ],
-                "scan_metadata": {
-                    "scopes": {
-                        "flutter": {
-                            "status": "success",
-                            "configured_rule_ids": ["flutter.source.sql-injection"],
+            scoped_payload(
+                flutter=assessment_payload(
+                    rule("example.database", title="Database query review"),
+                    category="code",
+                    results=[
+                        {
+                            "check_id": "example.database",
+                            "path": str(project_path / "lib" / "database.dart"),
+                            "start": {"line": 12},
                         }
-                    }
-                },
-            }
+                    ],
+                )
+            )
         ),
         relative_target_path="opengrep_results.json",
     )
-    generated_reports: list[tuple[dict, Path]] = []
+    generated_reports: list[tuple[ReportData, Path]] = []
 
     monkeypatch.setattr(
         workflow.MobileScannerFactory,
         "build_scanner_list",
         lambda self, scan_config: [_ArtifactScanner(scanner_results)],
     )
+
+    def scan_opengrep(self, scan_config, scan_output_method):
+        scan_output_method.write_result(opengrep_result)
+        return [opengrep_result]
+
     monkeypatch.setattr(
         workflow.MobileAnalysisWorkflowService,
         "_perform_opengrep_scan",
-        lambda self, scan_config, scan_output_method: [opengrep_result],
+        scan_opengrep,
     )
 
     def fake_pdf_generation(data, report_path: Path) -> Path:
@@ -125,24 +130,27 @@ def test_flutter_workflow_persists_post_scan_output_and_requests_report(
         report_path.write_bytes(b"%PDF-fake")
         return report_path
 
-    monkeypatch.setattr(
-        workflow.PdfReportGenerator, "generate", lambda self, data, path: fake_pdf_generation(data, path)
-    )
+    monkeypatch.setattr(PdfReportGenerator, "generate", lambda self, data, path: fake_pdf_generation(data, path))
 
     workflow.MobileAnalysisWorkflowService().run(config)
 
     post_scan_path = output_path / workflow.MobileAnalysisWorkflowService.POST_SCAN_OUTPUT_FILE_NAME
     post_scan = json.loads(post_scan_path.read_text(encoding="utf-8"))
-    assert post_scan["meta"]["platform"] == "Flutter"
-    assert post_scan["meta"]["target_type"] == "SOURCE"
-    assert post_scan["dependency_inventory"]["declared"][0]["name"] == "http"
-    assert post_scan["code_evidence"]["contains_potential_sql_injection"] == {
-        "present": True,
-        "evidence": "lib/database.dart:12",
-        "details": ["lib/database.dart:12"],
-    }
+    assert post_scan["schema_version"] == 1
+    assert post_scan["metadata"]["target"]["platform"] == "flutter"
+    assert post_scan["metadata"]["target"]["target_type"] == "source"
+    assert post_scan["platform_details"]["presentation"]["dependencies"]["declared"][0]["name"] == "http"
+    assessment = post_scan["vulnerability_sections"][0]["checks"][0]
+    assert assessment["rule_id"] == "example.database"
+    assert assessment["result"] == "present"
+    assert "database.dart:12" in assessment["evidence"]
+    assert post_scan["findings_severity"]["high"] == 1
+    assert post_scan["risk_summary"][0]["risk_level"] == "high"
     assert len(generated_reports) == 1
     report_data, report_path = generated_reports[0]
+    assert ReportData.from_dict(post_scan) == report_data
+    assert post_scan == json.loads(json.dumps(report_data.to_dict()))
     assert report_data.metadata.target.target_kind.value == "flutter_source"
+    assert report_data.vulnerability_sections[0].checks[0].name == "Database query review"
     assert report_path.name == "example_app_phoenix_Report.pdf"
     assert report_path.read_bytes() == b"%PDF-fake"

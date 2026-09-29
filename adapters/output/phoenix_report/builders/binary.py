@@ -1,15 +1,12 @@
 """Shared implementation boundary for binary report builders."""
 
 from abc import ABC
-from dataclasses import replace
 
 from domain.report import (
     AssessmentStatus,
     FunctionalityDetails,
     PlatformAssessment,
     ReportPlatform,
-    SecurityCheck,
-    VulnerabilitySection,
 )
 from ports.report_data_builder_port import ReportDataBuilderPort
 
@@ -47,35 +44,4 @@ class BinaryReportDataBuilder(ReportDataBuilderPort, ABC):
             return f"Evidence indicates that {name.lower()} functionality is present."
         if status == AssessmentStatus.NOT_PRESENT:
             return f"No evidence indicates that {name.lower()} functionality is present."
-        return f"{name} functionality was not evaluated because scan evidence is unavailable."
-
-    @staticmethod
-    def _attach_single_platform_assessments(
-        sections: tuple[VulnerabilitySection, ...],
-        platform: ReportPlatform,
-    ) -> tuple[VulnerabilitySection, ...]:
-        return tuple(
-            replace(
-                section,
-                checks=tuple(
-                    BinaryReportDataBuilder._single_platform_check(check, platform) for check in section.checks
-                ),
-            )
-            for section in sections
-        )
-
-    @staticmethod
-    def _single_platform_check(check: SecurityCheck, platform: ReportPlatform) -> SecurityCheck:
-        status = check.result
-        return replace(
-            check,
-            platform_assessments=(
-                PlatformAssessment(
-                    platform=platform,
-                    status=status,
-                    explanation=check.explanation,
-                    evidence=(check.evidence,) if check.evidence else (),
-                ),
-            ),
-            status=status,
-        )
+        return "Not evaluated because functionality evidence was not produced by the binary scan."
