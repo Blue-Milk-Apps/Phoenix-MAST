@@ -101,6 +101,7 @@ COPY --chown=phoenix:phoenix ports ./ports
 
 RUN /opt/phoenix-venv/bin/pip install --no-cache-dir . \
     && apt-get purge -y curl \
+    && apt-get autoremove --purge -y \
     && /opt/phoenix-venv/bin/python -m pip uninstall --yes pip \
     && /usr/local/bin/python -m pip uninstall --yes pip \
     && rm -rf /var/lib/apt/lists/*
