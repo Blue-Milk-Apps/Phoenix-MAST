@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile:1.7
-FROM golang:1.26.6-trixie@sha256:b75d466dd608587fd66cca705a307ba65b889827d06ad61d6a75f0482b51b7c7 AS syft-builder
-RUN go install github.com/anchore/syft/cmd/syft@v1.52.0
+FROM golang:1.26.6-trixie@sha256:b75d466dd608587fd66cca705a307ba65b889827d06ad61d6a75f0482b51b7c7 AS go-tools-builder
+ARG GITLEAKS_VERSION=8.30.1
+RUN go install github.com/anchore/syft/cmd/syft@v1.52.0 \
+    && go install -ldflags "-X=github.com/zricethezav/gitleaks/v8/version.Version=v${GITLEAKS_VERSION}" \
+        "github.com/zricethezav/gitleaks/v8@v${GITLEAKS_VERSION}"
 
 FROM python:3.12-slim-trixie AS phoenix
 
@@ -31,28 +34,25 @@ RUN apt-get update \
 
 # 3. Static Tooling Installations
 ARG TRUFFLEHOG_VERSION=v3.97.9
-ARG GITLEAKS_VERSION=8.30.1
 ARG APKTOOL_VERSION=2.10.0
 ARG IPSW_VERSION=3.1.728
 RUN curl -sSfL "https://raw.githubusercontent.com/trufflesecurity/trufflehog/${TRUFFLEHOG_VERSION}/scripts/install.sh" | sh -s -- -b /usr/local/bin "${TRUFFLEHOG_VERSION}" \
-    && curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
-    | tar -xz -C /usr/local/bin gitleaks \
     && curl -sSfL "https://github.com/blacktop/ipsw/releases/download/v${IPSW_VERSION}/ipsw_${IPSW_VERSION}_linux_x86_64.tar.gz" \
     | tar -xz -C /usr/local/bin ipsw \
     && curl -sSfL -o /usr/local/bin/apktool \
     "https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool" \
     && curl -sSfL -o /usr/local/bin/apktool.jar \
     "https://github.com/iBotPeaches/Apktool/releases/download/v${APKTOOL_VERSION}/apktool_${APKTOOL_VERSION}.jar" \
-    && chmod +x /usr/local/bin/gitleaks /usr/local/bin/ipsw /usr/local/bin/apktool /usr/local/bin/apktool.jar \
+    && chmod +x /usr/local/bin/ipsw /usr/local/bin/apktool /usr/local/bin/apktool.jar \
     && apktool --version \
     && aapt2 version \
     && apksigner version \
-    && gitleaks version \
     && ipsw version \
     && trufflehog --version
 
-COPY --from=syft-builder /go/bin/syft /usr/local/bin/syft
-RUN syft version
+COPY --from=go-tools-builder /go/bin/gitleaks /usr/local/bin/gitleaks
+COPY --from=go-tools-builder /go/bin/syft /usr/local/bin/syft
+RUN gitleaks version && syft version
 
 # 4. Python Environment Setup
 ARG APKID_VERSION=3.1.0
