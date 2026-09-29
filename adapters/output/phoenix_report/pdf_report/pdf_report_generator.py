@@ -20,6 +20,8 @@ from adapters.output.phoenix_report.pdf_report.presentation import PdfPresentati
 from adapters.output.phoenix_report.pdf_report.react_native import map_react_native_details
 from domain.report import (
     AndroidBinaryReportDetails,
+    AssessmentStatus,
+    FindingSeverity,
     FlutterReportDetails,
     IOSBinaryReportDetails,
     NativeAndroidReportDetails,
@@ -174,7 +176,28 @@ class PdfReportGenerator(ReportGeneratorPort):
                 for summary in report_data.risk_summary
             },
             "findings_severity": asdict(report_data.findings_severity),
+            "finding_summary": PdfReportGenerator._finding_summary(report_data),
         }
+
+    @staticmethod
+    def _finding_summary(report_data: ReportData) -> list[dict[str, object]]:
+        """Summarize the same matched checks counted by the severity bars on every target."""
+
+        summary = []
+        for section in report_data.vulnerability_sections:
+            matches = [check for check in section.checks if check.result == AssessmentStatus.PRESENT]
+            if not matches:
+                continue
+            counts = asdict(FindingSeverity.from_sections((section,)))
+            summary.append(
+                {
+                    "area": section.name,
+                    "severity": next((level for level, count in counts.items() if count), "not_applicable"),
+                    "findings": [{"title": check.name, "finding_type": check.finding_type} for check in matches],
+                    "incomplete": any(check.execution_status not in {"", "success"} for check in matches),
+                }
+            )
+        return summary
 
     @staticmethod
     def _platform_label(platform: ReportPlatform) -> str:

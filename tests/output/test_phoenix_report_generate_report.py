@@ -74,4 +74,4 @@ def test_pdf_presentation_maps_android_details_and_charts() -> None:
     assert presentation["app_components"]["activities"] == 2
     assert presentation["functionality"]["Camera"]["present"] is True
     assert presentation["permissions"][0]["general_description"] == "Camera access."
-    assert build_charts(presentation)["overall_risk_polar"]
+    assert build_charts(presentation)["finding_severity_polar"]

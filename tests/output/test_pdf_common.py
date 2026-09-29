@@ -10,22 +10,25 @@ from adapters.output.phoenix_report.pdf_report.common import (
 )
 
 
-def test_build_charts_handles_empty_risk_summary() -> None:
-    assert build_charts({"risk_summary": {}})["overall_risk_polar"]
+def test_build_charts_handles_no_matched_findings() -> None:
+    assert build_charts({"finding_summary": []})["finding_severity_polar"]
 
 
-@pytest.mark.parametrize("categories", [2, 12])
-def test_risk_chart_uses_four_rings_with_critical_at_the_edge(monkeypatch, categories) -> None:
+@pytest.mark.parametrize("categories", [1, 5, 12])
+def test_finding_chart_includes_info_with_critical_at_the_edge(monkeypatch, categories) -> None:
     import matplotlib.pyplot as plt
     import numpy as np
 
     monkeypatch.setattr(plt, "close", lambda *args: None)
-    levels = {"Code": "critical", "iOS / Crypto": "low"}
-    levels.update({"networking" if index == 0 else f"Category {index}": "high" for index in range(categories - 2)})
-    build_charts({"risk_summary": levels})
+    labels = ["Code", "iOS / Crypto", "Networking", "Storage", "Frameworks"]
+    severities = ["critical", "high", "medium", "low", "info"]
+    levels = {labels[index] if index < 5 else f"Category {index}": severities[index % 5] for index in range(categories)}
+    build_charts({"finding_summary": [{"area": key, "severity": value} for key, value in levels.items()]})
     axis = plt.gcf().axes[0]
-    assert axis.get_ylim() == (0, 4)
-    assert list(axis.get_yticks()) == [1, 2, 3, 4]
+    assert axis.get_ylim() == (0, 5)
+    assert list(axis.get_yticks()) == [1, 2, 3, 4, 5]
+    assert [label.get_text() for label in axis.get_yticklabels()] == ["Info", "Low", "Medium", "High", "Critical"]
+    assert [patch.get_height() for patch in axis.patches] == [5 - index % 5 for index in range(categories)]
     assert axis.patches[0].get_height() == axis.get_ylim()[1]
     assert len(axis.patches) == categories
     assert axis.get_xlim() == (0, 2 * np.pi)

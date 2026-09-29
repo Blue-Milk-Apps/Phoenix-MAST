@@ -2,7 +2,7 @@
 
 from collections.abc import Iterable
 
-from adapters.output.phoenix_report.pdf_report.common.charts import build_charts, make_overall_risk_polar_chart
+from adapters.output.phoenix_report.pdf_report.common.charts import build_charts, make_finding_severity_polar_chart
 from adapters.output.phoenix_report.pdf_report.common.images import (
     get_app_icon_data_uri,
     get_report_brand_icon_data_uri,
@@ -57,5 +57,5 @@ __all__ = [
     "map_functionality",
     "get_app_icon_data_uri",
     "get_report_brand_icon_data_uri",
-    "make_overall_risk_polar_chart",
+    "make_finding_severity_polar_chart",
 ]

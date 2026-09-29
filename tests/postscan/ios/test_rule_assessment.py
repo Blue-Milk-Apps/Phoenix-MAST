@@ -2,15 +2,20 @@ import json
 
 import pytest
 
-from adapters.output.phoenix_report.builders.android import NativeAndroidReportDataBuilder
-from adapters.output.phoenix_report.builders.ios import NativeIOSReportDataBuilder
+from adapters.output.phoenix_report.builders.android import (
+    AndroidBinaryReportDataBuilder,
+    NativeAndroidReportDataBuilder,
+)
+from adapters.output.phoenix_report.builders.flutter import FlutterReportDataBuilder
+from adapters.output.phoenix_report.builders.ios import IOSBinaryReportDataBuilder, NativeIOSReportDataBuilder
+from adapters.output.phoenix_report.builders.react_native import ReactNativeReportDataBuilder
 from adapters.output.phoenix_report.pdf_report.pdf_report_generator import PdfReportGenerator
 from adapters.post_scan.ios.native.scan_detail_extractor import NativeIOSScanDetailExtractor
 from adapters.post_scan.ios.native.scan_output_loader import NativeIOSScanOutputLoader
 from application.post_scan_processing_service import PostScanProcessingService
 from application.report_generation_service import ReportGenerationService
 from domain.post_scan.rule_assessment import rule_assessments
-from domain.report.models import AssessmentStatus
+from domain.report.models import AssessmentStatus, ReportData
 from tests.rule_fixtures import assessment_payload, rule
 
 
@@ -49,14 +54,49 @@ def test_new_id_and_custom_category_need_no_python_registration():
 
 
 @pytest.mark.parametrize("finding_type", ["review", "control", "observation"])
-def test_nonweakness_matches_count_by_severity_without_increasing_risk(finding_type):
-    report = build(
-        assessment_payload(rule(finding_type=finding_type, severity="LOW"), results=[{"check_id": "example.check"}])
+@pytest.mark.parametrize("severity", ["LOW", "INFO"])
+@pytest.mark.parametrize(
+    "target_kind,platform,stack,builder",
+    [
+        ("ios_binary", "ios", None, IOSBinaryReportDataBuilder),
+        ("android_binary", "android", None, AndroidBinaryReportDataBuilder),
+        ("native_ios_source", "ios", "native_ios", NativeIOSReportDataBuilder),
+        ("native_android_source", "android", "native_android", NativeAndroidReportDataBuilder),
+        ("flutter_source", "flutter", "flutter", FlutterReportDataBuilder),
+        ("react_native_source", "react_native", "react_native", ReactNativeReportDataBuilder),
+    ],
+)
+def test_nonweakness_matches_count_by_severity_without_increasing_risk(
+    finding_type, severity, target_kind, platform, stack, builder
+):
+    output = assessment_payload(
+        rule(finding_type=finding_type, severity=severity), results=[{"check_id": "example.check"}], platform=platform
+    )
+    output["scan_metadata"]["mode"] = mode = "source" if stack else "binary"
+    report = ReportGenerationService([builder()]).build_report_data(
+        {
+            "target_information": {
+                "target_kind": target_kind,
+                "platform": platform,
+                "target_type": mode,
+                "stack": stack,
+            },
+            "rule_assessments": rule_assessments(output),
+        }
     )
     assert report.vulnerability_sections[-1].checks[0].finding_type == finding_type
     assert report.findings_severity.high == 0
-    assert report.findings_severity.low == 1
+    assert getattr(report.findings_severity, severity.lower()) == 1
     assert report.overall_evaluation[-1].risk_level.value == "not_evaluated"
+    restored = ReportData.from_dict(json.loads(json.dumps(report.to_dict())))
+    assert PdfReportGenerator._presentation_data(restored)["finding_summary"] == [
+        {
+            "area": "Custom",
+            "severity": severity.lower(),
+            "findings": [{"title": "Example check", "finding_type": finding_type}],
+            "incomplete": False,
+        }
+    ]
 
 
 def test_snapshot_is_sufficient_for_later_report_generation():
@@ -77,6 +117,7 @@ def test_failed_rules_and_partial_matches_remain_distinct():
     assert "incomplete scan" in checks[0].explanation
     assert len(checks) == 1
     assert build(output).rule_status == "failed"
+    assert PdfReportGenerator._presentation_data(build(output))["finding_summary"][0]["incomplete"] is True
 
 
 def test_scoped_catalog_preserves_ios_platform_and_outcomes():
@@ -115,7 +156,7 @@ def test_pdf_projection_keeps_metadata_and_dynamic_categories():
     template = environment.get_template("report.html.jinja")
     context = {
         "data": data,
-        "charts": {"overall_risk_polar": ""},
+        "charts": {"finding_severity_polar": ""},
         "presentation": asdict(PdfPresentation.for_target_kind(report.metadata.target.target_kind)),
         "css": "",
         "app_icon_uri": "",
@@ -129,6 +170,11 @@ def test_pdf_projection_keeps_metadata_and_dynamic_categories():
     assert 'width:100.0%; background:#5499c7;' in bars
     assert bars.count('class="bar-label"') == 5
     assert "Secure" not in bars
+    summary = html.split('<table class="summary-table">')[1].split("</table>")[0]
+    assert "Example check (Review)" in summary
+    assert "Low" in summary
+    assert "Not_Evaluated" not in summary
+    assert "No confirmed weakness" not in summary
     table = html.split('<table class="findings-table">')[1].split("</table>")[0]
     assert all(
         f">{column}</th>" in table
@@ -184,6 +230,7 @@ def test_no_hits_omit_check_tables_but_keep_security_categories_in_summary():
     assert report.overall_evaluation[-1].risk_level.value == "low"
     assert report.rule_coverage
     assert report.rule_status == "success"
+    assert PdfReportGenerator._presentation_data(report)["finding_summary"] == []
 
 
 @pytest.mark.parametrize("platform", ["ios", "android"])
@@ -215,6 +262,7 @@ def test_summary_includes_unmatched_crypto_and_excludes_functionality(platform):
         "Crypto": "low",
     }
     assert {row.area for row in report.risk_summary} == {"Crypto"}
+    assert PdfReportGenerator._presentation_data(report)["finding_summary"] == []
 
 
 def source_scan_report(tmp_path, artifacts):

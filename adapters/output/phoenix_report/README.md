@@ -33,7 +33,8 @@ sample files in `data/` are not inputs to this API.
   Required fields use Jinja's strict undefined handling, so missing data fails
   rendering instead of silently producing blank fields or zero findings.
 - `templates/style.css` controls colors, tables, page size, and page numbering.
-- `pdf_report/common/charts.py` renders the aggregate's category risks.
+- `pdf_report/common/charts.py` renders the highest matched finding severity in
+  each area, including Info, from the same checks used by the severity counts.
 - `assets/` contains branding and the placeholder used when an app icon is
   unavailable. An absent icon does not change assessment results.
 
@@ -43,6 +44,13 @@ observations remain separate. Category risks use weakness findings. Flutter and 
 their framework or embedded Android/iOS origin. Android component counts appear
 only for Android targets; certificate and file-hash sections are binary-only.
 Empty endpoint collections do not produce a table or an extra report section.
+
+The shared Overall Security chart and summary show matched findings of every
+finding type, including inventory observations. Summary entries keep their finding
+types, so reviews and observations are not presented as confirmed weaknesses.
+Areas without matches do not receive a finding severity. The aggregate's separate
+weakness risk assessments are unchanged; saved JSON already contains all checks
+needed to regenerate this overview for every platform and scan mode.
 
 Security data belongs in the aggregate, not in template defaults. When extending
 a report, update its typed model and platform mapper, then the relevant template

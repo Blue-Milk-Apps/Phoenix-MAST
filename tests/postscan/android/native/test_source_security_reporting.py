@@ -115,7 +115,7 @@ def test_missing_security_scanner_omits_unmatched_checks_from_report() -> None:
     assert report.findings_severity.info == 0
 
 
-def test_report_presentation_contains_risk_chart() -> None:
+def test_report_presentation_contains_finding_severity_chart() -> None:
     report = _report(NativeAndroidScanDetailExtractor().extract_sections({}))
     presentation = PdfReportGenerator._presentation_data(report)
-    assert build_charts(presentation)["overall_risk_polar"]
+    assert build_charts(presentation)["finding_severity_polar"]

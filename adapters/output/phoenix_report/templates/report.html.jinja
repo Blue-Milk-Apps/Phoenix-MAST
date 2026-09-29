@@ -74,9 +74,10 @@
   </div>
 </div>
 
-<!-- ===================== OVERALL RISK ===================== -->
+<!-- ===================== OVERALL SECURITY ===================== -->
 <div class="section">
   <h2>Overall Security</h2>
+  <p class="muted">The chart shows the highest matched finding severity in each area. Reviews require validation; observations and controls do not establish vulnerabilities.</p>
   <div class="security-overview no-break">
     <div class="severity-bars" aria-label="Finding counts by severity">
       {% set max_count = [data.findings_severity.values() | max, 1] | max %}
@@ -91,23 +92,26 @@
       </div>
       {% endfor %}
     </div>
-    {% if data.overall_evaluation %}
+    {% if data.finding_summary %}
     <div class="risk-graph-wrap">
-      <img class="polar-chart" src="data:image/png;base64,{{ charts.overall_risk_polar }}" alt="Overall security by area">
+      <img class="polar-chart" src="data:image/png;base64,{{ charts.finding_severity_polar }}" alt="Highest matched finding severity by area">
     </div>
     {% endif %}
   </div>
 
   <h2>Summary</h2>
-  {% if data.overall_evaluation %}
+  {% if data.finding_summary %}
   <table class="summary-table">
     <thead><tr><th class="col-area">Area</th><th class="col-summary-severity">Severity</th><th>Findings Summary</th></tr></thead>
     <tbody>
-    {% for row in data.overall_evaluation %}
+    {% for row in data.finding_summary %}
     <tr>
-      <td>{{ row.area_of_concern }}</td>
-      <td>{{ risk_badge(row.risk_rating) }}</td>
-      <td class="eval-findings"><ul>{% for f in row.summary_findings %}<li>{{ f }}</li>{% endfor %}</ul></td>
+      <td>{{ row.area }}</td>
+      <td>{{ risk_badge(row.severity | replace('_', ' ') | title) }}</td>
+      <td class="eval-findings">
+        <ul>{% for finding in row.findings %}<li>{{ finding.title }}{% if finding.finding_type %} ({{ finding.finding_type | title }}){% endif %}</li>{% endfor %}</ul>
+        {% if row.incomplete %}<p class="muted">Evidence retained from an incomplete tool execution.</p>{% endif %}
+      </td>
     </tr>
     {% endfor %}
     </tbody>
