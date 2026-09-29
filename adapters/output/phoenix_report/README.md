@@ -90,7 +90,26 @@ The PDF shows captured observations in inventory tables instead of duplicating
 them in check tables. Inventory-only categories do not receive risk ratings.
 
 `ReportData.sbom` carries the Syft completion status and package name, version,
-ecosystem, package URL, and locations for every scan target. Missing or failed
+ecosystem, package URL, and locations for source scans. Missing or failed
 inventories remain distinguishable from completed inventories with no packages.
 These two additive fields default to unavailable/empty when loading older
 schema-version-1 reports. PDF regeneration requires no original tool artifacts.
+
+
+## iOS binary dependencies
+
+`platform_details.dependencies` combines LIEF load commands from the main executable,
+`ipsw swift-dump --type` module/type metadata, and embedded `.framework`, `.bundle`,
+and `.dylib` paths. Plist metadata supplies version, build, identifier, executable,
+and minimum OS; versions are never inferred from Swift symbols or bundle names.
+The PDF replaces the Frameworks observation section with an iOS Dependencies table.
+OpenGrep-only references remain distinguishable from load-command evidence.
+
+Swift modules without matching dynamic dependencies are labeled Static (inferred),
+not automatically third-party. Primary app and runtime module names are excluded.
+Resource bundles are separate observations and do not establish linkage or ownership.
+Type stripping, missing metadata, and modules with no type definitions can limit
+coverage; this inventory is not a source package manifest. Failed extractions retain
+partial evidence and explicitly report incomplete coverage. Framework executables
+are not scanned. The typed inventory persists in JSON for standalone PDF regeneration;
+older aggregates default to Not evaluated.

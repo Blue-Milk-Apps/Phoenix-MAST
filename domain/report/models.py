@@ -602,6 +602,29 @@ class IOSSDKCategoryDetails:
 
 
 @dataclass(frozen=True)
+class IOSDependency:
+    """An observed dependency, module, or resource bundle; ownership is not inferred."""
+
+    name: str
+    kind: str
+    linkage: str = "Unknown"
+    version: str = ""
+    build: str = ""
+    bundle_id: str = ""
+    minimum_os: str = ""
+    executable: str = ""
+    paths: tuple[str, ...] = ()
+    evidence: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class IOSDependencyInventory:
+    status: str = "Not evaluated"
+    notes: tuple[str, ...] = ()
+    items: tuple[IOSDependency, ...] = ()
+
+
+@dataclass(frozen=True)
 class IOSBinaryReportDetails(PlatformReportDetails):
     """iOS-binary-specific content for a report."""
 
@@ -617,6 +640,7 @@ class IOSBinaryReportDetails(PlatformReportDetails):
     manual_review_available: bool = False
     manual_review_status: str = "Not Assessed"
     manual_review_findings: tuple[ManualReviewFinding, ...] = ()
+    dependencies: IOSDependencyInventory = IOSDependencyInventory()
 
     @property
     def target_kind(self) -> ReportTargetKind:
@@ -719,6 +743,8 @@ class ReportData:
                 model = next(member for member in get_args(model) if member is not type(None))
             if is_dataclass(model):
                 names = {item.name for item in fields(model)}
+                if model is IOSBinaryReportDetails and isinstance(value, Mapping):
+                    value = {"dependencies": asdict(IOSDependencyInventory()), **value}
                 if model is FindingSeverity and isinstance(value, Mapping):
                     # Older aggregates included a non-severity bucket and omitted review findings.
                     value = {key: item for key, item in value.items() if key != "secure"}

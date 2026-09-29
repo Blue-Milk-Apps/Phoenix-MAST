@@ -77,14 +77,12 @@ class MobileScannerFactory:
                     ApksignerScanner(),
                     ApkidScanner(),
                     StringsScanner(),
-                    SyftScanner(),
                     TrufflehogScanner(),
                     GitleaksScanner(),
                 ]
             case ("BINARY", "IOS", _):
                 return [
                     IpswScanner(),
-                    SyftScanner(),
                     LIEFScanner(),
                     StringsScanner(),
                     TrufflehogScanner(),

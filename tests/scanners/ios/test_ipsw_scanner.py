@@ -6,6 +6,8 @@ import subprocess
 import zipfile
 from pathlib import Path
 
+import pytest
+
 from adapters.scanners.ios.ipsw_scanner import IpswScanner
 from domain.models import ScanConfig, ScanType
 
@@ -50,7 +52,8 @@ def test_ipsw_scan_requires_ipa(tmp_path: Path) -> None:
     assert "IPA files" in results[0].error_message
 
 
-def test_ipsw_scan_returns_raw_command_outputs(monkeypatch, tmp_path: Path) -> None:
+@pytest.mark.parametrize("swift_exit_code", [0, 1])
+def test_ipsw_scan_returns_raw_command_outputs(monkeypatch, tmp_path: Path, swift_exit_code: int) -> None:
     ipa_path = tmp_path / "sample.ipa"
     with zipfile.ZipFile(ipa_path, "w") as archive:
         archive.writestr(
@@ -83,6 +86,13 @@ def test_ipsw_scan_returns_raw_command_outputs(monkeypatch, tmp_path: Path) -> N
 
         if argv == ["/usr/local/bin/ipsw", "version"]:
             return subprocess.CompletedProcess(argv, 0, "ipsw version 3.1.687\n", "")
+
+        if argv[1] == "swift-dump":
+            assert Path(argv[2]).name == "TestApp"
+            assert argv[3:] == ["--type", ".*", "--no-color"]
+            return subprocess.CompletedProcess(
+                argv, swift_exit_code, "struct BoxSdkGen.Client {}\nstruct Vortex.System {}\n", ""
+            )
 
         binary_name = Path(argv[3]).name
         assert binary_name == "TestApp"
@@ -132,11 +142,13 @@ def test_ipsw_scan_returns_raw_command_outputs(monkeypatch, tmp_path: Path) -> N
         "path": "TestApp",
     }
     assert app_output["scan_metadata"]["ipsw_version"] == "ipsw version 3.1.687"
-    assert app_output["scan_metadata"]["execution_status"] == "SUCCESS"
+    expected_status = "PARTIAL_SUCCESS" if swift_exit_code else "SUCCESS"
+    assert app_output["scan_metadata"]["execution_status"] == expected_status
     assert [command["purpose"] for command in app_output["commands"]] == [
         "macho_info_json",
         "code_signature",
         "entitlements",
+        "swift_types",
     ]
     assert "stdout" not in app_output["commands"][0]
     assert "stderr" not in app_output["commands"][0]
@@ -165,4 +177,11 @@ def test_ipsw_scan_returns_raw_command_outputs(monkeypatch, tmp_path: Path) -> N
         "application-identifier": "TestApp",
         "com.apple.developer.team-identifier": "ABCDE12345",  # pragma: allowlist secret
     }
-    assert len(calls) == 4
+    assert app_output["analysis"]["swift_modules"] == {
+        "status": expected_status,
+        "modules": [
+            {"name": "BoxSdkGen", "type_count": 1, "examples": ["Client"]},
+            {"name": "Vortex", "type_count": 1, "examples": ["System"]},
+        ],
+    }
+    assert len(calls) == 5

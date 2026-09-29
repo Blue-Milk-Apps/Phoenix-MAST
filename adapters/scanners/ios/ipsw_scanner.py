@@ -41,7 +41,7 @@ class IpswCommandResult:
 class IpswScanner(ScannerPort):
     """Scanner for Mach-O metadata extracted from IPA binaries using ipsw."""
 
-    COMMAND_PROFILE = "IPSW_MACHO_INFO_V1"
+    COMMAND_PROFILE = "IPSW_MACHO_INFO_V2"
     DEFAULT_TIMEOUT_SECONDS = 120
     MAX_COMMAND_OUTPUT_EXCERPT_CHARS = 4000
     SCANNER_VERSION = "1.0"
@@ -180,6 +180,13 @@ class IpswScanner(ScannerPort):
                 ["macho", "info", str(binary_path), "--ent"],
             ),
         ]
+        core_status = self._execution_status(command_results)
+        swift_types = self._run_ipsw(
+            ipsw_executable,
+            "swift_types",
+            ["swift-dump", str(binary_path), "--type", ".*", "--no-color"],
+        )
+        command_results.append(swift_types)
         binary_relative_path = relative_result_path(extracted.app_bundle, binary_path)
 
         return {
@@ -195,7 +202,11 @@ class IpswScanner(ScannerPort):
                 "path": binary_relative_path,
             },
             "scan_metadata": {
-                "execution_status": self._execution_status(command_results),
+                "execution_status": (
+                    "PARTIAL_SUCCESS"
+                    if core_status == "SUCCESS" and swift_types.execution_status != "SUCCESS"
+                    else core_status
+                ),
                 "duration_seconds": round(
                     sum(result.duration_seconds for result in command_results),
                     6,
@@ -303,6 +314,26 @@ class IpswScanner(ScannerPort):
             "macho": self._macho_summary(commands_by_purpose.get("macho_info_json")),
             "code_signature": self._code_signature_summary(commands_by_purpose.get("code_signature")),
             "entitlements": self._entitlements_summary(commands_by_purpose.get("entitlements")),
+            "swift_modules": self._swift_module_summary(commands_by_purpose.get("swift_types")),
+        }
+
+    @staticmethod
+    def _swift_module_summary(command: IpswCommandResult | None) -> dict[str, Any]:
+        """Normalize ipsw's decoded type contexts; do not parse Swift mangling in Python."""
+        modules: dict[str, set[str]] = {}
+        output = command.stdout if command else ""
+        if isinstance(output, bytes):
+            output = output.decode("utf-8", errors="replace")
+        for line in output.splitlines():
+            match = re.match(r"^(?:struct|class|enum|protocol) ([\w]+)\.([^\s<{]+)", line)
+            if match:
+                modules.setdefault(match[1], set()).add(match[2])
+        return {
+            "status": command.execution_status if command else "NOT_EVALUATED",
+            "modules": [
+                {"name": name, "type_count": len(types), "examples": sorted(types)[:3]}
+                for name, types in sorted(modules.items())
+            ],
         }
 
     def _macho_summary(self, command_result: IpswCommandResult | None) -> dict[str, Any]:

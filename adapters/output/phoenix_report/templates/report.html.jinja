@@ -632,7 +632,32 @@ SOFTWARE.
 {% endfor %}
 
 <!-- ===================== OBSERVATION INVENTORIES ===================== -->
+{% if data.ios_dependencies is defined %}
+<div class="section checks-section">
+  <h2>iOS Dependencies</h2>
+  <p class="small">Inventory: {{ data.ios_dependencies.status }}. Framework and bundle versions come from their Info.plist files. Resource bundles do not establish code linkage. Static Swift modules are inferred from type definitions in the primary executable without a matching dynamic dependency; they may be app-owned. Symbol stripping and optimization can limit detection. This is not a complete package manifest.</p>
+  {% for note in data.ios_dependencies.notes %}<p class="small">{{ note }}</p>{% endfor %}
+  {% if data.ios_dependencies['items'] %}
+  <table class="compact inventory-table dependency-table">
+    <colgroup><col style="width: 19%"><col style="width: 13%"><col style="width: 9%"><col style="width: 23%"><col style="width: 36%"></colgroup>
+    <thead><tr><th>Name</th><th>Type / Linkage</th><th>Version / Build</th><th>Metadata</th><th>Evidence / Location</th></tr></thead>
+    <tbody>
+    {% for item in data.ios_dependencies['items'] %}
+    <tr>
+      <td>{{ item.name }}</td>
+      <td>{{ item.kind }}<br><span class="small">{{ item.linkage }}</span></td>
+      <td>{{ item.version or 'Unknown' }}{% if item.build %}<br>Build: {{ item.build }}{% endif %}</td>
+      <td class="small rule-evidence">{% if item.bundle_id %}{{ item.bundle_id }}<br>{% endif %}{% if item.minimum_os %}Minimum OS: {{ item.minimum_os }}<br>{% endif %}{% if item.executable %}Executable: {{ item.executable }}{% endif %}</td>
+      <td class="small rule-evidence">{% for path in item.paths %}{{ path.removeprefix('/System/Library/Frameworks/') }}<br>{% endfor %}{% for evidence in item.evidence %}{{ evidence }}<br>{% endfor %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="small">No dependency observations available.</p>{% endif %}
+</div>
+{% endif %}
 {% for category, inventories in data.inventories | groupby('category') %}
+{% if not (data.ios_dependencies is defined and data.ios_dependencies.status != 'Not evaluated' and category == 'Frameworks') %}
 <div class="section">
   <h2>{{ category }}</h2>
   {% for inventory in inventories %}
@@ -643,15 +668,17 @@ SOFTWARE.
     <thead><tr><th>Value</th><th>Locations</th></tr></thead>
     <tbody>
     {% for item in inventory['values'] %}
-    <tr><td class="mono">{{ item.value }}</td><td class="small rule-evidence">{{ item.locations | join('\n') }}</td></tr>
+    <tr><td class="mono">{{ item.value.removeprefix('/System/Library/Frameworks/') }}</td><td class="small rule-evidence">{{ item.locations | join('\n') }}</td></tr>
     {% endfor %}
     </tbody>
   </table>
   {% endfor %}
 </div>
+{% endif %}
 {% endfor %}
 
 <!-- ===================== SOFTWARE BILL OF MATERIALS ===================== -->
+{% if data.meta.target_type == 'SOURCE' %}
 <div class="section">
   <h2>Software Bill of Materials</h2>
   <p class="small">Syft: {{ data.sbom.status }}{% if data.sbom.reason %} &middot; {{ data.sbom.reason }}{% endif %}</p>
@@ -667,6 +694,8 @@ SOFTWARE.
   </table>
   {% elif data.sbom.status == 'Completed' %}<p class="small">Syft completed without identifying package records.</p>{% endif %}
 </div>
+
+{% endif %}
 
 <!-- ===================== SECRET SCANNERS ===================== -->
 <div class="section">

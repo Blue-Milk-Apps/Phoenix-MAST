@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from domain.models import ScanConfig, ScanResult, ScanType
@@ -66,13 +67,27 @@ class PlistBinaryScanner(ScannerPort):
                     )
                 ]
 
-            return PlistReportBuilder(
+            results = PlistReportBuilder(
                 scanner_name=self.name,
                 scan_type=self.scan_type,
                 description=self.description,
                 base_path=extracted.app_bundle,
                 output_format=self._output_format,
             ).build(plist_files)
+            for result in results:
+                if result.relative_target_path == "scan_index.json":
+                    index = json.loads(result.raw_output)
+                    index["embedded_paths"] = sorted(
+                        path.relative_to(extracted.app_bundle).as_posix()
+                        for path in extracted.app_bundle.rglob("*")
+                        if not path.is_symlink()
+                        and (
+                            (path.is_dir() and path.suffix in {".bundle", ".framework"})
+                            or (path.is_file() and path.suffix == ".dylib")
+                        )
+                    )
+                    result.raw_output = json.dumps(index, indent=2, sort_keys=True)
+            return results
         except Exception as exc:
             return [
                 ScanResult(

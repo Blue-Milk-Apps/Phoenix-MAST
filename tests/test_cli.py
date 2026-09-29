@@ -153,7 +153,6 @@ def test_create_scan_config_for_android_binary(tmp_path: Path, monkeypatch) -> N
             ScanType.APKTOOL,
             ScanType.APKSIGNER,
             ScanType.APKID,
-            ScanType.SYFT,
             ScanType.GITLEAKS,
             ScanType.TRUFFLEHOG,
             ScanType.STRINGS,
@@ -184,7 +183,6 @@ def test_android_binary_opengrep_preserves_rule_catalog_and_functionality(tmp_pa
         ScanType.APKTOOL,
         ScanType.APKSIGNER,
         ScanType.APKID,
-        ScanType.SYFT,
         ScanType.GITLEAKS,
         ScanType.TRUFFLEHOG,
         ScanType.STRINGS,
@@ -245,7 +243,6 @@ def test_create_scan_config_for_ios_binary(tmp_path: Path, monkeypatch) -> None:
             ScanType.PLIST_BINARY,
             ScanType.TRUFFLEHOG,
             ScanType.GITLEAKS,
-            ScanType.SYFT,
         },
     )
 
@@ -271,7 +268,6 @@ def test_create_scan_config_for_ios_binary_includes_opengrep_when_rules_path_is_
         ScanType.GITLEAKS,
         ScanType.STRINGS,
         ScanType.PLIST_BINARY,
-        ScanType.SYFT,
     }
 
 

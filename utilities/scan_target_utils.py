@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -48,6 +49,23 @@ def secret_scan_paths(config: ScanConfig, target: ResolvedScanTarget) -> tuple[P
     """Include extracted text without rescanning reports or other tool artifacts."""
     strings = config.output_path / "strings"
     if config.target_type == "BINARY" and config.platform == "IOS" and strings.is_dir():
+        # Keep symbols for functionality/SDK detection, but omit them from secret inputs.
+        paths = []
+        for source in sorted(strings.rglob("*.txt")):
+            destination = config.output_path / "secret_inputs" / source.relative_to(strings)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with source.open("rb") as original, destination.open("wb") as filtered:
+                for line in original:
+                    if re.fullmatch(
+                        rb"(?:_\$|\$[sS])[A-Za-z0-9_.$]+|_symbolic [A-Za-z0-9_.$]+(?: [A-Za-z0-9_.$]+)*",
+                        line.strip(),
+                    ):
+                        filtered.write(b"\n")
+                    else:
+                        filtered.write(line)
+            paths.append(destination)
+        if paths:
+            return tuple(paths)
         return (strings,)
     if (
         config.target_type == "BINARY"

@@ -108,7 +108,7 @@ def test_gitleaks_ios_binary_scan_uses_primary_executable(monkeypatch, tmp_path:
             captured_cmd.extend(cmd)
             self.returncode = 0
             if strings.exists():
-                assert Path(cmd[-1]) == strings
+                assert Path(cmd[-1]) == config.output_path / "secret_inputs/Demo.txt"
             else:
                 assert Path(cmd[-1]).is_file()
                 assert Path(cmd[-1]).name == "Demo"
@@ -131,15 +131,26 @@ def test_gitleaks_ios_binary_scan_uses_primary_executable(monkeypatch, tmp_path:
     assert results[0].success
     assert captured_cmd[-1] != str(ipa_path)
     strings.mkdir(parents=True)
-    (strings / "Demo.txt").write_text("app strings")
+    original = (
+        "_$s9BoxSdkGen03DocC10TagV2025R0CfD\n"
+        "_symbolic _____ 9BoxSdkGen19TrashedFilesManagerC\n"
+        "$s9BoxSdkGen6ClientC\n"
+        "app strings\nBox token=keep-this-value\ntext _$symbol keep\n"
+        "_symbolic token=keep-this-value\n"
+    )
+    (strings / "Demo.txt").write_text(original)
     (config.output_path / "post_scan_processing.json").write_text("{}")
     (config.output_path / "trufflehog").mkdir()
     (config.output_path / "trufflehog/report.json").write_text("{}")
     captured_cmd.clear()
     results = GitleaksScanner().scan(config)
     assert results[0].success
+    assert (strings / "Demo.txt").read_text() == original
+    assert (config.output_path / "secret_inputs/Demo.txt").read_text() == (
+        "\n\n\napp strings\nBox token=keep-this-value\ntext _$symbol keep\n_symbolic token=keep-this-value\n"
+    )
     assert captured_cmd.count("dir") == 1
-    assert captured_cmd[-1] == str(strings)
+    assert captured_cmd[-1] == str(config.output_path / "secret_inputs/Demo.txt")
 
 
 def _build_test_ipa(ipa_path: Path) -> Path:

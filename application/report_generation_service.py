@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from dataclasses import replace
 from typing import Any, Mapping
 
+from domain.post_scan.ios.binary.dependencies import with_dependency_observations
 from domain.report import (
     ReportData,
     ReportMetadata,
@@ -47,6 +48,7 @@ class ReportGenerationService:
         metadata = self._metadata_from(post_scan_data)
         builder = self._builder_resolver.resolve(metadata.target.target_kind)
         report = with_rule_assessments(builder.build(post_scan_data, metadata), post_scan_data)
+        report = with_dependency_observations(report)
         summaries = tuple(
             SecretScanSummary(
                 scanner=item["scanner"],

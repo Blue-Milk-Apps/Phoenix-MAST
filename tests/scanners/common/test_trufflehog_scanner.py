@@ -70,7 +70,7 @@ def test_trufflehog_ios_binary_scan_uses_primary_executable_and_skips_verified_o
         def __init__(self, cmd: list[str]) -> None:
             captured_cmd.extend(cmd)
             if strings.exists():
-                assert cmd[2:4] == [str(strings), "--log-level=-1"]
+                assert cmd[2:4] == [str(config.output_path / "secret_inputs/Demo.txt"), "--log-level=-1"]
             else:
                 assert Path(cmd[2]).is_file()
                 assert Path(cmd[2]).name == "Demo"
@@ -92,14 +92,25 @@ def test_trufflehog_ios_binary_scan_uses_primary_executable_and_skips_verified_o
     assert captured_cmd[2] != str(ipa_path)
     assert "--only-verified" not in captured_cmd
     strings.mkdir(parents=True)
-    (strings / "Demo.txt").write_text("app strings")
+    original = (
+        "_$s9BoxSdkGen03DocC10TagV2025R0CfD\n"
+        "_symbolic _____ 9BoxSdkGen19TrashedFilesManagerC\n"
+        "$s9BoxSdkGen6ClientC\n"
+        "app strings\nBox token=keep-this-value\ntext _$symbol keep\n"
+        "_symbolic token=keep-this-value\n"
+    )
+    (strings / "Demo.txt").write_text(original)
     (config.output_path / "post_scan_processing.json").write_text("{}")
     (config.output_path / "gitleaks").mkdir()
     (config.output_path / "gitleaks/report.json").write_text("{}")
     captured_cmd.clear()
     results = TrufflehogScanner().scan(config)
     assert results[0].success
-    assert captured_cmd[2:4] == [str(strings), "--log-level=-1"]
+    assert (strings / "Demo.txt").read_text() == original
+    assert (config.output_path / "secret_inputs/Demo.txt").read_text() == (
+        "\n\n\napp strings\nBox token=keep-this-value\ntext _$symbol keep\n_symbolic token=keep-this-value\n"
+    )
+    assert captured_cmd[2:4] == [str(config.output_path / "secret_inputs/Demo.txt"), "--log-level=-1"]
 
 
 def _build_test_ipa(ipa_path: Path) -> Path:

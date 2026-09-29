@@ -23,6 +23,7 @@ from domain.report import (
     ReportTargetKind,
     UrlSchemeDetails,
 )
+from domain.report.models import IOSDependency, IOSDependencyInventory
 
 
 class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
@@ -53,6 +54,16 @@ class IOSBinaryReportDataBuilder(BinaryReportDataBuilder):
     def _details(cls, data: Mapping[str, Any]) -> IOSBinaryReportDetails:
         manual_review_findings = ()
         return IOSBinaryReportDetails(
+            dependencies=IOSDependencyInventory(
+                status=cls._text(cls._mapping(data, "dependencies"), "status") or "Not evaluated",
+                notes=tuple(cls._mapping(data, "dependencies").get("notes", ())),
+                items=tuple(
+                    IOSDependency(
+                        **{**item, "paths": tuple(item.get("paths", ())), "evidence": tuple(item.get("evidence", ()))}
+                    )
+                    for item in cls._mapping(data, "dependencies").get("items", ())
+                ),
+            ),
             file_info=FileDetails(
                 **{
                     k: cls._text(cls._mapping(data, "file_info"), k)
