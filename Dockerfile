@@ -2,8 +2,12 @@
 FROM golang:1.26.6-trixie@sha256:b75d466dd608587fd66cca705a307ba65b889827d06ad61d6a75f0482b51b7c7 AS go-tools-builder
 ARG GITLEAKS_VERSION=8.30.1
 RUN go install github.com/anchore/syft/cmd/syft@v1.52.0 \
-    && go install -ldflags "-X=github.com/zricethezav/gitleaks/v8/version.Version=v${GITLEAKS_VERSION}" \
-        "github.com/zricethezav/gitleaks/v8@v${GITLEAKS_VERSION}"
+    && git clone --depth 1 --branch "v${GITLEAKS_VERSION}" \
+        https://github.com/gitleaks/gitleaks.git /tmp/gitleaks \
+    && cd /tmp/gitleaks \
+    && go get golang.org/x/crypto@v0.56.0 \
+    && go build -ldflags "-X=github.com/zricethezav/gitleaks/v8/version.Version=v${GITLEAKS_VERSION}" \
+        -o /go/bin/gitleaks .
 
 FROM python:3.12-slim-trixie AS phoenix
 
