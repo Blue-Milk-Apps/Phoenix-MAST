@@ -1,4 +1,7 @@
 # syntax=docker/dockerfile:1.7
+FROM golang:1.26.6-trixie@sha256:b75d466dd608587fd66cca705a307ba65b889827d06ad61d6a75f0482b51b7c7 AS syft-builder
+RUN go install github.com/anchore/syft/cmd/syft@v1.52.0
+
 FROM python:3.12-slim-trixie AS phoenix
 
 LABEL org.opencontainers.image.source="https://github.com/Blue-Milk-Apps/Phoenix-MAST"
@@ -27,13 +30,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # 3. Static Tooling Installations
-ARG SYFT_VERSION=v1.44.0
-ARG TRUFFLEHOG_VERSION=v3.95.2
+ARG TRUFFLEHOG_VERSION=v3.97.9
 ARG GITLEAKS_VERSION=8.30.1
 ARG APKTOOL_VERSION=2.10.0
-ARG IPSW_VERSION=3.1.687
-RUN curl -sSfL "https://raw.githubusercontent.com/anchore/syft/${SYFT_VERSION}/install.sh" | sh -s -- -b /usr/local/bin "${SYFT_VERSION}" \
-    && curl -sSfL "https://raw.githubusercontent.com/trufflesecurity/trufflehog/${TRUFFLEHOG_VERSION}/scripts/install.sh" | sh -s -- -b /usr/local/bin "${TRUFFLEHOG_VERSION}" \
+ARG IPSW_VERSION=3.1.728
+RUN curl -sSfL "https://raw.githubusercontent.com/trufflesecurity/trufflehog/${TRUFFLEHOG_VERSION}/scripts/install.sh" | sh -s -- -b /usr/local/bin "${TRUFFLEHOG_VERSION}" \
     && curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
     | tar -xz -C /usr/local/bin gitleaks \
     && curl -sSfL "https://github.com/blacktop/ipsw/releases/download/v${IPSW_VERSION}/ipsw_${IPSW_VERSION}_linux_x86_64.tar.gz" \
@@ -48,14 +49,16 @@ RUN curl -sSfL "https://raw.githubusercontent.com/anchore/syft/${SYFT_VERSION}/i
     && apksigner version \
     && gitleaks version \
     && ipsw version \
-    && syft version \
     && trufflehog --version
+
+COPY --from=syft-builder /go/bin/syft /usr/local/bin/syft
+RUN syft version
 
 # 4. Python Environment Setup
 ARG APKID_VERSION=3.1.0
-ARG ANDROGUARD_VERSION=4.1.3
-ARG LIEF_VERSION=0.17.2
-ARG OPENGREP_VERSION=1.22.0
+ARG ANDROGUARD_VERSION=4.1.4
+ARG LIEF_VERSION=0.17.6
+ARG OPENGREP_VERSION=1.30.0
 ARG TARGETARCH
 RUN /usr/local/bin/python -m pip install --no-cache-dir --upgrade "pip>=26.2.0" \
     && /usr/local/bin/python -m venv /opt/phoenix-venv \
@@ -94,6 +97,8 @@ COPY --chown=phoenix:phoenix ports ./ports
 
 RUN /opt/phoenix-venv/bin/pip install --no-cache-dir . \
     && apt-get purge -y curl \
+    && /opt/phoenix-venv/bin/python -m pip uninstall --yes pip \
+    && /usr/local/bin/python -m pip uninstall --yes pip \
     && rm -rf /var/lib/apt/lists/*
 
 # 6. Working Directory
