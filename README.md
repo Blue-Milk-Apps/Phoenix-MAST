@@ -1,3 +1,8 @@
+<h1>
+  <img alt="Phoenix MAST logo" src="./assets/PhoenixShield1280x640.png" width="100" valign="middle">
+  &nbsp;Phoenix MAST
+</h1>
+
 # Phoenix MAST
 
 Phoenix MAST coordinates mobile security scanners for iOS, Android, Flutter, and React Native. It collects scanner artifacts, assembles evidence, and optionally generates JSON and PDF reports. Docker provides the scanner tools; the Python application controls their execution and reporting.
