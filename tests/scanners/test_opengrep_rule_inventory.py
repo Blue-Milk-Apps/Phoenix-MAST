@@ -139,8 +139,13 @@ def test_all_targets_scan_all_category_files_once_per_platform_scope(
     monkeypatch.setattr(OpenGrepScanner, "_opengrep_version", lambda self: "test")
     result = MobileAnalysisWorkflowService()._perform_opengrep_scan(config, None)[0]
     assert result.success
+    assert result.scan_type == (ScanType.OPENGREP_BINARY if mode == "binary" else ScanType.OPENGREP_SOURCE)
     assert len(commands) == len(scopes)
     for scope, command in zip(scopes, commands, strict=True):
+        if mode == "binary":
+            assert command[command.index("--max-target-bytes") + 1] == "0"
+        else:
+            assert "--max-target-bytes" not in command
         configs = [Path(command[i + 1]) for i, value in enumerate(command) if value == "--config"]
         assert OpenGrepScanner._configured_rule_ids(configs) == [f"{scope}.code", f"{scope}.storage"]
         target = strings_path if mode == "binary" else project

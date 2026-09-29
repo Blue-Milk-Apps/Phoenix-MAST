@@ -24,7 +24,7 @@ REPORT_PATH = "opengrep_results.json"
 
 
 class OpenGrepScanner(ScannerPort):
-    """Scanner for extracting source-code findings with OpenGrep."""
+    """Shared CLI runner; platform adapters add the rule metadata required by reports."""
 
     DEFAULT_PROCESS_TIMEOUT_SECONDS = 300
 
@@ -41,10 +41,11 @@ class OpenGrepScanner(ScannerPort):
         self._rules_path = rules_path.resolve() if rules_path else None
         self._scan_paths = [path.resolve() for path in scan_paths] if scan_paths else None
         self._tool_version: str | None = None
+        self._scan_type = ScanType.OPENGREP_SOURCE
 
     @property
     def scan_type(self) -> ScanType:
-        return ScanType.OPENGREP_SOURCE
+        return self._scan_type
 
     @property
     def name(self) -> str:
@@ -147,6 +148,7 @@ class OpenGrepScanner(ScannerPort):
         return [config.project_path]
 
     def scan(self, config: ScanConfig) -> list[ScanResult]:
+        self._scan_type = ScanType.OPENGREP_BINARY if config.target_type == "BINARY" else ScanType.OPENGREP_SOURCE
         opengrep_home = Path(tempfile.mkdtemp(prefix="phoenix_opengrep_"))
         process: subprocess.Popen[str] | None = None
         command: list[str] | None = None
@@ -187,6 +189,9 @@ class OpenGrepScanner(ScannerPort):
                 "--no-git-ignore",
                 "--disable-version-check",
             ]
+            if config.target_type == "BINARY":
+                # Extracted binary evidence routinely exceeds OpenGrep's source-file size limit.
+                command.extend(["--max-target-bytes", "0"])
 
             for pattern in config.ignore_patterns:
                 command.extend(["--exclude", pattern])
@@ -203,7 +208,7 @@ class OpenGrepScanner(ScannerPort):
             for line in stderr_data.splitlines():
                 clean_line = line.replace("\r", "").rstrip()
                 if clean_line:
-                    print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}{clean_line}")
+                    print(f"OpenGrep {config.target_type.title()} -> {clean_line}")
 
             if process.returncode != 0:
                 return [
@@ -438,21 +443,24 @@ def validate_rule_inventory(rules_directory: Path) -> RuleInventory:
 
 
 class CategoryOpenGrepScanner(ScannerPort):
+    """Validate the rule catalog and attach reporting metadata to OpenGrep results."""
+
     REPORT_PATH = "opengrep_results.json"
 
     def __init__(self, rules_directory: Path, scan_paths: list[Path] | None = None, *, platform: str = "ios") -> None:
         self._platform = platform
         self._rules_directory = rules_directory.resolve()
         self._scan_paths = [path.resolve() for path in scan_paths] if scan_paths else None
+        self._scan_type = ScanType.OPENGREP_SOURCE
 
     @property
     def scan_type(self) -> ScanType:
-        return ScanType.OPENGREP_SOURCE
+        return self._scan_type
 
     @property
     def name(self) -> str:
         platform = "iOS" if self._platform == "ios" else self._platform.replace("_", " ").title()
-        return f"{platform} Category OpenGrep Scanner"
+        return f"{platform} OpenGrep Scanner"
 
     @property
     def description(self) -> str:
@@ -462,6 +470,7 @@ class CategoryOpenGrepScanner(ScannerPort):
         return OpenGrepScanner().is_available()
 
     def scan(self, config: ScanConfig) -> list[ScanResult]:
+        self._scan_type = ScanType.OPENGREP_BINARY if config.target_type == "BINARY" else ScanType.OPENGREP_SOURCE
         paths = self._scan_paths or [config.project_path.resolve()]
         metadata: dict[str, Any] = {
             "status": "failed",

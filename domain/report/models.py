@@ -602,6 +602,29 @@ class IOSSDKCategoryDetails:
 
 
 @dataclass(frozen=True)
+class IOSDependency:
+    """An observed dependency, module, or resource bundle; ownership is not inferred."""
+
+    name: str
+    kind: str
+    linkage: str = "Unknown"
+    version: str = ""
+    build: str = ""
+    bundle_id: str = ""
+    minimum_os: str = ""
+    executable: str = ""
+    paths: tuple[str, ...] = ()
+    evidence: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class IOSDependencyInventory:
+    status: str = "Not evaluated"
+    notes: tuple[str, ...] = ()
+    items: tuple[IOSDependency, ...] = ()
+
+
+@dataclass(frozen=True)
 class IOSBinaryReportDetails(PlatformReportDetails):
     """iOS-binary-specific content for a report."""
 
@@ -617,6 +640,7 @@ class IOSBinaryReportDetails(PlatformReportDetails):
     manual_review_available: bool = False
     manual_review_status: str = "Not Assessed"
     manual_review_findings: tuple[ManualReviewFinding, ...] = ()
+    dependencies: IOSDependencyInventory = IOSDependencyInventory()
 
     @property
     def target_kind(self) -> ReportTargetKind:
@@ -639,6 +663,40 @@ class SecretScanSummary:
 
 
 @dataclass(frozen=True)
+class InventoryValue:
+    value: str
+    locations: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class RuleObservation:
+    category: str
+    title: str
+    rule_id: str
+    platform: str
+    severity: str
+    description: str
+    execution_status: str
+    values: tuple[InventoryValue, ...] = ()
+
+
+@dataclass(frozen=True)
+class SbomPackage:
+    name: str
+    version: str = ""
+    ecosystem: str = ""
+    purl: str = ""
+    locations: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class SbomSummary:
+    status: str = "Unavailable"
+    reason: str = "No readable Syft inventory was recorded."
+    packages: tuple[SbomPackage, ...] = ()
+
+
+@dataclass(frozen=True)
 class ReportData:
     """The final scan aggregate shared by JSON output and report renderers."""
 
@@ -652,6 +710,8 @@ class ReportData:
     rule_status: str = ""
     rule_status_reason: str = ""
     secret_scans: tuple[SecretScanSummary, ...] = ()
+    inventories: tuple[RuleObservation, ...] = ()
+    sbom: SbomSummary = SbomSummary()
 
     def to_dict(self) -> dict[str, Any]:
         """Return the versioned aggregate for JSON serialization."""
@@ -683,6 +743,8 @@ class ReportData:
                 model = next(member for member in get_args(model) if member is not type(None))
             if is_dataclass(model):
                 names = {item.name for item in fields(model)}
+                if model is IOSBinaryReportDetails and isinstance(value, Mapping):
+                    value = {"dependencies": asdict(IOSDependencyInventory()), **value}
                 if model is FindingSeverity and isinstance(value, Mapping):
                     # Older aggregates included a non-severity bucket and omitted review findings.
                     value = {key: item for key, item in value.items() if key != "secure"}
@@ -713,7 +775,11 @@ class ReportData:
 
         # Resolve the platform detail model from the saved target, never from scan files.
         metadata = restore(ReportMetadata, data.get("metadata"), "metadata")
-        report = restore(cls, {key: value for key, value in data.items() if key != "schema_version"}, "report")
+        saved = {key: value for key, value in data.items() if key != "schema_version"}
+        # These inventories were not present in earlier schema-version-1 aggregates.
+        saved.setdefault("inventories", [])
+        saved.setdefault("sbom", asdict(SbomSummary()))
+        report = restore(cls, saved, "report")
         if "secure" in data["findings_severity"]:
             report = replace(report, findings_severity=FindingSeverity.from_sections(report.vulnerability_sections))
         return report

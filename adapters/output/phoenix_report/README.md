@@ -6,7 +6,7 @@ that model. Rendering does not load a blank data template or merge sample data.
 
 ## Usage
 
-The scan workflow generates the PDF automatically. To regenerate one from a
+The scan workflow generates a PDF when `--pdf` is supplied. Aggregate JSON is independently enabled with `--json`. To regenerate one from a
 saved `post_scan_processing.json` (schema version 1):
 
 ```python
@@ -33,7 +33,8 @@ sample files in `data/` are not inputs to this API.
   Required fields use Jinja's strict undefined handling, so missing data fails
   rendering instead of silently producing blank fields or zero findings.
 - `templates/style.css` controls colors, tables, page size, and page numbering.
-- `pdf_report/common/charts.py` renders the aggregate's category risks.
+- `pdf_report/common/charts.py` renders the highest matched finding severity in
+  each area, including Info, from the same checks used by the severity counts.
 - `assets/` contains branding and the placeholder used when an app icon is
   unavailable. An absent icon does not change assessment results.
 
@@ -43,6 +44,13 @@ observations remain separate. Category risks use weakness findings. Flutter and 
 their framework or embedded Android/iOS origin. Android component counts appear
 only for Android targets; certificate and file-hash sections are binary-only.
 Empty endpoint collections do not produce a table or an extra report section.
+
+The shared Overall Security chart and summary show matched findings of every
+finding type, including inventory observations. Summary entries keep their finding
+types, so reviews and observations are not presented as confirmed weaknesses.
+Areas without matches do not receive a finding severity. The aggregate's separate
+weakness risk assessments are unchanged; saved JSON already contains all checks
+needed to regenerate this overview for every platform and scan mode.
 
 Security data belongs in the aggregate, not in template defaults. When extending
 a report, update its typed model and platform mapper, then the relevant template
@@ -71,3 +79,37 @@ WeasyPrint can find Homebrew libraries under `/opt/homebrew/lib` or
 If WeasyPrint fails with errors such as `cannot load library 'libgobject-2.0-0'`
 or `cannot load library 'libpango-1.0-0'`, first verify that the Homebrew
 packages are installed and then rerun the scan inside the project virtualenv.
+
+## Observation and package inventories
+
+`ReportData.inventories` stores INFO observations populated from named OpenGrep
+captures. Each group retains its category, title, rule ID, platform, description,
+execution status, and distinct values with evidence locations. These checks still
+contribute once per matched rule to severity counts and remain in aggregate JSON.
+The PDF shows captured observations in inventory tables instead of duplicating
+them in check tables. Inventory-only categories do not receive risk ratings.
+
+`ReportData.sbom` carries the Syft completion status and package name, version,
+ecosystem, package URL, and locations for source scans. Missing or failed
+inventories remain distinguishable from completed inventories with no packages.
+These two additive fields default to unavailable/empty when loading older
+schema-version-1 reports. PDF regeneration requires no original tool artifacts.
+
+
+## iOS binary dependencies
+
+`platform_details.dependencies` combines LIEF load commands from the main executable,
+`ipsw swift-dump --type` module/type metadata, and embedded `.framework`, `.bundle`,
+and `.dylib` paths. Plist metadata supplies version, build, identifier, executable,
+and minimum OS; versions are never inferred from Swift symbols or bundle names.
+The PDF replaces the Frameworks observation section with an iOS Dependencies table.
+OpenGrep-only references remain distinguishable from load-command evidence.
+
+Swift modules without matching dynamic dependencies are labeled Static (inferred),
+not automatically third-party. Primary app and runtime module names are excluded.
+Resource bundles are separate observations and do not establish linkage or ownership.
+Type stripping, missing metadata, and modules with no type definitions can limit
+coverage; this inventory is not a source package manifest. Failed extractions retain
+partial evidence and explicitly report incomplete coverage. Framework executables
+are not scanned. The typed inventory persists in JSON for standalone PDF regeneration;
+older aggregates default to Not evaluated.

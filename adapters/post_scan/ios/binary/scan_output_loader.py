@@ -16,7 +16,7 @@ class IOSBinaryScanOutputLoader(ArtifactLoader):
         return {
             "scan_output_path": str(root),
             "scan_metadata": self._load_json(root / "scan_metadata.json"),
-            "opengrep": self._load_json(root / "opengrep_source" / "opengrep_results.json"),
+            "opengrep": self._load_binary_opengrep(root),
             "ipsw_outputs": self._load_json_documents(root / "ipsw"),
             "lief_outputs": self._load_json_documents(root / "lief"),
             "plist_outputs": self._load_json_documents(root / "plist_binary", exclude={"scan_index.json"}),

@@ -99,7 +99,7 @@ strings --help
 apktool --version
 aapt2 version
 apksigner version
-apkid --version
+apkid --help
 ipsw version
 syft version
 ```

@@ -77,18 +77,16 @@ class MobileScannerFactory:
                     ApksignerScanner(),
                     ApkidScanner(),
                     StringsScanner(),
-                    SyftScanner(),
                     TrufflehogScanner(),
                     GitleaksScanner(),
                 ]
             case ("BINARY", "IOS", _):
                 return [
                     IpswScanner(),
-                    SyftScanner(),
                     LIEFScanner(),
+                    StringsScanner(),
                     TrufflehogScanner(),
                     GitleaksScanner(),
-                    StringsScanner(),
                     PlistBinaryScanner(),
                 ]
             case ("SOURCE", _, "FLUTTER"):
@@ -239,7 +237,7 @@ class MobileAnalysisWorkflowService:
             reason = "Binary OpenGrep rules have not been provided; security findings were not evaluated."
             result = ScanResult(
                 scanner_name="OpenGrep",
-                scan_type=ScanType.OPENGREP_SOURCE,
+                scan_type=ScanType.OPENGREP_BINARY,
                 skipped=True,
                 error_message=reason,
                 relative_target_path="opengrep_results.json",
@@ -282,17 +280,14 @@ class MobileAnalysisWorkflowService:
                     if scan_config.opengrep_rules_root
                     else None,
                 )
-            elif scan_config.platform == "IOS" or scan_config.stack == "NATIVE_ANDROID":
+            elif scan_config.platform in {"IOS", "ANDROID"}:
                 opengrep_scanner = CategoryOpenGrepScanner(
                     platform=scan_config.platform.lower(),
                     rules_directory=Path(open_grep_rules_path),
                     scan_paths=opengrep_scan_paths,
                 )
             else:
-                opengrep_scanner = OpenGrepScanner(
-                    rules_path=Path(open_grep_rules_path),
-                    scan_paths=opengrep_scan_paths,
-                )
+                raise ValueError(f"Unsupported OpenGrep platform: {scan_config.platform}")
             return ScannerService([opengrep_scanner]).scan_project(
                 scan_config, output=scan_output_method, retain_output=False
             )

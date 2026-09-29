@@ -14,7 +14,7 @@ Local scans depend on the uv-managed project environment. APKiD is declared in `
 
 ```bash
 uv sync
-uv run apkid --version
+uv run apkid --help
 ```
 
 After that, `uv run phoenix ...` resolves `apkid` from the same project environment used by Phoenix.
@@ -23,7 +23,7 @@ When intentionally changing the APKiD version, update the project metadata and l
 
 ```bash
 uv add "apkid==<version>"
-uv run apkid --version
+uv run apkid --help
 ```
 
 Unavailable or incomplete APKiD execution fails the Phoenix scan. Available evidence is retained for investigation.
@@ -34,7 +34,7 @@ Build the Phoenix image and verify that APKiD resolves inside the container:
 
 ```bash
 docker compose build phoenix
-docker compose run --rm --entrypoint apkid phoenix --version
+docker compose run --rm --entrypoint apkid phoenix --help
 ```
 
 ## Operational Purpose
@@ -106,7 +106,7 @@ Phoenix separates APKiD evidence into five lifecycle stages.
 
 1. Raw output
 
-   Raw APKiD stdout and stderr are preserved as separate raw artifacts when present. They are audit references, not the primary evidence model.
+   Raw APKiD stdout and stderr are preserved as separate raw artifacts when present. APKiD emits one JSON document per target that produces results; Phoenix combines their file records and reads the tool version from that output. Malformed or truncated output remains a failure, with earlier evidence preserved. Raw artifacts are audit references, not the primary evidence model.
 
 2. Normalized detections
 

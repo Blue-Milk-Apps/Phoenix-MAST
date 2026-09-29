@@ -19,7 +19,7 @@ class AndroidBinaryScanOutputLoader(ArtifactLoader):
             "trufflehog_outputs": self._load_known_json(root / "trufflehog" / "trufflehog_results.json"),
             "syft_outputs": self._load_known_json(root / "syft" / "sbom.json"),
             "scan_metadata": self._load_json(root / "scan_metadata.json"),
-            "opengrep": self._load_json(root / "opengrep_source" / "opengrep_results.json"),
+            "opengrep": self._load_binary_opengrep(root),
             "androguard_components": self._load_json(root / "androguard" / "components.json"),
             "androguard_metadata": self._load_json(root / "androguard" / "metadata.json"),
             "androguard_permissions": self._load_json(root / "androguard" / "permissions.json"),

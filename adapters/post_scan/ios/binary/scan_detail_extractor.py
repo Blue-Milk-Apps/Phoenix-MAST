@@ -7,6 +7,7 @@ from typing import Any
 
 from domain.post_scan.dependencies import syft_packages
 from domain.post_scan.ios.binary.app_info import IOSAppInfo
+from domain.post_scan.ios.binary.dependencies import ios_dependencies
 from domain.post_scan.ios.binary.endpoints import IOSEndpoints
 from domain.post_scan.ios.binary.file_info import IOSFileInfo
 from domain.post_scan.ios.binary.ipa_binary_evidence import IOSIPABinaryEvidence
@@ -46,4 +47,5 @@ class IOSBinaryScanDetailExtractor(ScanDetailExtractorPort):
             "permissions": IOSPermissions(loaded_outputs).items,
             "hardcoded_values": secret_values(loaded_outputs),
             "endpoints": IOSEndpoints(loaded_outputs).items,
+            "dependencies": asdict(ios_dependencies(loaded_outputs)),
         }

@@ -134,41 +134,28 @@ def test_lief_scan_returns_raw_output(monkeypatch, tmp_path: Path) -> None:
                     ),
                 ]
             )
-        return FakeBinary(
-            [
-                make_macho(
-                    FakeHeader.CpuType.ARM64,
-                    FakeHeader.FileType.DYLIB,
-                    "Foo.framework/Foo",
-                    ["_objc_release"],
-                ),
-            ]
-        )
+        raise AssertionError(f"Unexpected executable: {path}")
 
     fake_lief = types.SimpleNamespace(MachO=types.SimpleNamespace(parse=fake_parse))
     monkeypatch.setattr("adapters.scanners.ios.lief_scanner.lief", fake_lief)
 
     results = LIEFScanner().scan(config)
 
-    assert len(results) == 2
+    assert len(results) == 1
     assert all(result.success for result in results)
     assert not (config.output_path / "lief").exists()
 
     results_by_path = {result.relative_target_path: json.loads(result.raw_output) for result in results}
     assert set(results_by_path) == {
         "TestApp.json",
-        "Frameworks/Foo.framework/Foo.json",
     }
 
     app_contents = results_by_path["TestApp.json"]
-    framework_contents = results_by_path["Frameworks/Foo.framework/Foo.json"]
 
     assert app_contents["target"].endswith("TestApp")
     assert app_contents["app_info"]["bundle_id"] == "com.example.test"
-    assert framework_contents["app_info"]["bundle_id"] == "com.example.test"
 
     main_binary = app_contents["binary"]
-    framework_binary = framework_contents["binary"]
 
     assert main_binary["kind"] == "main"
     assert main_binary["path"] == "TestApp"
@@ -185,9 +172,3 @@ def test_lief_scan_returns_raw_output(monkeypatch, tmp_path: Path) -> None:
         "_objc_release",
     ]
     assert "libSystem.B.dylib" in main_binary["slices"][0]["libraries"]
-
-    assert framework_binary["kind"] == "framework"
-    assert framework_binary["path"] == "Frameworks/Foo.framework/Foo"
-    assert len(framework_binary["slices"]) == 1
-    assert framework_binary["slices"][0]["file_type"] == "DYLIB"
-    assert "Foo.framework/Foo" in framework_binary["slices"][0]["libraries"]

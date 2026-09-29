@@ -491,6 +491,7 @@ def test_ios_binary_scan_detail_extractor_returns_direct_ios_contract(tmp_path: 
         "file_info",
         "app_info",
         "ipa_binary_evidence",
+        "dependencies",
         "url_schemes",
         "functionality",
         "third_party_sdks",

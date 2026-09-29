@@ -298,7 +298,7 @@ class PlistReportBuilder:
         if plist_type in {"credentials_or_preferences_plist", "entitlements_plist", "privacy_manifest"}:
             return True
         if plist_type == "ios_info_plist":
-            return self._bundle_role(plist_file, data) in {"app", "framework"}
+            return self._bundle_role(plist_file, data) in {"app", "framework", "resource_bundle"}
         if self._has_sensitive_key(data):
             return True
         return False
@@ -322,6 +322,8 @@ class PlistReportBuilder:
 
         package_type = str(data.get("CFBundlePackageType", "")).upper()
         source_path = self._source_path(plist_file).lower()
+        if plist_file.parent.suffix.lower() == ".bundle":
+            return "resource_bundle"
         if package_type == "APPL" or data.get("LSRequiresIPhoneOS") is True:
             return "app"
         if package_type == "FMWK" or ".framework/" in source_path or source_path.endswith(".framework/info.plist"):

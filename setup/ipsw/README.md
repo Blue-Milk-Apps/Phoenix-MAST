@@ -1,6 +1,6 @@
 # ipsw Scanner Setup
 
-Phoenix uses `ipsw` during IPA binary scans to collect focused Apple-specific Mach-O, code-signature, and entitlement evidence from app and framework binaries. The scanner writes compact analyst-facing summaries into Phoenix scan artifacts and does not generate findings by itself.
+Phoenix uses `ipsw` during IPA binary scans to collect focused Apple-specific Mach-O, code-signature, and entitlement evidence and Swift type metadata from the primary app executable. The scanner writes compact analyst-facing summaries into Phoenix scan artifacts and does not generate findings by itself.
 
 ## Local Install
 
@@ -57,11 +57,10 @@ The scanner skips non-IPA inputs, including APK files and source directories. It
 scan-results/.../ipsw/
 ```
 
-For a typical IPA, outputs include the main app binary and embedded framework binaries:
+The primary app executable is the only binary analyzed:
 
 ```text
 scan-results/.../ipsw/AppName.json
-scan-results/.../ipsw/Frameworks/Example.framework/Example.json
 ```
 
 ## Output

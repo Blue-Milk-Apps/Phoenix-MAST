@@ -9,12 +9,14 @@ from domain.report.models import (
     AssessmentStatus,
     CheckSeverity,
     FindingSeverity,
+    InventoryValue,
     OverallEvaluation,
     PlatformAssessment,
     ReportData,
     ReportPlatform,
     RiskLevel,
     RiskSummary,
+    RuleObservation,
     SecurityCheck,
     VulnerabilitySection,
 )
@@ -25,6 +27,8 @@ def with_rule_assessments(report: ReportData, data: Mapping[str, Any]) -> Report
     if not isinstance(assessment, Mapping):
         assessment = {}
     groups: dict[str, list[SecurityCheck]] = {}
+    inventories = []
+    inventory_ids = set()
     for section in report.vulnerability_sections:
         # Preserve positive evidence even when another platform was not evaluated.
         checks = [
@@ -53,6 +57,34 @@ def with_rule_assessments(report: ReportData, data: Mapping[str, Any]) -> Report
             text = str(extra.get("lines") or "").strip()
             evidence.append(f"{location}: {text}".strip(": "))
         execution = rule["execution_status"]
+        capture = metadata.get("inventory")
+        if capture:
+            inventory_ids.add(rule["rule_id"])
+            values: dict[str, list[str]] = {}
+            for match in rule["matches"]:
+                value = ((match.get("extra") or {}).get("metavars") or {}).get(capture, {}).get("abstract_content")
+                if not isinstance(value, str) or not value.strip():
+                    continue
+                path = str(match.get("path", ""))
+                line = (match.get("start") or {}).get("line")
+                location = f"{path}:{line}" if line is not None else path
+                values.setdefault(value.strip(), []).append(location)
+            if values:
+                inventories.append(
+                    RuleObservation(
+                        category=category.replace("_", " ").title(),
+                        title=metadata["title"],
+                        rule_id=rule["rule_id"],
+                        platform=platform.value,
+                        severity=severity,
+                        description=metadata["description"],
+                        execution_status=execution,
+                        values=tuple(
+                            InventoryValue(value, tuple(dict.fromkeys(locations)))
+                            for value, locations in sorted(values.items())
+                        ),
+                    )
+                )
         explanation = metadata["description"]
         if status == AssessmentStatus.PRESENT and execution != "success":
             explanation += " Matches were retained from an incomplete scan."
@@ -95,6 +127,8 @@ def with_rule_assessments(report: ReportData, data: Mapping[str, Any]) -> Report
         matches = tuple(check for check in checks if check.result == AssessmentStatus.PRESENT)
         if matches:
             sections.append(VulnerabilitySection(label, "", matches))
+        if all(check.rule_id in inventory_ids for check in checks):
+            continue
         weaknesses = [check for check in checks if check.finding_type in {"", "weakness"}]
         weakness_matches = [check for check in weaknesses if check.result == AssessmentStatus.PRESENT]
         risk = RiskLevel.NOT_EVALUATED
@@ -124,6 +158,7 @@ def with_rule_assessments(report: ReportData, data: Mapping[str, Any]) -> Report
         overall_evaluation=tuple(evaluations),
         risk_summary=tuple(summaries),
         findings_severity=FindingSeverity.from_sections(sections),
+        inventories=tuple(inventories),
         rule_coverage=tuple(assessment.get("coverage", ())),
         rule_status=str(assessment.get("status", "")),
         rule_status_reason=str(assessment.get("reason", "")),

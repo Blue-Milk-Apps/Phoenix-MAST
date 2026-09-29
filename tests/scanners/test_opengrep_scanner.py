@@ -2,7 +2,7 @@ from pathlib import Path
 
 from adapters.scanners.common import opengrep_scanner
 from adapters.scanners.common.opengrep_scanner import OpenGrepScanner
-from domain.models import ScanConfig
+from domain.models import ScanConfig, ScanType
 
 
 def test_opengrep_command_receives_one_strings_directory(tmp_path: Path, monkeypatch) -> None:
@@ -40,6 +40,8 @@ def test_opengrep_command_receives_one_strings_directory(tmp_path: Path, monkeyp
     )[0]
 
     assert result.success is True
+    assert result.scan_type is ScanType.OPENGREP_BINARY
     assert "--strict" in command
+    assert command[command.index("--max-target-bytes") + 1] == "0"
     assert command[4:5] == [str(strings_path.resolve())]
     assert str(strings_path / "classes.txt") not in command

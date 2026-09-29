@@ -6,7 +6,7 @@ import subprocess
 
 from domain.models import ScanConfig, ScanResult, ScanType
 from ports.scanner_port import ScannerPort
-from utilities.scan_target_utils import ResolvedScanTarget, resolve_scan_target
+from utilities.scan_target_utils import ResolvedScanTarget, resolve_scan_target, secret_scan_paths
 
 REPORT_PATH = "trufflehog_results.json"
 
@@ -38,16 +38,21 @@ class TrufflehogScanner(ScannerPort):
         resolved_target: ResolvedScanTarget | None = None
         try:
             resolved_target = resolve_scan_target(config)
-            print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}Tool input: {resolved_target.path}")
+            paths = secret_scan_paths(config, resolved_target)
+            for path in paths:
+                print(f"{ScannerPort.format_stdout_prefix(self.scan_type)}Tool input: {path}")
             cmd = [
                 "trufflehog",
                 "filesystem",
-                str(resolved_target.path),
+                *(str(path) for path in paths),
                 "--log-level=-1",  # Any level above -1 is too verbose for our purposes
                 "--json",
                 "--no-update",
                 "--fail-on-scan-errors",
             ]
+
+            if config.target_type == "BINARY":
+                cmd.append("--no-verification")
 
             process = subprocess.run(
                 cmd,

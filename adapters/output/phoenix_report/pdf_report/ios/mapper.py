@@ -66,6 +66,7 @@ def map_ios_binary_details(details: IOSBinaryReportDetails) -> dict[str, object]
     """Return template-shaped iOS binary inventory data."""
 
     return {
+        "ios_dependencies": asdict(details.dependencies),
         "file_info": asdict(details.file_info),
         "app_info": asdict(details.app_info),
         "ipa_binary_protections": [

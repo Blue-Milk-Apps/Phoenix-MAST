@@ -111,30 +111,39 @@ def test_exclusion_list_and_globs_use_one_filtered_tree(tmp_path):
         "vendor/lib/a.py",
         "nested/vendor/b.py",
         "scan-results/old/report.json",
+        "archived/renamed [run]/report.json",
     ]:
         path = project / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(name)
-    args = _build_parser().parse_args(
-        [
-            "scan",
-            "--ios-source",
-            str(project),
-            "--exclude",
-            "**/vendor,**/*.generated.py",
-            "--output",
-            str(project / "scan-results"),
-        ]
-    )
-    config = _create_scan_config(args)
-    assert config.exclude_patterns == ["**/vendor", "**/*.generated.py"]
-    with source_scan_workspace(config) as filtered:
-        staged = filtered.project_path
-        assert staged != project
-        assert {p.relative_to(staged).as_posix() for p in staged.rglob("*") if p.is_file()} == {"src/keep.py"}
-        assert filtered.display_project_path == str(project)
-        assert (project / "vendor/lib/a.py").is_file()
-    assert not staged.exists()
+    for previous in (project / "scan-results/old", project / "archived/renamed [run]"):
+        FileScanOutput(previous).write_scan_metadata(ScanConfig(project, previous))
+    (project / "results-alias").symlink_to(project / "archived/renamed [run]", target_is_directory=True)
+    for output in (project / "scan-results", project, tmp_path / "external-results"):
+        args = _build_parser().parse_args(
+            [
+                "scan",
+                "--ios-source",
+                str(project),
+                "--exclude",
+                "**/vendor,**/*.generated.py",
+                "--output",
+                str(output),
+            ]
+        )
+        config = _create_scan_config(args)
+        assert config.exclude_patterns == ["**/vendor", "**/*.generated.py"]
+        with source_scan_workspace(config) as filtered:
+            staged = filtered.project_path
+            assert staged != project
+            assert {p.relative_to(staged).as_posix() for p in staged.rglob("*") if p.is_file()} == {"src/keep.py"}
+            assert filtered.display_project_path == str(project)
+            assert (project / "vendor/lib/a.py").is_file()
+            assert (project / "archived/renamed [run]/report.json").is_file()
+        assert not staged.exists()
+    with pytest.raises(ValueError, match="Phoenix scan results directory"):
+        with source_scan_workspace(ScanConfig(previous, tmp_path / "new-output")):
+            pytest.fail("Results must not become source inputs")
 
 
 def test_exclusions_do_not_follow_symlinks_back_into_excluded_paths(tmp_path):
@@ -273,7 +282,7 @@ def test_missing_binary_rules_record_unassessed_coverage(tmp_path, empty_directo
         (config.opengrep_rules_path / ".gitkeep").touch()
     output = FileScanOutput(config.output_path)
     result = MobileAnalysisWorkflowService()._perform_opengrep_scan(config, output)[0]
-    payload = json.loads((config.output_path / "opengrep_source/opengrep_results.json").read_text())
+    payload = json.loads((config.output_path / "opengrep_binary/opengrep_results.json").read_text())
     assert result.skipped
     assert payload["scan_metadata"]["status"] == "not_evaluated"
     coverage = rule_assessments(payload)["coverage"]

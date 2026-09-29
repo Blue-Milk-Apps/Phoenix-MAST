@@ -168,7 +168,7 @@ table.compact th, table.compact td { font-size: 8pt; padding: 4px 6px; }
 .eval-findings li { margin-bottom: 2px; }
 
 /* ---------- Functionality grid ---------- */
-.func-legend { margin: 12px 0 24px; font-size: 8pt; }
+.func-legend { margin: 8px 0 12px; font-size: 8pt; }
 .func-legend span { margin-right: 20px; }
 .func-legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
 .func-legend-present { color: #16233c; font-weight: bold; }
@@ -177,8 +177,8 @@ table.compact th, table.compact td { font-size: 8pt; padding: 4px 6px; }
 .func-legend-absent::before { background: #b6bec9; }
 .func-grid { margin: 0 -4px; }
 .func-row { display: flex; break-inside: avoid; }
-.func-item { width: 20%; min-height: 108px; padding: 12px 8px; text-align: center; break-inside: avoid; }
-.func-item svg { display: block; margin: 0 auto 10px; }
+.func-item { width: 20%; min-height: 80px; padding: 6px 8px; text-align: center; break-inside: avoid; }
+.func-item svg { display: block; width: 32px; height: 32px; margin: 0 auto 6px; }
 .func-name { font-size: 8.5pt; line-height: 1.35; font-weight: normal; }
 .func-present .func-name { color: #16233c; font-weight: bold; }
 .func-absent .func-name { color: #7b8492; }
@@ -222,3 +222,9 @@ table.compact th, table.compact td { font-size: 8pt; padding: 4px 6px; }
 .secret-findings th:last-child { width: 20%; }
 .secret-findings td { overflow-wrap: anywhere; }
 .secret-findings tr { break-inside: avoid; }
+
+/* Keep long install names, package URLs, and evidence inside inventory columns. */
+.inventory-table { table-layout: fixed; width: 100%; }
+.inventory-table td { overflow-wrap: anywhere; word-wrap: break-word; }
+.inventory-table thead { display: table-header-group; }
+.inventory-table tr { break-inside: avoid; }

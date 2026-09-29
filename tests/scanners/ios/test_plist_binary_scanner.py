@@ -44,6 +44,12 @@ def test_plist_binary_scan_writes_normalized_plists(tmp_path: Path) -> None:
         )
         archive.writestr(f"Payload/{app_bundle_name}/Test", b"stub-binary")
         archive.writestr(f"Payload/{app_bundle_name}/AppIcon60x60@3x.png", icon.getvalue())
+        archive.writestr(f"Payload/{app_bundle_name}/NoPlist.bundle/data.txt", "resource")
+        archive.writestr(f"Payload/{app_bundle_name}/Frameworks/libDemo.dylib", b"not scanned")
+        archive.writestr(
+            f"Payload/{app_bundle_name}/Package_Resources.bundle/Info.plist",
+            plistlib.dumps({"CFBundleIdentifier": "example.resources", "CFBundleName": "Resources"}),
+        )
         archive.writestr(
             f"Payload/{app_bundle_name}/Frameworks/Foo.framework/Info.plist",
             plistlib.dumps(
@@ -62,7 +68,20 @@ def test_plist_binary_scan_writes_normalized_plists(tmp_path: Path) -> None:
 
     results = PlistBinaryScanner().scan(config)
 
-    assert len(results) == 3
+    assert len(results) == 4
+    index = json.loads(
+        next(result.raw_output for result in results if result.relative_target_path == "scan_index.json")
+    )
+    assert index["embedded_paths"] == [
+        "Frameworks/Foo.framework",
+        "Frameworks/libDemo.dylib",
+        "NoPlist.bundle",
+        "Package_Resources.bundle",
+    ]
+    assert (
+        next(item for item in index["plists"] if item["source_path"].startswith("Package_"))["role"]
+        == "resource_bundle"
+    )
     assert all(result.success for result in results)
     outputs = {result.relative_target_path: json.loads(result.raw_output) for result in results}
     assert outputs["Info.json"]["app_meta"]["bundle_identifier"] == "com.example.app"
@@ -72,10 +91,11 @@ def test_plist_binary_scan_writes_normalized_plists(tmp_path: Path) -> None:
     assert base64.b64decode(app_info.icon_data_uri.split(",")[1]) == icon.getvalue()
     assert outputs["Frameworks/Foo.framework/Info.json"]["framework_meta"]["bundle_identifier"] == ("com.example.foo")
     assert outputs["Frameworks/Foo.framework/Info.json"]["plist"]["CFBundleIdentifier"] == ("com.example.foo")
-    assert outputs["scan_index.json"]["emitted_plist_count"] == 2
+    assert outputs["scan_index.json"]["emitted_plist_count"] == 3
     assert {item["role"] for item in outputs["scan_index.json"]["plists"]} == {
         "app",
         "framework",
+        "resource_bundle",
     }
 
     for result in results:

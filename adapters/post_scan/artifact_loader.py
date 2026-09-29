@@ -20,6 +20,14 @@ class ArtifactLoader(ScanOutputLoaderPort):
             return None
 
     @classmethod
+    def _load_binary_opengrep(cls, root: Path) -> Any:
+        path = root / "opengrep_binary" / "opengrep_results.json"
+        if not path.exists():
+            # Older binary scans used the source artifact directory too.
+            path = root / "opengrep_source" / "opengrep_results.json"
+        return cls._load_json(path)
+
+    @classmethod
     def _load_known_json(cls, path: Path) -> dict[str, Any]:
         return {path.name: cls._load_json(path)} if path.is_file() else {}
 

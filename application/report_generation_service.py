@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from dataclasses import replace
 from typing import Any, Mapping
 
+from domain.post_scan.ios.binary.dependencies import with_dependency_observations
 from domain.report import (
     ReportData,
     ReportMetadata,
@@ -15,7 +16,7 @@ from domain.report import (
     ReportTargetKind,
     ReportTargetType,
 )
-from domain.report.models import SecretFindingSummary, SecretScanSummary
+from domain.report.models import SbomPackage, SbomSummary, SecretFindingSummary, SecretScanSummary
 from domain.report.rule_report import with_rule_assessments
 from ports.report_data_builder_port import ReportDataBuilderPort
 
@@ -47,6 +48,7 @@ class ReportGenerationService:
         metadata = self._metadata_from(post_scan_data)
         builder = self._builder_resolver.resolve(metadata.target.target_kind)
         report = with_rule_assessments(builder.build(post_scan_data, metadata), post_scan_data)
+        report = with_dependency_observations(report)
         summaries = tuple(
             SecretScanSummary(
                 scanner=item["scanner"],
@@ -56,7 +58,18 @@ class ReportGenerationService:
             )
             for item in post_scan_data.get("secret_scans", ())
         )
-        return replace(report, secret_scans=summaries)
+        inventory = post_scan_data.get("sbom")
+        sbom = SbomSummary()
+        if isinstance(inventory, Mapping):
+            sbom = SbomSummary(
+                status=str(inventory["status"]),
+                reason=str(inventory.get("reason", "")),
+                packages=tuple(
+                    SbomPackage(**{**item, "locations": tuple(item.get("locations", ()))})
+                    for item in inventory.get("packages", ())
+                ),
+            )
+        return replace(report, secret_scans=summaries, sbom=sbom)
 
     @classmethod
     def _metadata_from(cls, post_scan_data: Mapping[str, Any]) -> ReportMetadata:
