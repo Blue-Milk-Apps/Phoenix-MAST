@@ -87,6 +87,7 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
+          provenance: ${{ github.ref_name == 'main' || github.ref_name == 'develop' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
