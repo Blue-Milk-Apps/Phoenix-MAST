@@ -42,10 +42,17 @@ RUN apt-get update \
     && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends \
     bash git curl ca-certificates \
-    aapt apksigner \
+    aapt \
     binutils libmagic1t64 \
     libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-dejavu-core \
     openjdk-21-jre-headless \
+    && rm -rf /var/lib/apt/lists/*
+
+# Extract Debian's apksigner without installing its full-JRE dependency; it runs on the headless JRE above.
+RUN apt-get update \
+    && apt-get download apksigner \
+    && dpkg-deb -x "$(find . -maxdepth 1 -name 'apksigner_*.deb' -print -quit)" / \
+    && rm -f apksigner_*.deb \
     && rm -rf /var/lib/apt/lists/*
 
 # 3. Static Tooling Installations
