@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any, Mapping
 
+from domain.post_scan.rule_assessment import rule_description
 from domain.report.models import (
     AssessmentStatus,
     CheckSeverity,
@@ -77,7 +78,7 @@ def with_rule_assessments(report: ReportData, data: Mapping[str, Any]) -> Report
                         rule_id=rule["rule_id"],
                         platform=platform.value,
                         severity=severity,
-                        description=metadata["description"],
+                        description=rule_description(rule),
                         execution_status=execution,
                         values=tuple(
                             InventoryValue(value, tuple(dict.fromkeys(locations)))
@@ -85,7 +86,7 @@ def with_rule_assessments(report: ReportData, data: Mapping[str, Any]) -> Report
                         ),
                     )
                 )
-        explanation = metadata["description"]
+        explanation = rule_description(rule)
         if status == AssessmentStatus.PRESENT and execution != "success":
             explanation += " Matches were retained from an incomplete scan."
         remediation = metadata.get("remediation", {})

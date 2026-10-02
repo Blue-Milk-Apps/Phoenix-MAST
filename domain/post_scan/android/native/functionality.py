@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from domain.post_scan.android.native.scan_extraction_context import NativeAndroidScanExtractionContext
-from domain.post_scan.rule_assessment import assessments_from_outputs
+from domain.post_scan.rule_assessment import assessments_from_outputs, rule_description
 
 
 @dataclass
@@ -32,7 +32,7 @@ class NativeAndroidFunctionality:
                 if definitions and all(rule["status"] == "not_present" for rule in definitions)
                 else None
             )
-            explanations = list(dict.fromkeys(rule["metadata"]["description"] for rule in matches))
+            explanations = list(dict.fromkeys(rule_description(rule) for rule in matches))
             self.items[capability] = {
                 "present": present,
                 "explanation": " ".join(explanations)

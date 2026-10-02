@@ -15,6 +15,8 @@ def test_categories_and_metadata_come_from_files(tmp_path: Path):
         ("crypto", ("example.crypto",)),
     ]
     assert inventory.catalog[1]["metadata"]["finding_type"] == "review"
+    assert "description" not in inventory.catalog[1]["metadata"]
+    assert inventory.catalog[1]["message"] == "An example marker was found."
     assert len(inventory.fingerprint) == 64
     assert "pattern-regex" not in inventory.catalog[0]
 
@@ -28,11 +30,23 @@ def test_duplicate_ids_are_rejected(tmp_path: Path):
 
 @pytest.mark.parametrize(
     "field,value",
-    [("finding_type", "vulnerability"), ("scope", None), ("category", "code"), ("capability_type", ["Source"])],
+    [
+        ("finding_type", "vulnerability"),
+        ("scope", None),
+        ("category", "code"),
+        ("capability_type", ["Source"]),
+        ("message", None),
+        ("message", ""),
+        ("message", " "),
+        ("message", 123),
+    ],
 )
 def test_invalid_metadata_is_rejected(tmp_path: Path, field, value):
     definition = rule()
-    definition["metadata"][field] = value
+    if field == "message":
+        definition[field] = value
+    else:
+        definition["metadata"][field] = value
     write_rules(tmp_path / "anything.yml", definition)
     with pytest.raises(RuleInventoryError):
         validate_rule_inventory(tmp_path)

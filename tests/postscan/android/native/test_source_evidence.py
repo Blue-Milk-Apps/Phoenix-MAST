@@ -27,9 +27,11 @@ def test_android_rules_use_flat_metadata() -> None:
 
 def test_functionality_uses_opengrep_metadata_without_python_permission_mapping() -> None:
     camera = rule("example.camera", finding_type="observation")
-    camera["metadata"].update(functionality="Camera", description="Camera functionality detected.")
+    camera["metadata"].update(functionality="Camera")
+    camera["message"] = "Camera functionality detected."
     maps = rule("example.maps", finding_type="observation")
-    maps["metadata"].update(functionality="Maps", description="Maps usage detected.")
+    maps["metadata"].update(functionality="Maps")
+    maps["message"] = "Maps usage detected."
     custom = rule("example.custom", finding_type="observation")
     custom["metadata"].update(functionality="Custom Capability")
     opengrep = assessment_payload(

@@ -43,7 +43,10 @@ class RuleDefinition:
             FindingType(metadata.get("finding_type"))
         except (ValueError, TypeError) as exc:
             raise ValueError(f"{rule_id}: finding_type must be weakness, review, control, or observation.") from exc
-        for field in ("title", "description", "scope", "impact"):
+        message = rule.get("message")
+        if not isinstance(message, str) or not message.strip():
+            raise ValueError(f"{rule_id}: message must be a non-empty string.")
+        for field in ("title", "scope", "impact"):
             if not isinstance(metadata.get(field), str) or not metadata[field].strip():
                 raise ValueError(f"{rule_id}: metadata.{field} must be a non-empty string.")
         remediation = metadata.get("remediation")
@@ -63,7 +66,7 @@ class RuleDefinition:
                 raise ValueError(f"{rule_id}: metadata.inventory must name a capture such as $VALUE.")
             if metadata["finding_type"] != "observation" or severity != "info":
                 raise ValueError(f"{rule_id}: inventory rules must be INFO observations.")
-        return cls(rule_id.strip(), category, rule_file, fingerprint, severity, str(rule.get("message", "")), metadata)
+        return cls(rule_id.strip(), category, rule_file, fingerprint, severity, message, metadata)
 
     def snapshot(self) -> dict[str, Any]:
         return asdict(self)
@@ -132,6 +135,12 @@ def assessments_from_outputs(loaded_outputs: dict[str, Any]) -> dict[str, Any]:
     return cached if isinstance(cached, dict) else rule_assessments(loaded_outputs.get("opengrep"))
 
 
+def rule_description(rule: Mapping[str, Any]) -> str:
+    """Use the rule message, preserving descriptions in older saved snapshots."""
+
+    return str(rule["metadata"].get("description") or rule["message"])
+
+
 class RuleFunctionality:
     """Group declared YAML functionality labels, preserving each scanner scope."""
 
@@ -154,7 +163,7 @@ class RuleFunctionality:
                     if all(rule["status"] == "not_present" for rule in rules)
                     else "not_evaluated"
                 )
-                descriptions = list(dict.fromkeys(rule["metadata"]["description"] for rule in matches))
+                descriptions = list(dict.fromkeys(rule_description(rule) for rule in matches))
                 locations = []
                 for rule in matches:
                     for match in rule["matches"]:
