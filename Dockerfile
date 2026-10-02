@@ -1,22 +1,31 @@
 # syntax=docker/dockerfile:1.7
-FROM golang:1.26.6-trixie@sha256:b75d466dd608587fd66cca705a307ba65b889827d06ad61d6a75f0482b51b7c7 AS go-tools-builder
+FROM golang:1.26.8-trixie@sha256:eae2aaa6add2936cbf350dd0d2628b363461542f0c4b3c0b558957e0f2997379 AS go-tools-builder
 ARG GITLEAKS_VERSION=8.30.1
 ARG IPSW_VERSION=3.1.728
+ARG SYFT_VERSION=1.52.0
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         fuse3 libfuse3-dev bzip2 libbz2-dev cmake libattr1-dev zlib1g-dev \
     && rm -rf /var/lib/apt/lists/* \
-    && go install github.com/anchore/syft/cmd/syft@v1.52.0 \
+    && git clone --depth 1 --branch "v${SYFT_VERSION}" \
+        https://github.com/anchore/syft.git /tmp/syft \
+    && cd /tmp/syft \
+    && go get github.com/containerd/containerd/v2@v2.3.6 \
+        go.opentelemetry.io/otel/sdk@v1.45.0 \
+    && CGO_ENABLED=0 go build -ldflags "-X main.version=${SYFT_VERSION}" \
+        -o /go/bin/syft ./cmd/syft \
     && git clone --depth 1 --branch "v${GITLEAKS_VERSION}" \
         https://github.com/gitleaks/gitleaks.git /tmp/gitleaks \
     && cd /tmp/gitleaks \
     && go get golang.org/x/crypto@v0.56.0 \
+        github.com/mholt/archives@v0.1.5 \
+        github.com/nwaples/rardecode/v2@v2.2.0 github.com/ulikunitz/xz@v0.5.15 \
     && go build -ldflags "-X=github.com/zricethezav/gitleaks/v8/version.Version=v${GITLEAKS_VERSION}" \
         -o /go/bin/gitleaks . \
     && git clone --depth 1 --branch "v${IPSW_VERSION}" \
         https://github.com/blacktop/ipsw.git /tmp/ipsw \
     && cd /tmp/ipsw \
-    && go get google.golang.org/grpc@v1.83.2 \
+    && go get google.golang.org/grpc@v1.83.2 github.com/antchfx/xpath@v1.3.6 \
     && CGO_ENABLED=1 go build \
         -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=v${IPSW_VERSION}" \
         -o /go/bin/ipsw ./cmd/ipsw
@@ -35,6 +44,7 @@ ENV FORCE_COLOR=1 \
     OPENGREP_OFFLINE=1 \
     OPENGREP_DISABLE_METRICS=1 \
     OPENGREP_SEND_METRICS=off \
+    SYFT_CHECK_FOR_APP_UPDATE=false \
     TRUFFLEHOG_NO_UPDATE=1
 
 # 2. System dependencies
@@ -78,7 +88,7 @@ SH
 
 # 3. Static Tooling Installations
 ARG TRUFFLEHOG_VERSION=v3.97.9
-ARG APKTOOL_VERSION=2.10.0
+ARG APKTOOL_VERSION=2.12.1
 RUN curl -sSfL "https://raw.githubusercontent.com/trufflesecurity/trufflehog/${TRUFFLEHOG_VERSION}/scripts/install.sh" | sh -s -- -b /usr/local/bin "${TRUFFLEHOG_VERSION}" \
     && curl -sSfL -o /usr/local/bin/apktool \
     "https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool" \
