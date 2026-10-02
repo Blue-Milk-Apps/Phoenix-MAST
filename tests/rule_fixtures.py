@@ -10,7 +10,7 @@ from domain.post_scan.rule_assessment import RuleDefinition
 def rule(rule_id="example.check", *, finding_type="weakness", severity="HIGH", title="Example check"):
     return {
         "id": rule_id,
-        "message": "Example matched",
+        "message": "An example marker was found.",
         "severity": severity,
         "languages": ["generic"],
         "pattern-regex": "EXAMPLE_MARKER",
@@ -18,7 +18,6 @@ def rule(rule_id="example.check", *, finding_type="weakness", severity="HIGH", t
             "finding_type": finding_type,
             "scope": "matched_code",
             "title": title,
-            "description": "An example marker was found.",
             "impact": "Review the example context.",
             "remediation": {
                 "guidance": "Remove the example marker.",

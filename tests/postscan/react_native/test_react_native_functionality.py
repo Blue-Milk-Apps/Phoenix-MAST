@@ -63,7 +63,8 @@ def test_older_scan_without_catalog_does_not_claim_assessment():
 
 def test_dependency_declarations_are_reported_from_yaml_observations():
     definition = _capability("package.navigation", "Navigation")
-    definition["metadata"].update(scope="app_declaration", description="Navigation dependency declared.")
+    definition["metadata"].update(scope="app_declaration")
+    definition["message"] = "Navigation dependency declared."
     output = scoped_payload(
         react_native=assessment_payload(
             definition, category="functionality", results=[{"check_id": "package.navigation", "path": "package.json"}]

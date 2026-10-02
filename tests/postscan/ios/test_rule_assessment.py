@@ -44,6 +44,7 @@ def test_new_id_and_custom_category_need_no_python_registration():
     check = section.checks[0]
     assert section.name == "Custom"
     assert check.name == "Title from YAML"
+    assert check.explanation == "An example marker was found."
     assert check.rule_id == "brand-new-id"
     assert check.result == AssessmentStatus.PRESENT
     assert check.scope == "matched_code"
@@ -89,6 +90,10 @@ def test_nonweakness_matches_count_by_severity_without_increasing_risk(
     assert getattr(report.findings_severity, severity.lower()) == 1
     assert report.overall_evaluation[-1].risk_level.value == "not_evaluated"
     restored = ReportData.from_dict(json.loads(json.dumps(report.to_dict())))
+    assert restored.vulnerability_sections[-1].checks[0].explanation == "An example marker was found."
+    assert PdfReportGenerator._presentation_data(restored)["vulnerability_sections"][-1]["checks"][0][
+        "explanation"
+    ] == "An example marker was found."
     assert PdfReportGenerator._presentation_data(restored)["finding_summary"] == [
         {
             "area": "Custom",
@@ -106,6 +111,10 @@ def test_snapshot_is_sufficient_for_later_report_generation():
     report = build(output)
     assert report.vulnerability_sections[-1].checks[0].name == "Saved title"
     assert report.vulnerability_sections[-1].checks[0].result == AssessmentStatus.PRESENT
+
+    output["scan_metadata"]["rule_catalog"][0]["metadata"]["description"] = "Saved legacy description."
+    legacy_report = build(output)
+    assert legacy_report.vulnerability_sections[-1].checks[0].explanation == "Saved legacy description."
 
 
 def test_failed_rules_and_partial_matches_remain_distinct():
