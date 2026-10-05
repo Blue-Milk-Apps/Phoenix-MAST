@@ -1,0 +1,99 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "urn:uuid:425af541-425c-4579-a845-503be6892737",
+  "author": "Phoenix MAST security assessment",
+  "timestamp": "2026-10-05T14:48:26Z",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": {
+        "name": "GO-2026-4887"
+      },
+      "products": [
+        {
+          "@id": "pkg:generic/phoenix@sha256%3A425af541425ce5792845503be689273793e3e61ed67d22c11feb00b1471d64f1",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/github.com/docker/docker@v28.5.2%2Bincompatible"
+            }
+          ]
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "This assessment applies only to the named Phoenix image. ipsw 3.1.728 uses Docker client/API packages and pkg/stdcopy. The builder dependency list excludes Docker daemon, authorization, and plugin packages. Inspection of all 101630 Go functions in ipsw found 64 client functions and no daemon, authorization, or plugin functions. The affected daemon implementation is absent. Assessed ipsw SHA-256: e670464829ba97030cc1d1e1722874a6cb309c0c7fe8e8ac1f092af509c26508. This does not assess an external Docker daemon."
+    },
+    {
+      "vulnerability": {
+        "name": "GHSA-pxq6-2prw-chj9"
+      },
+      "products": [
+        {
+          "@id": "pkg:generic/phoenix@sha256%3A425af541425ce5792845503be689273793e3e61ed67d22c11feb00b1471d64f1",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/github.com/docker/docker@v28.5.2%2Bincompatible"
+            }
+          ]
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "This assessment applies only to the named Phoenix image. ipsw 3.1.728 uses Docker client/API packages and pkg/stdcopy. The builder dependency list excludes Docker daemon, authorization, and plugin packages. Inspection of all 101630 Go functions in ipsw found 64 client functions and no daemon, authorization, or plugin functions. The affected daemon implementation is absent. Assessed ipsw SHA-256: e670464829ba97030cc1d1e1722874a6cb309c0c7fe8e8ac1f092af509c26508. This does not assess an external Docker daemon."
+    },
+    {
+      "vulnerability": {
+        "name": "GHSA-x86f-5xw2-fm2r"
+      },
+      "products": [
+        {
+          "@id": "pkg:generic/phoenix@sha256%3A425af541425ce5792845503be689273793e3e61ed67d22c11feb00b1471d64f1",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/github.com/docker/docker@v28.5.2%2Bincompatible"
+            }
+          ]
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "This assessment applies only to the named Phoenix image. ipsw 3.1.728 uses Docker client/API packages and pkg/stdcopy. The builder dependency list excludes Docker daemon, authorization, and plugin packages. Inspection of all 101630 Go functions in ipsw found 64 client functions and no daemon, authorization, or plugin functions. The affected daemon implementation is absent. Assessed ipsw SHA-256: e670464829ba97030cc1d1e1722874a6cb309c0c7fe8e8ac1f092af509c26508. This does not assess an external Docker daemon."
+    },
+    {
+      "vulnerability": {
+        "name": "GHSA-rg2x-37c3-w2rh"
+      },
+      "products": [
+        {
+          "@id": "pkg:generic/phoenix@sha256%3A425af541425ce5792845503be689273793e3e61ed67d22c11feb00b1471d64f1",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/github.com/docker/docker@v28.5.2%2Bincompatible"
+            }
+          ]
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "This assessment applies only to the named Phoenix image. ipsw 3.1.728 uses Docker client/API packages and pkg/stdcopy. The builder dependency list excludes Docker daemon, authorization, and plugin packages. Inspection of all 101630 Go functions in ipsw found 64 client functions and no daemon, authorization, or plugin functions. The affected daemon implementation is absent. Assessed ipsw SHA-256: e670464829ba97030cc1d1e1722874a6cb309c0c7fe8e8ac1f092af509c26508. This does not assess an external Docker daemon."
+    },
+    {
+      "vulnerability": {
+        "name": "GHSA-vp62-88p7-qqf5"
+      },
+      "products": [
+        {
+          "@id": "pkg:generic/phoenix@sha256%3A425af541425ce5792845503be689273793e3e61ed67d22c11feb00b1471d64f1",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/github.com/docker/docker@v28.5.2%2Bincompatible"
+            }
+          ]
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "This assessment applies only to the named Phoenix image. ipsw 3.1.728 uses Docker client/API packages and pkg/stdcopy. The builder dependency list excludes Docker daemon, authorization, and plugin packages. Inspection of all 101630 Go functions in ipsw found 64 client functions and no daemon, authorization, or plugin functions. The affected daemon implementation is absent. Assessed ipsw SHA-256: e670464829ba97030cc1d1e1722874a6cb309c0c7fe8e8ac1f092af509c26508. This does not assess an external Docker daemon."
+    }
+  ]
+}

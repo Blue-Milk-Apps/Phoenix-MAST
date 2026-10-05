@@ -54,7 +54,8 @@ RUN test "${TARGETARCH:-amd64}" = amd64 \
     || { echo "Android SDK Build Tools require --platform linux/amd64" >&2; exit 1; }
 RUN apk upgrade --no-cache \
     && apk add --no-cache \
-        python-3.12 py3.12-pip \
+        "python-3.14=3.14.8_git20261001-r2" py3.14-pip \
+        "openssl-4.0-libcrypto>=4.0.3-r2" \
         bash git curl ca-certificates-bundle \
         binutils libmagic \
         pango harfbuzz ttf-dejavu \
@@ -67,7 +68,7 @@ RUN <<'SH'
 set -eu
 curl -sSfL "https://dl.google.com/android/repository/${ANDROID_BUILD_TOOLS_ARCHIVE}" -o /tmp/android-build-tools.zip
 echo "${ANDROID_BUILD_TOOLS_SHA256}  /tmp/android-build-tools.zip" | sha256sum -c -
-python3.12 - <<'PY'
+python3.14 - <<'PY'
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -110,7 +111,7 @@ ARG APKID_VERSION=3.1.0
 ARG ANDROGUARD_VERSION=4.1.4
 ARG LIEF_VERSION=0.17.6
 ARG OPENGREP_VERSION=1.30.0
-RUN python3.12 -m venv /opt/phoenix-venv \
+RUN python3.14 -m venv /opt/phoenix-venv \
     && /opt/phoenix-venv/bin/python -m pip install --no-cache-dir --upgrade "pip>=26.2.0" \
     && case "${TARGETARCH:-amd64}" in \
         amd64) OPENGREP_ASSET="opengrep_manylinux_x86" ;; \
@@ -146,7 +147,7 @@ COPY --chown=phoenix:phoenix entrypoints ./entrypoints
 COPY --chown=phoenix:phoenix ports ./ports
 
 RUN /opt/phoenix-venv/bin/pip install --no-cache-dir . \
-    && apk del curl py3.12-pip \
+    && apk del curl py3.14-pip \
     && /opt/phoenix-venv/bin/python -m pip uninstall --yes pip
 
 # 6. Working Directory

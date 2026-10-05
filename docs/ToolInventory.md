@@ -40,7 +40,7 @@ All independently installed analysis tools above have an execution path. Raw evi
 
 | Package/tool | Why present |
 | --- | --- |
-| Python 3.12, pip, venv | Engine and Python tool runtime/install environment. |
+| Python 3.14, pip, venv | Container runtime and Python tool installation environment; the engine supports Python 3.12+. |
 | Bash | Interactive image entrypoint and Apktool launcher. |
 | Git | Repository discovery used by OpenGrep and its upstream tool support. |
 | CA certificates | HTTPS certificate verification by tools. |
