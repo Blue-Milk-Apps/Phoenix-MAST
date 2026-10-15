@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1.7
-FROM golang:1.26.8-trixie@sha256:eae2aaa6add2936cbf350dd0d2628b363461542f0c4b3c0b558957e0f2997379 AS go-tools-builder
+FROM golang:1.26.9-trixie@sha256:f06b7122f888680048afb247c4e5f49c0069eb6c4c1ccae0f3f4834527a8d22c AS go-tools-builder
 ARG GITLEAKS_VERSION=8.30.1
+# Omit ipsw's IDA integrations, which require the deprecated Docker SDK.
 ARG IPSW_VERSION=3.1.728
 ARG SYFT_VERSION=1.52.0
 RUN apt-get update \
@@ -11,7 +12,7 @@ RUN apt-get update \
         https://github.com/anchore/syft.git /tmp/syft \
     && cd /tmp/syft \
     && go get github.com/containerd/containerd/v2@v2.3.6 \
-        go.opentelemetry.io/otel/sdk@v1.45.0 \
+        go.opentelemetry.io/otel/sdk@v1.45.0 golang.org/x/net@v0.60.0 \
     && CGO_ENABLED=0 go build -ldflags "-X main.version=${SYFT_VERSION}" \
         -o /go/bin/syft ./cmd/syft \
     && git clone --depth 1 --branch "v${GITLEAKS_VERSION}" \
@@ -25,10 +26,16 @@ RUN apt-get update \
     && git clone --depth 1 --branch "v${IPSW_VERSION}" \
         https://github.com/blacktop/ipsw.git /tmp/ipsw \
     && cd /tmp/ipsw \
+    && rm cmd/ipsw/cmd/dyld/dyld_ida.go cmd/ipsw/cmd/kernel/kernel_ida.go \
     && go get google.golang.org/grpc@v1.83.2 github.com/antchfx/xpath@v1.3.6 \
+        golang.org/x/net@v0.60.0 \
+    && go list -deps ./cmd/ipsw > /tmp/ipsw-deps.txt \
+    && ! grep -E '^github[.]com/docker/docker(/|$)' /tmp/ipsw-deps.txt \
     && CGO_ENABLED=1 go build \
         -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=v${IPSW_VERSION}" \
-        -o /go/bin/ipsw ./cmd/ipsw
+        -o /go/bin/ipsw ./cmd/ipsw \
+    && go version -m /go/bin/ipsw > /tmp/ipsw-build-info.txt \
+    && ! grep -F 'github.com/docker/docker' /tmp/ipsw-build-info.txt
 
 FROM cgr.dev/chainguard/wolfi-base:latest@sha256:824f77df45397eb954dfb963db255907ee8842e3446353ce93d688e5e862f51d AS phoenix
 
@@ -55,6 +62,7 @@ RUN test "${TARGETARCH:-amd64}" = amd64 \
 RUN apk upgrade --no-cache \
     && apk add --no-cache \
         python-3.12 py3.12-pip \
+        "openssl-4.0-libcrypto>=4.0.3-r2" \
         bash git curl ca-certificates-bundle \
         binutils libmagic \
         pango harfbuzz ttf-dejavu \
