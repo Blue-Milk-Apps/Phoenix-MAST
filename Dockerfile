@@ -13,6 +13,7 @@ RUN apt-get update \
     && cd /tmp/syft \
     && go get github.com/containerd/containerd/v2@v2.3.6 \
         go.opentelemetry.io/otel/sdk@v1.45.0 golang.org/x/net@v0.60.0 \
+        github.com/moby/sys/user@v0.4.1 \
     && CGO_ENABLED=0 go build -ldflags "-X main.version=${SYFT_VERSION}" \
         -o /go/bin/syft ./cmd/syft \
     && git clone --depth 1 --branch "v${GITLEAKS_VERSION}" \
@@ -36,6 +37,15 @@ RUN apt-get update \
         -o /go/bin/ipsw ./cmd/ipsw \
     && go version -m /go/bin/ipsw > /tmp/ipsw-build-info.txt \
     && ! grep -F 'github.com/docker/docker' /tmp/ipsw-build-info.txt
+
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:824f77df45397eb954dfb963db255907ee8842e3446353ce93d688e5e862f51d AS java-runtime-builder
+# APKTool needs image processing; native audio and X11 backends are unused.
+RUN apk add --no-cache binutils openjdk-21=21.0.12.1-r4 openjdk-21-jmods=21.0.12.1-r4 \
+    && /usr/lib/jvm/java-21-openjdk/bin/jlink \
+        --add-modules java.base,java.desktop,java.logging,jdk.crypto.ec,jdk.unsupported,jdk.zipfs \
+        --strip-debug --no-header-files --no-man-pages \
+        --exclude-files '**/libjsound.so,**/libawt_xawt.so' \
+        --output /opt/phoenix-java
 
 FROM cgr.dev/chainguard/wolfi-base:latest@sha256:824f77df45397eb954dfb963db255907ee8842e3446353ce93d688e5e862f51d AS phoenix
 
@@ -61,12 +71,15 @@ RUN test "${TARGETARCH:-amd64}" = amd64 \
     || { echo "Android SDK Build Tools require --platform linux/amd64" >&2; exit 1; }
 RUN apk upgrade --no-cache \
     && apk add --no-cache \
-        python-3.12 py3.12-pip \
+        "glibc-2.44>=2.44-r8" "glibc-2.44-locale-posix>=2.44-r8" \
+        "ld-linux-2.44>=2.44-r8" "libcrypt1-2.44>=2.44-r8" \
+        python-3.15=3.15.0-r0 \
         "openssl-4.0-libcrypto>=4.0.3-r2" \
         bash git curl ca-certificates-bundle \
         binutils libmagic \
-        pango harfbuzz ttf-dejavu \
-        openjdk-21-jre
+        pango harfbuzz ttf-dejavu lcms2 libjpeg-turbo
+
+COPY --from=java-runtime-builder /opt/phoenix-java /usr/lib/jvm/java-21-openjdk
 
 # Wolfi has no aapt package; retain aapt2 and apksigner from Google's Build Tools 36.1.
 ARG ANDROID_BUILD_TOOLS_ARCHIVE=build-tools_r36.1_linux.zip
@@ -75,7 +88,7 @@ RUN <<'SH'
 set -eu
 curl -sSfL "https://dl.google.com/android/repository/${ANDROID_BUILD_TOOLS_ARCHIVE}" -o /tmp/android-build-tools.zip
 echo "${ANDROID_BUILD_TOOLS_SHA256}  /tmp/android-build-tools.zip" | sha256sum -c -
-python3.12 - <<'PY'
+python3.15 - <<'PY'
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -116,9 +129,12 @@ RUN gitleaks version && ipsw version && syft version
 # 4. Python Environment Setup
 ARG APKID_VERSION=3.1.0
 ARG ANDROGUARD_VERSION=4.1.4
-ARG LIEF_VERSION=0.17.6
+ARG LIEF_VERSION=1.0.0
+ARG BROTLI_VERSION=1.2.0
 ARG OPENGREP_VERSION=1.30.0
-RUN python3.12 -m venv /opt/phoenix-venv \
+RUN apk add --no-cache --virtual .python-build-deps \
+        build-base python-3.15-dev=3.15.0-r0 \
+    && python3.15 -m venv /opt/phoenix-venv \
     && /opt/phoenix-venv/bin/python -m pip install --no-cache-dir --upgrade "pip>=26.2.0" \
     && case "${TARGETARCH:-amd64}" in \
         amd64) OPENGREP_ASSET="opengrep_manylinux_x86" ;; \
@@ -134,9 +150,11 @@ RUN python3.12 -m venv /opt/phoenix-venv \
         "androguard==${ANDROGUARD_VERSION}" \
         "lief==${LIEF_VERSION}" \
         "apkid==${APKID_VERSION}" \
+        "brotli==${BROTLI_VERSION}" \
     && opengrep --version \
     && /opt/phoenix-venv/bin/python -c "from importlib.metadata import version; print('apkid ' + version('apkid'))" \
-    && /opt/phoenix-venv/bin/python -c "from androguard.misc import AnalyzeAPK; import lief; print('androguard and lief imports ok')"
+    && /opt/phoenix-venv/bin/python -c "from androguard.misc import AnalyzeAPK; import lief; print('androguard and lief imports ok')" \
+    && apk del .python-build-deps
 
 # 5. Application User and Source Code
 WORKDIR /app
@@ -154,7 +172,7 @@ COPY --chown=phoenix:phoenix entrypoints ./entrypoints
 COPY --chown=phoenix:phoenix ports ./ports
 
 RUN /opt/phoenix-venv/bin/pip install --no-cache-dir . \
-    && apk del curl py3.12-pip \
+    && apk del curl \
     && /opt/phoenix-venv/bin/python -m pip uninstall --yes pip
 
 # 6. Working Directory
