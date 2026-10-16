@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1.7
+ARG APKTOOL_VERSION=2.12.1
 FROM golang:1.26.9-trixie@sha256:f06b7122f888680048afb247c4e5f49c0069eb6c4c1ccae0f3f4834527a8d22c AS go-tools-builder
 ARG GITLEAKS_VERSION=8.30.1
 # Omit ipsw's IDA integrations, which require the deprecated Docker SDK.
@@ -13,7 +14,7 @@ RUN apt-get update \
     && cd /tmp/syft \
     && go get github.com/containerd/containerd/v2@v2.3.6 \
         go.opentelemetry.io/otel/sdk@v1.45.0 golang.org/x/net@v0.60.0 \
-        github.com/moby/sys/user@v0.4.1 \
+        github.com/moby/sys/user@v0.4.1 github.com/hashicorp/go-getter@v1.8.10 \
     && CGO_ENABLED=0 go build -ldflags "-X main.version=${SYFT_VERSION}" \
         -o /go/bin/syft ./cmd/syft \
     && git clone --depth 1 --branch "v${GITLEAKS_VERSION}" \
@@ -46,6 +47,19 @@ RUN apk add --no-cache binutils openjdk-21=21.0.12.1-r4 openjdk-21-jmods=21.0.12
         --strip-debug --no-header-files --no-man-pages \
         --exclude-files '**/libjsound.so,**/libawt_xawt.so' \
         --output /opt/phoenix-java
+
+FROM java-runtime-builder AS apktool-builder
+ARG APKTOOL_VERSION
+ARG GUAVA_VERSION=33.7.2-jre
+ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+# Rebuild the pinned release with Guava's deserialization fix.
+RUN apk add --no-cache git \
+    && git clone --depth 1 --branch "v${APKTOOL_VERSION}" \
+        https://github.com/iBotPeaches/Apktool.git /tmp/apktool \
+    && cd /tmp/apktool \
+    && sed -i "s/^guava = \".*\"$/guava = \"${GUAVA_VERSION}\"/" gradle/libs.versions.toml \
+    && ./gradlew --no-daemon --max-workers=2 release :brut.apktool:apktool-cli:proguard -x test \
+    && cp "brut.apktool/apktool-cli/build/libs/apktool-${APKTOOL_VERSION}.jar" /tmp/apktool.jar
 
 FROM cgr.dev/chainguard/wolfi-base:latest@sha256:824f77df45397eb954dfb963db255907ee8842e3446353ce93d688e5e862f51d AS phoenix
 
@@ -109,12 +123,11 @@ SH
 
 # 3. Static Tooling Installations
 ARG TRUFFLEHOG_VERSION=v3.97.9
-ARG APKTOOL_VERSION=2.12.1
+ARG APKTOOL_VERSION
+COPY --from=apktool-builder /tmp/apktool.jar /usr/local/bin/apktool.jar
 RUN curl -sSfL "https://raw.githubusercontent.com/trufflesecurity/trufflehog/${TRUFFLEHOG_VERSION}/scripts/install.sh" | sh -s -- -b /usr/local/bin "${TRUFFLEHOG_VERSION}" \
     && curl -sSfL -o /usr/local/bin/apktool \
-    "https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool" \
-    && curl -sSfL -o /usr/local/bin/apktool.jar \
-    "https://github.com/iBotPeaches/Apktool/releases/download/v${APKTOOL_VERSION}/apktool_${APKTOOL_VERSION}.jar" \
+    "https://raw.githubusercontent.com/iBotPeaches/Apktool/v${APKTOOL_VERSION}/scripts/linux/apktool" \
     && chmod +x /usr/local/bin/apktool /usr/local/bin/apktool.jar \
     && apktool --version \
     && aapt2 version \
