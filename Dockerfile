@@ -2,7 +2,7 @@
 ARG APKTOOL_VERSION=2.12.1
 FROM golang:1.26.9-trixie@sha256:f06b7122f888680048afb247c4e5f49c0069eb6c4c1ccae0f3f4834527a8d22c AS go-tools-builder
 ARG GITLEAKS_VERSION=8.30.1
-# Omit ipsw's IDA integrations, which require the deprecated Docker SDK.
+# Omit unused Syft Snap sources and ipsw IDA integrations.
 ARG IPSW_VERSION=3.1.728
 ARG SYFT_VERSION=1.52.0
 RUN apt-get update \
@@ -12,11 +12,23 @@ RUN apt-get update \
     && git clone --depth 1 --branch "v${SYFT_VERSION}" \
         https://github.com/anchore/syft.git /tmp/syft \
     && cd /tmp/syft \
+    && sed -i \
+        -e '/"github.com\/anchore\/syft\/syft\/source\/snapsource"/d' \
+        -e '/Join(tagProvider(snapsource[.]NewLocalSourceProvider/d' \
+        -e '/Join(tagProvider(snapsource[.]NewRemoteSourceProvider/d' \
+        -e '/Join(tagProvider(ocimodelsource/s/)[.]$/)/' \
+        syft/source/sourceproviders/source_providers.go \
+    && rm internal/file/getter.go \
+    && gofmt -w syft/source/sourceproviders/source_providers.go \
     && go get github.com/containerd/containerd/v2@v2.3.6 \
         go.opentelemetry.io/otel/sdk@v1.45.0 golang.org/x/net@v0.60.0 \
-        github.com/moby/sys/user@v0.4.1 github.com/hashicorp/go-getter@v1.8.10 \
+        github.com/moby/sys/user@v0.4.1 \
+    && CGO_ENABLED=0 go list -deps ./cmd/syft > /tmp/syft-deps.txt \
+    && ! grep -E '^github[.]com/hashicorp/go-getter(/|$)' /tmp/syft-deps.txt \
     && CGO_ENABLED=0 go build -ldflags "-X main.version=${SYFT_VERSION}" \
         -o /go/bin/syft ./cmd/syft \
+    && go version -m /go/bin/syft > /tmp/syft-build-info.txt \
+    && ! grep -F 'github.com/hashicorp/go-getter' /tmp/syft-build-info.txt \
     && git clone --depth 1 --branch "v${GITLEAKS_VERSION}" \
         https://github.com/gitleaks/gitleaks.git /tmp/gitleaks \
     && cd /tmp/gitleaks \
