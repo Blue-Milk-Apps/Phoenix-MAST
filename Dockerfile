@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 ARG APKTOOL_VERSION=2.12.1
-FROM golang:1.26.9-trixie@sha256:f06b7122f888680048afb247c4e5f49c0069eb6c4c1ccae0f3f4834527a8d22c AS go-tools-builder
+FROM golang:1.26.10-trixie@sha256:909771fef53e3dcb0950255f0c9a8b4728c3b841e61509c7b29b098de7ee02d4 AS go-tools-builder
 ARG GITLEAKS_VERSION=8.30.1
 # Omit unused Syft Snap sources and ipsw IDA integrations.
 ARG IPSW_VERSION=3.1.728
@@ -102,7 +102,7 @@ RUN apk upgrade --no-cache \
         "ld-linux-2.44>=2.44-r8" "libcrypt1-2.44>=2.44-r8" \
         python-3.15=3.15.0-r0 \
         "openssl-4.0-libcrypto>=4.0.3-r2" \
-        bash git curl ca-certificates-bundle \
+        bash git curl "ca-certificates-bundle>=20260909-r3" \
         binutils libmagic \
         pango harfbuzz ttf-dejavu lcms2 libjpeg-turbo
 
