@@ -34,6 +34,7 @@ RUN apt-get update \
     && cd /tmp/gitleaks \
     && go get golang.org/x/crypto@v0.56.0 \
         github.com/mholt/archives@v0.1.5 \
+        github.com/klauspost/compress@v1.18.7 \
         github.com/nwaples/rardecode/v2@v2.2.0 github.com/ulikunitz/xz@v0.5.15 \
     && go build -ldflags "-X=github.com/zricethezav/gitleaks/v8/version.Version=v${GITLEAKS_VERSION}" \
         -o /go/bin/gitleaks . \
