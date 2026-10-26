@@ -2,7 +2,6 @@
 ARG APKTOOL_VERSION=2.12.1
 FROM golang:1.26.10-trixie@sha256:909771fef53e3dcb0950255f0c9a8b4728c3b841e61509c7b29b098de7ee02d4 AS go-tools-builder
 ARG GITLEAKS_VERSION=8.30.1
-# Omit unused Syft Snap sources and ipsw IDA integrations.
 ARG IPSW_VERSION=3.1.728
 ARG SYFT_VERSION=1.52.0
 RUN apt-get update \
@@ -53,7 +52,6 @@ RUN apt-get update \
     && ! grep -F 'github.com/docker/docker' /tmp/ipsw-build-info.txt
 
 FROM cgr.dev/chainguard/wolfi-base:latest@sha256:824f77df45397eb954dfb963db255907ee8842e3446353ce93d688e5e862f51d AS java-runtime-builder
-# APKTool needs image processing; native audio and X11 backends are unused.
 RUN apk add --no-cache binutils openjdk-21=21.0.12.1-r4 openjdk-21-jmods=21.0.12.1-r4 \
     && /usr/lib/jvm/java-21-openjdk/bin/jlink \
         --add-modules java.base,java.desktop,java.logging,jdk.crypto.ec,jdk.unsupported,jdk.zipfs \
@@ -65,7 +63,6 @@ FROM java-runtime-builder AS apktool-builder
 ARG APKTOOL_VERSION
 ARG GUAVA_VERSION=33.7.2-jre
 ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk
-# Rebuild the pinned release with Guava's deserialization fix.
 RUN apk add --no-cache git \
     && git clone --depth 1 --branch "v${APKTOOL_VERSION}" \
         https://github.com/iBotPeaches/Apktool.git /tmp/apktool \
@@ -78,7 +75,6 @@ FROM cgr.dev/chainguard/wolfi-base:latest@sha256:824f77df45397eb954dfb963db25590
 
 LABEL org.opencontainers.image.source="https://github.com/Blue-Milk-Apps/Phoenix-MAST"
 
-# 1. Environment & Global Settings
 ENV FORCE_COLOR=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -91,9 +87,7 @@ ENV FORCE_COLOR=1 \
     SYFT_CHECK_FOR_APP_UPDATE=false \
     TRUFFLEHOG_NO_UPDATE=1
 
-# 2. System dependencies
 ARG TARGETARCH
-# Google's Linux Android tools match the linux/amd64 image published by CI.
 RUN test "${TARGETARCH:-amd64}" = amd64 \
     || { echo "Android SDK Build Tools require --platform linux/amd64" >&2; exit 1; }
 RUN apk upgrade --no-cache \
@@ -102,13 +96,13 @@ RUN apk upgrade --no-cache \
         "ld-linux-2.44>=2.44-r8" "libcrypt1-2.44>=2.44-r8" \
         python-3.15=3.15.0-r0 \
         "openssl-4.0-libcrypto>=4.0.3-r2" \
+        "libbrotlicommon1>=1.2.1-r0" "libbrotlidec1>=1.2.1-r0" "libbrotlienc1>=1.2.1-r0" \
         bash git curl "ca-certificates-bundle>=20260909-r3" \
         binutils libmagic \
         pango harfbuzz ttf-dejavu lcms2 libjpeg-turbo
 
 COPY --from=java-runtime-builder /opt/phoenix-java /usr/lib/jvm/java-21-openjdk
 
-# Wolfi has no aapt package; retain aapt2 and apksigner from Google's Build Tools 36.1.
 ARG ANDROID_BUILD_TOOLS_ARCHIVE=build-tools_r36.1_linux.zip
 ARG ANDROID_BUILD_TOOLS_SHA256=a7b5889e4a79fcf3b0976bef40d401f4240fb1eed891d9d91169da1111e11d78
 RUN <<'SH'
@@ -134,7 +128,6 @@ ln -s /opt/android-build-tools/apksigner /usr/local/bin/apksigner
 rm /tmp/android-build-tools.zip
 SH
 
-# 3. Static Tooling Installations
 ARG TRUFFLEHOG_VERSION=v3.97.9
 ARG APKTOOL_VERSION
 COPY --from=apktool-builder /tmp/apktool.jar /usr/local/bin/apktool.jar
@@ -156,7 +149,7 @@ RUN gitleaks version && ipsw version && syft version
 ARG APKID_VERSION=3.1.0
 ARG ANDROGUARD_VERSION=4.1.4
 ARG LIEF_VERSION=1.0.0
-ARG BROTLI_VERSION=1.2.0
+ARG BROTLI_VERSION=1.2.1
 ARG OPENGREP_VERSION=1.30.0
 RUN apk add --no-cache --virtual .python-build-deps \
         build-base python-3.15-dev=3.15.0-r0 \
@@ -201,7 +194,6 @@ RUN /opt/phoenix-venv/bin/pip install --no-cache-dir . \
     && apk del curl \
     && /opt/phoenix-venv/bin/python -m pip uninstall --yes pip
 
-# 6. Working Directory
 USER phoenix
 WORKDIR /workspace
 
