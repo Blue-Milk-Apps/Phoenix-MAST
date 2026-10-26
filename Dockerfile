@@ -102,6 +102,7 @@ RUN apk upgrade --no-cache \
         "ld-linux-2.44>=2.44-r8" "libcrypt1-2.44>=2.44-r8" \
         python-3.15=3.15.0-r0 \
         "openssl-4.0-libcrypto>=4.0.3-r2" \
+        "libbrotlicommon1>=1.2.1-r0" "libbrotlidec1>=1.2.1-r0" "libbrotlienc1>=1.2.1-r0" \
         bash git curl "ca-certificates-bundle>=20260909-r3" \
         binutils libmagic \
         pango harfbuzz ttf-dejavu lcms2 libjpeg-turbo
@@ -156,7 +157,7 @@ RUN gitleaks version && ipsw version && syft version
 ARG APKID_VERSION=3.1.0
 ARG ANDROGUARD_VERSION=4.1.4
 ARG LIEF_VERSION=1.0.0
-ARG BROTLI_VERSION=1.2.0
+ARG BROTLI_VERSION=1.2.1
 ARG OPENGREP_VERSION=1.30.0
 RUN apk add --no-cache --virtual .python-build-deps \
         build-base python-3.15-dev=3.15.0-r0 \
